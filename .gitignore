@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+# Preprocessed assembler
+*.s
+
 # Object files
 *.o
 
