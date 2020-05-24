@@ -211,38 +211,35 @@ Please be aware that not all errors reported by PCMemTest are due to bad
 memory. The test implicitly tests the CPU, caches, and motherboard. It is
 impossible for the test to determine what causes the failure to occur. Most
 failures will be due to a problem with memory. When it is not, the only option
-is to replace parts until the failure is corrected. 
+is to replace parts until the failure is corrected.
 
 Once a memory error has been detected, determining the failing module is not a
 clear cut procedure. With the large number of motherboard vendors and possible
 combinations of memory slots it would be difficult if not impossible to assemble
 complete information about how a particular error would map to a failing memory
 module. However, there are steps that may be taken to determine the failing
-module. Here are three techniques that you may wish to use:
+module. Here are some techniques that you may wish to use:
 
-1) Removing modules
+* Removing modules
+  * This is the simplest method for isolating a failing modules, but may only
+    be employed when one or more modules can be removed from the system. By
+    selectively removing modules from the system and then running the test
+    you will be able to find the bad module(s). Be sure to note exactly which
+    modules are in the system when the test passes and when the test fails.
 
-This is the simplest method for isolating a failing modules, but may only
-be employed when one or more modules can be removed from the system. By
-selectively removing modules from the system and then running the test
-you will be able to find the bad module(s). Be sure to note exactly which
-modules are in the system when the test passes and when the test fails.
+* Rotating modules
+  * When none of the modules can be removed then you may wish to rotate modules
+    to find the failing one. This technique can only be used if there are three
+    or more modules in the system. Change the location of two modules at a time.
+    For example put the module from slot 1 into slot 2 and put the module from
+    slot 2 in slot 1. Run the test and if either the failing bit or address
+    changes then you know that the failing module is one of the ones just moved.
+    By using several combinations of module movement you should be able to
+    determine which module is failing.
 
-2) Rotating modules
-
-When none of the modules can be removed then you may wish to rotate modules
-to find the failing one. This technique can only be used if there are three
-or more modules in the system. Change the location of two modules at a time.
-For example put the module from slot 1 into slot 2 and put the module from
-slot 2 in slot 1. Run the test and if either the failing bit or address
-changes then you know that the failing module is one of the ones just moved.
-By using several combinations of module movement you should be able to
-determine which module is failing.
-
-3) Replacing modules
-
-If you are unable to use either of the previous techniques then you are
-left to selective replacement of modules to find the failure. 
+* Replacing modules
+  * If you are unable to use either of the previous techniques then you are
+    left to selective replacement of modules to find the failure.
 
 Sometimes memory errors show up due to component incompatibility. A memory
 module may work fine in one system and not in another. This is not uncommon
@@ -297,7 +294,7 @@ It should be obvious that this strategy requires an exact knowledge of how the
 memory cells are laid out on the chip. In addition there is a never ending
 number of possible chip layouts for different chip types and manufacturers
 making this strategy impractical. However, there are testing algorithms that
-can approximate this ideal strategy. 
+can approximate this ideal strategy.
 
 ## PCMemTest Test Algorithms
 
@@ -310,12 +307,12 @@ inversions. The moving inversion tests work as follows:
      1. check that the pattern has not changed
      2. write the pattern's complement
      3. increment the address
-     4. repeat 2.1 to 2.3
+     4. repeat 2.i to 2.iii
   3. Starting at the highest address
      1. check that the pattern has not changed
      2. write the pattern's complement
      3. decrement the address
-     4. repeat 3.1 - 3.3
+     4. repeat 3.i - 3.iii
 
 This algorithm is a good approximation of an ideal memory test but there are
 some limitations. Most high density chips today store data 4 to 16 bits wide.
@@ -335,12 +332,12 @@ caching or buffering. The algorithm works as follows:
   1. For starting offsets of 0 - 19 do
      1. write every 20th location with a pattern
      2. write all other locations with the pattern's complement
-     3. repeat 1.2 one or more times
+     3. repeat 1.ii one or more times
      4. check every 20th location for the pattern
 
 This algorithm accomplishes nearly the same level of adjacency testing as
 moving inversions but is not affected by caching or buffering. Since separate
-write passes (1.1, 1.2) and the read pass (1.4) are done for all of memory we
+write passes (1.i, 1.ii) and the read pass (1.iv) are done for all of memory we
 can be assured that all of the buffers and cache have been flushed between
 passes. The selection of 20 as the stride size was somewhat arbitrary. Larger
 strides may be more effective but would take longer to execute. The choice of
@@ -396,7 +393,7 @@ In each memory region in turn, and for each pattern in turn, uses the moving
 inversions algorithm with patterns of a random number and its complement. The
 random number is different on each test pass so multiple passes increase
 effectiveness.
-  
+
 ### Test 6 : Moving inversions, 32/64 bit pattern
 
 In each memory region in turn, and for each pattern in turn, uses the moving
