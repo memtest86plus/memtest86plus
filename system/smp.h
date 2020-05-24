@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: GPL-2.0
+#ifndef _SMP_H_
+#define _SMP_H_
+/*
+ * Provides support for multi-threaded operation.
+ *
+ * Copyright (C) 2020 Martin Whitaker.
+ */
+
+#include <stdint.h>
+
+#include "boot.h"
+
+#include "barrier.h"
+#include "spinlock.h"
+
+/*
+ * The maximum number of active physical CPUs. This only affects memory
+ * footprint, so can be increased if needed.
+ */
+#define MAX_PCPUS   (1 + MAX_APS)
+
+/*
+ * An error code returned by smp_start().
+ */
+typedef enum {
+    SMP_ERR_NONE                    = 0,
+    SMP_ERR_BOOT_TIMEOUT            = 1,
+    SMP_ERR_STARTUP_IPI_NOT_SENT    = 2,
+    SMP_ERR_STARTUP_IPI_ERROR       = 0x100 // error code will be added to this
+} smp_error_t;
+
+/*
+ * The number of available physical CPUs. Initially this is 1, but may
+ * increase after calling smp_init().
+ */
+extern int num_pcpus;
+
+/*
+ * Initialises the SMP state and detects the number of physical CPUs.
+ */
+void smp_init(void);
+
+/*
+ * Starts the selected APs.
+ */
+smp_error_t smp_start(bool enable_pcpu[MAX_PCPUS]);
+
+/*
+ * Signals that an AP has booted.
+ */
+void smp_set_ap_booted(int pcpu_num);
+
+/*
+ * Returns the ordinal number of the calling PCPU.
+ */
+int smp_my_pcpu_num(void);
+
+/*
+ * Allocates and initialises a barrier object in pinned memory.
+ */
+barrier_t *smp_alloc_barrier(int num_threads);
+
+/*
+ * Allocates and initialises a spinlock object in pinned memory.
+ */
+spinlock_t *smp_alloc_mutex();
+
+#endif /* _SMP_H_ */
