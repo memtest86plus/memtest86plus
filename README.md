@@ -10,18 +10,18 @@ protocol. It should work on any Pentium class or later CPU.
 
 ## Table of Contents
 
-  * [Origins]
-  * [Licensing]
-  * [Build and Installation]
-  * [Operation]
-  * [Error Display]
-  * [Trouble-shooting Memory Errors]
-  * [Execution Time]
-  * [Memory Testing Philosophy]
-  * [PCMemTest Test Algorithms]
-  * [Individual Test Descriptions]
-  * [Known Limitations and Bugs]
-  * [Acknowledgments]
+  * [Origins](#origins)
+  * [Licensing](#licensing)
+  * [Build and Installation](#build-and-installation)
+  * [Operation](#operation)
+  * [Error Display](#error-display)
+  * [Trouble-shooting Memory Errors](#trouble-shooting-memory-errors)
+  * [Execution Time](#execution-time)
+  * [Memory Testing Philosophy](#memory-testing-philosophy)
+  * [PCMemTest Test Algorithms](#pcmemtest-test-algorithms)
+  * [Individual Test Descriptions](#individual-test-descriptions)
+  * [Known Limitations and Bugs](#known-limitations-and-bugs)
+  * [Acknowledgments](#acknowledgments)
 
 ## Origins
 
@@ -307,15 +307,15 @@ inversions. The moving inversion tests work as follows:
 
   1. Fill memory with a pattern
   2. Starting at the lowest address
-    1. check that the pattern has not changed
-    2. write the pattern's complement
-    3. increment the address
-    4. repeat 2.1 to 2.3
+     1. check that the pattern has not changed
+     2. write the pattern's complement
+     3. increment the address
+     4. repeat 2.1 to 2.3
   3. Starting at the highest address
-    1. check that the pattern has not changed
-    2. write the pattern's complement
-    3. decrement the address
-    4. repeat 3.1 - 3.3
+     1. check that the pattern has not changed
+     2. write the pattern's complement
+     3. decrement the address
+     4. repeat 3.1 - 3.3
 
 This algorithm is a good approximation of an ideal memory test but there are
 some limitations. Most high density chips today store data 4 to 16 bits wide.
@@ -333,10 +333,10 @@ algorithm called Modulo-20 was created. This algorithm is not affected by
 caching or buffering. The algorithm works as follows:
 
   1. For starting offsets of 0 - 19 do
-    1. write every 20th location with a pattern
-    2. write all other locations with the pattern's complement
-    3. repeat 1.2 one or more times
-    4. check every 20th location for the pattern
+     1. write every 20th location with a pattern
+     2. write all other locations with the pattern's complement
+     3. repeat 1.2 one or more times
+     4. check every 20th location for the pattern
 
 This algorithm accomplishes nearly the same level of adjacency testing as
 moving inversions but is not affected by caching or buffering. Since separate
@@ -469,3 +469,6 @@ and assistance listed below:
  * Major enhancements to hardware detection and reporting in version 3.2, 3.3
    and 3.4 provided by Samuel Demeulemeester (from Memtest86+ v1.11, v1.60
    and v1.70).
+
+In addition, several bug fixes for Memtest86+ were imported from
+[anphsw/memtest86](https://github.com/anphsw/memtest86).
