@@ -7,8 +7,5 @@
 # Object files
 *.o
 
-# Linker scripts
-ldscript*
-
 # Binaries
 memtest*
