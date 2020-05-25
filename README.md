@@ -1,12 +1,12 @@
 # PCMemTest
 
-PCMemTest is a thorough, stand-alone memory test for Intel/AMD x86 architecture
-systems. BIOS based memory tests are only a quick check and often miss failures
-that are detected by PCMemTest.
+PCMemTest is a stand-alone memory tester for x86 and x86-64 architecture
+computers. It provides a more thorough memory check than that provided by
+BIOS memory tests.
 
 PCMemTest can be loaded and run either directly by a legacy PC BIOS or via an
 intermediate bootloader that supports the Linux 16-bit, 32-bit, or 64-bit boot
-protocol. It should work on any Pentium class or later CPU.
+protocol. It should work on any Pentium class or later 32-bit or 64-bit CPU.
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ In particular, no attempt is made to measure the cache and main memory speed,
 or to identify and report the DRAM type. This should allow PCMemTest to work
 without modification on future hardware.
 
-PCMemTest was based on the last public release of Memtest86+, v5.01.
+PCMemTest is based on the last public release of Memtest86+, v5.01.
 
 ## Licensing
 
