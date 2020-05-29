@@ -214,6 +214,8 @@ static void global_init(void)
 
 static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 {
+    vm_map_size = 0;
+
     // Reduce the window to fit in the user-specified limits.
     if (win_start < pm_limit_lower) {
         win_start = pm_limit_lower;
@@ -227,7 +229,6 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 
     // Now initialise the virtual memory map with the intersection
     // of the window and the physical memory segments.
-    vm_map_size = 0;
     for (int i = 0; i < pm_map_size; i++) {
         uintptr_t seg_start = pm_map[i].start;
         uintptr_t seg_end   = pm_map[i].end;
@@ -327,6 +328,9 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
 
         if (vm_map_size == 0) {
             // No memory to test in this window.
+            if (my_vcpu == master_vcpu) {
+                window_num++;
+            }
             continue;
         }
 
