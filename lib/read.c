@@ -22,7 +22,7 @@
 // Public Functions
 //------------------------------------------------------------------------------
 
-uintptr_t read_value(int row, int col, int field_width)
+uintptr_t read_value(int row, int col, int field_width, int shift)
 {
     char buffer[1 + field_width];
 
@@ -105,14 +105,13 @@ uintptr_t read_value(int row, int col, int field_width)
         }
     }
 
-    int shift = 0;
     if (got_suffix) {
         switch (buffer[n-1]) {
-          case 'T': /* tera */ shift = 40; n--; break;
-          case 'G': /* gig  */ shift = 30; n--; break;
-          case 'M': /* meg  */ shift = 20; n--; break;
-          case 'P': /* page */ shift = 12; n--; break;
-          case 'K': /* kilo */ shift = 10; n--; break;
+          case 'T': /* tera */ shift += 40; n--; break;
+          case 'G': /* gig  */ shift += 30; n--; break;
+          case 'M': /* meg  */ shift += 20; n--; break;
+          case 'P': /* page */ shift += 12; n--; break;
+          case 'K': /* kilo */ shift += 10; n--; break;
         }
     }
 
@@ -126,5 +125,5 @@ uintptr_t read_value(int row, int col, int field_width)
         }
     }
 
-    return value << shift;
+    return shift < 0 ? value >> shift : value << shift;
 }

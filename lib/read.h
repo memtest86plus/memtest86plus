@@ -13,10 +13,11 @@
  * Returns an unsigned numeric value entered on the keyboard. Echoes the
  * input to the display field located at (row,col), limiting it to field_width
  * characters. If the entered value is prefixed by "0x", assumes base 16,
- * otherwise assumes base 10. If the value is suffixed by 'K', 'P', 'M', or
- * 'G', the returned value will be scaled by 10^10, 10^12, 10^20, or 10^30
- * accordingly.
+ * otherwise assumes base 10. If the value is suffixed by 'K', 'P', 'M',
+ * 'G', or 'T', the returned value will be scaled by 2^10, 2^12, 2^20,
+ * 2^30, or 2^40 accordingly. The returned value will also be scaled by
+ * 2^shift.
  */
-uintptr_t read_value(int x, int y, int field_width);
+uintptr_t read_value(int x, int y, int field_width, int shift);
 
 #endif // READ_H

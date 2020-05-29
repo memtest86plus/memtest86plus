@@ -154,7 +154,7 @@ static bool add_or_remove_test(bool add)
 {
     
     display_input_message(POP_R+14, "Enter test #");
-    int n = read_value(POP_R+14, POP_C+2+12, 2);
+    int n = read_value(POP_R+14, POP_C+2+12, 2, 0);
     if (n < 0 || n >= NUM_TEST_PATTERNS) {
         display_error_message(POP_R+14, "Invalid test number");
         return false;
@@ -168,13 +168,13 @@ static bool add_or_remove_test(bool add)
 static bool add_test_range()
 {
     display_input_message(POP_R+14, "Enter first test #");
-    int n1 = read_value(POP_R+14, POP_C+2+18, 2);
+    int n1 = read_value(POP_R+14, POP_C+2+18, 2, 0);
     if (n1 < 0 || n1 >= NUM_TEST_PATTERNS) {
         display_error_message(POP_R+14, "Invalid test number");
         return false;
     }
     display_input_message(POP_R+14, "Enter last test #");
-    int n2 = read_value(POP_R+14, POP_C+2+17, 2);
+    int n2 = read_value(POP_R+14, POP_C+2+17, 2, 0);
     if (n2 < n1 || n2 >= NUM_TEST_PATTERNS) {
         display_error_message(POP_R+14, "Invalid test range");
         return false;
@@ -264,7 +264,7 @@ static void address_range_menu(void)
         switch (get_key()) {
           case '1': {
             display_input_message(POP_R+10, "Enter lower limit: ");
-            uintptr_t page = read_value(POP_R+10, POP_C+2+19, 15) >> PAGE_SHIFT;
+            uintptr_t page = read_value(POP_R+10, POP_C+2+19, 15, -PAGE_SHIFT);
             if (page < pm_limit_upper) {
                 clear_popup_row(POP_R+10);
                 pm_limit_lower = page;
@@ -275,7 +275,7 @@ static void address_range_menu(void)
           } break;
           case '2': {
             display_input_message(POP_R+10, "Enter upper limit: ");
-            uintptr_t page = read_value(POP_R+10, POP_C+2+19, 15) >> PAGE_SHIFT;
+            uintptr_t page = read_value(POP_R+10, POP_C+2+19, 15, -PAGE_SHIFT);
             if (page > pm_limit_lower) {
                 clear_popup_row(POP_R+10);
                 pm_limit_upper = page;
@@ -391,7 +391,7 @@ static bool add_or_remove_cpu(bool add)
 {
     
     display_input_message(POP_R+14, "Enter CPU #");
-    int n = read_value(POP_R+14, POP_C+2+11, 2);
+    int n = read_value(POP_R+14, POP_C+2+11, 2, 0);
     if (n < 1 || n >= num_pcpus) {
         display_error_message(POP_R+14, "Invalid CPU number");
         return false;
@@ -405,13 +405,13 @@ static bool add_or_remove_cpu(bool add)
 static bool add_cpu_range()
 {
     display_input_message(POP_R+14, "Enter first CPU #");
-    int n1 = read_value(POP_R+14, POP_C+2+17, 2);
+    int n1 = read_value(POP_R+14, POP_C+2+17, 2, 0);
     if (n1 < 1 || n1 >= num_pcpus) {
         display_error_message(POP_R+14, "Invalid CPU number");
         return false;
     }
     display_input_message(POP_R+14, "Enter last CPU #");
-    int n2 = read_value(POP_R+14, POP_C+2+16, 2);
+    int n2 = read_value(POP_R+14, POP_C+2+16, 2, 0);
     if (n2 < n1 || n2 >= num_pcpus) {
         display_error_message(POP_R+14, "Invalid CPU range");
         return false;
