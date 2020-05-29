@@ -26,9 +26,10 @@ uintptr_t read_value(int row, int col, int field_width)
 {
     char buffer[1 + field_width];
 
-    for (int i = 0; i <= field_width; i++ ) {
+    for (int i = 0; i < field_width; i++ ) {
         buffer[i] = ' ';
     }
+    buffer[field_width] = '\0';
 
     int n = 0;
     int base = 10;
@@ -92,7 +93,7 @@ uintptr_t read_value(int row, int col, int field_width)
             usleep(1000);
             break;
         }
-        if (buffer[n] != ' ') {
+        if (n < field_width && buffer[n] != ' ') {
             n++;
         }
         prints(row, col, buffer);
