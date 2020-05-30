@@ -120,7 +120,6 @@ static void run_at(uintptr_t addr, int my_pcpu)
     uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
 
     if (my_pcpu == 0) {
-        map_window(0x80000); // TODO: Why is this necessary?
         memmove((void *)addr, &_start, _end - _start);
     }
     BARRIER;
