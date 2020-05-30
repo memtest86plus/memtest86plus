@@ -127,6 +127,12 @@ flush:	movw	$KERNEL_DS, %ax
 
 	call	reloc
 
+	# Disable paging (needed during restart).
+
+	movl	%cr0, %eax
+	andl	$0x7fffffff, %eax
+	movl	%eax, %cr0
+
 	# Enable PAE if supported.
 
 	movl	%ebx, %edi		# ebx is overwritten by cpuid
@@ -155,7 +161,7 @@ flush:	movw	$KERNEL_DS, %ax
 	andl	$0x20000000, %edx
 	jz	0f			# bail if not supported
 
-	movl	$0xc0000080, %ecx	# enable long mode.
+	movl	$0xc0000080, %ecx	# enable long mode
 	rdmsr
 	orl	$0x00000100, %eax
 	wrmsr
