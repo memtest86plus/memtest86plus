@@ -49,6 +49,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include <stdint.h>
+
 extern uint8_t	_start[];
 
 extern uint8_t	startup[];
