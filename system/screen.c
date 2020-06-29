@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "boot.h"
+#include "bootparams.h"
 
 #include "font.h"
 #include "vmem.h"
@@ -12,62 +13,8 @@
 #include "screen.h"
 
 //------------------------------------------------------------------------------
-// Constants
-//------------------------------------------------------------------------------
-
-// screen_info.orig_video_isVGA values.
-
-#define VIDEO_TYPE_VLFB             0x23    // VESA VGA in graphic mode
-#define VIDEO_TYPE_EFI              0x70    // EFI graphic mode
-
-// screen_info.capabilities values.
-
-#define LFB_CAPABILITY_64BIT_BASE   (1 << 1)
-
-//------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
-
-// The following definition must match the Linux screen_info struct.
-
-typedef struct {
-    uint8_t 	orig_x;
-    uint8_t  	orig_y;
-    uint16_t 	ext_mem_k;
-    uint16_t 	orig_video_page;
-    uint8_t  	orig_video_mode;
-    uint8_t  	orig_video_cols;
-    uint8_t  	flags;
-    uint8_t  	unused2;
-    uint16_t 	orig_video_ega_bx;
-    uint16_t 	unused3;
-    uint8_t  	orig_video_lines;
-    uint8_t  	orig_video_isVGA;
-    uint16_t 	orig_video_points;
-
-    uint16_t 	lfb_width;
-    uint16_t 	lfb_height;
-    uint16_t 	lfb_depth;
-    uint32_t 	lfb_base;
-    uint32_t 	lfb_size;
-    uint16_t 	cl_magic, cl_offset;
-    uint16_t 	lfb_linelength;
-    uint8_t  	red_size;
-    uint8_t  	red_pos;
-    uint8_t  	green_size;
-    uint8_t  	green_pos;
-    uint8_t  	blue_size;
-    uint8_t  	blue_pos;
-    uint8_t  	rsvd_size;
-    uint8_t  	rsvd_pos;
-    uint16_t 	vesapm_seg;
-    uint16_t 	vesapm_off;
-    uint16_t 	pages;
-    uint16_t 	vesa_attributes;
-    uint32_t 	capabilities;
-    uint32_t 	ext_lfb_base;
-    uint8_t  	_reserved[2];
-} __attribute__((packed)) screen_info_t;
 
 typedef struct {
     uint8_t     r;
@@ -206,7 +153,9 @@ static void put_value(int row, int col, uint16_t value)
 
 void screen_init(void)
 {
-    const screen_info_t *screen_info = (screen_info_t *)boot_params_addr;
+    const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
+
+    const screen_info_t *screen_info = &boot_params->screen_info;
 
     bool use_lfb = screen_info->orig_video_isVGA == VIDEO_TYPE_VLFB
                 || screen_info->orig_video_isVGA == VIDEO_TYPE_EFI;

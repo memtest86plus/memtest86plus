@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "boot.h"
+#include "bootparams.h"
 
 #include "memsize.h"
 
@@ -27,28 +28,6 @@
 
 #define RES_START   0x0a0000
 #define RES_END     0x100000
-
-//------------------------------------------------------------------------------
-// Types
-//------------------------------------------------------------------------------
-
-// The following definition must match the Linux e820_type enum.
-
-typedef enum {
-    E820_NONE       = 0,
-    E820_RAM        = 1,
-    E820_RESERVED   = 2,
-    E820_ACPI       = 3,    // usable as RAM once ACPI tables have been read
-    E820_NVS        = 4
-} e820_type_t;
-
-// The following definition must match the Linux e820_entry struct.
-
-typedef struct {
-    uint64_t        addr;
-    uint64_t        size;
-    uint32_t        type;
-} __attribute__((packed)) e820_entry_t;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -277,12 +256,10 @@ void pmem_init(void)
     e820_entry_t sanitized_map[E820_MAP_SIZE];
 
     num_pm_pages = 0;
-    
-    const e820_entry_t *e820_map = (e820_entry_t *)(boot_params_addr + E820_MAP);
 
-    int e820_entries = *(uint8_t *)(boot_params_addr + E820_ENTRIES);
+    const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 
-    int sanitized_entries = sanitize_e820_map(sanitized_map, e820_map, e820_entries);
+    int sanitized_entries = sanitize_e820_map(sanitized_map, boot_params->e820_map, boot_params->e820_entries);
 
     init_pm_map(sanitized_map, sanitized_entries);
     sort_pm_map();

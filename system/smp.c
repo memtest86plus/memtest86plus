@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "boot.h"
+#include "bootparams.h"
 
 #include "memsize.h"
 #include "pmem.h"
@@ -112,11 +113,6 @@
 
 #define MADT_PF_ENABLED             0x1
 #define MADT_PF_ONLINE_CAPABLE      0x2
-
-// Linux EFI loader signatures
-
-#define EL32Signature   ('E' | ('L' << 8) | ('3' << 16) | ('2' << 24))
-#define EL64Signature   ('E' | ('L' << 8) | ('6' << 16) | ('4' << 24))
 
 // Private memory heap used for AP trampoline and synchronisation objects
 
@@ -287,19 +283,6 @@ typedef struct {
     efi_guid_t  guid;  
     uint64_t    table; 
 } efi64_config_table_t;   
-
-// The following definition must match the Linux efi_info struct.
-
-typedef struct {
-    uint32_t    loader_signature;
-    uint32_t    sys_tab;
-    uint32_t    mem_desc_size;
-    uint32_t    mem_desc_version;
-    uint32_t    mem_map;
-    uint32_t    mem_map_size;
-    uint32_t    sys_tab_hi;
-    uint32_t    mem_map_hi;
-} efi_info_t;
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -574,16 +557,18 @@ static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_tabl
 
 static bool find_cpus_in_rsdp(void)
 {
-    efi_info_t *efi_info = (efi_info_t *)(boot_params_addr + 0x1c0);
+    const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
+
+    const efi_info_t *efi_info = &boot_params->efi_info;
 
     // Search for the RSDP
     rsdp_t *rp = NULL;
-    if (efi_info->loader_signature == EL32Signature) {
+    if (efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab;
         rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
     }
 #ifdef __x86_64__
-    if (efi_info->loader_signature == EL64Signature) {
+    if (efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
         rp = find_rsdp_in_efi64_system_table((efi64_system_table_t *)system_table_addr);
     }
