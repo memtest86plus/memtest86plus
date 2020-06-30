@@ -17,6 +17,7 @@
 
 #include "boot.h"
 #include "bootparams.h"
+#include "efi.h"
 
 #include "memsize.h"
 #include "pmem.h"
@@ -224,65 +225,6 @@ typedef struct {
     uint8_t     apic_id;
     uint32_t    flags;
 } madt_processor_entry_t;
-
-typedef struct {
-    uint32_t    a;
-    uint16_t    b;
-    uint16_t    c;
-    uint8_t     d[8];
-} efi_guid_t;
-
-typedef struct {
-    uint64_t    signature; 
-    uint32_t    revision;
-    uint32_t    header_size;
-    uint32_t    crc32;
-    uint32_t    reserved;
-} efi_table_header_t;
-
-typedef struct {
-    efi_table_header_t  header;
-    uint32_t    fw_vendor;
-    uint32_t    fw_revision;
-    uint32_t    con_in_handle;
-    uint32_t    con_in;
-    uint32_t    con_out_handle;
-    uint32_t    con_out;
-    uint32_t    std_err_handle;
-    uint32_t    std_err;
-    uint32_t    runtime_services;
-    uint32_t    boot_services;
-    uint32_t    num_config_tables;
-    uint32_t    config_tables;
-} efi32_system_table_t;
-
-typedef struct {
-    efi_table_header_t  header;
-    uint64_t    fw_vendor;
-    uint32_t    fw_revision;
-    uint32_t    unused1;
-    uint64_t    con_in_handle;
-    uint64_t    con_in;
-    uint64_t    con_out_handle;
-    uint64_t    con_out;
-    uint64_t    std_err_handle;
-    uint64_t    std_err;
-    uint64_t    runtime_services;
-    uint64_t    boot_services;
-    uint32_t    num_config_tables;
-    uint32_t    unused2;
-    uint64_t    config_tables;
-} efi64_system_table_t;
-
-typedef struct {
-    efi_guid_t  guid;
-    uint32_t    table;  
-} efi32_config_table_t;
-
-typedef struct {
-    efi_guid_t  guid;  
-    uint64_t    table; 
-} efi64_config_table_t;   
 
 //------------------------------------------------------------------------------
 // Private Variables
