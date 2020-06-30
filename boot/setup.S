@@ -74,8 +74,8 @@ relocatable_kernel:
 min_alignment:
 	.byte	0
 xload_flags:
-#ifdef __X86_64__
-	.word	1		# XLF_KERNEL_64
+#ifdef __x86_64__
+	.word	0x9		# XLF_KERNEL_64,XLF_EFI_HANDOVER_64
 #else
 	.word	0
 #endif
@@ -96,7 +96,7 @@ pref_address:
 init_size:
 	.long	_initsize
 handover_offset:
-	.long	0
+	.long	0x10
 
 do_setup:
 	# Reload the segment registers, except for the stack.

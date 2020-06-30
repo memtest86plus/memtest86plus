@@ -101,11 +101,11 @@ startup32:
 	movl	%eax, -6(%esp)
 	ljmp	*-6(%esp)
 
-	.org	0x200
 	.code64
 
 # The Linux 64-bit boot entry point.
 
+	.org	0x200
 	.globl	startup64
 startup64:
 	cld
@@ -114,6 +114,20 @@ startup64:
 	# Save the boot params pointer.
 
 	movq	%rsi, boot_params_addr(%rip)
+
+	jmp	startup
+
+# The Linux 64-bit EFI handover point.
+
+	.org	0x210
+	.globl	efi_handover
+efi_handover:
+	andq	$~0xf, %rsp
+	call	efi_main
+
+	# Save the boot params pointer.
+
+	movq	%rax, boot_params_addr(%rip)
 
 # The 64-bit entry point for AP boot and for restart after relocation.
 

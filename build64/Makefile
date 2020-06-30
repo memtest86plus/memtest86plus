@@ -44,7 +44,7 @@ APP_OBJS = app/badram.o \
            app/interrupt.o \
            app/main.o
 
-OBJS = boot/startup.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/startup.o boot/efiboot.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
 all: memtest.bin
 
@@ -63,6 +63,10 @@ boot/startup.s: ../boot/startup64.S ../boot/boot.h
 boot/%.s: ../boot/%.S ../boot/boot.h
 	@mkdir -p boot
 	$(CC) -E -traditional -I../boot -o $@ $<
+
+boot/efiboot.o: ../boot/efiboot.c
+	@mkdir -p boot
+	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/reloc.o: ../system/reloc64.c
 	@mkdir -p system
