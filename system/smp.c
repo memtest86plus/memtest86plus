@@ -117,9 +117,9 @@
 
 // Private memory heap used for AP trampoline and synchronisation objects
 
-#define HEAP_BASE_ADDR              (smp_page << PAGE_SHIFT)
+#define HEAP_BASE_ADDR              (smp_heap_page << PAGE_SHIFT)
 
-#define AP_TRAMPOLINE_PAGE          (smp_page)
+#define AP_TRAMPOLINE_PAGE          (smp_heap_page)
 
 //------------------------------------------------------------------------------
 // Types
@@ -241,7 +241,7 @@ static uint8_t          pcpu_num_to_apic_id[MAX_PCPUS];
 
 static volatile bool    cpu_started[MAX_PCPUS];
 
-static uintptr_t        smp_page = 0;
+static uintptr_t        smp_heap_page = 0;
 
 static uintptr_t        alloc_addr = 0;
 
@@ -652,7 +652,7 @@ void smp_init(void)
 
     // Reserve last page of first segment for AP trampoline and sync objects.
     // These need to remain pinned in place during relocation.
-    smp_page = --pm_map[0].end;
+    smp_heap_page = --pm_map[0].end;
 
     ap_startup_addr = (uintptr_t)startup;
 

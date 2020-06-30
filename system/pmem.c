@@ -26,8 +26,8 @@
 
 // The reserved memory starting at 640KB.
 
-#define RES_START   0x0a0000
-#define RES_END     0x100000
+#define RESERVED_MEM_START  0x0a0000
+#define RESERVED_MEM_END    0x100000
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -202,14 +202,14 @@ static void init_pm_map(const e820_entry_t e820_map[], int e820_entries)
             uint64_t end   = start + e820_map[i].size;
 
             // Don't ever use memory between 640KB and 1024KB
-            if (start > RES_START && start < RES_END) {
-                if (end < RES_END) {
+            if (start > RESERVED_MEM_START && start < RESERVED_MEM_END) {
+                if (end < RESERVED_MEM_END) {
                     continue;
                 }
-                start = RES_END;
+                start = RESERVED_MEM_END;
             }
-            if (end > RES_START && end < RES_END) {
-                end = RES_START;
+            if (end > RESERVED_MEM_START && end < RESERVED_MEM_END) {
+                end = RESERVED_MEM_START;
             }
 
             pm_map[pm_map_size].start = (start + PAGE_SIZE - 1) >> PAGE_SHIFT;
