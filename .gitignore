@@ -8,4 +8,9 @@
 *.o
 
 # Binaries
-memtest*
+memtest_shared
+memtest_shared.bin
+*.bin
+*.efi
+*.img
+*.iso
