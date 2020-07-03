@@ -94,7 +94,7 @@ setup_data:
 pref_address:
 	.quad	HIGH_LOAD_ADDR
 init_size:
-	.long	_initsize
+	.long	_init_size
 handover_offset:
 	.long	0x10
 

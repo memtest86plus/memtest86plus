@@ -357,7 +357,7 @@ setup_sects:
 root_flags:
 	.word	0
 sys_size:
-	.long	_syssize
+	.long	_sys_size
 ram_size:
 	.word	0
 vid_mode:
