@@ -29,7 +29,7 @@
 static efi_guid_t EFI_CONSOLE_OUT_DEVICE_GUID         = { 0xd3b36f2c, 0xd551, 0x11d4, {0x9a, 0x46, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d} };
 static efi_guid_t EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID   = { 0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a} };
 
-static efi_system_table_t *sys_table;
+static efi_system_table_t *sys_table = NULL;
 
 //------------------------------------------------------------------------------
 // Macro Functions
@@ -476,34 +476,7 @@ static void set_e820_map(boot_params_t *params)
 // Public Functions
 //------------------------------------------------------------------------------
 
-void efi_handover(efi_handle_t handle, efi_system_table_t *sys_table, boot_params_t *boot_params) __attribute__((noreturn));
-
-efi_status_t efiapi efi_pe_entry(efi_handle_t handle, efi_system_table_t *sys_table_arg)
-{
-    // Check if we were booted by the EFI firmware.
-    if (sys_table->header.signature != EFI_SYSTEM_TABLE_SIGNATURE) {
-        print_string("bad system table signature\n");
-        return EFI_INVALID_PARAMETER;
-    }
-
-    sys_table = sys_table_arg;
-
-    boot_params_t *boot_params = NULL;
-    efi_status_t status = alloc_low_memory((void **)&boot_params, sizeof(boot_params_t), 0);
-    if (status != EFI_SUCCESS) {
-        print_string("failed to allocate low memory for boot params\n");
-        return status;
-    }
-
-    memset(boot_params, 0, sizeof(boot_params_t));
-
-    efi_handover(handle, sys_table, boot_params);
-    // should never return
-
-    return EFI_ABORTED;
-}
-
-boot_params_t *efi_main(efi_handle_t handle, efi_system_table_t *sys_table_arg, boot_params_t *boot_params)
+boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg, boot_params_t *boot_params)
 {
     efi_status_t status;
 
@@ -511,6 +484,15 @@ boot_params_t *efi_main(efi_handle_t handle, efi_system_table_t *sys_table_arg, 
     if (sys_table->header.signature != EFI_SYSTEM_TABLE_SIGNATURE) {
         print_string("bad system table signature\n");
         goto fail;
+    }
+
+    if (boot_params == NULL) {
+        status = alloc_low_memory((void **)&boot_params, sizeof(boot_params_t), 0);
+        if (status != EFI_SUCCESS) {
+            print_string("failed to allocate low memory for boot params\n");
+            goto fail;
+        }
+        memset(boot_params, 0, sizeof(boot_params_t));
     }
 
     status = set_screen_info(boot_params);
@@ -530,7 +512,7 @@ boot_params_t *efi_main(efi_handle_t handle, efi_system_table_t *sys_table_arg, 
     return boot_params;
 
 fail:
-    print_string("efi_main() failed\n");
+    print_string("efi_setup() failed\n");
 
     while (1) {
         __asm__("hlt");

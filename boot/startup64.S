@@ -3,8 +3,8 @@
 // startup64.S contains the 64-bit startup code for both the BSP and APs.
 // It initialises stacks, memory management, and exception handling, clears
 // the BSS, completes relocation, and finally calls the main application.
-// It supports both the 32-bit and 64-bit Linux boot protocols for the first
-// boot of the BSP.
+// It supports both the 32-bit and 64-bit Linux boot protocols and EFI boot
+// for the first boot of the BSP.
 //
 // Copyright (C) 2020 Martin Whitaker.
 //
@@ -103,6 +103,16 @@ startup32:
 
 	.code64
 
+# The EFI PE32+ boot entry point.
+
+	.org	0x100
+	.globl	efi_boot
+efi_boot:
+	movq	%rcx, %rdi		# the EFI image handle
+	movq	%rdx, %rsi		# the EFI system table pointer
+	movq	$0, %rdx		# the boot params pointer (0 = not yet allocated)
+	jmp	efi_handover
+
 # The Linux 64-bit boot entry point.
 
 	.org	0x200
@@ -123,7 +133,7 @@ startup64:
 	.globl	efi_handover
 efi_handover:
 	andq	$~0xf, %rsp
-	call	efi_main
+	call	efi_setup
 
 	# Save the boot params pointer.
 
