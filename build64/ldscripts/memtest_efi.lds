@@ -21,5 +21,5 @@ SECTIONS {
 	_text_size = (_text_end  - _text_start);
 
 	_sys_size  = _text_size >> 4;
-	_init_size = _text_size;
+	_init_size = _text_size + _bss_size;
 }

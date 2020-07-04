@@ -100,10 +100,12 @@ memtest_shared.bin: memtest_shared
 	objcopy -O binary $< memtest_shared.bin
 
 memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
-	$(LD) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
+	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
 
 memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi.lds
-	$(LD) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
+	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
 
 memtest.img: memtest.bin
 	dd if=/dev/zero of=memtest.img bs=1474560 count=1
