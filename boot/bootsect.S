@@ -30,7 +30,7 @@
 boot:
 	# Initialise the segment registers and the stack.
 
-	ljmp	$BOOT_SEG, $(init - boot)
+	ljmp	$BOOT_SEG, $init
 init:
 	movw	%cs, %ax
 	movw	%ax, %ds
@@ -123,7 +123,7 @@ load_setup_done:
 	movb	$0x09, %cl
 
 got_sectors:
-	movw	%cx, %cs:sectors - boot
+	movw	%cx, %cs:sectors
 	movw	$BOOT_SEG, %ax
 	movw	%ax, %es
 
@@ -150,7 +150,7 @@ got_sectors:
 
 	# Fix up the Linux boot header to indicate we've loaded into low memory.
 
-	leaw	code32_start - boot, %di
+	leaw	code32_start, %di
 	movl	$LOW_LOAD_ADDR, (%di)
 
 	# After that (everything loaded), we jump to the setup code loaded
@@ -177,12 +177,12 @@ die:
 rp_read:
 	movw	%es, %ax
 	subw	$MAIN_SEG, %ax		# have we loaded all yet?
-	cmpw	sys_size - boot, %ax
+	cmpw	sys_size, %ax
 	jbe	ok1_read
 	ret
 ok1_read:
-	movw	%cs:sectors - boot, %ax
-	subw	sread - boot, %ax
+	movw	%cs:sectors, %ax
+	subw	sread, %ax
 	movw	%ax, %cx
 	shlw	$9, %cx
 	addw	%bx, %cx
@@ -194,18 +194,18 @@ ok1_read:
 ok2_read:
 	call	read_track
 	movw	%ax, %cx
-	add	sread - boot, %ax
-	cmpw	%cs:sectors - boot, %ax
+	add	sread, %ax
+	cmpw	%cs:sectors, %ax
 	jne	ok3_read
 	movw	$1, %ax
-	subw	head - boot, %ax
+	subw	head, %ax
 	jne	ok4_read
-	incw	track - boot
+	incw	track
 ok4_read:
-	movw	%ax, head - boot
+	movw	%ax, head
 	xorw	%ax, %ax
 ok3_read:
-	movw	%ax, sread - boot
+	movw	%ax, sread
 	shlw	$9, %cx
 	addw	%cx, %bx
 	jnc	rp_read
@@ -223,11 +223,11 @@ read_track:
 	int	$0x10
 	popa
 
-	movw	track - boot, %dx
-	movw	sread - boot, %cx
+	movw	track, %dx
+	movw	sread, %cx
 	incw	%cx
 	movb	%dl, %ch
-	movw	head - boot, %dx
+	movw	head, %dx
 	movb	%dl, %dh
 	andw	$0x0100, %dx
 	movb	$2, %ah
