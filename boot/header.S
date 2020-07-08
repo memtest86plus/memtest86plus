@@ -124,7 +124,7 @@ optional_header:
 	.long	0				# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
-	.long	BASE_OF_CODE + 0x100		# AddressOfEntryPoint
+	.long	BASE_OF_CODE + 0x1e0		# AddressOfEntryPoint
 
 	.long	BASE_OF_CODE			# BaseOfCode
 #ifndef __x86_64__

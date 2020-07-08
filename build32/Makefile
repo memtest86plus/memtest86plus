@@ -45,10 +45,11 @@ APP_OBJS = app/badram.o \
            app/interrupt.o \
            app/main.o
 
-OBJS = boot/startup.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
-all: memtest.bin
+all: memtest.bin memtest.efi
 
+-include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
 -include $(subst .o,.d,$(LIB_OBJS))
 -include $(subst .o,.d,$(TST_OBJS))
@@ -64,6 +65,10 @@ boot/startup.s: ../boot/startup32.S ../boot/boot.h
 boot/%.s: ../boot/%.S ../boot/boot.h
 	@mkdir -p boot
 	$(CC) -m32 -E -traditional -I../boot -o $@ $<
+
+boot/efisetup.o: ../boot/efisetup.c
+	@mkdir -p boot
+	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/reloc.o: ../system/reloc32.c
 	@mkdir -p system
@@ -96,16 +101,31 @@ memtest_shared.bin: memtest_shared
 	objcopy -O binary $< memtest_shared.bin
 
 memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
-	$(LD) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
+	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
 
-memtest.img: memtest.bin
-	dd if=/dev/zero of=memtest.img bs=1474560 count=1
-	dd if=memtest.bin of=memtest.img bs=1474560 conv=notrunc
+memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi.lds
+	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
 
-iso: memtest.img
+floppy.img: memtest.bin
+	dd if=/dev/zero of=floppy.img bs=1474560 count=1
+	dd if=memtest.bin of=floppy.img bs=1474560 conv=notrunc
+
+esp.img: memtest.efi
+	@mkdir -p iso/EFI/BOOT
+	cp memtest.efi iso/EFI/BOOT/bootia32.efi
+	@rm -f esp.img
+	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
+	mcopy -s -i esp.img iso/EFI ::
+
+iso: floppy.img esp.img
 	@mkdir -p iso/boot
-	genisoimage -b memtest.img -c boot/boot.catalog -V "PCMemTest-32" -o memtest.iso iso memtest.img
-	@rm -rf iso
+	cp floppy.img iso/boot/floppy.img
+	xorrisofs -pad -R -J -volid PCMemTest32 -graft-points -hide-rr-moved \
+		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
+		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
+		  -o ./memtest.iso /boot=./iso/boot
 
 clean:
-	rm -rf boot system lib tests app *.iso memtest* iso
+	rm -rf boot system lib tests app *.img *.iso memtest* iso

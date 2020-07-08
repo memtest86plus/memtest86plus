@@ -105,7 +105,7 @@ startup32:
 
 # The EFI PE32+ boot entry point.
 
-	.org	0x100
+	.org	0x1e0
 	.globl	efi_boot
 efi_boot:
 	movq	%rcx, %rdi		# the EFI image handle

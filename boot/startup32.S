@@ -3,7 +3,8 @@
 // startup32.S contains the 32-bit startup code for both the BSP and APs.
 // It initialises stacks, memory management, and exception handling, clears
 // the BSS, completes relocation, and finally calls the main application.
-// It supports the 32-bit Linux boot protocol for the first boot of the BSP.
+// It supports the 32-bit Linux boot protocol and EFI boot for the first
+// boot of the BSP.
 //
 // Copyright (C) 2020 Martin Whitaker.
 //
@@ -30,6 +31,40 @@
 startup32:
 	cld
 	cli
+	jmp	startup
+
+# The Linux 32-bit EFI handover point.
+
+	.org	0x10
+	.globl	efi_handover
+efi_handover:
+	popl	%eax			# the return address (discard)
+	popl	%ecx			# the EFI image handle
+	popl	%edx			# the EFI system table pointer
+	popl	%esi			# the boot params pointer
+
+	# Load the GOT pointer.
+
+	call	0f
+0:	popl	%ebx
+	addl	$_GLOBAL_OFFSET_TABLE_+[.-0b], %ebx
+
+	# Fill out the boot params structure.
+
+	subl	$12, %esp		# align the stack
+	andl	$~0xf, %esp
+	addl	$12, %esp
+
+	pushl	%esi			# the boot params pointer
+	pushl	%edx			# the EFI system table pointer
+	pushl	%ecx			# the EFI image handle
+
+	call	efi_setup
+
+	# Fall though to the shared 32-bit entry point with the boot
+	# params pointer in %esi.
+
+	movl	%eax, %esi
 
 # The 32-bit entry point for AP boot and for restart after relocation.
 
@@ -127,10 +162,11 @@ flush:	movw	$KERNEL_DS, %ax
 
 	call	reloc
 
-	# Disable paging (needed during restart).
+	# Disable paging (needed during restart). Also disable write protect
+	# (in case set by EFI boot).
 
 	movl	%cr0, %eax
-	andl	$0x7fffffff, %eax
+	andl	$0x7ffeffff, %eax
 	movl	%eax, %cr0
 
 	# Enable PAE if supported.
@@ -189,6 +225,21 @@ flush:	movw	$KERNEL_DS, %ax
 0:	pushl	$0	# error code
 	pushl	$257	# vector
 	jmp	int_handler
+
+# The EFI PE32 boot entry point.
+
+	.org	0x1e0
+	.globl	efi_boot
+efi_boot:
+	popl	%eax			# the return address (discard)
+	popl	%ecx			# the EFI image handle
+	popl	%edx			# the EFI system table pointer
+
+	pushl	$0			# the boot params pointer (0 = not yet allocated)
+	pushl	%edx			# the EFI system table pointer
+	pushl	%ecx			# the EFI image handle
+
+	call	efi_handover		# never returns
 
 # Individual interrupt vector handlers. These need to be spaced equally, to
 # allow the IDT initialisation loop above to work, so we use noops to pad out

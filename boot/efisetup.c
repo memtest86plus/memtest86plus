@@ -206,7 +206,7 @@ static efi_status_t alloc_low_memory(void **ptr, size_t size, efi_phys_addr_t mi
 
         status = efi_call_bs(allocate_pages, EFI_ALLOCATE_ADDRESS, EFI_LOADER_DATA, num_pages, &start);
         if (status == EFI_SUCCESS) {
-            *ptr = (void *)start;
+            *ptr = (void *)(uintptr_t)start;
             efi_call_bs(free_pool, mem_map);
             return EFI_SUCCESS;
         }

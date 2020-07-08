@@ -77,7 +77,7 @@ xload_flags:
 #ifdef __x86_64__
 	.word	0x9		# XLF_KERNEL_64,XLF_EFI_HANDOVER_64
 #else
-	.word	0
+	.word	0x4		# XLF_EFI_HANDOVER_32
 #endif
 cmd_line_size:
 	.long	255
