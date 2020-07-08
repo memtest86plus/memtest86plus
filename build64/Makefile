@@ -107,17 +107,24 @@ memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi
 	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
 
-memtest.img: memtest.bin
-	dd if=/dev/zero of=memtest.img bs=1474560 count=1
-	dd if=memtest.bin of=memtest.img bs=1474560 conv=notrunc
+floppy.img: memtest.bin
+	dd if=/dev/zero of=floppy.img bs=1474560 count=1
+	dd if=memtest.bin of=floppy.img bs=1474560 conv=notrunc
 
-iso: memtest.img memtest.efi
-	@mkdir -p iso/boot iso/EFI/BOOT
-	cp memtest.img iso/boot/memtest.img
+esp.img: memtest.efi
+	@mkdir -p iso/EFI/BOOT
 	cp memtest.efi iso/EFI/BOOT/bootx64.efi
+	@rm -f esp.img
+	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
+	mcopy -s -i esp.img iso/EFI ::
+
+iso: floppy.img esp.img
+	@mkdir -p iso/boot
+	cp floppy.img iso/boot/floppy.img
 	xorrisofs -pad -R -J -volid PCMemTest64 -graft-points -hide-rr-moved \
-		  -b /boot/memtest.img --efi-boot /EFI/BOOT/bootx64.efi \
-		  -o ./memtest.iso /boot=./iso/boot /EFI=./iso/EFI
+		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
+		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
+		  -o ./memtest.iso /boot=./iso/boot
 
 clean:
-	rm -rf boot system lib tests app *.iso memtest* iso
+	rm -rf boot system lib tests app *.img *.iso memtest* iso
