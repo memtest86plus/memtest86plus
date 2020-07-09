@@ -4,9 +4,10 @@ PCMemTest is a stand-alone memory tester for x86 and x86-64 architecture
 computers. It provides a more thorough memory check than that provided by
 BIOS memory tests.
 
-PCMemTest can be loaded and run either directly by a legacy PC BIOS or via an
-intermediate bootloader that supports the Linux 16-bit, 32-bit, or 64-bit boot
-protocol. It should work on any Pentium class or later 32-bit or 64-bit CPU.
+PCMemTest can be loaded and run either directly by a PC BIOS (legacy or UEFI)
+or via an intermediate bootloader that supports the Linux 16-bit, 32-bit,
+64-bit, or EFI handover boot protocol. It should work on any Pentium class or
+later 32-bit or 64-bit CPU.
 
 ## Table of Contents
 
@@ -54,22 +55,30 @@ using the GNU toolchain and the ELF file format. The tools required are:
   * GCC
   * binutils
   * make
-  * genisoimage (optional)
+  * dosfstools and mtools (optional)
+  * xorrisofs (optional)
 
-To build a 32-bit image that can be booted by an intermediate bootloader,
-change directory into the `build32` directory and type `make`. The result
-is a `memtest.bin` binary image file which can be booted using either the
-16-bit or 32-bit Linux boot protocols.
+To build a 32-bit image, change directory into the `build32` directory and
+type `make`. The result is a `memtest.bin` binary image file which can be
+booted directly by a legacy BIOS (in floppy mode) or by an intermediate
+bootloader using the Linux 16-bit boot protocol and a `memtest.efi` binary
+image file which can be booted directly by a 32-bit UEFI BIOS. Either image
+can be booted by an intermediate bootloader using the Linux 32-bit or 32-bit
+EFI handover boot protocols. 
 
-To build a 64-bit image that can be booted by an intermediate bootloader,
-change directory into the `build64` directory and type `make`. The result
-is a `memtest.bin` binary image file which can be booted using any of the
-16-bit, 32-bit, or 64-bit Linux boot protocols.
+To build a 64-bit image, change directory into the `build64` directory and
+type `make`. The result is a `memtest.bin` binary image file which can be
+booted directly by a legacy BIOS (in floppy mode) or by an intermediate
+bootloader using the Linux 16-bit boot protocol and a `memtest.efi` binary
+image file which can be booted directly by a 64-bit UEFI BIOS. Either image
+can be booted by an intermediate bootloader using the Linux 32-bit, 64-bit,
+or 64-bit EFI handover boot protocols.
 
 In either case, to build an ISO image that can be used to create a bootable
 CD, DVD, or USB Flash drive, type `make iso`, The result is a `memtest.iso`
 ISO image file. This can then be written directly to a blank CD or DVD, or
-to a USB Flash drive, which can then be booted directly by a legacy PC BIOS.
+to a USB Flash drive, which can then be booted directly by a legacy or UEFI
+PC BIOS.
 
 Note that when writing to a USB Flash drive, the ISO image must be written
 directly ('dumped') to the raw device, either by using the `dd` command or
@@ -436,7 +445,7 @@ of all zeros and all ones.
 
 ## Known Limitations and Bugs
 
-  * When booted on a UEFI system, keyboard input will only be seem if the
+  * When booted on a UEFI system, keyboard input will only be seen if the
     CSM is enabled in the BIOS. Without this, the test will run, but you
     will be unable to alter the configuration.
   * Temperature reporting is currently only supported for Intel CPUs.
@@ -451,7 +460,7 @@ and assistance listed below:
    build.c are from the Linux 1.2.1 kernel and have been heavily modified.
 
  * Doug Sisk provided code to support a console connected via a serial port.
-  (not used by PCMemTest)
+   (not used by PCMemTest)
 
  * Code to create BadRAM patterns was provided by Rick van Rein.
 
