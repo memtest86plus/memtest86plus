@@ -150,8 +150,7 @@ got_sectors:
 
 	# Fix up the Linux boot header to indicate we've loaded into low memory.
 
-	leaw	code32_start, %di
-	movl	$LOW_LOAD_ADDR, (%di)
+	movl	$LOW_LOAD_ADDR, code32_start
 
 	# After that (everything loaded), we jump to the setup code loaded
 	# directly after the boot block.
