@@ -14,3 +14,4 @@ memtest_shared.bin
 *.efi
 *.img
 *.iso
+*.mbr

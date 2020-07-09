@@ -108,6 +108,9 @@ memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi
 	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
 
+memtest.mbr: memtest_shared.bin boot/mbr.o ldscripts/memtest_mbr.lds
+	$(LD) -T ldscripts/memtest_mbr.lds boot/mbr.o -b binary memtest_shared.bin -o memtest.mbr
+
 floppy.img: memtest.bin
 	dd if=/dev/zero of=floppy.img bs=1474560 count=1
 	dd if=memtest.bin of=floppy.img bs=1474560 conv=notrunc
@@ -119,10 +122,10 @@ esp.img: memtest.efi
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
 
-iso: floppy.img esp.img
+iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
 	cp floppy.img iso/boot/floppy.img
-	xorrisofs -pad -R -J -volid PCMemTest32 -graft-points -hide-rr-moved \
+	xorrisofs -pad -R -J -volid PCMemTest32 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /boot=./iso/boot
