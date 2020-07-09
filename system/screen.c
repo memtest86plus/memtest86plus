@@ -95,7 +95,7 @@ static void lfb8_put_char(int row, int col, uint8_t ch, uint8_t attr)
     for (int y = 0; y < FONT_HEIGHT; y++) {
         uint8_t font_row = font_data[ch][y];
         for (int x = 0; x < FONT_WIDTH; x++) {
-            pixel_row[x] = font_row & 0x80  ? fg_colour : bg_colour;
+            pixel_row[x] = font_row & 0x80 ? fg_colour : bg_colour;
             font_row <<= 1;
         }
         pixel_row += lfb_stride;
@@ -114,7 +114,29 @@ static void lfb16_put_char(int row, int col, uint8_t ch, uint8_t attr)
     for (int y = 0; y < FONT_HEIGHT; y++) {
         uint8_t font_row = font_data[ch][y];
         for (int x = 0; x < FONT_WIDTH; x++) {
-            pixel_row[x] = font_row & 0x80  ? fg_colour : bg_colour;
+            pixel_row[x] = font_row & 0x80 ? fg_colour : bg_colour;
+            font_row <<= 1;
+        }
+        pixel_row += lfb_stride;
+    }
+}
+
+static void lfb24_put_char(int row, int col, uint8_t ch, uint8_t attr)
+{
+    shadow_buffer[row][col].ch   = ch;
+    shadow_buffer[row][col].attr = attr;
+
+    uint32_t fg_colour = lfb_pallete[attr % 16];
+    uint32_t bg_colour = lfb_pallete[attr / 16];
+
+    uint8_t *pixel_row = (uint8_t *)lfb_base + row * FONT_HEIGHT * lfb_stride + col * FONT_WIDTH * 3;
+    for (int y = 0; y < FONT_HEIGHT; y++) {
+        uint8_t font_row = font_data[ch][y];
+        for (int x = 0; x < FONT_WIDTH * 3; x += 3) {
+            uint32_t colour = font_row & 0x80 ? fg_colour : bg_colour;
+            pixel_row[x+0] = colour & 0xff; colour >>= 8;
+            pixel_row[x+1] = colour & 0xff; colour >>= 8;
+            pixel_row[x+2] = colour & 0xff;
             font_row <<= 1;
         }
         pixel_row += lfb_stride;
@@ -133,7 +155,7 @@ static void lfb32_put_char(int row, int col, uint8_t ch, uint8_t attr)
     for (int y = 0; y < FONT_HEIGHT; y++) {
         uint8_t font_row = font_data[ch][y];
         for (int x = 0; x < FONT_WIDTH; x++) {
-            pixel_row[x] = font_row & 0x80  ? fg_colour : bg_colour;
+            pixel_row[x] = font_row & 0x80 ? fg_colour : bg_colour;
             font_row <<= 1;
         }
         pixel_row += lfb_stride;
@@ -171,6 +193,9 @@ void screen_init(void)
         } else if (lfb_depth <= 16) {
             lfb_bytes_per_pixel = 2;
             put_char = lfb16_put_char;
+        } else if (lfb_depth <= 24) {
+            lfb_bytes_per_pixel = 3;
+            put_char = lfb24_put_char;
         } else {
             lfb_bytes_per_pixel = 4;
             put_char = lfb32_put_char;
@@ -205,7 +230,9 @@ void screen_init(void)
             lfb_base += (excess_height / 2) * lfb_stride;
         }
 
-        lfb_stride /= lfb_bytes_per_pixel;
+        if (lfb_bytes_per_pixel != 3) {
+            lfb_stride /= lfb_bytes_per_pixel;
+        }
 
         // Initialise the pallete.
         uint32_t r_max = (1 << screen_info->red_size  ) - 1;
