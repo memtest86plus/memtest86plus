@@ -327,12 +327,12 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->rsvd_pos        = 24;
         break;
       case PIXEL_BIT_MASK:
-        si->lfb_depth       = si->red_size + si->green_size + si->blue_size + si->rsvd_size;
-        si->lfb_linelength  = (info->pixels_per_scan_line * si->lfb_depth) / 8;
         get_bit_range(info->pixel_info.red_mask,   &si->red_pos,   &si->red_size);
         get_bit_range(info->pixel_info.green_mask, &si->green_pos, &si->green_size);
         get_bit_range(info->pixel_info.blue_mask,  &si->blue_pos,  &si->blue_size);
         get_bit_range(info->pixel_info.rsvd_mask,  &si->rsvd_pos,  &si->rsvd_size);
+        si->lfb_depth       = si->red_size + si->green_size + si->blue_size + si->rsvd_size;
+        si->lfb_linelength  = (info->pixels_per_scan_line * si->lfb_depth) / 8;
         break;
       default:
         si->lfb_depth       = 4;
