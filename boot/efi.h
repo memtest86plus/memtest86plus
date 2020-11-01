@@ -23,6 +23,7 @@
 #define EFI_INVALID_PARAMETER   (NATIVE_MSB |  2)
 #define EFI_UNSUPPORTED         (NATIVE_MSB |  3)
 #define EFI_BUFFER_TOO_SMALL    (NATIVE_MSB |  5)
+#define EFI_NOT_READY           (NATIVE_MSB |  6)
 #define EFI_NOT_FOUND           (NATIVE_MSB | 14)
 #define EFI_ABORTED             (NATIVE_MSB | 21)
 
@@ -125,6 +126,17 @@ typedef struct {
     uint32_t            crc32;
     uint32_t            reserved;
 } efi_table_header_t;
+
+typedef struct {
+    uint16_t            scan_code;
+    efi_char16_t        ch;
+} efi_input_key_t;
+
+typedef struct efi_simple_text_in_s {
+    void *reset;
+    efi_status_t (efiapi *read_key_stroke)(struct efi_simple_text_in_s *, efi_input_key_t *);
+    void *test_string;
+} efi_simple_text_in_t;
 
 typedef struct efi_simple_text_out_s {
     void *reset;
@@ -233,9 +245,9 @@ typedef struct {
     efi_char16_t           *fw_vendor;
     uint32_t                fw_revision;
     efi_handle_t            con_in_handle;
-    void                   *con_in;
+    efi_simple_text_in_t   *con_in;
     efi_handle_t            con_out_handle;
-    efi_simple_text_out_t   *con_out;
+    efi_simple_text_out_t  *con_out;
     efi_handle_t            std_err_handle;
     efi_simple_text_out_t  *std_err;
     void                   *runtime_services;

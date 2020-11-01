@@ -16,6 +16,8 @@
 
 #include "string.h"
 
+#define DEBUG 0
+
 //------------------------------------------------------------------------------
 // Constants
 //------------------------------------------------------------------------------
@@ -82,7 +84,7 @@ static void print_string(char *str)
     }
 }
 
-#ifdef DEBUG
+#if DEBUG
 static void print_dec(unsigned value)
 {
     char buffer[16];
@@ -108,6 +110,13 @@ static void print_hex(uintptr_t value)
 	value /= 16;
     } while (value > 0);
     print_string(str);
+}
+
+static void wait_for_key(void)
+{
+    efi_input_key_t input_key;
+
+    while (efi_call_proto(efi_table_attr(sys_table, con_in), read_key_stroke, &input_key) == EFI_NOT_READY) {}
 }
 #endif
 
@@ -269,6 +278,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         }
     }
     if (!gop) {
+#if DEBUG
+        print_string("GOP not found\n");
+#endif
         return EFI_NOT_FOUND;
     }
 
@@ -336,6 +348,28 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         break;
     }
     si->lfb_size = si->lfb_linelength * si->lfb_height;
+
+#if DEBUG
+    print_string("FB base   : ");
+    print_hex(si->lfb_base);
+    print_string("\n");
+    print_string("FB size   : ");
+    print_dec(si->lfb_width);
+    print_string(" x ");
+    print_dec(si->lfb_height);
+    print_string("\n");
+    print_string("FB format :");
+    print_string(" R"); print_dec(si->red_size);
+    print_string(" G"); print_dec(si->green_size);
+    print_string(" B"); print_dec(si->blue_size);
+    print_string(" A"); print_dec(si->rsvd_size);
+    print_string("\n");
+    print_string("FB stride : ");
+    print_dec(si->lfb_linelength);
+    print_string("\n");
+    print_string("Press any key to continue...\n");
+    wait_for_key();
+#endif
 
     return EFI_SUCCESS;
 }
