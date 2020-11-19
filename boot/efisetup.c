@@ -303,6 +303,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     switch (info->pixel_format) {
       case PIXEL_RGB_RESERVED_8BIT_PER_COLOR:
+#if DEBUG
+        print_string("RGB32 mode\n");
+#endif
         si->lfb_depth       = 32;
         si->lfb_linelength  = info->pixels_per_scan_line * 4;
         si->red_size        = 8;
@@ -315,6 +318,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->rsvd_pos        = 24;
         break;
       case PIXEL_BGR_RESERVED_8BIT_PER_COLOR:
+#if DEBUG
+        print_string("BGR32 mode\n");
+#endif
         si->lfb_depth       = 32;
         si->lfb_linelength  = info->pixels_per_scan_line * 4;
         si->red_size        = 8;
@@ -327,6 +333,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->rsvd_pos        = 24;
         break;
       case PIXEL_BIT_MASK:
+#if DEBUG
+        print_string("Bit mask mode\n");
+#endif
         get_bit_range(info->pixel_info.red_mask,   &si->red_pos,   &si->red_size);
         get_bit_range(info->pixel_info.green_mask, &si->green_pos, &si->green_size);
         get_bit_range(info->pixel_info.blue_mask,  &si->blue_pos,  &si->blue_size);
@@ -335,6 +344,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->lfb_linelength  = (info->pixels_per_scan_line * si->lfb_depth) / 8;
         break;
       default:
+#if DEBUG
+        print_string("Unsupported mode\n");
+#endif
         si->lfb_depth       = 4;
         si->lfb_linelength  = si->lfb_width / 2;
         si->red_size        = 0;
