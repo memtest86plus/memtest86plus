@@ -631,7 +631,7 @@ static smp_error_t start_cpu(int pcpu_num)
 // Public Functions
 //------------------------------------------------------------------------------
 
-void smp_init(void)
+void smp_init(bool smp_enable)
 {
     for (int i = 0; i < MAX_APIC_IDS; i++) {
         apic_id_to_pcpu_num[i] = 0;
@@ -644,7 +644,9 @@ void smp_init(void)
 
     num_pcpus = 1;
 
-    (void)(find_cpus_in_rsdp() || find_cpus_in_floating_mp_struct());
+    if (smp_enable) {
+        (void)(find_cpus_in_rsdp() || find_cpus_in_floating_mp_struct());
+    }
 
     for (int i = 0; i < num_pcpus; i++) {
         apic_id_to_pcpu_num[pcpu_num_to_apic_id[i]] = i;

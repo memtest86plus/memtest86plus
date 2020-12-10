@@ -586,9 +586,11 @@ void config_menu(bool initial)
 
 void initial_config(void)
 {
-    display_notice("Press <F1> to configure, <Enter> to start testing");
+    display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
 
     bool got_key = false;
+    bool smp_enabled = false;
+    bool smp_init_done = false;
     for (int i = 0; i < 5000 && !got_key; i++) {
         usleep(1000);
         switch (get_key()) {
@@ -598,8 +600,19 @@ void initial_config(void)
             reboot();
             break;
           case '1':
+            smp_init(smp_enabled);
+            smp_init_done = true;
             config_menu(true);
             got_key = true;
+            break;
+          case '2':
+            smp_enabled = !smp_enabled;
+            if (smp_enabled) {
+                display_notice("Press <F1> to configure, <F2> to disable SMP, <Enter> to start testing");
+            } else {
+                display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
+            }
+            i = 0;
             break;
           case ' ':
             toggle_scroll_lock();
@@ -610,5 +623,8 @@ void initial_config(void)
           default:
             break;
         }
+    }
+    if (!smp_init_done) {
+        smp_init(smp_enabled);
     }
 }

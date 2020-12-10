@@ -99,13 +99,15 @@ the system was booted in UEFI mode, graphics mode must be used.
 
 Once booted, PCMemTest will initialise its display, then pause for a few
 seconds to allow the user to configure its operation. If no key is pressed,
-it will automatically start running all tests using all available CPU cores,
+it will automatically start running all tests using a single CPU core,
 continuing indefinitely until the user reboots or halts the machine.
 
 At startup, and when running tests, PCMemTest responds to the following keys:
 
   * F1
     * enters the configuration menu
+  * F2
+    * toggles detection and use of multiple CPU cores (SMP)
   * Space
     * toggles scroll lock (stops/starts error message scrolling)
   * Enter

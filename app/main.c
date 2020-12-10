@@ -155,8 +155,6 @@ static void global_init(void)
 
     error_init();
 
-    smp_init();
-
     initial_config();
 
     clear_message_area();

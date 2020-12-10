@@ -39,7 +39,7 @@ extern int num_pcpus;
 /*
  * Initialises the SMP state and detects the number of physical CPUs.
  */
-void smp_init(void);
+void smp_init(bool smp_enable);
 
 /*
  * Starts the selected APs.
