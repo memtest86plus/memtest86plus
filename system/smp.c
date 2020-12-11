@@ -508,12 +508,16 @@ static bool find_cpus_in_rsdp(void)
 
     // Search for the RSDP
     rsdp_t *rp = NULL;
-    if (efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
+    if (boot_params->acpi_rsdp_addr != 0) {
+        // Validate it
+        rp = scan_for_rsdp(boot_params->acpi_rsdp_addr, 0x8);
+    }
+    if (rp == NULL && efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab;
         rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
     }
 #ifdef __x86_64__
-    if (efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
+    if (rp == NULL && efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
         rp = find_rsdp_in_efi64_system_table((efi64_system_table_t *)system_table_addr);
     }

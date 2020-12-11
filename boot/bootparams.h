@@ -86,15 +86,17 @@ typedef struct {
 
 typedef struct {
     screen_info_t   screen_info;
-    uint8_t         unused1[0x1c0 - 0x040];
+    uint8_t         unused1[0x070 - 0x040];
+    uint64_t        acpi_rsdp_addr;
+    uint8_t         unused2[0x1c0 - 0x078];
     efi_info_t      efi_info;
-    uint8_t         unused2[0x1e8 - 0x1e0];
+    uint8_t         unused3[0x1e8 - 0x1e0];
     uint8_t         e820_entries;
-    uint8_t         unused3[0x214 - 0x1e9];
+    uint8_t         unused4[0x214 - 0x1e9];
     uint32_t        code32_start;
-    uint8_t         unused4[0x2d0 - 0x218];
+    uint8_t         unused5[0x2d0 - 0x218];
     e820_entry_t    e820_map[E820_MAP_SIZE];
-    uint8_t         unused5[0xeec - 0xd00];
+    uint8_t         unused6[0xeec - 0xd00];
 } __attribute__((packed)) boot_params_t;
 
 #endif /* BOOTPARAMS_H */
