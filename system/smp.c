@@ -89,7 +89,8 @@
 
 #define MPCSignature    ('P' | ('C' << 8) | ('M' << 16) | ('P' << 24))
 
-#define RSDPSignature   ('R' | ('S' << 8) | ('D' << 16) | (' ' << 24))
+#define RSDPSignature1  ('R' | ('S' << 8) | ('D' << 16) | (' ' << 24))
+#define RSDPSignature2  ('P' | ('T' << 8) | ('R' << 16) | (' ' << 24))
 
 #define RSDTSignature   ('R' | ('S' << 8) | ('D' << 16) | ('T' << 24))
 
@@ -207,7 +208,7 @@ typedef struct {
 } rsdp_t;
 
 typedef struct {
-    char        signature[4];   // "RSDT"
+    char        signature[4];   // "RSDT" or "XSDT"
     uint32_t    length;
     uint8_t     revision;
     uint8_t     checksum;
@@ -216,7 +217,7 @@ typedef struct {
     char        oem_revision[4];
     char        creator_id[4];
     char        creator_revision[4];
-} rsdt_t;
+} rsdt_header_t;
 
 typedef struct {
     uint8_t     type;
@@ -382,7 +383,7 @@ static bool find_cpus_in_floating_mp_struct(void)
         fp = scan_for_floating_ptr_struct(0xf0000, 0x10000);
     }
     if (fp == NULL) {
-        // Search the BIOS ESDS area.
+        // Search the BIOS EBDA area.
         uintptr_t address = *(uint16_t *)0x40E << 4;
         if (address) {
             fp = scan_for_floating_ptr_struct(address, 0x400);
@@ -420,10 +421,12 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
 
     while (ptr < end) {
         rsdp_t *rp = (rsdp_t *)ptr;
-        if (*ptr == RSDPSignature && checksum(ptr, rp->length) == 0) {
-            return rp;
+        if (*ptr == RSDPSignature1 && *(ptr+1) == RSDPSignature2 && checksum(ptr, 20) == 0) {
+            if (rp->revision < 2 || (rp->length < 1024 && checksum(ptr, rp->length) == 0)) {
+                return rp;
+            }
         }
-        ptr++;
+        ptr += 4;
     }
     return NULL;
 }
@@ -516,25 +519,25 @@ static bool find_cpus_in_rsdp(void)
     }
 #endif
     if (rp == NULL) {
-        // Search the BIOS reserved area.
-        rp = scan_for_rsdp(0xE0000, 0x20000);
-    }
-    if (rp == NULL) {
-        // Search the BIOS ESDS area.
+        // Search the BIOS EBDA area.
         uintptr_t address = *(uint16_t *)0x40E << 4;
         if (address) {
             rp = scan_for_rsdp(address, 0x400);
         }
     }
     if (rp == NULL) {
+        // Search the BIOS reserved area.
+        rp = scan_for_rsdp(0xE0000, 0x20000);
+    }
+    if (rp == NULL) {
         // RSDP not found, give up.
         return false;
     }
 
-    // Found the RSDP, now get either the RSDT or XSDT.
-    rsdt_t *rt;
+    // Found the RSDP, now get either the RSDT or XSDT and scan it for a pointer to the MADT.
+    rsdt_header_t *rt;
     if (rp->revision >= 2) {
-        rt = (rsdt_t *)((uintptr_t)rp->xsdt_addr);
+        rt = (rsdt_header_t *)((uintptr_t)rp->xsdt_addr);
         if (rt == 0) {
             return false;
         }
@@ -542,11 +545,24 @@ static bool find_cpus_in_rsdp(void)
         if (*(uint32_t *)rt != XSDTSignature) {
             return false;
         }
-        if (checksum((uint8_t *)rt, rt->length) != 0) {
+        if (checksum(rt, rt->length) != 0) {
             return false;
         }
+        // Scan the XSDT for a pointer to the MADT.
+        uint64_t *tab_ptr = (uint64_t *)((uint8_t *)rt + sizeof(rsdt_header_t));
+        uint64_t *tab_end = (uint64_t *)((uint8_t *)rt + rt->length);
+
+        while (tab_ptr < tab_end) {
+            uint32_t *ptr = (uint32_t *)((uintptr_t)(*tab_ptr++));  // read the next table entry
+
+            if (ptr && *ptr == MADTSignature) {
+                if (parse_madt(ptr)) {
+                    return true;
+                }
+            }
+        }
     } else {
-        rt = (rsdt_t *)((uintptr_t)rp->rsdt_addr);
+        rt = (rsdt_header_t *)((uintptr_t)rp->rsdt_addr);
         if (rt == 0) {
             return false;
         }
@@ -554,21 +570,20 @@ static bool find_cpus_in_rsdp(void)
         if (*(uint32_t *)rt != RSDTSignature) {
             return false;
         }
-        if (checksum((uint8_t *)rt, rt->length) != 0) {
+        if (checksum(rt, rt->length) != 0) {
             return false;
         }
-    }
+        // Scan the RSDT for a pointer to the MADT.
+        uint32_t *tab_ptr = (uint32_t *)((uint8_t *)rt + sizeof(rsdt_header_t));
+        uint32_t *tab_end = (uint32_t *)((uint8_t *)rt + rt->length);
 
-    // Scan the RSDT or XSDT for a pointer to the MADT.
-    uint32_t *tab_ptr = (uint32_t *)(rt + 1); // immediately follows the RSDT/XSDT
-    uint32_t *tab_end = tab_ptr + (rt->length / sizeof(uint32_t));
+        while (tab_ptr < tab_end) {
+            uint32_t *ptr = (uint32_t *)((uintptr_t)(*tab_ptr++));  // read the next table entry
 
-    while (tab_ptr < tab_end) {
-        uint32_t *ptr = (uint32_t *)((uintptr_t)(*tab_ptr++));  // read the next table entry
-
-        if (ptr && *ptr == MADTSignature) {
-            if (parse_madt(ptr)) {
-                return true;
+            if (ptr && *ptr == MADTSignature) {
+                if (parse_madt(ptr)) {
+                    return true;
+                }
             }
         }
     }
