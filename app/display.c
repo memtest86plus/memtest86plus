@@ -138,7 +138,9 @@ void display_init(void)
 
 void display_start_run(void)
 {
-    clear_message_area();
+    if (!enable_trace) {
+        clear_message_area();
+    }
     clear_screen_region(7, 47, 9, 57);                  // run time
     clear_screen_region(9, 47, 9, 57);                  // pass number
     clear_screen_region(9, 66, 9, SCREEN_WIDTH - 1);    // error count
