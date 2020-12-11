@@ -37,6 +37,15 @@ typedef enum {
 extern int num_pcpus;
 
 /*
+ * The search step that located the ACPI RSDP (for debug).
+ */
+extern const char *rsdp_source;
+/*
+ * The address of the ACPI RSDP (for debug).
+ */
+extern uintptr_t rsdp_addr;
+
+/*
  * Initialises the SMP state and detects the number of physical CPUs.
  */
 void smp_init(bool smp_enable);

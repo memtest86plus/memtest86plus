@@ -252,6 +252,10 @@ static uintptr_t        alloc_addr = 0;
 
 int num_pcpus = 1;  // There is always at least one CPU, the BSP
 
+const char *rsdp_source = "";
+
+uintptr_t rsdp_addr = 0;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
@@ -511,15 +515,18 @@ static bool find_cpus_in_rsdp(void)
     if (boot_params->acpi_rsdp_addr != 0) {
         // Validate it
         rp = scan_for_rsdp(boot_params->acpi_rsdp_addr, 0x8);
+        if (rp) rsdp_source = "boot parameters";
     }
     if (rp == NULL && efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab;
         rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
+        if (rp) rsdp_source = "EFI32 system table";
     }
 #ifdef __x86_64__
     if (rp == NULL && efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
         rp = find_rsdp_in_efi64_system_table((efi64_system_table_t *)system_table_addr);
+        if (rp) rsdp_source = "EFI64 system table";
     }
 #endif
     if (rp == NULL) {
@@ -527,16 +534,19 @@ static bool find_cpus_in_rsdp(void)
         uintptr_t address = *(uint16_t *)0x40E << 4;
         if (address) {
             rp = scan_for_rsdp(address, 0x400);
+            if (rp) rsdp_source = "BIOS EBDA";
         }
     }
     if (rp == NULL) {
         // Search the BIOS reserved area.
         rp = scan_for_rsdp(0xE0000, 0x20000);
+        if (rp) rsdp_source = "BIOS reserved area";
     }
     if (rp == NULL) {
         // RSDP not found, give up.
         return false;
     }
+    rsdp_addr = (uintptr_t)rp;
 
     // Found the RSDP, now get either the RSDT or XSDT and scan it for a pointer to the MADT.
     rsdt_header_t *rt;

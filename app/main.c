@@ -191,6 +191,9 @@ static void global_init(void)
     for (int i = 0; i < pm_map_size; i++) {
         trace(0, "pm %0*x - %0*x", 2*sizeof(uintptr_t), pm_map[i].start, 2*sizeof(uintptr_t), pm_map[i].end);
     }
+    if (rsdp_addr != 0) {
+        trace(0, "ACPI RSDP found in %s at %0*x", rsdp_source, 2*sizeof(uintptr_t), rsdp_addr);
+    }
 
     start_barrier = smp_alloc_barrier(num_vcpus);
     run_barrier   = smp_alloc_barrier(num_vcpus);
