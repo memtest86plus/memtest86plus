@@ -68,9 +68,9 @@ void display_init(void)
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
 #if TESTWORD_WIDTH > 32
-    prints( 0, 0, "    PCMemTest-64  v1.3     ");
+    prints( 0, 0, "    PCMemTest-64  v1.4     ");
 #else
-    prints( 0, 0, "    PCMemTest-32  v1.3     ");
+    prints( 0, 0, "    PCMemTest-32  v1.4     ");
 #endif
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
