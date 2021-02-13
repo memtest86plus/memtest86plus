@@ -121,13 +121,15 @@ esp.img: memtest.efi
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
 
-iso: memtest.mbr floppy.img esp.img
+memtest.iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
 	cp floppy.img iso/boot/floppy.img
 	xorrisofs -pad -R -J -volid PCMemTest64 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /boot=./iso/boot
+
+iso: memtest.iso
 
 clean:
 	rm -rf boot system lib tests app *.img *.iso memtest* iso
