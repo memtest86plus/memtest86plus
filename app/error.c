@@ -152,6 +152,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     bool new_header = (error_count == 0) || (error_mode != last_error_mode);
     if (new_header) {
         clear_message_area();
+        badram_init();
     }
     last_error_mode = error_mode;
 
@@ -284,11 +285,6 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         break;
 
       case ERROR_MODE_BADRAM:
-        if (new_header) {
-            display_pinned_message(0, 0, "BadRAM Patterns");
-            display_pinned_message(0, 1, "---------------");
-            badram_init();
-        }
         if (new_badram) {
             badram_display();
         }

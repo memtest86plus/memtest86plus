@@ -196,8 +196,11 @@ void badram_display(void)
     }
 
     check_input();
-    scroll();
 
+    clear_message_area();
+    display_pinned_message(0, 0, "BadRAM Patterns");
+    display_pinned_message(1, 0, "---------------");
+    scroll();
     display_scrolled_message(0, "badram=");
     int col = 7;
     for (int i = 0; i < num_patterns; i++) {
@@ -205,12 +208,12 @@ void badram_display(void)
             display_scrolled_message(col, ",");
             col++;
         }
-        int text_width = 2 * (TESTWORD_DIGITS + 3);
+        int text_width = 2 * (TESTWORD_DIGITS + 2) + 1;
         if (col > (SCREEN_WIDTH - text_width)) {
             scroll();
             col = 7;
         }
-        display_scrolled_message(col, "0x0*x,0x0*x",
+        display_scrolled_message(col, "0x%0*x,0x%0*x",
                                  TESTWORD_DIGITS, pattern[i].addr,
                                  TESTWORD_DIGITS, pattern[i].mask);
         col += text_width;
