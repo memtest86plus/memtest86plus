@@ -211,7 +211,7 @@ capture regular patterns of errors caused by the hardware structure in a terse
 syntax.
 
 The BadRAM patterns are grown incrementally rather than calculated from an
-overview of all errors. The number of pairs is constrained to five for a
+overview of all errors. The number of pairs is constrained to ten for a
 number of practical reasons. As a result, handcrafting patterns from the
 output in address printing mode may, in exceptional cases, yield better
 results.
