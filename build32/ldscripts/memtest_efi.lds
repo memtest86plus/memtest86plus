@@ -17,6 +17,7 @@ SECTIONS {
 		. = ALIGN(512);
 		_text_end = . ;
 	}
+	/DISCARD/ : { *(*) }
 
 	_text_size = (_text_end  - _text_start);
 

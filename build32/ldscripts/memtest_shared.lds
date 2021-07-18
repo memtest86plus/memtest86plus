@@ -49,5 +49,5 @@ SECTIONS {
 		. = ALIGN(256);
 		_end = .;
 	}
-	/DISCARD/ : { *(*) }	
+	/DISCARD/ : { *(*) }
 }
