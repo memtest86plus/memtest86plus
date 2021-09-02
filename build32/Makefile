@@ -101,11 +101,11 @@ memtest_shared.bin: memtest_shared
 	objcopy -O binary $< memtest_shared.bin
 
 memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
-	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
+	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
 
 memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi.lds
-	$(eval SIZES=$(shell size -G -d memtest_shared | grep memtest_shared))
+	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
 
 memtest.mbr: memtest_shared.bin boot/mbr.o ldscripts/memtest_mbr.lds
