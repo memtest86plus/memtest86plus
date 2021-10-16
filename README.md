@@ -144,7 +144,8 @@ The configuration menu allows the user to:
   * skip to the next test (when running tests)
 
 In all cases, the number keys may be used as alternatives to the function keys
-(1 = F1, 2 = F2, ... 0 = F10).
+(1 = F1, 2 = F2, ... 0 = F10) and F10 (or 0) can be used as an alternative to
+the escape key.
 
 ## Error Reporting
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -171,6 +171,8 @@ void display_start_test(void)
 void check_input(void)
 {
     switch (get_key()) {
+      case '0':
+        // fall through
       case ESC:
         clear_message_area();
         display_notice("Rebooting...");

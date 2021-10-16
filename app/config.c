@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from memtest86+ config.c:
 //
@@ -222,6 +222,8 @@ static void test_selection_menu(void)
           case '5':
             changed = set_all_tests(true);
             break;
+          case '0':
+            // fall through
           case ESC: {
             clear_popup_row(POP_R+14);
             int num_selected = 0;
@@ -290,6 +292,8 @@ static void address_range_menu(void)
             pm_limit_upper = pm_map[pm_map_size - 1].end;
             changed = true;
             break;
+          case '0':
+            // fall through
           case ESC:
             exit_menu = true;
             break;
@@ -330,6 +334,8 @@ static void cpu_mode_menu(void)
             cpu_mode = ch - '1';
             printc(POP_R+3+cpu_mode, POP_C+2, '*');
             break;
+          case '0':
+            // fall through
           case ESC:
             exit_menu = true;
             break;
@@ -365,6 +371,8 @@ static void error_mode_menu(void)
             error_mode = ch - '1';
             printc(POP_R+3+error_mode, POP_C+2, '*');
             break;
+          case '0':
+            // fall through
           case ESC:
             exit_menu = true;
             break;
@@ -460,6 +468,8 @@ static void cpu_selection_menu(void)
           case '5':
             changed = set_all_cpus(true);
             break;
+          case '0':
+            // fall through
           case ESC:
             clear_popup_row(POP_R+14);
             exit_menu = true;
@@ -562,6 +572,8 @@ void config_menu(bool initial)
                 enable_trace = !enable_trace;
             }
             break;
+          case '0':
+            // fall through
           case ESC:
             exit_menu = true;
             break;
@@ -594,6 +606,8 @@ void initial_config(void)
     for (int i = 0; i < 5000 && !got_key; i++) {
         usleep(1000);
         switch (get_key()) {
+          case '0':
+            // fall through
           case ESC:
             clear_message_area();
             display_notice("Rebooting...");
