@@ -5,8 +5,10 @@
  * Provides (macro) functions that implement the UI display.
  * All knowledge about the display layout is encapsulated here.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
+
+#include <stdbool.h>
 
 #include "screen.h"
 

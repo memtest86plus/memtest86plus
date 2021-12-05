@@ -4,9 +4,10 @@
 /*
  * Provides functions that can be called by the memory tests to report errors.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "test.h"

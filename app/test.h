@@ -4,9 +4,10 @@
 /*
  * Provides types and variables used when performing the memory tests.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "pmem.h"

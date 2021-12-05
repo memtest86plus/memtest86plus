@@ -5,8 +5,10 @@
  * Provides the prototypes for the basic test functions used to implement
  * the tests.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
+
+#include <stdbool.h>
 
 #include "test.h"
 
