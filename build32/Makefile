@@ -122,7 +122,7 @@ esp.img: memtest.efi
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
 
-iso: memtest.mbr floppy.img esp.img
+memtest.iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
 	cp floppy.img iso/boot/floppy.img
 	xorrisofs -pad -R -J -volid PCMemTest32 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
@@ -130,5 +130,60 @@ iso: memtest.mbr floppy.img esp.img
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /boot=./iso/boot
 
+iso: memtest.iso
+
 clean:
-	rm -rf boot system lib tests app *.img *.iso memtest* iso
+	rm -rf boot system lib tests app *.img *.iso memtest* iso grub-*
+
+# grub-memtest.iso can be used for testing the various different boot modes,
+# using GRUB as an intermediate bootloader. Upstream GRUB only supports the
+# 16-bit and 32-bit boot protocols, via the "linux16" and "linux" commands.
+# Fedora add support for the EFI handover boot protocols, via the "linuxefi"
+# command, and, since 2019, remove support for the 32-bit protocol, aliasing
+# the "linux" command to either "linux16" or "linuxefi", depending on whether
+# you boot in legacy or EFI mode. Mageia follows Fedora, but restores support
+# for the 32-bit protocol, via the "linux32" command. Other distributions no
+# doubt do their own thing. The boot menu on grub-memtest.iso attempts to
+# support all these options.
+
+GRUB_FONT_DIR ?= /usr/share/grub
+
+GRUB_LIB_DIR ?= /usr/lib/grub
+
+GRUB_MKIMAGE ?= grub2-mkimage
+
+GRUB_MODULES = iso9660 fat part_msdos all_video font gfxterm gfxmenu \
+               boot chain configfile echo ls
+
+grub-eltorito.img:
+	$(GRUB_MKIMAGE) --output $@ --prefix /boot/grub --format i386-pc-eltorito biosdisk $(GRUB_MODULES)
+
+grub-bootia32.efi:
+	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format i386-efi $(GRUB_MODULES)
+
+grub-esp.img: memtest.efi grub-bootia32.efi ../grub/grub-efi.cfg
+	@mkdir -p grub-iso/EFI/BOOT/grub/i386-efi grub-iso/EFI/BOOT/grub/fonts
+	cp memtest.efi grub-iso/EFI/BOOT/pcmemtest
+	cp grub-bootia32.efi grub-iso/EFI/BOOT/bootia32.efi
+	cp ../grub/grub-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
+	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
+	cp $(GRUB_LIB_DIR)/i386-efi/*.mod grub-iso/EFI/BOOT/grub/i386-efi/
+	@rm -f grub-esp.img
+	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C grub-esp.img 8192
+	mcopy -s -i grub-esp.img grub-iso/EFI ::
+
+grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/grub-legacy.cfg grub-esp.img
+	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
+	cp memtest.bin grub-iso/boot/pcmemtest
+	cp grub-eltorito.img grub-iso/boot/eltorito.img
+	cp ../grub/grub-legacy.cfg grub-iso/boot/grub/grub.cfg
+	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
+	cp $(GRUB_LIB_DIR)/i386-pc/*.mod grub-iso/boot/grub/i386-pc/
+	xorrisofs -pad -R -J -volid PCMemTest64 -graft-points -hide-rr-moved \
+		  --grub2-mbr $(GRUB_LIB_DIR)/i386-pc/boot_hybrid.img \
+		  -b /boot/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
+		  --efi-boot --interval:appended_partition_2:all:: \
+		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./grub-esp.img \
+		  -o ./grub-memtest.iso /boot=./grub-iso/boot /EFI=./grub-iso/EFI
+
+grub-iso: grub-memtest.iso

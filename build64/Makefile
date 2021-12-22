@@ -160,22 +160,22 @@ grub-eltorito.img:
 grub-bootx64.efi:
 	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format x86_64-efi $(GRUB_MODULES)
 
-grub-esp.img: memtest.efi grub-bootx64.efi grub/grub-efi.cfg
+grub-esp.img: memtest.efi grub-bootx64.efi ../grub/grub-efi.cfg
 	@mkdir -p grub-iso/EFI/BOOT/grub/x86_64-efi grub-iso/EFI/BOOT/grub/fonts
 	cp memtest.efi grub-iso/EFI/BOOT/pcmemtest
 	cp grub-bootx64.efi grub-iso/EFI/BOOT/bootx64.efi
-	cp grub/grub-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
+	cp ../grub/grub-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
 	cp $(GRUB_LIB_DIR)/x86_64-efi/*.mod grub-iso/EFI/BOOT/grub/x86_64-efi/
 	@rm -f grub-esp.img
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C grub-esp.img 8192
 	mcopy -s -i grub-esp.img grub-iso/EFI ::
 
-grub-memtest.iso: memtest.bin grub-eltorito.img grub/grub-legacy.cfg grub-esp.img
+grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/grub-legacy.cfg grub-esp.img
 	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
 	cp memtest.bin grub-iso/boot/pcmemtest
 	cp grub-eltorito.img grub-iso/boot/eltorito.img
-	cp grub/grub-legacy.cfg grub-iso/boot/grub/grub.cfg
+	cp ../grub/grub-legacy.cfg grub-iso/boot/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
 	cp $(GRUB_LIB_DIR)/i386-pc/*.mod grub-iso/boot/grub/i386-pc/
 	xorrisofs -pad -R -J -volid PCMemTest64 -graft-points -hide-rr-moved \
