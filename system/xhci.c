@@ -982,6 +982,7 @@ void *xhci_init(uintptr_t base_addr)
         pm_map[heap_segment].end = heap_segment_end;
         return NULL;
     }
+    usleep(100*MILLISEC);  // USB maximum device attach time.
 
     // Record the controller context size.
     uint32_t context_size = cap_regs->hcc_params1 & 0x4 ? 64 : 32;
