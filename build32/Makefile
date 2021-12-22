@@ -11,13 +11,16 @@ SYS_OBJS = system/cpuid.o \
            system/font.o \
            system/hwctrl.o \
            system/keyboard.o \
+           system/ohci.o \
            system/pci.o \
            system/pmem.o \
            system/reloc.o \
            system/screen.o \
            system/smp.o \
            system/temperature.o \
-           system/vmem.o
+           system/usbkbd.o \
+           system/vmem.o \
+           system/xhci.o
 
 LIB_OBJS = lib/barrier.o \
            lib/ctype.o \

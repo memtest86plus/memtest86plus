@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from memtest86+ main.c:
 //
@@ -150,6 +150,8 @@ static void global_init(void)
     badram_init();
 
     config_init();
+
+    keyboard_init(true);
 
     display_init();
 
