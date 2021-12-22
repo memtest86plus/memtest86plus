@@ -128,7 +128,7 @@ memtest.iso: memtest.mbr floppy.img esp.img
 	xorrisofs -pad -R -J -volid PCMemTest32 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
-		  -o ./memtest.iso /boot=./iso/boot
+		  -o ./memtest.iso /boot=./iso/boot /EFI=./iso/EFI
 
 iso: memtest.iso
 
