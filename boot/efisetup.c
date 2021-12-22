@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from Linux 5.6 arch/x86/boot/compressed/eboot.c and extracts
 // from drivers/firmware/efi/libstub:
@@ -478,7 +478,7 @@ static void set_e820_map(boot_params_t *params)
 #endif
     size_t mem_map_size  = params->efi_info.mem_map_size;
     size_t mem_desc_size = params->efi_info.mem_desc_size;
-    size_t num_descs     = mem_map_size /mem_desc_size;
+    size_t num_descs     = mem_map_size / mem_desc_size;
 
     e820_entry_t *prev = NULL;
     e820_entry_t *next = params->e820_map;
