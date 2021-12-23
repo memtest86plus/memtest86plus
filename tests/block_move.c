@@ -82,7 +82,7 @@ int test_block_move(int my_vcpu, int iterations)
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
-    barrier_wait(run_barrier);
+    flush_caches(my_vcpu);
 
     // Now move the data around. First move the data up half of the segment size 
     // we are testing. Then move the data to the original location + 32 bytes.
@@ -193,7 +193,8 @@ int test_block_move(int my_vcpu, int iterations)
             }
         } while (!at_end && ++pe); // advance pe to next start point
     }
-    barrier_wait(run_barrier);
+
+    flush_caches(my_vcpu);
 
     // Now check the data. The error checking is rather crude.  We just check that the
     // adjacent words are the same.

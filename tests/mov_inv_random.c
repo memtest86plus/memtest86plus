@@ -80,6 +80,8 @@ int test_mov_inv_random(int my_vcpu)
     // memory location. Repeat.
     testword_t invert = 0;
     for (int i = 0; i < 2; i++) {
+        flush_caches(my_vcpu);
+
         random_seed(my_vcpu, seed);
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;

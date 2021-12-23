@@ -105,6 +105,8 @@ int test_modulo_n(int my_vcpu, int iterations, testword_t pattern1, testword_t p
         }
     }
 
+    flush_caches(my_vcpu);
+
     // Now check every nth location.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;

@@ -78,4 +78,10 @@ testword_t random(int my_vcpu);
  */
 void calculate_chunk(testword_t **start, testword_t **end, int my_vcpu, int segment, size_t chunk_align);
 
+/*
+ * Flushes the CPU caches. If SMP is enabled, synchronises the threads before
+ * and after issuing the cache flush instruction.
+ */
+void flush_caches(int my_vcpu);
+
 #endif // TEST_HELPER_H

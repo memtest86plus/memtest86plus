@@ -94,6 +94,8 @@ int test_mov_inv_fixed(int my_vcpu, int iterations, testword_t pattern1, testwor
     // Check for the current pattern and then write the alternate pattern for
     // each memory location. Test from the bottom up and then from the top down.
     for (int i = 0; i < iterations; i++) {
+        flush_caches(my_vcpu);
+
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_vcpu, j, sizeof(testword_t));
@@ -126,6 +128,8 @@ int test_mov_inv_fixed(int my_vcpu, int iterations, testword_t pattern1, testwor
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
         }
+
+        flush_caches(my_vcpu);
 
         for (int j = vm_map_size - 1; j >= 0; j--) {
             testword_t *start, *end;

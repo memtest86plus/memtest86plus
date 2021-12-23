@@ -65,6 +65,8 @@ static int pattern_fill(int my_vcpu, testword_t offset)
         } while (!at_end && ++pe); // advance pe to next start point
     }
 
+    flush_caches(my_vcpu);
+
     return ticks;
 }
 

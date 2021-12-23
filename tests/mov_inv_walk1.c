@@ -73,6 +73,8 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
     for (int i = 0; i < iterations; i++) {
         pattern = (testword_t)1 << offset;
 
+        flush_caches(my_vcpu);
+
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_vcpu, j, sizeof(testword_t));
@@ -107,6 +109,8 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
         }
+
+        flush_caches(my_vcpu);
 
         for (int j = vm_map_size - 1; j >= 0; j--) {
             testword_t *start, *end;

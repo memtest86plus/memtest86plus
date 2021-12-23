@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Partly derived from an extract of memtest86+ test.c:
 //
@@ -14,6 +14,10 @@
 // By Chris Brady
 
 #include <stdint.h>
+
+#include "cache.h"
+
+#include "barrier.h"
 
 #include "config.h"
 #include "display.h"
@@ -106,5 +110,16 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_vcpu, int segm
         if (*end > vm_map[segment].end) {
             *end = vm_map[segment].end;
         }
+    }
+}
+
+void flush_caches(int my_vcpu)
+{
+    if (my_vcpu >= 0) {
+        barrier_wait(run_barrier);
+        if (my_vcpu == master_vcpu) {
+            cache_flush();
+        }
+        barrier_wait(run_barrier);
     }
 }

@@ -2,9 +2,9 @@
 #ifndef CACHE_H
 #define CACHE_H
 /*
- * Provides functions to enable/disable the CPU caches.
+ * Provides functions to enable, disable, and flush the CPU caches.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
 /*
@@ -20,7 +20,7 @@ static inline void cache_off(void)
         "wbinvd                     \n"
         : /* no outputs */
         : /* no inputs */
-        : "rax"
+        : "rax", "memory"
     );
 #else
     __asm__ __volatile__ ("\t"
@@ -30,7 +30,7 @@ static inline void cache_off(void)
         "wbinvd                     \n"
         : /* no outputs */
         : /* no inputs */
-        : "eax"
+        : "eax", "memory"
     );
 #endif
 }
@@ -47,7 +47,7 @@ static inline void cache_on(void)
         "movq   %%rax, %%cr0        \n"
         : /* no outputs */
         : /* no inputs */
-        : "rax"
+        : "rax", "memory"
     );
 #else
     __asm__ __volatile__ ("\t"
@@ -56,9 +56,22 @@ static inline void cache_on(void)
         "movl   %%eax, %%cr0        \n"
         : /* no outputs */
         : /* no inputs */
-        : "eax"
+        : "eax", "memory"
     );
 #endif
+}
+
+/*
+ * Flush the CPU caches.
+ */
+static inline void cache_flush(void)
+{
+    __asm__ __volatile__ ("\t"
+        "wbinvd\n"
+        : /* no outputs */
+        : /* no inputs */
+        : "memory"
+    );
 }
 
 #endif // CACHE_H
