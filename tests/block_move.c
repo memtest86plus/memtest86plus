@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -60,22 +60,22 @@ int test_block_move(int my_vcpu, int iterations)
             testword_t pattern1 = 1;
             do {
                 testword_t pattern2 = ~pattern1;
-                p[ 0] = pattern1;
-                p[ 1] = pattern1;
-                p[ 2] = pattern1;
-                p[ 3] = pattern1;
-                p[ 4] = pattern2;
-                p[ 5] = pattern2;
-                p[ 6] = pattern1;
-                p[ 7] = pattern1;
-                p[ 8] = pattern1;
-                p[ 9] = pattern1;
-                p[10] = pattern2;
-                p[11] = pattern2;
-                p[12] = pattern1;
-                p[13] = pattern1;
-                p[14] = pattern2;
-                p[15] = pattern2;
+                write_word(p + 0,  pattern1);
+                write_word(p + 1,  pattern1);
+                write_word(p + 2,  pattern1);
+                write_word(p + 3,  pattern1);
+                write_word(p + 4,  pattern2);
+                write_word(p + 5,  pattern2);
+                write_word(p + 6,  pattern1);
+                write_word(p + 7,  pattern1);
+                write_word(p + 8,  pattern1);
+                write_word(p + 9,  pattern1);
+                write_word(p + 10, pattern2);
+                write_word(p + 11, pattern2);
+                write_word(p + 12, pattern1);
+                write_word(p + 13, pattern1);
+                write_word(p + 14, pattern2);
+                write_word(p + 15, pattern2);
                 pattern1 = pattern1 << 1 | pattern1 >> (TESTWORD_WIDTH - 1);  // rotate left
             } while (p <= (pe - 16) && (p += 16)); // test before increment in case pointer overflows
             do_tick(my_vcpu);
@@ -219,8 +219,10 @@ int test_block_move(int my_vcpu, int iterations)
             }
             test_addr[my_vcpu] = (uintptr_t)p;
             do {
-                if (unlikely(p[0] != p[1])) {
-                    data_error(p, p[0], p[1], false);
+                testword_t p0 = read_word(p + 0);
+                testword_t p1 = read_word(p + 1);
+                if (unlikely(p0 != p1)) {
+                    data_error(p, p0, p1, false);
                 }
             } while (p <= (pe - 2) && (p += 2)); // test before increment in case pointer overflows
             do_tick(my_vcpu);

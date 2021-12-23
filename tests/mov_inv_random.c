@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -69,7 +69,7 @@ int test_mov_inv_random(int my_vcpu)
             }
             test_addr[my_vcpu] = (uintptr_t)p;
             do {
-                *p = random(my_vcpu);
+                write_word(p, random(my_vcpu));
             } while (p++ < pe); // test before increment in case pointer overflows
             do_tick(my_vcpu);
             BAILOUT;
@@ -104,11 +104,11 @@ int test_mov_inv_random(int my_vcpu)
                 test_addr[my_vcpu] = (uintptr_t)p;
                 do {
                     testword_t expect = random(my_vcpu) ^ invert;
-                    testword_t actual = *p;
+                    testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);
                     }
-                    *p = ~expect;
+                    write_word(p, ~expect);
                 } while (p++ < pe); // test before increment in case pointer overflows
                 do_tick(my_vcpu);
                 BAILOUT;

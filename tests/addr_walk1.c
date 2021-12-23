@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -56,7 +56,7 @@ int test_addr_walk1(int my_vcpu)
                     break;
                 }
                 testword_t expect = invert ^ (testword_t)p1;
-                *p1 = expect;
+                write_word(p1, expect);
 
                 // Walking one on our second address.
                 uintptr_t mask2 = sizeof(testword_t);
@@ -69,12 +69,12 @@ int test_addr_walk1(int my_vcpu)
                     if (p2 > (testword_t *)pe) {
                         break;
                     }
-                    *p2 = ~invert ^ (testword_t)p2;
+                    write_word(p2, ~invert ^ (testword_t)p2);
     
-                    testword_t actual = *p1;
+                    testword_t actual = read_word(p1);
                     if (unlikely(actual != expect)) {
                         addr_error(p1, p2, expect, actual);
-                        *p1 = expect;  // recover from error
+                        write_word(p1, expect);  // recover from error
                     }
                 } while (mask2);
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -60,7 +60,7 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
             }
             test_addr[my_vcpu] = (uintptr_t)p;
             do {
-                *p = inverse ? ~pattern : pattern;
+                write_word(p, inverse ? ~pattern : pattern);
                 pattern = pattern << 1 | pattern >> (TESTWORD_WIDTH - 1);  // rotate left
             } while (p++ < pe); // test before increment in case pointer overflows
             do_tick(my_vcpu);
@@ -96,11 +96,11 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                 test_addr[my_vcpu] = (uintptr_t)p;
                 do {
                     testword_t expect = inverse ? ~pattern : pattern;
-                    testword_t actual = *p;
+                    testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);
                     }
-                    *p = ~expect;
+                    write_word(p, ~expect);
                     pattern = pattern << 1 | pattern >> (TESTWORD_WIDTH - 1);  // rotate left
                 } while (p++ < pe); // test before increment in case pointer overflows
                 do_tick(my_vcpu);
@@ -132,11 +132,11 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                 do {
                     pattern = pattern >> 1 | pattern << (TESTWORD_WIDTH - 1);  // rotate right
                     testword_t expect = inverse ? pattern : ~pattern;
-                    testword_t actual = *p;
+                    testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);
                     }
-                    *p = ~expect;
+                    write_word(p, ~expect);
                 } while (p-- > ps); // test before decrement in case pointer overflows
                 do_tick(my_vcpu);
                 BAILOUT;

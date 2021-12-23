@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -59,7 +59,7 @@ static int pattern_fill(int my_vcpu, testword_t pattern)
             }
             test_addr[my_vcpu] = (uintptr_t)p;
             do {
-                *p = pattern;
+                write_word(p, pattern);
             } while (p++ < pe); // test before increment in case pointer overflows
             do_tick(my_vcpu);
             BAILOUT;
@@ -95,7 +95,7 @@ static int pattern_check(int my_vcpu, testword_t pattern)
             }
             test_addr[my_vcpu] = (uintptr_t)p;
             do {
-                testword_t actual = *p;
+                testword_t actual = read_word(p);
                 if (unlikely(actual != pattern)) {
                     data_error(p, pattern, actual, true);
                 }

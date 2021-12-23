@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -83,7 +83,7 @@ int test_mov_inv_fixed(int my_vcpu, int iterations, testword_t pattern1, testwor
 #endif
 #else
             do {
-                *p = pattern1;
+                write_word(p, pattern1);
             } while (p++ < pe); // test before increment in case pointer overflows
 #endif
             do_tick(my_vcpu);
@@ -116,11 +116,11 @@ int test_mov_inv_fixed(int my_vcpu, int iterations, testword_t pattern1, testwor
                 }
                 test_addr[my_vcpu] = (uintptr_t)p;
                 do {
-                    testword_t actual = *p;
+                    testword_t actual = read_word(p);
                     if (unlikely(actual != pattern1)) {
                         data_error(p, pattern1, actual, true);
                     }
-                    *p = pattern2;
+                    write_word(p, pattern2);
                 } while (p++ < pe); // test before increment in case pointer overflows
                 do_tick(my_vcpu);
                 BAILOUT;
@@ -149,11 +149,11 @@ int test_mov_inv_fixed(int my_vcpu, int iterations, testword_t pattern1, testwor
                 }
                 test_addr[my_vcpu] = (uintptr_t)p;
                 do {
-                    testword_t actual = *p;
+                    testword_t actual = read_word(p);
                     if (unlikely(actual != pattern2)) {
                         data_error(p, pattern2, actual, true);
                     }
-                    *p = pattern1;
+                    write_word(p, pattern1);
                 } while (p-- > ps); // test before decrement in case pointer overflows
                 do_tick(my_vcpu);
                 BAILOUT;

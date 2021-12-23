@@ -5,13 +5,26 @@
  * Provides some common definitions and helper functions for the memory
  * tests.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
 #include <stddef.h>
 #include <stdint.h>
 
 #include "test.h"
+
+/*
+ * Test word atomic read and write functions.
+ */
+#ifdef __x86_64__
+#include "memrw64.h"
+#define read_word   read64
+#define write_word  write64
+#else
+#include "memrw32.h"
+#define read_word   read32
+#define write_word  write32
+#endif
 
 /*
  * A wrapper for guiding branch prediction.
