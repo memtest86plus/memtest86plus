@@ -15,6 +15,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "boot.h"
+#include "bootparams.h"
+
 #include "cpuinfo.h"
 #include "hwctrl.h"
 #include "keyboard.h"
@@ -22,9 +25,11 @@
 #include "pmem.h"
 #include "screen.h"
 #include "smp.h"
+#include "usbkbd.h"
 
 #include "read.h"
 #include "print.h"
+#include "string.h"
 #include "unistd.h"
 
 #include "display.h"
@@ -56,6 +61,8 @@ static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
 
 static uint16_t popup_save_buffer[POP_W * POP_H];
 
+static bool smp_enabled = false;
+
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
@@ -74,9 +81,65 @@ bool            enable_pcpu[MAX_PCPUS];
 bool            enable_temperature = false;
 bool            enable_trace       = false;
 
+bool            pause_at_start     = true;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+static void parse_option(const char *option, const char *params)
+{
+    if (option[0] == '\0') return;
+
+    if (strncmp(option, "keyboard", 9) == 0 && params != NULL) {
+        if (strncmp(params, "legacy", 7) == 0) {
+            keyboard_types = KT_LEGACY;
+        } else if (strncmp(params, "usb", 4) == 0) {
+            keyboard_types = KT_USB;
+        } else if (strncmp(params, "buggy-usb", 10) == 0) {
+            keyboard_types = KT_USB;
+            usb_init_options = USB_EXTRA_RESET;
+        }
+    } else if (strncmp(option, "nopause", 8) == 0) {
+        pause_at_start = false;
+    } else if (strncmp(option, "smp", 4) == 0) {
+        smp_enabled = true;
+    }
+}
+
+static void parse_command_line(char *cmd_line, int cmd_line_size)
+{
+    const char *option = cmd_line;
+    const char *params = NULL;
+    for (int i = 0; i < cmd_line_size; i++) {
+        switch (cmd_line[i]) {
+          case '\0':
+            parse_option(option, params);
+            return;
+          case ' ':
+            cmd_line[i] = '\0';
+            parse_option(option, params);
+            option = &cmd_line[i+1];
+            params = NULL;
+            break;
+          case '=':
+            cmd_line[i] = '\0';
+            params = &cmd_line[i+1];
+            break;
+          default:
+            break;
+        }
+    }
+}
+
+static void display_initial_notice(void)
+{
+    if (smp_enabled) {
+        display_notice("Press <F1> to configure, <F2> to disable SMP, <Enter> to start testing");
+    } else {
+        display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
+    }
+}
 
 static void update_num_pages_to_test(void)
 {
@@ -496,7 +559,15 @@ void config_init(void)
     }
 
     enable_temperature = !no_temperature;
-    enable_trace       = false;
+
+    const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
+
+    uintptr_t cmd_line_addr = boot_params->cmd_line_ptr;
+    if (cmd_line_addr != 0) {
+        int cmd_line_size = boot_params->cmd_line_size;
+        if (cmd_line_size == 0) cmd_line_size = 255;
+        parse_command_line((char *)cmd_line_addr, cmd_line_size);
+    }
 }
 
 void config_menu(bool initial)
@@ -586,42 +657,39 @@ void config_menu(bool initial)
 
 void initial_config(void)
 {
-    display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
+    display_initial_notice();
 
-    bool got_key = false;
-    bool smp_enabled = false;
     bool smp_init_done = false;
-    for (int i = 0; i < 5000 && !got_key; i++) {
-        usleep(1000);
-        switch (get_key()) {
-          case ESC:
-            clear_message_area();
-            display_notice("Rebooting...");
-            reboot();
-            break;
-          case '1':
-            smp_init(smp_enabled);
-            smp_init_done = true;
-            config_menu(true);
-            got_key = true;
-            break;
-          case '2':
-            smp_enabled = !smp_enabled;
-            if (smp_enabled) {
-                display_notice("Press <F1> to configure, <F2> to disable SMP, <Enter> to start testing");
-            } else {
-                display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
+    if (pause_at_start) {
+        bool got_key = false;
+        for (int i = 0; i < 5000 && !got_key; i++) {
+            usleep(1000);
+            switch (get_key()) {
+              case ESC:
+                clear_message_area();
+                display_notice("Rebooting...");
+                reboot();
+                break;
+              case '1':
+                smp_init(smp_enabled);
+                smp_init_done = true;
+                config_menu(true);
+                got_key = true;
+                break;
+              case '2':
+                smp_enabled = !smp_enabled;
+                display_initial_notice();
+                i = 0;
+                break;
+              case ' ':
+                toggle_scroll_lock();
+                break;
+              case '\n':
+                got_key = true;
+                break;
+              default:
+                break;
             }
-            i = 0;
-            break;
-          case ' ':
-            toggle_scroll_lock();
-            break;
-          case '\n':
-            got_key = true;
-            break;
-          default:
-            break;
         }
     }
     if (!smp_init_done) {

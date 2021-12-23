@@ -9,7 +9,7 @@
 // boot_params struct. A pointer to this block is passed to the main program,
 // for compatiblity with the Linux 32-bit boot protocol.
 //
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from memtest86+ setup.S and head.S:
 //
@@ -161,6 +161,13 @@ do_setup:
 	# Copy code32_start to the boot_params struct.
 
 	movl	%eax, (BOOT_PARAMS_START + 0x214)
+
+	# Copy cmd_line_ptr and cmd_line_size to the boot_params struct.
+
+	movl	(cmd_line_ptr  - setup), %eax
+	movl	%eax, (BOOT_PARAMS_START + 0x228)
+	movl	(cmd_line_size - setup), %eax
+	movl	%eax, (BOOT_PARAMS_START + 0x238)
 
 	# Switch to protected mode.
 

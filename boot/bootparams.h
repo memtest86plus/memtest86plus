@@ -7,7 +7,7 @@
  * the Linux boot_params struct, although we only define the fields we are
  * interested in.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
 #include <stdint.h>
@@ -94,9 +94,13 @@ typedef struct {
     uint8_t         e820_entries;
     uint8_t         unused4[0x214 - 0x1e9];
     uint32_t        code32_start;
-    uint8_t         unused5[0x2d0 - 0x218];
+    uint8_t         unused5[0x228 - 0x218];
+    uint32_t        cmd_line_ptr;
+    uint8_t         unused6[0x238 - 0x22c];
+    uint32_t        cmd_line_size;
+    uint8_t         unused7[0x2d0 - 0x23c];
     e820_entry_t    e820_map[E820_MAP_SIZE];
-    uint8_t         unused6[0xeec - 0xd00];
+    uint8_t         unused8[0xeec - 0xd00];
 } __attribute__((packed)) boot_params_t;
 
 #endif /* BOOTPARAMS_H */

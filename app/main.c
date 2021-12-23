@@ -151,7 +151,7 @@ static void global_init(void)
 
     config_init();
 
-    keyboard_init(true);
+    keyboard_init(pause_at_start);
 
     display_init();
 

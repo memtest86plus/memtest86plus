@@ -4,7 +4,7 @@
 /*
  * Provides the configuration settings and pop-up menu.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -38,6 +38,8 @@ extern bool         enable_pcpu[MAX_PCPUS];
 
 extern bool         enable_temperature;
 extern bool         enable_trace;
+
+extern bool         pause_at_start;
 
 void config_init(void);
 
