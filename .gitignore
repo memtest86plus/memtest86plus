@@ -15,3 +15,6 @@ memtest_shared.bin
 *.img
 *.iso
 *.mbr
+
+# Directories
+grub-iso
