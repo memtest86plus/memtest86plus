@@ -8,6 +8,7 @@
 #include "pci.h"
 #include "screen.h"
 #include "usb.h"
+#include "vmem.h"
 
 #include "ohci.h"
 #include "xhci.h"
@@ -28,20 +29,23 @@
 //------------------------------------------------------------------------------
 
 typedef enum {
-    UHCI    = 0,
-    OHCI    = 1,
-    EHCI    = 2,
-    XHCI    = 3
-} usb_controller_type_t;
+    UHCI            = 0,
+    OHCI            = 1,
+    EHCI            = 2,
+    XHCI            = 3,
+    MAX_HCI_TYPE    = 4
+} hci_type_t;
 
 typedef struct {
-    usb_controller_type_t   type;
-    void                    *workspace;
+    hci_type_t      type;
+    void            *workspace;
 } usb_controller_info_t;
 
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
+
+static const char *hci_type_str[MAX_HCI_TYPE] = { "UHCI", "OHCI", "EHCI", "XHCI" };
 
 static usb_controller_info_t usb_controllers[MAX_USB_CONTROLLERS];
 
@@ -167,22 +171,43 @@ void find_usb_keyboards(bool pause_at_end)
 
                     // Test for a USB controller.
                     if (class_code == 0x0c03) {
-                        usb_controller_type_t controller_type = pci_config_read8 (bus, dev, func, 0x09) >> 4;
-                        uintptr_t base_addr;
-                        //uint8_t pm_cap_ptr;
-                        if (controller_type == UHCI) {
-                            base_addr = pci_config_read32(bus, dev, func, 0x20);
-                        } else {
-                            base_addr = pci_config_read32(bus, dev, func, 0x10);
+                        // Disable the device while we probe it.
+                        uint16_t control = pci_config_read16(bus, dev, func, 0x04);
+                        pci_config_write16(bus, dev, func, 0x04, control & ~0x0007);
+
+                        hci_type_t controller_type = pci_config_read8(bus, dev, func, 0x09) >> 4;
+                        if (controller_type >= MAX_HCI_TYPE) break;
+
+                        int bar = (controller_type == UHCI) ? 0x20 : 0x10;
+                        uintptr_t base_addr = pci_config_read32(bus, dev, func, bar);
+                        pci_config_write32(bus, dev, func, bar, 0xffffffff);
+                        uintptr_t mmio_size = pci_config_read32(bus, dev, func, bar);
+                        pci_config_write32(bus, dev, func, bar, base_addr);
 #ifdef __x86_64__
-                            if (base_addr & 0x4) {
-                                base_addr += (uintptr_t)pci_config_read32(bus, dev, func, 0x14) << 32;
-                            }
-#endif
+                        if (base_addr & 0x4) {
+                            base_addr += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
+                            pci_config_write32(bus, dev, func, bar + 4, 0xffffffff);
+                            mmio_size += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
+                            pci_config_write32(bus, dev, func, bar + 4, base_addr >> 32);
+                        } else {
+                            mmio_size += (uintptr_t)0xffffffff << 32;
                         }
+#endif
                         base_addr &= ~(uintptr_t)0xf;
+                        mmio_size &= ~(uintptr_t)0xf;
+                        mmio_size = ~mmio_size + 1;
+
+                        print_usb_info("Found %s controller %04x:%04x at %08x size %08x", hci_type_str[controller_type],
+                                       (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size);
+
+                        base_addr = map_device(base_addr, mmio_size);
+                        if (base_addr == 0) {
+                            print_usb_info("  Failed to map device into virtual memory");
+                            break;
+                        }
 
                         // Search for power management capability.
+                        //uint8_t pm_cap_ptr;
                         if (pci_status & 0x10) {
                             uint8_t cap_ptr = pci_config_read8(bus, dev, func, 0x34) & 0xfe;
                             while (cap_ptr != 0) {
@@ -201,30 +226,24 @@ void find_usb_keyboards(bool pause_at_end)
                             }
                         }
 
-                        // Make sure the device is enabled.
-                        uint16_t control = pci_config_read16(bus, dev, func, 0x04);
+                        // Enable the device.
                         pci_config_write16(bus, dev, func, 0x04, control | 0x0007);
 
                         // Initialise the device according to its type.
                         usb_controller_info_t *new_controller = &usb_controllers[num_usb_controllers];
                         new_controller->type = controller_type;
                         new_controller->workspace = NULL;
+
                         if (controller_type == UHCI) {
-                            print_usb_info("Found UHCI controller %04x:%04x at %08x",
-                                           (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr);
+                            print_usb_info("  This controller type is not supported yet");
                         }
                         if (controller_type == OHCI) {
-                            print_usb_info("Found OHCI controller %04x:%04x at %08x",
-                                           (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr);
                             new_controller->workspace = ohci_init(base_addr);
                         }
                         if (controller_type == EHCI) {
-                            print_usb_info("Found EHCI controller %04x:%04x at %08x",
-                                           (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr);
+                            print_usb_info("  This controller type is not supported yet");
                         }
                         if (controller_type == XHCI) {
-                            print_usb_info("Found XHCI controller %04x:%04x at %08x",
-                                           (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr);
                             new_controller->workspace = xhci_init(base_addr);
                         }
                         if (new_controller->workspace != NULL) {

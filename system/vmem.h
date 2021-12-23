@@ -5,7 +5,7 @@
  * Provides functions to handle physical memory page mapping into virtual
  * memory.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2021 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -16,7 +16,7 @@
 
 #define VM_WINDOW_SIZE     PAGE_C(1,GB)
 
-uintptr_t map_framebuffer(uintptr_t base_addr, size_t size);
+uintptr_t map_device(uintptr_t base_addr, size_t size);
 
 bool map_window(uintptr_t start_page);
 

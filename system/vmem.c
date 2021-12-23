@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2021 Martin Whitaker.
 //
 // Derived from memtest86+ vmem.c
 //
@@ -22,6 +22,8 @@
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
+
+static int          device_pages_used = 0;
 
 static uintptr_t    mapped_window = 2;
 
@@ -54,24 +56,20 @@ static void load_pdbr()
 // Public Functions
 //------------------------------------------------------------------------------
 
-uintptr_t map_framebuffer(uintptr_t base_addr, size_t size)
+uintptr_t map_device(uintptr_t base_addr, size_t size)
 {
-    uintptr_t first_page = base_addr >> VM_PAGE_SHIFT;
-    uintptr_t last_page  = (base_addr + size - 1) >> VM_PAGE_SHIFT;
-    if (first_page >= VM_PAGE_C(3,GB) && last_page < VM_PAGE_C(4,GB)) {
-        // No mapping required.
-        return base_addr;
-    }
+    uintptr_t first_virt_page = device_pages_used;
+    uintptr_t first_phys_page = base_addr >> VM_PAGE_SHIFT;
+    uintptr_t last_phys_page  = (base_addr + size - 1) >> VM_PAGE_SHIFT;
     // Compute the page table entries.
-    uintptr_t page = first_page;
-    for (int i = 0; i < 512; i++) {
-        pd3[i] = (page << VM_PAGE_SHIFT) + 0x83;
-        if (++page > last_page) break;
+    for (uintptr_t page = first_phys_page; page <= last_phys_page; page++) {
+        if (device_pages_used == 512) return 0;
+        pd3[device_pages_used++] = (page << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
     load_pdbr();
     // Return the mapped address.
-    return ADDR_C(3,GB) + base_addr % VM_PAGE_SIZE;
+    return ADDR_C(3,GB) + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
 bool map_window(uintptr_t start_page)
