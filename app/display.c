@@ -171,8 +171,6 @@ void display_start_test(void)
 void check_input(void)
 {
     switch (get_key()) {
-      case '0':
-        // fall through
       case ESC:
         clear_message_area();
         display_notice("Rebooting...");

@@ -196,7 +196,7 @@ static void test_selection_menu(void)
     prints(POP_R+5, POP_C+4, "<F3>  Add one test");
     prints(POP_R+6, POP_C+4, "<F4>  Add test range");
     prints(POP_R+7, POP_C+4, "<F5>  Add all tests");
-    prints(POP_R+8, POP_C+4, "<ESC> Exit menu");
+    prints(POP_R+8, POP_C+4, "<F10> Exit menu");
 
     display_selection_header(POP_R+10, NUM_TEST_PATTERNS - 1);
     for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
@@ -222,9 +222,7 @@ static void test_selection_menu(void)
           case '5':
             changed = set_all_tests(true);
             break;
-          case '0':
-            // fall through
-          case ESC: {
+          case '0': {
             clear_popup_row(POP_R+14);
             int num_selected = 0;
             for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
@@ -257,7 +255,7 @@ static void address_range_menu(void)
     prints(POP_R+3, POP_C+4, "<F1>  Set lower limit");
     prints(POP_R+4, POP_C+4, "<F2>  Set upper limit");
     prints(POP_R+5, POP_C+4, "<F3>  Test all memory");
-    prints(POP_R+6, POP_C+4, "<ESC> Exit menu");
+    prints(POP_R+6, POP_C+4, "<F10> Exit menu");
     printf(POP_R+8, POP_C+2, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
 
     bool exit_menu = false;
@@ -293,8 +291,6 @@ static void address_range_menu(void)
             changed = true;
             break;
           case '0':
-            // fall through
-          case ESC:
             exit_menu = true;
             break;
           default:
@@ -320,7 +316,7 @@ static void cpu_mode_menu(void)
     prints(POP_R+3, POP_C+4, "<F1>  Parallel    (All)");
     prints(POP_R+4, POP_C+4, "<F2>  Sequential  (Seq)");
     prints(POP_R+5, POP_C+4, "<F3>  Round robin (RR)");
-    prints(POP_R+6, POP_C+4, "<ESC> Exit menu");
+    prints(POP_R+6, POP_C+4, "<F10> Exit menu");
     printc(POP_R+3+cpu_mode, POP_C+2, '*');
 
     bool exit_menu = false;
@@ -335,8 +331,6 @@ static void cpu_mode_menu(void)
             printc(POP_R+3+cpu_mode, POP_C+2, '*');
             break;
           case '0':
-            // fall through
-          case ESC:
             exit_menu = true;
             break;
           default:
@@ -356,7 +350,7 @@ static void error_mode_menu(void)
     prints(POP_R+4, POP_C+4, "<F2>  Error summary");
     prints(POP_R+5, POP_C+4, "<F3>  Individual errors");
     prints(POP_R+6, POP_C+4, "<F4>  BadRAM patterns");
-    prints(POP_R+7, POP_C+4, "<ESC> Exit menu");
+    prints(POP_R+7, POP_C+4, "<F10> Exit menu");
     printc(POP_R+3+error_mode, POP_C+2, '*');
 
     bool exit_menu = false;
@@ -372,8 +366,6 @@ static void error_mode_menu(void)
             printc(POP_R+3+error_mode, POP_C+2, '*');
             break;
           case '0':
-            // fall through
-          case ESC:
             exit_menu = true;
             break;
           default:
@@ -441,7 +433,7 @@ static void cpu_selection_menu(void)
     prints(POP_R+5, POP_C+4, "<F3>  Add one CPU");
     prints(POP_R+6, POP_C+4, "<F4>  Add CPU range");
     prints(POP_R+7, POP_C+4, "<F5>  Add all CPUs");
-    prints(POP_R+8, POP_C+4, "<ESC> Exit menu");
+    prints(POP_R+8, POP_C+4, "<F10> Exit menu");
 
     display_selection_header(POP_R+10, num_pcpus - 1);
     printc(POP_R+12, POP_C+2, 'B');
@@ -469,8 +461,6 @@ static void cpu_selection_menu(void)
             changed = set_all_cpus(true);
             break;
           case '0':
-            // fall through
-          case ESC:
             clear_popup_row(POP_R+14);
             exit_menu = true;
             break;
@@ -532,10 +522,10 @@ void config_menu(bool initial)
             printf(POP_R+8,  POP_C+4, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
             if (no_temperature) set_foreground_colour(WHITE);
             printf(POP_R+9,  POP_C+4, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
-            prints(POP_R+10, POP_C+4, "<ESC> Exit menu");
+            prints(POP_R+10, POP_C+4, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_C+4, "<F5>  Skip current test");
-            prints(POP_R+8 , POP_C+4, "<ESC> Exit menu");
+            prints(POP_R+8 , POP_C+4, "<F10> Exit menu");
         }
 
         switch (get_key()) {
@@ -573,8 +563,6 @@ void config_menu(bool initial)
             }
             break;
           case '0':
-            // fall through
-          case ESC:
             exit_menu = true;
             break;
           default:
@@ -606,8 +594,6 @@ void initial_config(void)
     for (int i = 0; i < 5000 && !got_key; i++) {
         usleep(1000);
         switch (get_key()) {
-          case '0':
-            // fall through
           case ESC:
             clear_message_area();
             display_notice("Rebooting...");
