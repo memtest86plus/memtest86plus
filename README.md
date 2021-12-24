@@ -94,10 +94,21 @@ that file as if it were a Linux kernel with no initial RAM disk. Several
 boot command line options are recognised, as described below. If using the
 16-bit boot protocol, PCMemTest will use the display in text mode (640x400).
 If using the 32-bit or 64-bit boot protocols, PCMemTest will use the display
-in either text mode or graphics mode, as specified in the boot_params struct
+in either text mode or graphics mode, as specified in the `boot_params` struct
 passed to it by the bootloader. If in graphics mode, the supplied framebuffer
 must be at least 640x400 pixels; if larger, the display will be centred. If
 the system was booted in UEFI mode, graphics mode must be used.
+
+For test purposes, there is also an option to build an ISO image that uses
+GRUB as an intermediate bootloader. See the `Makefile` in the `build32` or
+`build64` directory for details. The ISO image is both legacy and UEFI
+bootable, so you need GRUB modules for both legacy and EFI boot installed
+on your build system. You may need to adjust some path and file names in
+the make file to match the naming on your system.
+
+The GRUB configuration files contained in the `grub` directory are there for
+use on the test ISO, but also serve as an example of how to boot PCMemTest
+from GRUB.
 
 ## Boot Options
 
@@ -126,14 +137,19 @@ default is to use both. An additional option on the boot command line is
 `buggy-usb` which enables the longer initialisation sequence required by some
 older USB devices.
 
-Note that older BIOSs usually support USB legacy keyboard emulation, which
-makes USB keyboards appear like legacy keyboards connected to ports 0x60
-and 0x64. This can often be enabled or disabled in the BIOS setup menus.
-If PCMemTest's USB device drivers are enabled, they will override this and
-access any USB keyboards directly. The downside of that is that the USB
-controllers and device drivers require some memory to be reserved for their
-private use, which means that memory can't then be covered by the memory
-tests.
+Older BIOSs usually support USB legacy keyboard emulation, which makes USB
+keyboards act like legacy keyboards connected to ports 0x60 and 0x64. This
+can often be enabled or disabled in the BIOS setup menus. If PCMemTest's
+USB device drivers are enabled, they will override this and access any USB
+keyboards directly. The downside of that is that the USB controllers and
+device drivers require some memory to be reserved for their private use,
+which means that memory can't then be covered by the memory tests. So to
+maximise test coverage, if it is supported, enable USB legacy keyboard
+emulation and add `keyboard=legacy` on the boot command line.
+
+**NOTE**: Some UEFI BIOSs only support USB legacy keyboard emulation when
+you enable the Compatibility System Module (CSM) in the BIOS setup. Others
+only support it when actually booting in legacy mode.
 
 **NOTE**: PCMemTest's USB device drivers are work in progress. Not all USB
 devices are supported yet.
@@ -493,9 +509,8 @@ of all zeros and all ones.
 
 ## Known Limitations and Bugs
 
-  * When booted on a UEFI system, keyboard input will only be seen if the
-    CSM is enabled in the BIOS. Without this, the test will run, but you
-    will be unable to alter the configuration.
+  * The UHCI and EHCI USB controllers are not yet supported.
+  * USB hubs (other than the controller root hub) are not yet supported.
   * Temperature reporting is currently only supported for Intel CPUs.
 
 ## Acknowledgments
