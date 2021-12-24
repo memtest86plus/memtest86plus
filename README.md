@@ -111,8 +111,8 @@ recognised:
     * enables the use of multiple CPU cores at startup
   * nopause
     * skips the pause for configuration at startup
-  * keyboard=<type>
-    * where <type> is one of
+  * keyboard=*type*
+    * where *type* is one of
       * legacy
       * usb
       * buggy-usb
@@ -135,8 +135,8 @@ controllers and device drivers require some memory to be reserved for their
 private use, which means that memory can't then be covered by the memory
 tests.
 
-PCMemTest's USB device drivers are work in progress. Not all USB devices are
-supported yet.
+**NOTE**: PCMemTest's USB device drivers are work in progress. Not all USB
+devices are supported yet.
 
 ## Operation
 
