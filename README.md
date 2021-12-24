@@ -14,6 +14,8 @@ later 32-bit or 64-bit CPU.
   * [Origins](#origins)
   * [Licensing](#licensing)
   * [Build and Installation](#build-and-installation)
+  * [Boot Options](#boot-options)
+  * [Keyboard Selection](#keyboard-selection)
   * [Operation](#operation)
   * [Error Display](#error-display)
   * [Trouble-shooting Memory Errors](#trouble-shooting-memory-errors)
@@ -39,7 +41,8 @@ In particular, no attempt is made to measure the cache and main memory speed,
 or to identify and report the DRAM type. This should allow PCMemTest to work
 without modification on future hardware.
 
-PCMemTest is based on the last public release of Memtest86+, v5.01.
+PCMemTest is based on the v5.01 release of Memtest86+, which was the last
+public release at the time of the fork.
 
 ## Licensing
 
@@ -84,16 +87,56 @@ Note that when writing to a USB Flash drive, the ISO image must be written
 directly ('dumped') to the raw device, either by using the `dd` command or
 by using a utility that provides the same functionality.
 
-When using an intermediate bootloader, the memtest.bin file should be stored
-in a disk partition the bootloader can access, and the bootloader configuration
-should be updated to boot from that file as if it were a Linux kernel with no
-initial RAM disk. Any boot command line options are ignored. If using the
+When using an intermediate bootloader, either the `memtest.bin` file or the
+`memtest.efi` file should be stored in a disk partition the bootloader can
+access, and the bootloader configuration should be updated to boot from
+that file as if it were a Linux kernel with no initial RAM disk. Several
+boot command line options are recognised, as described below. If using the
 16-bit boot protocol, PCMemTest will use the display in text mode (640x400).
 If using the 32-bit or 64-bit boot protocols, PCMemTest will use the display
 in either text mode or graphics mode, as specified in the boot_params struct
 passed to it by the bootloader. If in graphics mode, the supplied framebuffer
 must be at least 640x400 pixels; if larger, the display will be centred. If
 the system was booted in UEFI mode, graphics mode must be used.
+
+## Boot Options
+
+An intermediate bootloader may pass a boot command line to PCMemTest. The
+command line may contain one or more options, separated by spaces. Each
+option consists of an option name, optionally followed by an `=` sign and
+one or more parameters, separated by commas. The following options are
+recognised:
+
+  * smp
+    * enables the use of multiple CPU cores at startup
+  * nopause
+    * skips the pause for configuration at startup
+  * keyboard=<type>
+    * where <type> is one of
+      * legacy
+      * usb
+      * buggy-usb
+
+## Keyboard Selection
+
+PCMemTest supports both the legacy keyboard interface (using I/O ports 0x60
+and 0x64) and USB keyboards (using its own USB device drivers). One or the
+other can be selected via the boot command line, If neither is selected, the
+default is to use both. An additional option on the boot command line is
+`buggy-usb` which enables the longer initialisation sequence required by some
+older USB devices.
+
+Note that older BIOSs usually support USB legacy keyboard emulation, which
+makes USB keyboards appear like legacy keyboards connected to ports 0x60
+and 0x64. This can often be enabled or disabled in the BIOS setup menus.
+If PCMemTest's USB device drivers are enabled, they will override this and
+access any USB keyboards directly. The downside of that is that the USB
+controllers and device drivers require some memory to be reserved for their
+private use, which means that memory can't then be covered by the memory
+tests.
+
+PCMemTest's USB device drivers are work in progress. Not all USB devices are
+supported yet.
 
 ## Operation
 
