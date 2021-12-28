@@ -995,8 +995,8 @@ void *xhci_init(uintptr_t base_addr)
     for (int port_idx = 0; port_idx < num_ports; port_idx++) {
         if (num_keyboards >= MAX_KEYBOARDS) continue;
 
-        // Check if this port is valid.
-        if (port_type[port_idx] == 0) continue;
+        // We only expect to find keyboards on USB2 ports.
+        if (~port_type[port_idx] & PORT_TYPE_USB2) continue;
 
         // Check if anything is connected to this port.
         uint32_t port_status = read32(&op_regs->port_regs[port_idx].sc);
@@ -1004,9 +1004,7 @@ void *xhci_init(uintptr_t base_addr)
         num_devices++;
 
         // Reset the port (USB2 only).
-        if (port_type[port_idx] & PORT_TYPE_USB2) {
-            reset_xhci_port(op_regs, port_idx);
-        }
+        reset_xhci_port(op_regs, port_idx);
 
         // Wait for the device to be enabled.
         if (!wait_until_set(&op_regs->port_regs[port_idx].sc, XHCI_PORT_SC_PED, 500*MILLISEC)) continue;
