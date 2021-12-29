@@ -86,10 +86,10 @@ bool wait_until_set(const volatile uint32_t *reg, uint32_t bit_mask, int max_tim
 }
 
 int get_usb_keyboard_info_from_descriptors(const volatile uint8_t *desc_buffer, int desc_length,
-                                           usb_keyboard_info_t keyboard_info[], int keyboard_info_size)
+                                           usb_ep_info_t keyboard_info[], int keyboard_info_size)
 {
     int num_keyboards = 0;
-    usb_keyboard_info_t *kbd = NULL;
+    usb_ep_info_t *kbd = NULL;
     const volatile uint8_t *curr_ptr = desc_buffer + sizeof(usb_config_desc_t);
     const volatile uint8_t *tail_ptr = desc_buffer + desc_length;
     while (curr_ptr < tail_ptr) {

@@ -235,9 +235,8 @@ typedef struct {
     // Pointer to the host controller registers.
     ohci_op_regs_t      *op_regs;
 
-    // Values shared between functions during USB device initialisation.
-    int                 ep0_max_packet_size;
-    int                 config_total_length;
+    // Transient values used during device enumeration and configuration.
+    size_t              data_length;
 
     // Circular buffer for received keycodes.
     uint8_t             kc_buffer [WS_KC_BUFFER_SIZE];
@@ -249,7 +248,10 @@ typedef struct {
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define MIN(a, b)   ((a) < (b) ? (a) : (b))
+static size_t min(size_t a, size_t b)
+{
+    return (a < b) ? a : b;
+}
 
 static size_t num_pages(size_t size)
 {
@@ -263,7 +265,9 @@ static bool reset_ohci_port(ohci_op_regs_t *regs, int port_idx)
     for (int i = 0; i < 5; i++) {
         write32(&regs->rh_port_status[port_idx], OHCI_PORT_CONNECT_CHG | OHCI_PORT_RESET_CHG);
         write32(&regs->rh_port_status[port_idx], OHCI_SET_PORT_RESET);
-        if (!wait_until_set(&regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG, 500*MILLISEC)) return false;
+        if (!wait_until_set(&regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG, 500*MILLISEC)) {
+            return false;
+        }
     }
     write32(&regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG);
 
@@ -304,7 +308,7 @@ static bool wait_for_ohci_done(workspace_t *ws, int td_expected)
     return td_completed == td_expected;
 }
 
-static void build_ohci_td(ohci_td_t *td, uint32_t control, volatile void *buffer, size_t length)
+static void build_ohci_td(ohci_td_t *td, uint32_t control, const volatile void *buffer, size_t length)
 {
     td->control   = OHCI_TD_CC_NEW | control;
     td->curr_buff = (uintptr_t)buffer;
@@ -312,7 +316,7 @@ static void build_ohci_td(ohci_td_t *td, uint32_t control, volatile void *buffer
     td->next_td   = (uintptr_t)(td + 1);
 }
 
-static void build_ohci_ed(ohci_ed_t *ed, uint32_t control, ohci_td_t *head_td, ohci_td_t *tail_td)
+static void build_ohci_ed(ohci_ed_t *ed, uint32_t control, const ohci_td_t *head_td, const ohci_td_t *tail_td)
 {
     // Set the skip flag before modifying the head and tail pointers, in case we are modifying an active ED.
     // Use write32() to make sure the compiler doesn't reorder the writes.
@@ -322,69 +326,85 @@ static void build_ohci_ed(ohci_ed_t *ed, uint32_t control, ohci_td_t *head_td, o
     write32(&ed->control, control);
 }
 
-static uint32_t ohci_ed_control(int device_idx, int endpoint_idx, int max_packet_size, bool is_low_speed)
+static uint32_t ohci_ed_control(const usb_ep_info_t *ep)
 {
-    uint32_t control = OHCI_ED_FMT_GEN | OHCI_ED_DIR_TD | max_packet_size << 16 | endpoint_idx << 7 | device_idx;
-    if (is_low_speed) {
-        control |= OHCI_ED_SPD_LOW;
-    } else {
-        control |= OHCI_ED_SPD_FULL;
-    }
+    uint32_t control = OHCI_ED_FMT_GEN
+                     | OHCI_ED_DIR_TD
+                     | ep->device_speed
+                     | ep->max_packet_size << 16
+                     | ep->endpoint_num    << 7
+                     | ep->device_addr;
     return control;
 }
 
-static bool initialise_device(workspace_t *ws, int port_idx, int device_num, bool is_low_speed)
+static bool send_setup_request(workspace_t *ws, const usb_ep_info_t *ep, const usb_setup_pkt_t *setup_pkt)
 {
+    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
+    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
+    build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[2]);
+    write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
+    return wait_for_ohci_done(ws, 2);
+}
+
+static bool send_get_data_request(workspace_t *ws, const usb_ep_info_t *ep, const usb_setup_pkt_t *setup_pkt,
+                                  const volatile void *buffer, size_t length)
+{
+    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
+    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, buffer, length);
+    build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
+    build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[3]);
+    write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
+    return wait_for_ohci_done(ws, 3);
+}
+
+static bool initialise_device(workspace_t *ws, int port_idx, int device_speed, int device_addr, usb_ep_info_t *ep0)
+{
+    usb_setup_pkt_t setup_pkt;
+
+    // Initialise the endpoint descriptor for the default control pipe (endpoint 0).
+    ep0->device_speed    = device_speed;
+    ep0->device_addr     = 0;
+    ep0->interface_num   = 0;
+    ep0->endpoint_num    = 0;
+    ep0->max_packet_size = 8;
+    ep0->interval        = 0;
+
     // The device should currently be in Default state. We first fetch the first 8 bytes of the device descriptor to
     // discover the maximum packet size for the control endpoint. We then set the device address, which moves the
     // device into Addressed state, and fetch the full device descriptor. We don't currently make use of any of the
     // other fields of the device descriptor, but some USB devices may not work correctly if we don't fetch it.
-
-    ohci_op_regs_t *regs = ws->op_regs;
-
-    int usb_address = 0;
-    int fetch_length = 8;
-    int max_packet_size = 8;
+    size_t fetch_length = 8;
     goto fetch_device_descriptor;
 
   set_address:
-    build_setup_packet(ws->data, 0x00, 0x05, usb_address, 0, 0);
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, ws->data, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
-    build_ohci_ed(&ws->ed[0], ohci_ed_control(0, 0, max_packet_size, is_low_speed), &ws->td[0], &ws->td[2]);
-    write32(&regs->command_status, OHCI_CMD_CLF);
-    if (!wait_for_ohci_done(ws, 2)) {
+    build_setup_packet(&setup_pkt, 0x00, 0x05, device_addr, 0, 0);
+    if (!send_setup_request(ws, ep0, &setup_pkt)) {
         return false;
     }
+    ep0->device_addr = device_addr;
     usleep(2*MILLISEC);  // USB set address recovery time.
 
   fetch_device_descriptor:
-    build_setup_packet(ws->data, 0x80, 0x06, USB_DESC_DEVICE << 8, 0, fetch_length);
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, ws->data, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, ws->data, fetch_length);
-    build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
-    build_ohci_ed(&ws->ed[0], ohci_ed_control(usb_address, 0, max_packet_size, is_low_speed), &ws->td[0], &ws->td[3]);
-    write32(&regs->command_status, OHCI_CMD_CLF);
-    if (!wait_for_ohci_done(ws, 3) || !valid_usb_device_descriptor(ws->data)) {
+    build_setup_packet(&setup_pkt, 0x80, 0x06, USB_DESC_DEVICE << 8, 0, fetch_length);
+    if (!send_get_data_request(ws, ep0, &setup_pkt, ws->data, fetch_length)
+    ||  !valid_usb_device_descriptor(ws->data)) {
         return false;
     }
 
-    if (usb_address == 0) {
+    if (fetch_length == 8) {
         usb_device_desc_t *device = (usb_device_desc_t *)ws->data;
-        max_packet_size = device->max_packet_size;
-        if (!valid_usb_max_packet_size(max_packet_size, is_low_speed)) {
+        ep0->max_packet_size = device->max_packet_size;
+        if (!valid_usb_max_packet_size(ep0->max_packet_size, ep0->device_speed == OHCI_ED_SPD_LOW)) {
             return false;
         }
         if (usb_init_options & USB_EXTRA_RESET) {
-            if (!reset_ohci_port(regs, port_idx)) {
+            if (!reset_ohci_port(ws->op_regs, port_idx)) {
                 return false;
             }
         }
-        usb_address = device_num;
         fetch_length = sizeof(usb_device_desc_t);
         goto set_address;
     }
-    ws->ep0_max_packet_size = max_packet_size;
 
     // Fetch the first configuration descriptor and the associated interface and endpoint descriptors. Start by
     // requesting just the configuration descriptor. Then read the descriptor to determine whether we need to fetch
@@ -392,57 +412,41 @@ static bool initialise_device(workspace_t *ws, int port_idx, int device_num, boo
 
     fetch_length = sizeof(usb_config_desc_t);
   fetch_config_descriptor:
-    build_setup_packet(ws->data, 0x80, 0x06, USB_DESC_CONFIG << 8, 0, fetch_length);
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, ws->data, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, ws->data, fetch_length);
-    build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
-    build_ohci_ed(&ws->ed[0], ohci_ed_control(usb_address, 0, max_packet_size, is_low_speed), &ws->td[0], &ws->td[3]);
-    write32(&regs->command_status, OHCI_CMD_CLF);
-    if (!wait_for_ohci_done(ws, 3) || !valid_usb_config_descriptor(ws->data)) {
+    build_setup_packet(&setup_pkt, 0x80, 0x06, USB_DESC_CONFIG << 8, 0, fetch_length);
+    if (!send_get_data_request(ws, ep0, &setup_pkt, ws->data, fetch_length)
+    ||  !valid_usb_config_descriptor(ws->data)) {
         return false;
     }
     usb_config_desc_t *config = (usb_config_desc_t *)ws->data;
-    int total_length = MIN(config->total_length, WS_DATA_SIZE);
+    size_t total_length = min(config->total_length, WS_DATA_SIZE);
     if (total_length > fetch_length) {
         fetch_length = total_length;
         goto fetch_config_descriptor;
     }
-    ws->config_total_length = total_length;
+    ws->data_length = total_length;
 
     return true;
 }
 
-static bool configure_interface(workspace_t *ws, usb_keyboard_info_t *kbd)
+static bool configure_keyboard(workspace_t *ws, const usb_ep_info_t *ep0, const usb_ep_info_t *kbd)
 {
-    ohci_op_regs_t *regs = ws->op_regs;
+    usb_setup_pkt_t setup_pkt;
 
     // Set the device configuration.
-    build_setup_packet(ws->data, 0x00, 0x09, 1, 0, 0);
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, ws->data, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
-    build_ohci_ed(&ws->ed[0], ohci_ed_control(kbd->device_num, 0, ws->ep0_max_packet_size, kbd->port_speed), &ws->td[0], &ws->td[2]);
-    write32(&regs->command_status, OHCI_CMD_CLF);
-    if (!wait_for_ohci_done(ws, 2)) {
+    build_setup_packet(&setup_pkt, 0x00, 0x09, 1, 0, 0);
+    if (!send_setup_request(ws, ep0, &setup_pkt)) {
         return false;
     }
 
     // Set the idle duration to infinite.
-    build_setup_packet(ws->data, 0x21, 0x0a, 0, kbd->interface_num, 0);
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, ws->data, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
-    build_ohci_ed(&ws->ed[0], ohci_ed_control(kbd->device_num, 0, ws->ep0_max_packet_size, kbd->port_speed), &ws->td[0], &ws->td[2]);
-    write32(&regs->command_status, OHCI_CMD_CLF);
-    if (!wait_for_ohci_done(ws, 2)) {
+    build_setup_packet(&setup_pkt, 0x21, 0x0a, 0, kbd->interface_num, 0);
+    if (!send_setup_request(ws, ep0, &setup_pkt)) {
         return false;
     }
 
     // Select the boot protocol.
-    build_setup_packet(ws->data, 0x21, 0x0b, 0, kbd->interface_num, 0);
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, ws->data, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
-    build_ohci_ed(&ws->ed[0], ohci_ed_control(kbd->device_num, 0, ws->ep0_max_packet_size, kbd->port_speed), &ws->td[0], &ws->td[2]);
-    write32(&regs->command_status, OHCI_CMD_CLF);
-    if (!wait_for_ohci_done(ws, 2)) {
+    build_setup_packet(&setup_pkt, 0x21, 0x0b, 0, kbd->interface_num, 0);
+    if (!send_setup_request(ws, ep0, &setup_pkt)) {
         return false;
     }
 
@@ -554,10 +558,10 @@ void *ohci_init(uintptr_t base_addr)
     }
 
     // Scan the ports, looking for keyboards.
-    usb_keyboard_info_t keyboard_info[MAX_KEYBOARDS];
+    usb_ep_info_t keyboard_info[MAX_KEYBOARDS];
     int num_keyboards = 0;
     int num_devices = 0;
-    int device_num = 0;
+    int device_addr = 0;
     int min_interval = OHCI_MAX_INTERVAL;
     int num_ports = rh_descriptor_a & 0xf;
     for (int port_idx = 0; port_idx < num_ports; port_idx++) {
@@ -577,29 +581,30 @@ void *ohci_init(uintptr_t base_addr)
 
         // Now the port has been reset, we can determine the device speed.
         port_status = read32(&regs->rh_port_status[port_idx]);
-        bool is_low_speed = port_status & OHCI_PORT_LOW_SPEED;
+        uint32_t device_speed = (port_status & OHCI_PORT_LOW_SPEED) ? OHCI_ED_SPD_LOW : OHCI_ED_SPD_FULL;
 
         // Initialise the USB device. If successful, this leaves a set of configuration descriptors in the workspace
         // data buffer.
-        if (!initialise_device(ws, port_idx, ++device_num, is_low_speed)) {
+        usb_ep_info_t ep0;
+        if (!initialise_device(ws, port_idx, device_speed, ++device_addr, &ep0)) {
             goto disable_port;
         }
 
         // Scan the descriptors to see if this device has one or more keyboard interfaces and if so, record that
         // information in the keyboard info table.
-        usb_keyboard_info_t *new_keyboard_info = &keyboard_info[num_keyboards];
-        int new_keyboards = get_usb_keyboard_info_from_descriptors(ws->data, ws->config_total_length, new_keyboard_info,
+        usb_ep_info_t *new_keyboard_info = &keyboard_info[num_keyboards];
+        int new_keyboards = get_usb_keyboard_info_from_descriptors(ws->data, ws->data_length, new_keyboard_info,
                                                                    MAX_KEYBOARDS - num_keyboards);
 
         // Complete the new entries in the keyboard info table and configure the keyboard interfaces.
         for (int kbd_idx = 0; kbd_idx < new_keyboards; kbd_idx++) {
-            usb_keyboard_info_t *kbd = &new_keyboard_info[kbd_idx];
-            kbd->port_speed = is_low_speed;
-            kbd->device_num = device_num;
+            usb_ep_info_t *kbd = &new_keyboard_info[kbd_idx];
+            kbd->device_speed = device_speed;
+            kbd->device_addr  = device_addr;
             if (kbd->interval < min_interval) {
                 min_interval = kbd->interval;
             }
-            configure_interface(ws, kbd);
+            configure_keyboard(ws, &ep0, kbd);
 
             print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
                            1 + port_idx, kbd->interface_num, kbd->endpoint_num);
@@ -634,7 +639,7 @@ void *ohci_init(uintptr_t base_addr)
     // Initialise the interrupt ED and TD for each keyboard interface.
     ohci_ed_t *last_kbd_ed = NULL;
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
-        usb_keyboard_info_t *kbd = &keyboard_info[kbd_idx];
+        usb_ep_info_t *kbd = &keyboard_info[kbd_idx];
 
         ohci_ed_t *kbd_ed = &ws->ed[1 + kbd_idx];
         ohci_td_t *kbd_td = &ws->td[3 + kbd_idx];
@@ -642,7 +647,7 @@ void *ohci_init(uintptr_t base_addr)
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
         build_ohci_td(kbd_td, OHCI_TD_DP_IN | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_DLY, kbd_rpt, sizeof(hid_kbd_rpt_t));
-        build_ohci_ed(kbd_ed, ohci_ed_control(kbd->device_num, kbd->endpoint_num, kbd->max_packet_size, kbd->port_speed), kbd_td+0, kbd_td+1);
+        build_ohci_ed(kbd_ed, ohci_ed_control(kbd), kbd_td+0, kbd_td+1);
 
         kbd_ed->next_ed = (uintptr_t)last_kbd_ed;
         last_kbd_ed = kbd_ed;

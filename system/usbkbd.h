@@ -13,16 +13,16 @@
 #include <usb.h>
 
 /*
- * A USB keyboard device descriptor used internally by the various HCI drivers.
+ * A USB endpoint descriptor used internally by the various HCI drivers.
  */
 typedef struct {
-    int     port_speed;
-    int     device_num;
+    int     device_speed;
+    int     device_addr;
     int     interface_num;
     int     endpoint_num;
     int     max_packet_size;
     int     interval;
-} usb_keyboard_info_t;
+} usb_ep_info_t;
 
 /*
  * A set of USB device initialisation options.
@@ -40,14 +40,12 @@ typedef enum {
 extern usb_init_options_t usb_init_options;
 
 /*
- * Constructs a USB setup packet in buffer using the provided values/
+ * Constructs a USB setup packet in buffer using the provided values.
  *
  * Used internally by the various HCI drivers.
  */
-static inline void build_setup_packet(volatile void *buffer, int type, int request, int value, int index, int length)
+static inline void build_setup_packet(usb_setup_pkt_t *pkt, int type, int request, int value, int index, int length)
 {
-    usb_setup_pkt_t *pkt = (usb_setup_pkt_t *)buffer;
-
     pkt->type    = type;
     pkt->request = request;
     pkt->value   = value;
@@ -118,7 +116,7 @@ bool wait_until_set(const volatile uint32_t *reg, uint32_t bit_mask, int max_tim
  * Used internally by the various HCI drivers.
  */
 int get_usb_keyboard_info_from_descriptors(const volatile uint8_t *desc_buffer, int desc_length,
-                                           usb_keyboard_info_t keyboard_info[], int keyboard_info_size);
+                                           usb_ep_info_t keyboard_info[], int keyboard_info_size);
 
 /*
  * Displays an informational message, scrolling the screen if necessary.

@@ -317,21 +317,25 @@ typedef struct {
     xhci_rt_regs_t      *rt_regs;
     xhci_db_reg_t       *db_regs;
 
+    // Device context information.
+    uint64_t            *device_context_index;
+    size_t              context_size;
+
     // Host controller TRB ring enqueue cycle and index.
     uint32_t            cr_enqueue_state;
     uint32_t            er_dequeue_state;
 
-    // Values shared between functions during USB device initialisation.
-    int32_t             config_total_length;
+    // Transient values used during device enumeration and configuration.
+    size_t              data_length;
     uintptr_t           input_context_addr;
     uintptr_t           output_context_addr;
     uintptr_t           control_ep_tr_addr;
 
     // Keyboard slot ID lookup table
-    int32_t             kbd_slot_id [MAX_KEYBOARDS];
+    uint8_t             kbd_slot_id [MAX_KEYBOARDS];
 
     // Keyboard endpoint ID lookup table
-    int32_t             kbd_ep_id   [MAX_KEYBOARDS];
+    uint8_t             kbd_ep_id   [MAX_KEYBOARDS];
 
     // Circular buffer for received keycodes.
     uint8_t             kc_buffer [WS_KC_BUFFER_SIZE];
@@ -355,7 +359,10 @@ static int heap_segment = -1;
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define MIN(a, b)   ((a) < (b) ? (a) : (b))
+static size_t min(size_t a, size_t b)
+{
+    return (a < b) ? a : b;
+}
 
 static size_t num_pages(size_t size)
 {
@@ -395,9 +402,9 @@ static void memcpy32(void *dst, const void *src, size_t size)
 }
 #endif
 
-static int default_max_packet_size(int port_speed)
+static int default_max_packet_size(int device_speed)
 {
-    switch (port_speed) {
+    switch (device_speed) {
       case XHCI_LOW_SPEED:
         return 8;
       case XHCI_FULL_SPEED:
@@ -409,9 +416,9 @@ static int default_max_packet_size(int port_speed)
     }
 }
 
-static int xhci_ep_interval(int config_interval, int port_speed)
+static int xhci_ep_interval(int config_interval, int device_speed)
 {
-    if (port_speed < XHCI_HIGH_SPEED) {
+    if (device_speed < XHCI_HIGH_SPEED) {
         int log2_interval = 7;
         while ((1 << log2_interval) > config_interval) {
             log2_interval--;
@@ -448,7 +455,7 @@ static bool halt_host_controller(xhci_op_regs_t *op_regs)
     return wait_until_set(&op_regs->usb_status, XHCI_USBSTS_HCH, 20*MILLISEC);
 }
 
-static int get_xhci_port_speed(xhci_op_regs_t *op_regs, int port_idx)
+static int get_xhci_device_speed(xhci_op_regs_t *op_regs, int port_idx)
 {
     return (read32(&op_regs->port_regs[port_idx].sc) & XHCI_PORT_SC_PS) >> XHCI_PORT_SC_PS_OFFSET;
 }
@@ -566,15 +573,15 @@ static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int m
     return event_cc(event);
 }
 
-static void issue_setup_stage_trb(ep_tr_t *ep_tr, const volatile uint8_t *packet, int transfer_length)
+static void issue_setup_stage_trb(ep_tr_t *ep_tr, const usb_setup_pkt_t *setup_pkt)
 {
-    uint64_t params1 = *(const uint64_t *)packet;
-    uint32_t params2 = transfer_length;
+    uint64_t params1 = *(const uint64_t *)setup_pkt;
+    uint32_t params2 = sizeof(usb_setup_pkt_t);
     uint32_t control = XHCI_TRB_SETUP_STAGE | XHCI_TRB_TRT_IN | XHCI_TRB_IDT;
     ep_tr->enqueue_state = enqueue_trb(ep_tr->tr, EP_TR_SIZE, ep_tr->enqueue_state, control, params1, params2);
 }
 
-static void issue_data_stage_trb(ep_tr_t *ep_tr, const volatile uint8_t *buffer, uint32_t dir, int transfer_length)
+static void issue_data_stage_trb(ep_tr_t *ep_tr, const volatile void *buffer, uint32_t dir, size_t transfer_length)
 {
     uint64_t params1 = (uintptr_t)buffer;
     uint32_t params2 = transfer_length;
@@ -588,12 +595,38 @@ static void issue_status_stage_trb(ep_tr_t *ep_tr, uint32_t dir)
     ep_tr->enqueue_state = enqueue_trb(ep_tr->tr, EP_TR_SIZE, ep_tr->enqueue_state, control, 0, 0);
 }
 
-static void issue_normal_trb(ep_tr_t *ep_tr, const volatile void *buffer, uint32_t dir, int transfer_length)
+static void issue_normal_trb(ep_tr_t *ep_tr, const volatile void *buffer, uint32_t dir, size_t transfer_length)
 {
     uint64_t params1 = (uintptr_t)buffer;
     uint32_t params2 = transfer_length;
     uint32_t control = XHCI_TRB_NORMAL | dir | XHCI_TRB_IOC;
     ep_tr->enqueue_state = enqueue_trb(ep_tr->tr, EP_TR_SIZE, ep_tr->enqueue_state, control, params1, params2);
+}
+
+static bool send_setup_request(workspace_t *ws, int slot_id, const usb_setup_pkt_t *setup_pkt)
+{
+    xhci_trb_t event;
+
+    ep_tr_t *ep_tr = (ep_tr_t *)ws->control_ep_tr_addr;
+
+    issue_setup_stage_trb(ep_tr, setup_pkt);
+    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_IN);
+    ring_device_doorbell(ws->db_regs, slot_id, 1);
+    return wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS;
+}
+
+static bool send_get_data_request(workspace_t *ws, int slot_id, const usb_setup_pkt_t *setup_pkt,
+                                  const volatile void *buffer, size_t length)
+{
+    xhci_trb_t event;
+
+    ep_tr_t *ep_tr = (ep_tr_t *)ws->control_ep_tr_addr;
+
+    issue_setup_stage_trb(ep_tr, setup_pkt);
+    issue_data_stage_trb(ep_tr, buffer, XHCI_TRB_DIR_IN, length);
+    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_OUT);
+    ring_device_doorbell(ws->db_regs, slot_id, 1);
+    return wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS;
 }
 
 static bool disable_xhci_slot(workspace_t *ws, int slot_id)
@@ -602,19 +635,21 @@ static bool disable_xhci_slot(workspace_t *ws, int slot_id)
 
     enqueue_xhci_command(ws, XHCI_TRB_DISABLE_SLOT | slot_id << 24, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 10*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS) {
+    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 10*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
         return false;
     }
     return true;
 }
 
-static int init_device(workspace_t *ws, int port_idx, int slot_type, int context_size, uint64_t device_context_index[])
+static int initialise_device(workspace_t *ws, int port_idx, int slot_type)
 {
+    usb_setup_pkt_t setup_pkt;
+
     xhci_trb_t event;
 
     // Get the port speed.
 
-    int port_speed = get_xhci_port_speed(ws->op_regs, port_idx);
+    int device_speed = get_xhci_device_speed(ws->op_regs, port_idx);
 
     // Allocate a device slot and set up its output context.
 
@@ -625,21 +660,21 @@ static int init_device(workspace_t *ws, int port_idx, int slot_type, int context
     }
     int slot_id = event_slot_id(&event);
 
-    write64(&device_context_index[slot_id], ws->output_context_addr);
+    write64(&ws->device_context_index[slot_id], ws->output_context_addr);
 
     // Prepare the input context for the ADDRESS_DEVICE command.
 
     xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
     ctrl_context->add_context_flags = XHCI_CONTEXT_A0 | XHCI_CONTEXT_A1;
 
-    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + context_size);
+    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
     slot_context->root_hub_port_num = 1 + port_idx;
-    slot_context->params1           = 1 << 27 | port_speed << 20;
+    slot_context->params1           = 1 << 27 | device_speed << 20;
 
-    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + 2 * context_size);
+    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + 2 * ws->context_size);
     ep_context->params2             = XHCI_EP_CONTROL << 3 | 3 << 1; // EP Type | CErr
     ep_context->max_burst_size      = 0;
-    ep_context->max_packet_size     = default_max_packet_size(port_speed);
+    ep_context->max_packet_size     = default_max_packet_size(device_speed);
     ep_context->tr_dequeue_ptr      = ws->control_ep_tr_addr | 1;
 
     // Initialise the control endpoint transfer ring.
@@ -652,9 +687,9 @@ static int init_device(workspace_t *ws, int port_idx, int slot_type, int context
     // compatibility with some older USB devices we need to read the first 8 bytes of the device descriptor before
     // actually setting the address. We can conveniently combine both these requirements.
 
-    int fetch_length = sizeof(usb_device_desc_t);
+    size_t fetch_length = sizeof(usb_device_desc_t);
     uint32_t command_flags = 0;
-    if (port_speed < XHCI_HIGH_SPEED) {
+    if (device_speed < XHCI_HIGH_SPEED) {
         fetch_length  = 8;
         command_flags = XHCI_TRB_BSR;
     }
@@ -668,20 +703,16 @@ static int init_device(workspace_t *ws, int port_idx, int slot_type, int context
         usleep(2*MILLISEC);  // USB set address recovery time.
     }
 
-    build_setup_packet(ws->data, 0x80, 0x06, USB_DESC_DEVICE << 8, 0, fetch_length);
-    issue_setup_stage_trb(ep_tr, ws->data, sizeof(usb_setup_pkt_t));
-    issue_data_stage_trb(ep_tr, ws->data, XHCI_TRB_DIR_IN, fetch_length);
-    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_OUT);
-    ring_device_doorbell(ws->db_regs, slot_id, 1);
-    if (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS
-    || !valid_usb_device_descriptor(ws->data)) {
+    build_setup_packet(&setup_pkt, 0x80, 0x06, USB_DESC_DEVICE << 8, 0, fetch_length);
+    if (!send_get_data_request(ws, slot_id, &setup_pkt, ws->data, fetch_length)
+    ||  !valid_usb_device_descriptor(ws->data)) {
         goto disable_slot;
     }
 
-    if (command_flags == XHCI_TRB_BSR) {
+    if (fetch_length == 8) {
         usb_device_desc_t *device = (usb_device_desc_t *)ws->data;
-        if (!valid_usb_max_packet_size(device->max_packet_size, port_speed == XHCI_LOW_SPEED)) {
-            return false;
+        if (!valid_usb_max_packet_size(device->max_packet_size, device_speed == XHCI_LOW_SPEED)) {
+            goto disable_slot;
         }
         if (usb_init_options & USB_EXTRA_RESET) {
             reset_xhci_port(ws->op_regs, port_idx);
@@ -700,34 +731,32 @@ static int init_device(workspace_t *ws, int port_idx, int slot_type, int context
 
     fetch_length = sizeof(usb_config_desc_t);
   fetch_config_descriptor:
-    build_setup_packet(ws->data, 0x80, 0x06, USB_DESC_CONFIG << 8, 0, fetch_length);
-    issue_setup_stage_trb(ep_tr, ws->data, sizeof(usb_setup_pkt_t));
-    issue_data_stage_trb(ep_tr, ws->data, XHCI_TRB_DIR_IN, fetch_length);
-    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_OUT);
-    ring_device_doorbell(ws->db_regs, slot_id, 1);
-    if (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS
+    build_setup_packet(&setup_pkt, 0x80, 0x06, USB_DESC_CONFIG << 8, 0, fetch_length);
+    if (!send_get_data_request(ws, slot_id, &setup_pkt, ws->data, fetch_length)
     || !valid_usb_config_descriptor(ws->data)) {
         goto disable_slot;
     }
     usb_config_desc_t *config = (usb_config_desc_t *)ws->data;
-    int total_length = MIN(config->total_length, WS_DATA_SIZE);
+    size_t total_length = min(config->total_length, WS_DATA_SIZE);
     if (total_length > fetch_length) {
         fetch_length = total_length;
         goto fetch_config_descriptor;
     }
-    ws->config_total_length = total_length;
+    ws->data_length = total_length;
 
     return slot_id;
 
   disable_slot:
     if (disable_xhci_slot(ws, slot_id)) {
-        write64(&device_context_index[slot_id], 0);
+        write64(&ws->device_context_index[slot_id], 0);
     }
     return 0;
 }
 
-static bool configure_interface(workspace_t *ws, int slot_id, int context_size, usb_keyboard_info_t *kbd, int kbd_idx)
+static bool configure_keyboard(workspace_t *ws, int slot_id, int kbd_idx, usb_ep_info_t *kbd)
 {
+    usb_setup_pkt_t setup_pkt;
+
     xhci_trb_t event;
 
     // Calculate the endpoint ID. This is used both to select an endpoint context and as a doorbell target.
@@ -743,10 +772,10 @@ static bool configure_interface(workspace_t *ws, int slot_id, int context_size, 
     xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
     ctrl_context->add_context_flags = XHCI_CONTEXT_A0 | 1 << ep_id;
 
-    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + context_size);
-    slot_context->params1           = ep_id << 27 | kbd->port_speed << 20;
+    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
+    slot_context->params1           = ep_id << 27 | kbd->device_speed << 20;
 
-    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * context_size);
+    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * ws->context_size);
     ep_context->params1             = 0;
     ep_context->params2             = XHCI_EP_INTERRUPT_IN << 3 | 3 << 1; // EP Type | CErr
     ep_context->interval            = kbd->interval;
@@ -765,32 +794,21 @@ static bool configure_interface(workspace_t *ws, int slot_id, int context_size, 
 
     // Now configure the device itself.
 
-    ep_tr_t *ep_tr = (ep_tr_t *)ws->control_ep_tr_addr;
-
     // Set the device configuration.
-    build_setup_packet(ws->data, 0x00, 0x09, 1, 0, 0);
-    issue_setup_stage_trb(ep_tr, ws->data, sizeof(usb_setup_pkt_t));
-    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_IN);
-    ring_device_doorbell(ws->db_regs, slot_id, 1);
-    if (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    build_setup_packet(&setup_pkt, 0x00, 0x09, 1, 0, 0);
+    if (!send_setup_request(ws, slot_id, &setup_pkt)) {
         return false;
     }
 
     // Set the idle duration to infinite.
-    build_setup_packet(ws->data, 0x21, 0x0a, 0, kbd->interface_num, 0);
-    issue_setup_stage_trb(ep_tr, ws->data, sizeof(usb_setup_pkt_t));
-    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_IN);
-    ring_device_doorbell(ws->db_regs, slot_id, 1);
-    if (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    build_setup_packet(&setup_pkt, 0x21, 0x0a, 0, kbd->interface_num, 0);
+    if (!send_setup_request(ws, slot_id, &setup_pkt)) {
         return false;
     }
 
     // Select the boot protocol.
-    build_setup_packet(ws->data, 0x21, 0x0b, 0, kbd->interface_num, 0);
-    issue_setup_stage_trb(ep_tr, ws->data, sizeof(usb_setup_pkt_t));
-    issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_IN);
-    ring_device_doorbell(ws->db_regs, slot_id, 1);
-    if (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    build_setup_packet(&setup_pkt, 0x21, 0x0b, 0, kbd->interface_num, 0);
+    if (!send_setup_request(ws, slot_id, &setup_pkt)) {
         return false;
     }
 
@@ -904,7 +922,7 @@ void *xhci_init(uintptr_t base_addr)
     xhci_rt_regs_t *rt_regs = (xhci_rt_regs_t *)(base_addr + cap_regs->rts_offset);
     xhci_db_reg_t  *db_regs = (xhci_db_reg_t  *)(base_addr + cap_regs->db_offset);
 
-    // Ensure the controller is halted before resetting it.
+    // Ensure the controller is halted and then reset it.
     if (!halt_host_controller(op_regs)) return NULL;
 
     if (!reset_host_controller(op_regs)) return NULL;
@@ -963,6 +981,10 @@ void *xhci_init(uintptr_t base_addr)
     ws->rt_regs = rt_regs;
     ws->db_regs = db_regs;
 
+    ws->device_context_index = device_context_index;
+
+    ws->context_size = cap_regs->hcc_params1 & 0x4 ? 64 : 32;
+
     ws->cr_enqueue_state = WS_CR_SIZE;  // cycle = 1, index = 0
     ws->er_dequeue_state = WS_ER_SIZE;  // cycle = 1, index = 0
 
@@ -984,11 +1006,8 @@ void *xhci_init(uintptr_t base_addr)
     }
     usleep(100*MILLISEC);  // USB maximum device attach time.
 
-    // Record the controller context size.
-    uint32_t context_size = cap_regs->hcc_params1 & 0x4 ? 64 : 32;
-
     // Scan the ports, looking for keyboards.
-    usb_keyboard_info_t keyboard_info[MAX_KEYBOARDS];
+    usb_ep_info_t keyboard_info[MAX_KEYBOARDS];
     int num_keyboards = 0;
     int num_devices = 0;
     int num_ports = cap_regs->hcs_params1 & 0xff;
@@ -1030,24 +1049,24 @@ void *xhci_init(uintptr_t base_addr)
 
         // Initialise the device. If successful, this leaves a set of configuration descriptors in the workspace
         // data buffer.
-        int slot_id = init_device(ws, port_idx, slot_type, context_size, device_context_index);
+        int slot_id = initialise_device(ws, port_idx, slot_type);
         if (slot_id == 0) {
             goto disable_port;
         }
 
         // Scan the descriptors to see if this device has one or more keyboard interfaces and if so, record that
         // information in the keyboard info table.
-        usb_keyboard_info_t *new_keyboard_info = &keyboard_info[num_keyboards];
-        int new_keyboards = get_usb_keyboard_info_from_descriptors(ws->data, ws->config_total_length, new_keyboard_info,
+        usb_ep_info_t *new_keyboard_info = &keyboard_info[num_keyboards];
+        int new_keyboards = get_usb_keyboard_info_from_descriptors(ws->data, ws->data_length, new_keyboard_info,
                                                                    MAX_KEYBOARDS - num_keyboards);
 
         // Complete the new entries in the keyboard info table and configure the keyboard interfaces.
         for (int kbd_idx = 0; kbd_idx < new_keyboards; kbd_idx++) {
-            usb_keyboard_info_t *kbd = &new_keyboard_info[kbd_idx];
+            usb_ep_info_t *kbd = &new_keyboard_info[kbd_idx];
 
-            kbd->port_speed = get_xhci_port_speed(op_regs, port_idx);
-            kbd->interval   = xhci_ep_interval(kbd->interval, kbd->port_speed);
-            configure_interface(ws, slot_id, context_size, kbd, num_keyboards + kbd_idx);
+            kbd->device_speed = get_xhci_device_speed(op_regs, port_idx);
+            kbd->interval     = xhci_ep_interval(kbd->interval, kbd->device_speed);
+            configure_keyboard(ws, slot_id, num_keyboards + kbd_idx, kbd);
 
             print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
                            1 + port_idx, kbd->interface_num, kbd->endpoint_num);
@@ -1061,7 +1080,7 @@ void *xhci_init(uintptr_t base_addr)
         // If we didn't find any keyboard interfaces, we can free the allocated resources and disable the port.
 
         if (disable_xhci_slot(ws, slot_id)) {
-            write64(&device_context_index[slot_id], 0);
+            write64(&ws->device_context_index[slot_id], 0);
         }
 
       disable_port:
