@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2021 Martin Whitaker.
+// Copyright (C) 2021-2022 Martin Whitaker.
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -152,13 +152,12 @@
 
 #define OHCI_MAX_INTERVAL       32
 
-// Values specific to this implementation.
+// Values specific to this driver.
 
 #define MAX_KEYBOARDS           8                   // per host controller
 
 #define WS_ED_SIZE              (1 + MAX_KEYBOARDS) // Endpoint Descriptors
 #define WS_TD_SIZE              (3 + MAX_KEYBOARDS) // Transfer Descriptors
-#define WS_DATA_SIZE            1024                // bytes
 #define WS_KC_BUFFER_SIZE       8                   // keycodes
 
 #define MILLISEC                1000                // in microseconds
@@ -221,25 +220,21 @@ typedef volatile struct {
 // Data structures specific to this implementation.
 
 typedef struct {
+    hcd_workspace_t     base_ws;
+
     // System memory data structures used by the host controller.
     ohci_hcca_t         hcca;
-    ohci_ed_t           ed [WS_ED_SIZE];
-    ohci_td_t           td [WS_TD_SIZE];
+    ohci_ed_t           ed[WS_ED_SIZE];
+    ohci_td_t           td[WS_TD_SIZE];
 
-    // Data transfer buffers.
-    union {
-      volatile uint8_t  data    [WS_DATA_SIZE];
-      hid_kbd_rpt_t     kbd_rpt [MAX_KEYBOARDS];
-    };
+    // Keyboad data transfer buffers.
+    hid_kbd_rpt_t       kbd_rpt[MAX_KEYBOARDS];
 
     // Pointer to the host controller registers.
     ohci_op_regs_t      *op_regs;
 
-    // Transient values used during device enumeration and configuration.
-    size_t              data_length;
-
     // Circular buffer for received keycodes.
-    uint8_t             kc_buffer [WS_KC_BUFFER_SIZE];
+    uint8_t             kc_buffer[WS_KC_BUFFER_SIZE];
     int                 kc_index_i;
     int                 kc_index_o;
 } workspace_t  __attribute__ ((aligned (256)));
@@ -248,67 +243,61 @@ typedef struct {
 // Private Functions
 //------------------------------------------------------------------------------
 
-static size_t min(size_t a, size_t b)
-{
-    return (a < b) ? a : b;
-}
-
 static size_t num_pages(size_t size)
 {
     return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 }
 
-static bool reset_ohci_port(ohci_op_regs_t *regs, int port_idx)
+static bool reset_ohci_port(ohci_op_regs_t *op_regs, int port_idx)
 {
     // The OHCI reset lasts for 10ms, but the USB specification calls for 50ms (but not necessarily continuously).
     // So do it 5 times.
     for (int i = 0; i < 5; i++) {
-        write32(&regs->rh_port_status[port_idx], OHCI_PORT_CONNECT_CHG | OHCI_PORT_RESET_CHG);
-        write32(&regs->rh_port_status[port_idx], OHCI_SET_PORT_RESET);
-        if (!wait_until_set(&regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG, 500*MILLISEC)) {
+        write32(&op_regs->rh_port_status[port_idx], OHCI_PORT_CONNECT_CHG | OHCI_PORT_RESET_CHG);
+        write32(&op_regs->rh_port_status[port_idx], OHCI_SET_PORT_RESET);
+        if (!wait_until_set(&op_regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG, 1000*MILLISEC)) {
             return false;
         }
     }
-    write32(&regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG);
-
-    usleep(10*MILLISEC);  // USB reset recovery time
-
-    // Check the port is now active.
-    uint32_t status = read32(&regs->rh_port_status[port_idx]);
-    if ( status & OHCI_PORT_RESETING)  return false;
-    if (~status & OHCI_PORT_CONNECTED) return false;
-    if (~status & OHCI_PORT_ENABLED)   return false;
+    write32(&op_regs->rh_port_status[port_idx], OHCI_PORT_RESET_CHG);
 
     return true;
 }
 
-static ohci_td_t *get_ohci_done_head(workspace_t *ws)
+static ohci_td_t *get_ohci_done_head(const workspace_t *ws)
 {
-    if (!wait_until_set(&ws->op_regs->interrupt_status, OHCI_INTR_WDH, 10*MILLISEC)) {
+    ohci_op_regs_t *op_regs = ws->op_regs;
+
+    if (~read32(&op_regs->interrupt_status) & OHCI_INTR_WDH) {
         return NULL;
     }
     uintptr_t done_head = ws->hcca.done_head & 0xfffffffe;
-    write32(&ws->op_regs->interrupt_status, OHCI_INTR_WDH);
+    write32(&op_regs->interrupt_status, OHCI_INTR_WDH);
     return (ohci_td_t *)done_head;
 }
 
-static bool wait_for_ohci_done(workspace_t *ws, int td_expected)
+static bool wait_for_ohci_done(const workspace_t *ws, int td_expected)
 {
     int td_completed = 0;
 
-    ohci_td_t *td = get_ohci_done_head(ws);
-    while (td != NULL) {
-        td_completed++;
-        if ((td->control & OHCI_TD_CC) != OHCI_TD_CC_NO_ERR) {
-            return false;
+    // Rely on the controller to timeout if the device doesn't respond.
+    while (true) {
+        ohci_td_t *td = get_ohci_done_head(ws);
+        while (td != NULL) {
+            td_completed++;
+            if ((td->control & OHCI_TD_CC) != OHCI_TD_CC_NO_ERR) {
+                return false;
+            }
+            td = (ohci_td_t *)((uintptr_t)td->next_td);
         }
-        td = (ohci_td_t *)((uintptr_t)td->next_td);
+        if (td_completed == td_expected) break;
+        usleep(10);
     }
 
-    return td_completed == td_expected;
+    return true;
 }
 
-static void build_ohci_td(ohci_td_t *td, uint32_t control, const volatile void *buffer, size_t length)
+static void build_ohci_td(ohci_td_t *td, uint32_t control, const void *buffer, size_t length)
 {
     td->control   = OHCI_TD_CC_NEW | control;
     td->curr_buff = (uintptr_t)buffer;
@@ -326,19 +315,35 @@ static void build_ohci_ed(ohci_ed_t *ed, uint32_t control, const ohci_td_t *head
     write32(&ed->control, control);
 }
 
-static uint32_t ohci_ed_control(const usb_ep_info_t *ep)
+static uint32_t ohci_ed_control(const usb_ep_t *ep)
 {
+    uint32_t ed_speed = (ep->device_speed == USB_SPEED_LOW) ? OHCI_ED_SPD_LOW : OHCI_ED_SPD_FULL;
+
     uint32_t control = OHCI_ED_FMT_GEN
                      | OHCI_ED_DIR_TD
-                     | ep->device_speed
+                     | ed_speed
                      | ep->max_packet_size << 16
                      | ep->endpoint_num    << 7
-                     | ep->device_addr;
+                     | ep->device_id;
+
     return control;
 }
 
-static bool send_setup_request(workspace_t *ws, const usb_ep_info_t *ep, const usb_setup_pkt_t *setup_pkt)
+//------------------------------------------------------------------------------
+// Driver Methods
+//------------------------------------------------------------------------------
+
+static bool reset_root_hub_port(const usb_hcd_t *hcd, int port_num)
 {
+    const workspace_t *ws = (const workspace_t *)hcd->ws;
+
+    return reset_ohci_port(ws->op_regs, port_num - 1);
+}
+
+static bool setup_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
     build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
     build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
     build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[2]);
@@ -346,9 +351,11 @@ static bool send_setup_request(workspace_t *ws, const usb_ep_info_t *ep, const u
     return wait_for_ohci_done(ws, 2);
 }
 
-static bool send_get_data_request(workspace_t *ws, const usb_ep_info_t *ep, const usb_setup_pkt_t *setup_pkt,
-                                  const volatile void *buffer, size_t length)
+static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+                             const void *buffer, size_t length)
 {
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
     build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
     build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, buffer, length);
     build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
@@ -357,315 +364,9 @@ static bool send_get_data_request(workspace_t *ws, const usb_ep_info_t *ep, cons
     return wait_for_ohci_done(ws, 3);
 }
 
-static bool initialise_device(workspace_t *ws, int port_idx, int device_speed, int device_addr, usb_ep_info_t *ep0)
+static uint8_t get_keycode(const usb_hcd_t *hcd)
 {
-    usb_setup_pkt_t setup_pkt;
-
-    // Initialise the endpoint descriptor for the default control pipe (endpoint 0).
-    ep0->device_speed    = device_speed;
-    ep0->device_addr     = 0;
-    ep0->interface_num   = 0;
-    ep0->endpoint_num    = 0;
-    ep0->max_packet_size = 8;
-    ep0->interval        = 0;
-
-    // The device should currently be in Default state. We first fetch the first 8 bytes of the device descriptor to
-    // discover the maximum packet size for the control endpoint. We then set the device address, which moves the
-    // device into Addressed state, and fetch the full device descriptor. We don't currently make use of any of the
-    // other fields of the device descriptor, but some USB devices may not work correctly if we don't fetch it.
-    size_t fetch_length = 8;
-    goto fetch_device_descriptor;
-
-  set_address:
-    build_setup_packet(&setup_pkt, 0x00, 0x05, device_addr, 0, 0);
-    if (!send_setup_request(ws, ep0, &setup_pkt)) {
-        return false;
-    }
-    ep0->device_addr = device_addr;
-    usleep(2*MILLISEC);  // USB set address recovery time.
-
-  fetch_device_descriptor:
-    build_setup_packet(&setup_pkt, 0x80, 0x06, USB_DESC_DEVICE << 8, 0, fetch_length);
-    if (!send_get_data_request(ws, ep0, &setup_pkt, ws->data, fetch_length)
-    ||  !valid_usb_device_descriptor(ws->data)) {
-        return false;
-    }
-
-    if (fetch_length == 8) {
-        usb_device_desc_t *device = (usb_device_desc_t *)ws->data;
-        ep0->max_packet_size = device->max_packet_size;
-        if (!valid_usb_max_packet_size(ep0->max_packet_size, ep0->device_speed == OHCI_ED_SPD_LOW)) {
-            return false;
-        }
-        if (usb_init_options & USB_EXTRA_RESET) {
-            if (!reset_ohci_port(ws->op_regs, port_idx)) {
-                return false;
-            }
-        }
-        fetch_length = sizeof(usb_device_desc_t);
-        goto set_address;
-    }
-
-    // Fetch the first configuration descriptor and the associated interface and endpoint descriptors. Start by
-    // requesting just the configuration descriptor. Then read the descriptor to determine whether we need to fetch
-    // more data.
-
-    fetch_length = sizeof(usb_config_desc_t);
-  fetch_config_descriptor:
-    build_setup_packet(&setup_pkt, 0x80, 0x06, USB_DESC_CONFIG << 8, 0, fetch_length);
-    if (!send_get_data_request(ws, ep0, &setup_pkt, ws->data, fetch_length)
-    ||  !valid_usb_config_descriptor(ws->data)) {
-        return false;
-    }
-    usb_config_desc_t *config = (usb_config_desc_t *)ws->data;
-    size_t total_length = min(config->total_length, WS_DATA_SIZE);
-    if (total_length > fetch_length) {
-        fetch_length = total_length;
-        goto fetch_config_descriptor;
-    }
-    ws->data_length = total_length;
-
-    return true;
-}
-
-static bool configure_keyboard(workspace_t *ws, const usb_ep_info_t *ep0, const usb_ep_info_t *kbd)
-{
-    usb_setup_pkt_t setup_pkt;
-
-    // Set the device configuration.
-    build_setup_packet(&setup_pkt, 0x00, 0x09, 1, 0, 0);
-    if (!send_setup_request(ws, ep0, &setup_pkt)) {
-        return false;
-    }
-
-    // Set the idle duration to infinite.
-    build_setup_packet(&setup_pkt, 0x21, 0x0a, 0, kbd->interface_num, 0);
-    if (!send_setup_request(ws, ep0, &setup_pkt)) {
-        return false;
-    }
-
-    // Select the boot protocol.
-    build_setup_packet(&setup_pkt, 0x21, 0x0b, 0, kbd->interface_num, 0);
-    if (!send_setup_request(ws, ep0, &setup_pkt)) {
-        return false;
-    }
-
-    return true;
-}
-
-//------------------------------------------------------------------------------
-// Public Functions
-//------------------------------------------------------------------------------
-
-void *ohci_init(uintptr_t base_addr)
-{
-    ohci_op_regs_t *regs = (ohci_op_regs_t *)base_addr;
-
-    // Check the host controller revison.
-    if ((read32(&regs->revision) & 0xff) != 0x10) {
-        return NULL;
-    }
-
-    // Take ownership from the SMM if necessary.
-    if (read32(&regs->control) & OHCI_CTRL_IR) {
-        write32(&regs->interrupt_enable, OHCI_INTR_OC);
-        flush32(&regs->command_status, OHCI_CMD_OCR);
-        if (!wait_until_clr(&regs->control, OHCI_CTRL_IR, 1000*MILLISEC)) {
-            return NULL;
-        }
-    }
-
-    // Preserve the FM interval set by the SMM or BIOS.
-    // If not set, use the default value.
-    uint32_t fm_interval = read32(&regs->fm_interval) & 0x3fff;
-    if (fm_interval == 0) {
-        fm_interval = 0x2edf;
-    }
-
-    // Prepare for host controller setup (see section 5.1.1.3 of the OHCI spec.).
-    switch (read32(&regs->control) & OHCI_CTRL_HCFS) {
-      case OHCI_CTRL_HCFS_RST:
-        usleep(50*MILLISEC);
-        break;
-      case OHCI_CTRL_HCFS_SUS:
-      case OHCI_CTRL_HCFS_RES:
-        flush32(&regs->control, OHCI_CTRL_HCFS_SUS);
-        usleep(10*MILLISEC);
-        break;
-      default: // operational
-        break;
-    }
-
-    // Reset the host controller.
-    write32(&regs->command_status, OHCI_CMD_HCR);
-    if (!wait_until_clr(&regs->command_status, OHCI_CMD_HCR, 30)) {
-        return NULL;
-    }
-
-    // Check we are now in SUSPEND state.
-    if ((read32(&regs->control) & OHCI_CTRL_HCFS) != OHCI_CTRL_HCFS_SUS) {
-        return NULL;
-    }
-
-    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual
-    // memory, so allocate it in the first segment.
-    // TODO: check for segment overflow.
-    pm_map[0].end -= num_pages(sizeof(workspace_t));
-    uintptr_t workspace_addr = pm_map[0].end << PAGE_SHIFT;
-    workspace_t *ws = (workspace_t *)workspace_addr;
-
-    memset(ws, 0, sizeof(workspace_t));
-
-    // Initialise the control list ED.
-    ws->ed[0].control = OHCI_ED_SKIP;
-    ws->ed[0].next_ed = 0;
-
-    // Initialise the pointer to the device registers.
-    ws->op_regs = regs;
-
-    // Initialise the keycode buffer.
-    ws->kc_index_i = 0;
-    ws->kc_index_o = 0;
-
-    // Initialise the host controller.
-    uint32_t max_packet_size = ((fm_interval - 210) * 6) / 7;
-    write32(&regs->fm_interval, 1 << 31 | max_packet_size << 16 | fm_interval);
-    write32(&regs->periodic_start, (fm_interval * 9) / 10);
-    write32(&regs->hcca, (uintptr_t)(&ws->hcca));
-    write32(&regs->ctrl_head_ed, (uintptr_t)(&ws->ed[0]));
-    write32(&regs->bulk_head_ed, 0);
-    write32(&regs->ctrl_current_ed, 0);
-    write32(&regs->bulk_current_ed, 0);
-    write32(&regs->control, OHCI_CTRL_HCFS_RUN | OHCI_CTRL_CLE | OHCI_CTRL_CBSR0);
-    flush32(&regs->interrupt_status, ~0);
-
-    // Power up the ports.
-    uint32_t rh_descriptor_a = read32(&regs->rh_descriptor_a);
-    uint32_t rh_descriptor_b = read32(&regs->rh_descriptor_b);
-    if (~rh_descriptor_a & OHCI_RHDA_NPS) {
-        // If we have individual port power control, clear the port power control mask to allow us to power up all
-        // ports now.
-        if (rh_descriptor_a & OHCI_RHDA_PSM) {
-            write32(&regs->rh_descriptor_b, rh_descriptor_b & OHCI_RHDB_DR);
-        }
-
-        // Power up all ports.
-        flush32(&regs->rh_status, OHCI_RHS_LPSC);
-        int port_power_up_delay = (rh_descriptor_a >> 24) * 2*MILLISEC;
-        usleep(port_power_up_delay);
-
-        usleep(100*MILLISEC);  // USB maximum device attach time.
-    }
-
-    // Scan the ports, looking for keyboards.
-    usb_ep_info_t keyboard_info[MAX_KEYBOARDS];
-    int num_keyboards = 0;
-    int num_devices = 0;
-    int device_addr = 0;
-    int min_interval = OHCI_MAX_INTERVAL;
-    int num_ports = rh_descriptor_a & 0xf;
-    for (int port_idx = 0; port_idx < num_ports; port_idx++) {
-        if (num_keyboards >= MAX_KEYBOARDS) continue;
-
-        uint32_t port_status = read32(&regs->rh_port_status[port_idx]);
-
-        // Check the port is powered up.
-        if (~port_status & OHCI_PORT_POWERED) continue;
-
-        // Check if anything is connected to this port.
-        if (~port_status & OHCI_PORT_CONNECTED) continue;
-        num_devices++;
-
-        // Reset the port.
-        if (!reset_ohci_port(regs, port_idx)) continue;
-
-        // Now the port has been reset, we can determine the device speed.
-        port_status = read32(&regs->rh_port_status[port_idx]);
-        uint32_t device_speed = (port_status & OHCI_PORT_LOW_SPEED) ? OHCI_ED_SPD_LOW : OHCI_ED_SPD_FULL;
-
-        // Initialise the USB device. If successful, this leaves a set of configuration descriptors in the workspace
-        // data buffer.
-        usb_ep_info_t ep0;
-        if (!initialise_device(ws, port_idx, device_speed, ++device_addr, &ep0)) {
-            goto disable_port;
-        }
-
-        // Scan the descriptors to see if this device has one or more keyboard interfaces and if so, record that
-        // information in the keyboard info table.
-        usb_ep_info_t *new_keyboard_info = &keyboard_info[num_keyboards];
-        int new_keyboards = get_usb_keyboard_info_from_descriptors(ws->data, ws->data_length, new_keyboard_info,
-                                                                   MAX_KEYBOARDS - num_keyboards);
-
-        // Complete the new entries in the keyboard info table and configure the keyboard interfaces.
-        for (int kbd_idx = 0; kbd_idx < new_keyboards; kbd_idx++) {
-            usb_ep_info_t *kbd = &new_keyboard_info[kbd_idx];
-            kbd->device_speed = device_speed;
-            kbd->device_addr  = device_addr;
-            if (kbd->interval < min_interval) {
-                min_interval = kbd->interval;
-            }
-            configure_keyboard(ws, &ep0, kbd);
-
-            print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
-                           1 + port_idx, kbd->interface_num, kbd->endpoint_num);
-        }
-        if (new_keyboards > 0) {
-            num_keyboards += new_keyboards;
-            continue;
-        }
-
-        // If we didn't find any keyboard interfaces, we can disable the port.
-      disable_port:
-        write32(&regs->rh_port_status[port_idx], OHCI_CLR_PORT_ENABLE);
-    }
-
-    print_usb_info("  Found %i device%s, %i keyboard%s",
-                   num_devices,   num_devices   != 1 ? "s" : "",
-                   num_keyboards, num_keyboards != 1 ? "s" : "");
-
-    if (num_keyboards == 0) {
-        // Shut down the host controller and the root hub.
-        flush32(&regs->control, OHCI_CTRL_HCFS_RST);
-
-        // Delay to allow the controller to reset.
-        usleep(10);
-
-        // Deallocate the workspace for this controller.
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-
-        return NULL;
-    }
-
-    // Initialise the interrupt ED and TD for each keyboard interface.
-    ohci_ed_t *last_kbd_ed = NULL;
-    for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
-        usb_ep_info_t *kbd = &keyboard_info[kbd_idx];
-
-        ohci_ed_t *kbd_ed = &ws->ed[1 + kbd_idx];
-        ohci_td_t *kbd_td = &ws->td[3 + kbd_idx];
-
-        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
-
-        build_ohci_td(kbd_td, OHCI_TD_DP_IN | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_DLY, kbd_rpt, sizeof(hid_kbd_rpt_t));
-        build_ohci_ed(kbd_ed, ohci_ed_control(kbd), kbd_td+0, kbd_td+1);
-
-        kbd_ed->next_ed = (uintptr_t)last_kbd_ed;
-        last_kbd_ed = kbd_ed;
-    }
-
-    // Initialise the interrupt table.
-    for (int i = 0; i < OHCI_MAX_INTERVAL; i += min_interval) {
-        ws->hcca.intr_head_ed[i] = (uintptr_t)last_kbd_ed;
-    }
-    write32(&regs->control, OHCI_CTRL_HCFS_RUN | OHCI_CTRL_CLE | OHCI_CTRL_PLE | OHCI_CTRL_CBSR0);
-    flush32(&regs->interrupt_status, ~0);
-
-    return ws;
-}
-
-uint8_t ohci_get_keycode(void *workspace)
-{
-    workspace_t *ws = (workspace_t *)workspace;
+    workspace_t *ws = (workspace_t *)hcd->ws;
 
     ohci_td_t *td = get_ohci_done_head(ws);
     while (td != NULL) {
@@ -701,4 +402,223 @@ uint8_t ohci_get_keycode(void *workspace)
     }
 
     return 0;
+}
+
+//------------------------------------------------------------------------------
+// Driver Method Table
+//------------------------------------------------------------------------------
+
+static const hcd_methods_t methods = {
+    .reset_root_hub_port = reset_root_hub_port,
+    .allocate_slot       = NULL,
+    .release_slot        = NULL,
+    .assign_address      = assign_usb_address,  // use the base implementation for this method
+    .configure_hub_ep    = NULL,
+    .configure_kbd_ep    = NULL,
+    .setup_request       = setup_request,
+    .get_data_request    = get_data_request,
+    .get_keycode         = get_keycode
+};
+
+//------------------------------------------------------------------------------
+// Public Functions
+//------------------------------------------------------------------------------
+
+bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
+{
+    ohci_op_regs_t *op_regs = (ohci_op_regs_t *)base_addr;
+
+    // Check the host controller revison.
+    if ((read32(&op_regs->revision) & 0xff) != 0x10) {
+        return false;
+    }
+
+    // Take ownership from the SMM if necessary.
+    if (read32(&op_regs->control) & OHCI_CTRL_IR) {
+        write32(&op_regs->interrupt_enable, OHCI_INTR_OC);
+        flush32(&op_regs->command_status, OHCI_CMD_OCR);
+        if (!wait_until_clr(&op_regs->control, OHCI_CTRL_IR, 1000*MILLISEC)) {
+            return false;
+        }
+    }
+
+    // Preserve the FM interval set by the SMM or BIOS.
+    // If not set, use the default value.
+    uint32_t fm_interval = read32(&op_regs->fm_interval) & 0x3fff;
+    if (fm_interval == 0) {
+        fm_interval = 0x2edf;
+    }
+
+    // Prepare for host controller setup (see section 5.1.1.3 of the OHCI spec.).
+    switch (read32(&op_regs->control) & OHCI_CTRL_HCFS) {
+      case OHCI_CTRL_HCFS_RST:
+        usleep(50*MILLISEC);
+        break;
+      case OHCI_CTRL_HCFS_SUS:
+      case OHCI_CTRL_HCFS_RES:
+        flush32(&op_regs->control, OHCI_CTRL_HCFS_SUS);
+        usleep(10*MILLISEC);
+        break;
+      default: // operational
+        break;
+    }
+
+    // Reset the host controller.
+    write32(&op_regs->command_status, OHCI_CMD_HCR);
+    if (!wait_until_clr(&op_regs->command_status, OHCI_CMD_HCR, 30)) {
+        return false;
+    }
+
+    // Check we are now in SUSPEND state.
+    if ((read32(&op_regs->control) & OHCI_CTRL_HCFS) != OHCI_CTRL_HCFS_SUS) {
+        return false;
+    }
+
+    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory,
+    // so allocate it in the first segment.
+    // TODO: check for segment overflow.
+    pm_map[0].end -= num_pages(sizeof(workspace_t));
+    uintptr_t workspace_addr = pm_map[0].end << PAGE_SHIFT;
+    workspace_t *ws = (workspace_t *)workspace_addr;
+
+    memset(ws, 0, sizeof(workspace_t));
+
+    ws->op_regs = op_regs;
+
+    // Initialise the driver object for this controller.
+    hcd->methods = &methods;
+    hcd->ws      = &ws->base_ws;
+
+    // Initialise the control list ED.
+    ws->ed[0].control = OHCI_ED_SKIP;
+    ws->ed[0].next_ed = 0;
+
+    // Initialise the host controller.
+    uint32_t max_packet_size = ((fm_interval - 210) * 6) / 7;
+    write32(&op_regs->fm_interval, 1 << 31 | max_packet_size << 16 | fm_interval);
+    write32(&op_regs->periodic_start, (fm_interval * 9) / 10);
+    write32(&op_regs->hcca, (uintptr_t)(&ws->hcca));
+    write32(&op_regs->ctrl_head_ed, (uintptr_t)(&ws->ed[0]));
+    write32(&op_regs->bulk_head_ed, 0);
+    write32(&op_regs->ctrl_current_ed, 0);
+    write32(&op_regs->bulk_current_ed, 0);
+    write32(&op_regs->control, OHCI_CTRL_HCFS_RUN | OHCI_CTRL_CLE | OHCI_CTRL_CBSR0);
+    flush32(&op_regs->interrupt_status, ~0);
+
+    uint32_t rh_descriptor_a = read32(&op_regs->rh_descriptor_a);
+    uint32_t rh_descriptor_b = read32(&op_regs->rh_descriptor_b);
+
+    // Construct a hub descriptor for the root hub.
+    usb_hub_t root_hub;
+    root_hub.ep0            = NULL;
+    root_hub.level          = 0;
+    root_hub.route          = 0;
+    root_hub.num_ports      = rh_descriptor_a & 0xf;
+    root_hub.power_up_delay = rh_descriptor_a >> 24;
+
+    // Power up all the ports.
+    if (~rh_descriptor_a & OHCI_RHDA_NPS) {
+        // If we have individual port power control, clear the port power control mask to allow us to power up all
+        // ports at once.
+        if (rh_descriptor_a & OHCI_RHDA_PSM) {
+            write32(&op_regs->rh_descriptor_b, rh_descriptor_b & OHCI_RHDB_DR);
+        }
+
+        // Power up all ports.
+        flush32(&op_regs->rh_status, OHCI_RHS_LPSC);
+        usleep(root_hub.power_up_delay * 2 * MILLISEC);
+    }
+
+    usleep(100*MILLISEC);  // USB maximum device attach time.
+
+    // Scan the ports, looking for hubs and keyboards.
+    usb_ep_t keyboards[MAX_KEYBOARDS];
+    int num_keyboards = 0;
+    int num_devices = 0;
+    for (int port_idx = 0; port_idx < root_hub.num_ports; port_idx++) {
+        // If we've filled the keyboard info table, abort now.
+        if (num_keyboards >= MAX_KEYBOARDS) break;
+
+        uint32_t port_status = read32(&op_regs->rh_port_status[port_idx]);
+
+        // Check the port is powered up.
+        if (~port_status & OHCI_PORT_POWERED) continue;
+
+        // Check if anything is connected to this port.
+        if (~port_status & OHCI_PORT_CONNECTED) continue;
+
+        // Reset the port.
+        if (!reset_ohci_port(op_regs, port_idx)) continue;
+
+        usleep(10*MILLISEC);  // USB reset recovery time
+
+        port_status = read32(&op_regs->rh_port_status[port_idx]);
+
+        // Check the port is active.
+        if (~port_status & OHCI_PORT_CONNECTED) continue;
+        if (~port_status & OHCI_PORT_ENABLED)   continue;
+
+        // Now the port has been enabled, we can determine the device speed.
+        usb_speed_t device_speed = (port_status & OHCI_PORT_LOW_SPEED) ? USB_SPEED_LOW : USB_SPEED_FULL;
+
+        num_devices++;
+
+        // Look for keyboards attached directly or indirectly to this port.
+        if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, device_speed, num_devices,
+                                        &num_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
+            continue;
+        }
+
+        // If we didn't find any keyboard interfaces, we can disable the port.
+        write32(&op_regs->rh_port_status[port_idx], OHCI_CLR_PORT_ENABLE);
+    }
+
+    print_usb_info(" Found %i device%s, %i keyboard%s",
+                   num_devices,   num_devices   != 1 ? "s" : "",
+                   num_keyboards, num_keyboards != 1 ? "s" : "");
+
+    if (num_keyboards == 0) {
+        // Shut down the host controller and the root hub.
+        flush32(&op_regs->control, OHCI_CTRL_HCFS_RST);
+
+        // Delay to allow the controller to reset.
+        usleep(10);
+
+        // Deallocate the workspace for this controller.
+        pm_map[0].end += num_pages(sizeof(workspace_t));
+
+        return false;
+    }
+
+
+    // Initialise the interrupt ED and TD for each keyboard interface and find the minimum interval.
+    int min_interval = OHCI_MAX_INTERVAL;
+    ohci_ed_t *last_kbd_ed = NULL;
+    for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
+        usb_ep_t *kbd = &keyboards[kbd_idx];
+
+        ohci_ed_t *kbd_ed = &ws->ed[1 + kbd_idx];
+        ohci_td_t *kbd_td = &ws->td[3 + kbd_idx];
+
+        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+
+        build_ohci_td(kbd_td, OHCI_TD_DP_IN | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_DLY, kbd_rpt, sizeof(hid_kbd_rpt_t));
+        build_ohci_ed(kbd_ed, ohci_ed_control(kbd), kbd_td+0, kbd_td+1);
+
+        kbd_ed->next_ed = (uintptr_t)last_kbd_ed;
+        last_kbd_ed = kbd_ed;
+
+        if (kbd->interval < min_interval) {
+            min_interval = kbd->interval;
+        }
+    }
+
+    // Initialise the interrupt table.
+    for (int i = 0; i < OHCI_MAX_INTERVAL; i += min_interval) {
+        ws->hcca.intr_head_ed[i] = (uintptr_t)last_kbd_ed;
+    }
+    write32(&op_regs->control, OHCI_CTRL_HCFS_RUN | OHCI_CTRL_CLE | OHCI_CTRL_PLE | OHCI_CTRL_CBSR0);
+    flush32(&op_regs->interrupt_status, ~0);
+
+    return true;
 }

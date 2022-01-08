@@ -4,23 +4,20 @@
 /*
  * Provides support for USB keyboards connected via an OHCI controller.
  *
- * Copyright (C) 2021 Martin Whitaker.
+ * Copyright (C) 2021-2022 Martin Whitaker.
  */
 
 #include <stdint.h>
 
+#include "usbkbd.h"
+
 /*
  * Initialises the OHCI device found at base_addr, scans all the attached USB
  * devices, and configures any HID USB keyboard devices it finds to generate
- * periodic interrupt transfers that report key presses.
+ * periodic interrupt transfers that report key presses. Initialises hcd and
+ * returns true if the device was successfully initialised and one or more
+ * keyboards were found.
  */
-void *ohci_init(uintptr_t base_addr);
-
-/*
- * Polls the completed periodic interrupt transfers, stores the keycodes from
- * any new key press events in an internal queue, and if the keycode queue is
- * not empty, pops and returns the keycode from the front of the queue.
- */
-uint8_t ohci_get_keycode(void *ws);
+bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd);
 
 #endif // OHCI_H
