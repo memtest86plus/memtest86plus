@@ -25,7 +25,7 @@
 #include "pmem.h"
 #include "screen.h"
 #include "smp.h"
-#include "usbkbd.h"
+#include "usbhcd.h"
 
 #include "read.h"
 #include "print.h"

@@ -14,7 +14,7 @@
 #include "print.h"
 #include "unistd.h"
 
-#include "usbkbd.h"
+#include "usbhcd.h"
 
 //------------------------------------------------------------------------------
 // Constants

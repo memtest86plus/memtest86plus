@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-#include "usbkbd.h"
+#include "usbhcd.h"
 
 /*
  * Initialises the XHCI device found at base_addr, scans all the attached USB

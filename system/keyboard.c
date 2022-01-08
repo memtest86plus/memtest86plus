@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "io.h"
-#include "usbkbd.h"
+#include "usbhcd.h"
 
 #include "keyboard.h"
 

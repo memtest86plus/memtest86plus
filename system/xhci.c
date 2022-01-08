@@ -10,7 +10,6 @@
 
 #include "memory.h"
 #include "unistd.h"
-#include "usbkbd.h"
 #include "usb.h"
 
 #include "xhci.h"

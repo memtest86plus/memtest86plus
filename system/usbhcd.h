@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-#ifndef USBKBD_H
-#define USBKBD_H
+#ifndef USBHCD_H
+#define USBHCD_H
 /*
  * Provides the base USB host controller driver for USB keyboard support.
  *
@@ -254,4 +254,4 @@ void find_usb_keyboards(bool pause_at_end);
  */
 uint8_t get_usb_keycode(void);
 
-#endif // USBKBD_H
+#endif // USBHCD_H
