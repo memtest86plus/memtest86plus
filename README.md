@@ -510,7 +510,6 @@ of all zeros and all ones.
 ## Known Limitations and Bugs
 
   * The UHCI and EHCI USB controllers are not yet supported.
-  * USB hubs (other than the controller root hub) are not yet supported.
   * Temperature reporting is currently only supported for Intel CPUs.
 
 ## Acknowledgments
