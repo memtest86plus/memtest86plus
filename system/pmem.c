@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ memsize.c
 //
@@ -53,13 +53,11 @@ static int sanitize_e820_map(e820_entry_t new_map[], const e820_entry_t orig_map
         uint64_t            addr;   // address for this change point
     };
 
-    // Make these arrays static to keep the stack use small.
-    // This function does not need to be reentrant.
-    static struct change_member  change_point_list[2*E820_MAP_SIZE];
-    static struct change_member *change_point[2*E820_MAP_SIZE];
-    struct change_member        *change_tmp;
+    struct change_member  change_point_list[2*E820_MAP_SIZE];
+    struct change_member *change_point[2*E820_MAP_SIZE];
+    struct change_member *change_tmp;
 
-    static const e820_entry_t    *overlap_list[E820_MAP_SIZE];
+    const e820_entry_t   *overlap_list[E820_MAP_SIZE];
 
     /*
         Visually we're performing the following (1,2,3,4 = memory types)...
