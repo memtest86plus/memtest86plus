@@ -35,7 +35,7 @@ startup32:
 	# Use a temporary stack until we pick the correct one. We can
 	# safely use the high address, even if we are loaded low.
 
-	movl	$(HIGH_LOAD_ADDR + startup_stack_top - startup), %esp
+	movl	$(HIGH_LOAD_ADDR + startup_stack_top - startup32), %esp
 
 	# Get the load address.
 
