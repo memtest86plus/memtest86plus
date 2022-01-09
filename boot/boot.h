@@ -5,15 +5,20 @@
  * Definitions used in the boot code. Also defines exported symbols needed
  * in the main code.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #define MAX_APS 	64		/* Maximum number of active APs. This
 					   only affects memory footprint, so
 					   can be increased if needed */
 
-#define BSP_STACK_SIZE	4096		/* Stack size for the BSP */
-#define AP_STACK_SIZE	2048		/* Stack size for each AP */
+// NOTE: Before the APs are started, the BSP stack can extend downwards into
+// the area reserved for the AP stacks. So the stack size given here just
+// needs to be enough for running the main application once initialisation
+// is complete. The pmem initialisation needs ~12KB of stack, so make sure
+// the total stack size is at least that.
+
+#define PCPU_STACK_SIZE 2048		/* Stack size for each CPU core */
 
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */

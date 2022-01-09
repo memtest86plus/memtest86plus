@@ -6,7 +6,7 @@
 // It supports both the 32-bit and 64-bit Linux boot protocols and EFI boot
 // for the first boot of the BSP.
 //
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ head.S:
 //
@@ -151,10 +151,10 @@ startup:
 
 	xorq	%rax, %rax
 	call	smp_my_pcpu_num
-	movl	$AP_STACK_SIZE, %edx
+	movl	$PCPU_STACK_SIZE, %edx
 	mul	%edx
 	leaq	bsp_stack_top(%rip), %rsp
-	addq	%rax, %rsp
+	subq	%rax, %rsp
 
 	# Initialise the pml4 and pdp tables.
 
@@ -602,13 +602,13 @@ first_boot:
 	.bss
 	.align	16
 
-bsp_stack_base:
-	. = . + BSP_STACK_SIZE
-bsp_stack_top:
-
 ap_stacks_base:
-	. = . + (AP_STACK_SIZE * MAX_APS)
+	. = . + (PCPU_STACK_SIZE * MAX_APS)
 ap_stacks_top:
+
+bsp_stack_base:
+	. = . + PCPU_STACK_SIZE
+bsp_stack_top:
 
 startup_stack_base:
 	. = . + 64
