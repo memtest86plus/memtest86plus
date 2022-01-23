@@ -102,8 +102,7 @@
 
 // Add Context flags
 
-#define XHCI_CONTEXT_A0                 (1 << 0)
-#define XHCI_CONTEXT_A1                 (1 << 1)
+#define XHCI_CONTEXT_A(n)               (1 << (n))
 
 // Port Speed values
 
@@ -737,7 +736,7 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
     // Prepare the input context for the ADDRESS_DEVICE command.
 
     xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
-    ctrl_context->add_context_flags = XHCI_CONTEXT_A0 | XHCI_CONTEXT_A1;
+    ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(1);
 
     xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
     slot_context->params1 = 1 << 27 | usb_to_xhci_speed(device_speed) << 20;
@@ -828,7 +827,7 @@ static bool configure_interrupt_endpoint(workspace_t *ws, const usb_ep_t *ep, in
     // CONFIGURE_ENDPOINT command before issuing the command.
 
     xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
-    ctrl_context->add_context_flags = XHCI_CONTEXT_A0 | 1 << ep_id;
+    ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(ep_id);
 
     xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
     slot_context->params1           = ep_id << 27 | hub_flag << 26 | (slot_context->params1 & 0x00ffffff);

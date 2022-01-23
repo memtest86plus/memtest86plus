@@ -21,7 +21,7 @@
 
 // Values defined by the OHCI specification.
 
-// HcRevision register
+// HcControl register
 
 #define OHCI_CTRL_CBSR          0x00000003      // Control Bulk Service Ratio
 #define OHCI_CTRL_CBSR0         0x00000000      // Control Bulk Service Ratio 0
@@ -592,7 +592,7 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Initialise the interrupt ED and TD for each keyboard interface and find the minimum interval.
     int min_interval = OHCI_MAX_INTERVAL;
-    ohci_ed_t *last_kbd_ed = NULL;
+    uint32_t intr_head_ed = 0;
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
@@ -604,8 +604,8 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         build_ohci_td(kbd_td, OHCI_TD_DP_IN | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_DLY, kbd_rpt, sizeof(hid_kbd_rpt_t));
         build_ohci_ed(kbd_ed, ohci_ed_control(kbd), kbd_td+0, kbd_td+1);
 
-        kbd_ed->next_ed = (uintptr_t)last_kbd_ed;
-        last_kbd_ed = kbd_ed;
+        kbd_ed->next_ed = intr_head_ed;
+        intr_head_ed = (uintptr_t)kbd_ed;
 
         if (kbd->interval < min_interval) {
             min_interval = kbd->interval;
@@ -614,7 +614,7 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Initialise the interrupt table.
     for (int i = 0; i < OHCI_MAX_INTERVAL; i += min_interval) {
-        ws->hcca.intr_head_ed[i] = (uintptr_t)last_kbd_ed;
+        ws->hcca.intr_head_ed[i] = intr_head_ed;
     }
     write32(&op_regs->control, OHCI_CTRL_HCFS_RUN | OHCI_CTRL_CLE | OHCI_CTRL_PLE | OHCI_CTRL_CBSR0);
     flush32(&op_regs->interrupt_status, ~0);
