@@ -136,6 +136,7 @@ static bool build_hub_info(const usb_hcd_t *hcd, const usb_hub_t *parent, int po
         return false;
     }
 
+    ep1->driver_data     = ep0->driver_data;
     ep1->device_speed    = ep0->device_speed;
     ep1->device_id       = ep0->device_id;
     ep1->interface_num   = 0;
@@ -282,6 +283,7 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
     for (int port_num = 1; port_num <= hub->num_ports; port_num++) {
         // If we've filled the keyboard info table, abort now.
         if (*num_keyboards >= max_keyboards) break;
+
         uint32_t port_status;
 
         get_hub_port_status(hcd, hub, port_num, &port_status);
@@ -430,21 +432,29 @@ bool assign_usb_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num
 
     uint8_t *data_buffer = hcd->ws->data_buffer;
 
+    // If we've run out of USB addresses, abort now.
+    if (device_id > USB_MAX_ADDRESS) {
+        return false;
+    }
+
     // Initialise the control endpoint descriptor.
 
     ep0->device_speed    = device_speed;
     ep0->device_id       = 0;
     ep0->interface_num   = 0;
     ep0->endpoint_num    = 0;
-    ep0->max_packet_size = 8;
+    ep0->max_packet_size = default_max_packet_size(device_speed);
     ep0->interval        = 0;
 
-    // The device should currently be in Default state. We first fetch the first 8 bytes of the device descriptor to
-    // discover the maximum packet size for the control endpoint. We then set the device address, which moves the
-    // device into Address state, and fetch the full device descriptor.
+    // The device should currently be in Default state. For loww and full speed devices, We first fetch the first
+    // 8 bytes of the device descriptor to discover the maximum packet size for the control endpoint. We then set
+    // the device address, which moves the device into Address state, and fetch the full device descriptor.
 
-    size_t fetch_length = 8;
-    goto fetch_descriptor;
+    size_t fetch_length = sizeof(usb_device_desc_t);
+    if (device_speed < USB_SPEED_HIGH) {
+        fetch_length = 8;
+        goto fetch_descriptor;
+    }
 
   set_address:
     build_setup_packet(&setup_pkt, USB_REQ_TO_DEVICE, USB_SET_ADDRESS, device_id, 0, 0);
@@ -551,6 +561,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         // Complete the new entries in the keyboard info table and configure the keyboard interfaces.
         for (int kbd_idx = old_num_keyboards; kbd_idx < new_num_keyboards; kbd_idx++) {
             usb_ep_t *kbd = &keyboards[kbd_idx];
+            kbd->driver_data  = ep0.driver_data;
             kbd->device_speed = device_speed;
             kbd->device_id    = device_id;
             if (hcd->methods->configure_kbd_ep) {

@@ -45,7 +45,7 @@ typedef enum  __attribute__ ((packed)) {
  * A USB endpoint descriptor (used internally by the various HCI drivers).
  */
 typedef struct __attribute__ ((packed)) {
-    void            *driver_data;
+    uintptr_t       driver_data;
     usb_speed_t     device_speed;
     uint8_t         device_id;
     uint8_t         interface_num;
@@ -131,6 +131,25 @@ static inline void build_setup_packet(usb_setup_pkt_t *pkt, int type, int reques
     pkt->value   = value;
     pkt->index   = index;
     pkt->length  = length;
+}
+
+/* Returns the default maximum packet size for a USB device running at the
+ * given speed.
+ *
+ * Used internally by the various HCI drivers.
+ */
+static inline int default_max_packet_size(usb_speed_t device_speed)
+{
+    switch (device_speed) {
+      case USB_SPEED_LOW:
+        return 8;
+      case USB_SPEED_FULL:
+        return 64;
+      case USB_SPEED_HIGH:
+        return 64;
+      default:
+        return 0;
+    }
 }
 
 /*

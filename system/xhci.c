@@ -7,10 +7,10 @@
 #include "memrw32.h"
 #include "memsize.h"
 #include "pmem.h"
+#include "usb.h"
 
 #include "memory.h"
 #include "unistd.h"
-#include "usb.h"
 
 #include "xhci.h"
 
@@ -426,20 +426,6 @@ static int usb_to_xhci_speed(usb_speed_t usb_speed)
     }
 }
 
-static int default_max_packet_size(usb_speed_t device_speed)
-{
-    switch (device_speed) {
-      case USB_SPEED_LOW:
-        return 8;
-      case USB_SPEED_FULL:
-        return 64;
-      case USB_SPEED_HIGH:
-        return 64;
-      default:
-        return 0;
-    }
-}
-
 static int xhci_ep_interval(int config_interval, usb_speed_t device_speed)
 {
     if (device_speed < USB_SPEED_HIGH) {
@@ -777,7 +763,7 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
 
     ep_tr_t *ep_tr = (ep_tr_t *)ws->control_ep_tr_addr;
     ep_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
-    ep0->driver_data = (void *)ep_tr;
+    ep0->driver_data = (uintptr_t)ep_tr;
 
     // Set the device address. For full speed devices we need to read the first 8 bytes of the device descriptor
     // to determine the maximum packet size the device supports and update the device context accordingly. For
@@ -1002,8 +988,8 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
             xhci_legacy_support_t *legacy_support = (xhci_legacy_support_t *)ext_cap_base;
             // Take ownership from the SMM if necessary.
             int timer = 1000;
+            legacy_support->host_owns = 0x1;
             while (legacy_support->bios_owns & 0x1) {
-                legacy_support->host_owns = 0x1;
                 if (timer == 0) return false;
                 usleep(1*MILLISEC);
                 timer--;
@@ -1129,6 +1115,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     write64(&op_regs->dcbaap,     device_context_index_addr);
     write32(&op_regs->config,     (read32(&op_regs->config) & 0xfffffc00) | max_slots);
     if (!start_host_controller(op_regs)) {
+        pm_map[0].end += num_pages(sizeof(workspace_t));
         pm_map[heap_segment].end = heap_segment_end;
         return false;
     }

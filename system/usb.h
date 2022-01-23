@@ -11,6 +11,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// Basic limits.
+
+#define USB_MAX_ADDRESS         127
+
 // Request types.
 
 #define USB_REQ_TO_DEVICE       0x00
