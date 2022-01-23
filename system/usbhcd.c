@@ -8,6 +8,7 @@
 #include "usb.h"
 #include "vmem.h"
 
+#include "ehci.h"
 #include "ohci.h"
 #include "xhci.h"
 
@@ -673,7 +674,11 @@ void find_usb_keyboards(bool pause_at_end)
                             keyboards_found = ohci_init(base_addr, &usb_controllers[num_usb_controllers]);
                         }
                         if (controller_type == EHCI) {
-                            print_usb_info(" This controller type is not supported yet");
+                            if (func == 0) {
+                                keyboards_found = ehci_init(bus, dev, func, base_addr, &usb_controllers[num_usb_controllers]);
+                            } else {
+                                print_usb_info(" Skipping");
+                            }
                         }
                         if (controller_type == XHCI) {
                             keyboards_found = xhci_init(base_addr, &usb_controllers[num_usb_controllers]);
