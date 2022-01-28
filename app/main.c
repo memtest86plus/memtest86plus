@@ -346,9 +346,6 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
                 // Either there is no PAE or we are at the PAE limit.
                 break;
             }
-            if (i_am_master) {
-                display_spinner('-');
-            }
             run_test(my_vcpu, test_num, test_stage, iterations);
         }
 

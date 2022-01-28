@@ -27,6 +27,8 @@
 // Constants
 //------------------------------------------------------------------------------
 
+#define SPINNER_PERIOD  100     // milliseconds
+
 #define NUM_SPIN_STATES 4
 
 static const char spin_state[NUM_SPIN_STATES] = { '|', '/', '-', '\\' };
@@ -47,6 +49,7 @@ static int pass_bar_length = 0; // currently displayed length
 static int test_bar_length = 0; // currently displayed length
 
 static uint64_t run_start_time = 0; // TSC time stamp
+static uint64_t next_spin_time = 0; // TSC time stamp
 
 //------------------------------------------------------------------------------
 // Variables
@@ -82,7 +85,7 @@ void display_init(void)
     prints(5, 0, "Memory  : N/A               | Pattern: ");
     prints(6, 0, "-------------------------------------------------------------------------------");
     prints(7, 0, "CPU cores:     available,     enabled  | Time:            Temperature: N/A ");
-    prints(8, 0, "Run mode : PAR   Active:               | Pass:            Errors: ");
+    prints(8, 0, "Run mode : PAR    Using:               | Pass:            Errors: ");
     prints(9, 0, "-------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
@@ -148,7 +151,9 @@ void display_start_run(void)
     if (clks_per_msec > 0) {
         // If we've measured the CPU speed, we know the TSC is available.
         run_start_time = get_tsc();
+        next_spin_time = run_start_time + SPINNER_PERIOD * clks_per_msec;
     }
+    display_spinner('-');
 }
 
 void display_start_pass(void)
@@ -238,9 +243,6 @@ void do_tick(int my_vcpu)
         return;
     }
 
-    spin_idx = (spin_idx + 1) % NUM_SPIN_STATES;
-    display_spinner(spin_state[spin_idx]);
-
     test_ticks++;
     pass_ticks++;
 
@@ -266,12 +268,26 @@ void do_tick(int my_vcpu)
     display_pass_percentage(pct);
     display_pass_bar((BAR_LENGTH * pct) / 100);
 
+    bool update_spinner = true;
     if (clks_per_msec > 0) {
-        int secs  = (get_tsc() - run_start_time) / (1000 * clks_per_msec);
+        uint64_t current_time = get_tsc();
+
+        int secs  = (current_time - run_start_time) / (1000 * clks_per_msec);
         int mins  = secs / 60; secs %= 60;
         int hours = mins / 60; mins %= 60;
         display_run_time(hours, mins, secs);
+
+        if (current_time >= next_spin_time) {
+            next_spin_time = current_time + SPINNER_PERIOD * clks_per_msec;
+        } else {
+            update_spinner = false;
+        }
     }
+    if (update_spinner) {
+        spin_idx = (spin_idx + 1) % NUM_SPIN_STATES;
+        display_spinner(spin_state[spin_idx]);
+    }
+
 
     if (enable_temperature) {
         display_temperature(get_cpu_temperature());
