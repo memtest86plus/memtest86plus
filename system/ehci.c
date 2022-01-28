@@ -24,7 +24,7 @@
 
 // Basic limits
 
-#define EHCI_MAX_PFL_LENGTH     1024             // Maximum number of entries in periodic frame list
+#define EHCI_MAX_PFL_LENGTH     1024            // Maximum number of entries in periodic frame list
 
 // Extended capability IDs
 
@@ -96,8 +96,8 @@
 
 // - control member (8 bits)
 
-#define EHCI_QTD_PID_OUT        (0 << 0)        // PID Code is IN
-#define EHCI_QTD_PID_IN         (1 << 0)        // PID Code is OUT
+#define EHCI_QTD_PID_OUT        (0 << 0)        // PID Code is OUT
+#define EHCI_QTD_PID_IN         (1 << 0)        // PID Code is IN
 #define EHCI_QTD_PID_SETUP      (2 << 0)        // PID Code is SETUP
 
 #define EHCI_QTD_CERR(n)        ((n) << 2)      // Error Counter = n (n = 1..3)
@@ -107,7 +107,7 @@
 #define EHCI_QTD_IOC_N          (0 << 7)        // Interrupt On Completion is off
 #define EHCI_QTD_IOC_Y          (1 << 7)        // Interrupt On Completion is on
 
-// = data_length member (16 bits)
+// - data_length member (16 bits)
 
 #define EHCI_QTD_DT(n)          ((n) << 15)     // Data Toggle = n (n = 0,1)
 
@@ -177,14 +177,20 @@ typedef volatile struct {
     uint32_t            buffer_ptr[5];
     uint32_t            ext_buffer_ptr[5];
     uint32_t            padding[3];
-} ehci_qtd_t;
+} ehci_qtd_t  __attribute__ ((aligned (32)));
 
 typedef volatile struct {
     uint32_t            next_qhd_ptr;
     uint32_t            epcc[2];
     uint32_t            current_qtd_ptr;
-    ehci_qtd_t          qtd;
-    uint32_t            padding[4];
+    uint32_t            next_qtd_ptr;
+    uint32_t            alt_next_qtd_ptr;
+    uint8_t             status;
+    uint8_t             control;
+    uint16_t            data_length;
+    uint32_t            buffer_ptr[5];
+    uint32_t            ext_buffer_ptr[5];
+    uint32_t            padding[7];
 } ehci_qhd_t  __attribute__ ((aligned (32)));
 
 // Data structures specific to this implementation.
@@ -196,7 +202,7 @@ typedef struct {
     ehci_qhd_t          qhd[WS_QHD_SIZE];
     ehci_qtd_t          qtd[WS_QTD_SIZE];
 
-    // Keyboad data transfer buffers.
+    // Keyboard data transfer buffers.
     hid_kbd_rpt_t       kbd_rpt[MAX_KEYBOARDS];
 
     // Pointer to the host controller registers.
@@ -350,7 +356,7 @@ static void build_ehci_qhd(ehci_qhd_t *qhd, const ehci_qtd_t *qtd, const usb_ep_
         qhd->epcc[0] |= EHCI_QH_HRL;
     }
 
-    qhd->qtd.next_qtd_ptr = (uintptr_t)qtd;
+    qhd->next_qtd_ptr = (uintptr_t)qtd;
 }
 
 static uint32_t get_ehci_done(const workspace_t *ws)
@@ -460,7 +466,7 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
             build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN | EHCI_QTD_IOC_Y, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
 
             ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
-            kbd_qhd->qtd.next_qtd_ptr = (uintptr_t)kbd_qtd;
+            kbd_qhd->next_qtd_ptr = (uintptr_t)kbd_qtd;
         }
     }
 
