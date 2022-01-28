@@ -145,7 +145,10 @@ void display_start_run(void)
     clear_screen_region(8, 66, 8, SCREEN_WIDTH - 1);    // error count
     display_pass_count(0);
     display_error_count(0);
-    run_start_time = get_tsc();
+    if (clks_per_msec > 0) {
+        // If we've measured the CPU speed, we know the TSC is available.
+        run_start_time = get_tsc();
+    }
 }
 
 void display_start_pass(void)
@@ -263,7 +266,7 @@ void do_tick(int my_vcpu)
     display_pass_percentage(pct);
     display_pass_bar((BAR_LENGTH * pct) / 100);
 
-    if (cpuid_info.flags.rdtsc) {
+    if (clks_per_msec > 0) {
         int secs  = (get_tsc() - run_start_time) / (1000 * clks_per_msec);
         int mins  = secs / 60; secs %= 60;
         int hours = mins / 60; mins %= 60;
