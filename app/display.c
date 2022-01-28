@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -38,7 +38,7 @@ static const char spin_state[NUM_SPIN_STATES] = { '|', '/', '-', '\\' };
 static bool scroll_lock = false;
 static bool scroll_wait = false;
 
-static int spin_idx[MAX_VCPUS]; // current spinner position
+static int spin_idx = 0;        // current spinner position
 
 static int pass_ticks = 0;      // current value (ticks_per_pass is final value)
 static int test_ticks = 0;      // current value (ticks_per_test is final value)
@@ -74,22 +74,21 @@ void display_init(void)
 #endif
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
-    prints( 0,28,                             "| ");
-    prints( 1, 0, "CPU     : N/A               | Pass   % ");
-    prints( 2, 0, "L1 Cache: N/A               | Test   % ");
-    prints( 3, 0, "L2 Cache: N/A               | Test #   ");
-    prints( 4, 0, "L3 Cache: N/A               | Testing: ");
-    prints( 5, 0, "Memory  : N/A               | Pattern: ");
-    prints( 6, 0, "-------------------------------------------------------------------------------");
-    prints( 7, 0, "vCPU#:                                 | Time:            Temperature: N/A ");
-    prints( 8, 0, "State:                                 | ");
-    prints( 9, 0, "Cores:    Active /    Total (Run: All) | Pass:            Errors: ");
-    prints(10, 0, "-------------------------------------------------------------------------------");
+    prints(0,28,                             "| ");
+    prints(1, 0, "CPU     : N/A               | Pass   % ");
+    prints(2, 0, "L1 Cache: N/A               | Test   % ");
+    prints(3, 0, "L2 Cache: N/A               | Test #   ");
+    prints(4, 0, "L3 Cache: N/A               | Testing: ");
+    prints(5, 0, "Memory  : N/A               | Pattern: ");
+    prints(6, 0, "-------------------------------------------------------------------------------");
+    prints(7, 0, "CPU cores:     available,     enabled  | Time:            Temperature: N/A ");
+    prints(8, 0, "Run mode : PAR   Active:               | Pass:            Errors: ");
+    prints(9, 0, "-------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
-    for (int i = 0; i < 80; i++) {
-        print_char( 6, i, 0xc4);
-        print_char(10, i, 0xc4);
+    for (int i = 0;i < 80; i++) {
+        print_char(6, i, 0xc4);
+        print_char(9, i, 0xc4);
     }
     for (int i = 0; i < 6; i++) {
         print_char(i, 28, 0xb3);
@@ -97,9 +96,9 @@ void display_init(void)
     for (int i = 7; i < 10; i++) {
         print_char(i, 39, 0xb3);
     }
-    print_char( 6, 28, 0xc1);
-    print_char( 6, 39, 0xc2);
-    print_char(10, 39, 0xc1);
+    print_char(6, 28, 0xc1);
+    print_char(6, 39, 0xc2);
+    print_char(9, 39, 0xc1);
 
     set_foreground_colour(BLUE);
     set_background_colour(WHITE);
@@ -141,9 +140,9 @@ void display_start_run(void)
     if (!enable_trace) {
         clear_message_area();
     }
-    clear_screen_region(7, 47, 9, 57);                  // run time
-    clear_screen_region(9, 47, 9, 57);                  // pass number
-    clear_screen_region(9, 66, 9, SCREEN_WIDTH - 1);    // error count
+    clear_screen_region(7, 47, 7, 57);                  // run time
+    clear_screen_region(8, 47, 8, 57);                  // pass number
+    clear_screen_region(8, 66, 8, SCREEN_WIDTH - 1);    // error count
     display_pass_count(0);
     display_error_count(0);
     run_start_time = get_tsc();
@@ -224,9 +223,6 @@ void scroll(void)
 
 void do_tick(int my_vcpu)
 {
-    spin_idx[my_vcpu] = (spin_idx[my_vcpu] + 1) % NUM_SPIN_STATES;
-    display_spinner(my_vcpu, spin_state[spin_idx[my_vcpu]]);
-
     barrier_wait(run_barrier);
     if (master_vcpu == my_vcpu) {
         check_input();
@@ -238,6 +234,9 @@ void do_tick(int my_vcpu)
     if (master_vcpu != my_vcpu) {
         return;
     }
+
+    spin_idx = (spin_idx + 1) % NUM_SPIN_STATES;
+    display_spinner(spin_state[spin_idx]);
 
     test_ticks++;
     pass_ticks++;

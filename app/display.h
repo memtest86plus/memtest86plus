@@ -5,7 +5,7 @@
  * Provides (macro) functions that implement the UI display.
  * All knowledge about the display layout is encapsulated here.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -17,7 +17,7 @@
 
 #include "test.h"
 
-#define ROW_MESSAGE_T   11
+#define ROW_MESSAGE_T   10
 #define ROW_MESSAGE_B   (SCREEN_HEIGHT - 2)
 
 #define ROW_SCROLL_T    (ROW_MESSAGE_T + 2)
@@ -50,20 +50,23 @@
 #define display_memory_size(size) \
     printf(5, 10, "%kB", (uintptr_t)(size))
 
-#define display_cpu_num(me) \
-    printc(7, 7 + (me), '0' + ((me) % 10))
+#define display_available_cpus(count) \
+    printi(7, 10, count, 4, false, false)
 
-#define display_spinner(me, spin_state) \
-    printc(8, 7 + (me), spin_state)
-
-#define display_active_cpus(count) \
-    printi(9, 7, count, 2, false, false)
-
-#define display_total_cpus(count) \
-    printi(9, 19, count, 2, false, false)
+#define display_enabled_cpus(count) \
+    printi(7, 25, count, 4, false, false)
 
 #define display_cpu_mode(str) \
-    prints(9, 34, str)
+    prints(8, 11, str)
+
+#define display_active_cpu(pcpu_num) \
+    printf(8, 25, "core #%i", pcpu_num)
+
+#define display_all_active \
+    prints(8, 25, "all cores")
+
+#define display_spinner(spin_state) \
+    printc(8, 36, spin_state)
 
 #define display_pass_percentage(pct) \
     printi(1, 34, pct, 3, false, false)
@@ -126,10 +129,10 @@
     printf(7, 71, "%2i%cC   ", temp, 0xf8)
 
 #define display_pass_count(count) \
-    printi(9, 47, count, 0, false, true)
+    printi(8, 47, count, 0, false, true)
 
 #define display_error_count(count) \
-    printi(9, 66, count, 0, false, true)
+    printi(8, 66, count, 0, false, true)
 
 #define clear_message_area() \
     { \

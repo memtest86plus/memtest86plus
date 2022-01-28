@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ main.c:
 //
@@ -161,18 +161,17 @@ static void global_init(void)
 
     clear_message_area();
 
-    display_active_cpus(1);
-    display_total_cpus(num_pcpus);
+    display_available_cpus(num_pcpus);
 
     num_vcpus = 0;
     for (int i = 0; i < num_pcpus; i++) {
         if (enable_pcpu[i]) {
             pcpu_num_to_vcpu_num[i] = num_vcpus;
-            display_cpu_num(num_vcpus);
-            display_spinner(num_vcpus, 'S');
             num_vcpus++;
         }
     }
+    display_enabled_cpus(num_vcpus);
+
     master_vcpu = 0;
 
     if (enable_temperature) {
@@ -252,17 +251,22 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 static void test_all_windows(int my_pcpu, int my_vcpu)
 {
     int  active_cpus = 1;
-    bool i_am_active = (my_vcpu == master_vcpu);
+    bool i_am_master = (my_vcpu == master_vcpu);
+    bool i_am_active = i_am_master;
     if (!dummy_run) {
         if (cpu_mode == PAR && test_list[test_num].cpu_mode == PAR) {
             active_cpus = num_vcpus;
             i_am_active = true;
         }
     }
-    if (my_vcpu == master_vcpu) {
+    if (i_am_master) {
         barrier_init(run_barrier, active_cpus);
         if (!dummy_run) {
-            display_active_cpus(active_cpus);
+            if (active_cpus == 1) {
+                display_active_cpu(my_pcpu);
+            } else {
+                display_all_active;
+            }
         }
     }
 
@@ -274,15 +278,12 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
 
     // Loop through all possible windows.
     do {
-        if (!dummy_run) {
-            display_spinner(my_vcpu, 'W');
-        }
         BARRIER;
         if (bail) {
             break;
         }
 
-        if (my_vcpu == master_vcpu) {
+        if (i_am_master) {
             if (window_num == 0 && test_list[test_num].stages > 1) {
                 // A multi-stage test runs through all the windows at each stage.
                 // Relocation may disrupt the test.
@@ -306,7 +307,7 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
             }
         }
 
-        if (my_vcpu == master_vcpu) {
+        if (i_am_master) {
             switch (window_num) {
               case 0:
                 window_start = 0;
@@ -330,18 +331,14 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
 
         if (vm_map_size == 0) {
             // No memory to test in this window.
-            if (my_vcpu == master_vcpu) {
+            if (i_am_master) {
                 window_num++;
             }
             continue;
         }
 
-        if (!dummy_run) {
-            display_spinner(my_vcpu, '-');
-        }
-
         if (dummy_run) {
-            if (my_vcpu == master_vcpu) {
+            if (i_am_master) {
                 ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
             }
         } else {
@@ -349,10 +346,13 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
                 // Either there is no PAE or we are at the PAE limit.
                 break;
             }
+            if (i_am_master) {
+                display_spinner('-');
+            }
             run_test(my_vcpu, test_num, test_stage, iterations);
         }
 
-        if (my_vcpu == master_vcpu) {
+        if (i_am_master) {
             window_num++;
         }
     } while (window_end < pm_map[pm_map_size - 1].end);
