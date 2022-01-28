@@ -376,8 +376,8 @@ static void cpu_mode_menu(void)
 {
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_C+2, "CPU Sequencing Mode:");
-    prints(POP_R+3, POP_C+4, "<F1>  Parallel    (All)");
-    prints(POP_R+4, POP_C+4, "<F2>  Sequential  (Seq)");
+    prints(POP_R+3, POP_C+4, "<F1>  Parallel    (PAR)");
+    prints(POP_R+4, POP_C+4, "<F2>  Sequential  (SEQ)");
     prints(POP_R+5, POP_C+4, "<F3>  Round robin (RR)");
     prints(POP_R+6, POP_C+4, "<F10> Exit menu");
     printc(POP_R+3+cpu_mode, POP_C+2, '*');
