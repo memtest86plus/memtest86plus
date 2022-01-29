@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ config.c:
 //
@@ -45,11 +45,11 @@
 
 // Origin and size of the pop-up window.
 
-#define POP_R    4
+#define POP_R    2
 #define POP_C    22
 
 #define POP_W    36
-#define POP_H    16
+#define POP_H    20
 
 #define POP_REGION  POP_R, POP_C, POP_R + POP_H - 1, POP_C + POP_W - 1
 
@@ -191,16 +191,24 @@ static void display_error_message(int row, const char *message)
 static void display_selection_header(int row, int max_num)
 {
     prints(row+0, POP_C+2, "Current selection:");
-    printc(row+1, POP_C+2, '0');
-    for (int i = 1; i < max_num; i++) {
-        printc(row+1, POP_C+2+i, i % 10 ? 0xc4 : 0xc3);
+    if (max_num < 32) {
+        printc(row+1, POP_C+2, '0');
+    } else {
+        printc(row+1, POP_C+2, 0xda);
     }
-    printi(row+1, POP_C+2+max_num, max_num, 2, false, true);
+    for (int i = 1; i < max_num; i++) {
+        printc(row+1, POP_C+2+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
+    }
+    if (max_num < 32) {
+        printi(row+1, POP_C+2+max_num, max_num, 2, false, true);
+    } else {
+        printc(row+1, POP_C+2+max_num, 0xc4);
+    }
 }
 
 static void display_enabled(int row, int n, bool enabled)
 {
-    printc(row, POP_C+2+n, enabled ? '*' : '.');
+    printc(row+(n/32), POP_C+2+(n%32), enabled ? '*' : '.');
 }
 
 static bool set_all_tests(bool enabled)
