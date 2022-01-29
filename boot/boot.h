@@ -8,10 +8,6 @@
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
-#define MAX_APS 	64		/* Maximum number of active APs. This
-					   only affects memory footprint, so
-					   can be increased if needed */
-
 #define BSP_STACK_SIZE	16384		/* Stack size for the BSP */
 #define AP_STACK_SIZE	1024		/* Stack size for each AP */
 

@@ -4,7 +4,7 @@
 /*
  * Provides support for multi-threaded operation.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -16,10 +16,11 @@
 #include "spinlock.h"
 
 /*
- * The maximum number of active physical CPUs. This only affects memory
- * footprint, so can be increased if needed.
+ * The maximum number of active physical CPUs. There must be room in
+ * low memory for the program and all the CPU stacks and also enough
+ * rows in the config pop-up window to display the enabled state.
  */
-#define MAX_PCPUS   (1 + MAX_APS)
+#define MAX_PCPUS   256
 
 /*
  * An error code returned by smp_start().

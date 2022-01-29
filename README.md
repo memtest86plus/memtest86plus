@@ -196,7 +196,8 @@ The configuration menu allows the user to:
     * individual errors
     * BadRAM patterns
   * select which of the available CPU cores are used (at startup only)
-    * a maximum of 32 CPU cores can be selected, due to display limits
+    * a maximum of 256 CPU cores can be selected, due to memory and
+      display limits
     * the bootstrap processor (BSP) cannot be deselected
   * enable or disable the temperature display (at startup only)
   * enable or disable boot tracing for debug (at startup only)
