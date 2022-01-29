@@ -109,11 +109,13 @@ volatile uintptr_t  test_addr[MAX_VCPUS];
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define BARRIER \
-    if (TRACE_BARRIERS && !dummy_run) { \
-        trace(my_pcpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
-    } \
-    barrier_wait(start_barrier)
+#define BARRIER(enabled) \
+    if (enabled) { \
+        if (TRACE_BARRIERS) { \
+            trace(my_pcpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
+        } \
+        barrier_wait(start_barrier); \
+    }
 
 static void run_at(uintptr_t addr, int my_pcpu)
 {
@@ -122,7 +124,7 @@ static void run_at(uintptr_t addr, int my_pcpu)
     if (my_pcpu == 0) {
         memmove((void *)addr, &_start, _end - _start);
     }
-    BARRIER;
+    BARRIER(true);
 
     // We use a lock to ensure that only one CPU at a time jumps to
     // the new code. Some of the startup stuff is not thread safe!
@@ -251,7 +253,7 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 static void test_all_windows(int my_pcpu, int my_vcpu)
 {
     int  active_cpus = 1;
-    bool i_am_master = (my_vcpu == master_vcpu);
+    bool i_am_master = (my_vcpu == master_vcpu) || dummy_run;
     bool i_am_active = i_am_master;
     if (!dummy_run) {
         if (cpu_mode == PAR && test_list[test_num].cpu_mode == PAR) {
@@ -278,7 +280,7 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
 
     // Loop through all possible windows.
     do {
-        BARRIER;
+        BARRIER(!dummy_run);
         if (bail) {
             break;
         }
@@ -294,7 +296,7 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
                 window_num = 1;
             }
         }
-        BARRIER;
+        BARRIER(!dummy_run);
 
         // Relocate if necessary.
         if (window_num > 0) {
@@ -308,6 +310,7 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
         }
 
         if (i_am_master) {
+            trace(my_vcpu, "start window %i", window_num);
             switch (window_num) {
               case 0:
                 window_start = 0;
@@ -323,7 +326,7 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
             }
             setup_vm_map(window_start, window_end);
         }
-        BARRIER;
+        BARRIER(!dummy_run);
 
         if (!i_am_active) {
             continue;
@@ -383,7 +386,7 @@ void main(void)
         // Release the lock taken in run_at().
         spin_unlock(start_mutex);
     }
-    BARRIER;
+    BARRIER(true);
     init_state = 2;
 
 #if TEST_INTERRUPT
@@ -400,7 +403,7 @@ void main(void)
     // where we left off after each relocation.
 
     while (1) {
-        BARRIER;
+        BARRIER((my_vcpu != 0) || !dummy_run);
         if (my_vcpu == 0) {
             if (start_run) {
                 pass_num = 0;
@@ -421,7 +424,7 @@ void main(void)
                 }
             }
             if (start_test) {
-                // trace(my_vcpu, "start test %i", test_num);
+                trace(my_vcpu, "start test %i", test_num);
                 test_stage = 0;
                 rerun_test = true;
                 if (dummy_run) {
@@ -441,11 +444,11 @@ void main(void)
             start_test = false;
             rerun_test = false;
         }
-        BARRIER;
+        BARRIER(!dummy_run);
         if (test_list[test_num].enabled) {
             test_all_windows(my_pcpu, my_vcpu);
         }
-        BARRIER;
+        BARRIER(!dummy_run);
         if (my_vcpu != 0) {
             continue;
         }
