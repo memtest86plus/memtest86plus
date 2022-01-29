@@ -147,14 +147,16 @@ startup:
 
 	leaq	startup_stack_top(%rip), %rsp
 
-	# Pick the correct stack.
+	# Pick the correct stack. The stacks are allocated immediately
+	# after the end of the loaded program, BSP first, then APs.
 
 	xorq	%rax, %rax
 	call	smp_my_pcpu_num
-	movl	$PCPU_STACK_SIZE, %edx
+	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
-	leaq	bsp_stack_top(%rip), %rsp
-	subq	%rax, %rsp
+	addq	$BSP_STACK_SIZE, %rax
+	leaq	_end(%rip), %rsp
+	addq	%rax, %rsp
 
 	# Initialise the pml4 and pdp tables.
 
@@ -597,18 +599,10 @@ first_boot:
 
 	.previous
 
-# Stacks.
+# Startup stack.
 
 	.bss
 	.align	16
-
-ap_stacks_base:
-	. = . + (PCPU_STACK_SIZE * MAX_APS)
-ap_stacks_top:
-
-bsp_stack_base:
-	. = . + PCPU_STACK_SIZE
-bsp_stack_top:
 
 startup_stack_base:
 	. = . + 64

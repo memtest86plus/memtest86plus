@@ -88,13 +88,15 @@ startup:
 	movl	%esi, boot_params_addr@GOTOFF(%ebx)
 1:
 
-	# Pick the correct stack.
+	# Pick the correct stack. The stacks are allocated immediately
+	# after the end of the loaded program, BSP first, then APs.
 
 	call	smp_my_pcpu_num
-	movl	$PCPU_STACK_SIZE, %edx
+	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
-	leal	bsp_stack_top@GOTOFF(%ebx), %esp
-	subl	%eax, %esp
+	addl	$BSP_STACK_SIZE, %eax
+	leal	_end@GOTOFF(%ebx), %esp
+	addl	%eax, %esp
 
 	# Initialise the GDT descriptor.
 
@@ -552,18 +554,10 @@ first_boot:
 
 	.previous
 
-# Stacks.
+# Startup stack.
 
 	.bss
 	.align	16
-
-ap_stacks_base:
-	. = . + (PCPU_STACK_SIZE * MAX_APS)
-ap_stacks_top:
-
-bsp_stack_base:
-	. = . + PCPU_STACK_SIZE
-bsp_stack_top:
 
 startup_stack_base:
 	. = . + 64
