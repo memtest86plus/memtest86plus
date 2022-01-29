@@ -60,7 +60,8 @@
     prints(8, 11, str)
 
 #define display_active_cpu(pcpu_num) \
-    printf(8, 25, "core #%i", pcpu_num)
+    prints(8, 25, "core #"); \
+    printi(8, 31, pcpu_num, 3, false, true)
 
 #define display_all_active \
     prints(8, 25, "all cores")
