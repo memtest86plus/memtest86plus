@@ -407,6 +407,13 @@ static void address_range_menu(void)
     clear_screen_region(POP_REGION);
 }
 
+static void set_cpu_mode(cpu_mode_t mode)
+{
+    printc(POP_R+3+cpu_mode, POP_LM, ' ');
+    cpu_mode = mode;
+    printc(POP_R+3+cpu_mode, POP_LM, '*');
+}
+
 static void cpu_mode_menu(void)
 {
     clear_screen_region(POP_REGION);
@@ -424,9 +431,17 @@ static void cpu_mode_menu(void)
           case '1':
           case '2':
           case '3':
-            printc(POP_R+3+cpu_mode, POP_LM, ' ');
-            cpu_mode = ch - '1';
-            printc(POP_R+3+cpu_mode, POP_LM, '*');
+            set_cpu_mode(ch - '1');
+            break;
+          case 'u':
+            if (cpu_mode > 0) {
+                set_cpu_mode(cpu_mode - 1);
+            }
+            break;
+          case 'd':
+            if (cpu_mode < 2) {
+                set_cpu_mode(cpu_mode + 1);
+            }
             break;
           case '0':
             exit_menu = true;
@@ -438,6 +453,13 @@ static void cpu_mode_menu(void)
     }
 
     clear_screen_region(POP_REGION);
+}
+
+static void set_error_mode(error_mode_t mode)
+{
+    printc(POP_R+3+error_mode, POP_LM, ' ');
+    error_mode = mode;
+    printc(POP_R+3+error_mode, POP_LM, '*');
 }
 
 static void error_mode_menu(void)
@@ -459,9 +481,17 @@ static void error_mode_menu(void)
           case '2':
           case '3':
           case '4':
-            printc(POP_R+3+error_mode, POP_LM, ' ');
-            error_mode = ch - '1';
-            printc(POP_R+3+error_mode, POP_LM, '*');
+            set_error_mode(ch - '1');
+            break;
+          case 'u':
+            if (error_mode > 0) {
+                set_error_mode(error_mode - 1);
+            }
+            break;
+          case 'd':
+            if (error_mode < 3) {
+                set_error_mode(error_mode + 1);
+            }
             break;
           case '0':
             exit_menu = true;
