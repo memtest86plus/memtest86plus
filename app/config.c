@@ -46,12 +46,18 @@
 // Origin and size of the pop-up window.
 
 #define POP_R       3
-#define POP_C       22
+#define POP_C       21
 
-#define POP_W       36
+#define POP_W       38
 #define POP_H       18
 
-#define POP_REGION  POP_R, POP_C, POP_R + POP_H - 1, POP_C + POP_W - 1
+#define POP_LAST_R  (POP_R + POP_H - 1)
+#define POP_LAST_C  (POP_C + POP_W - 1)
+
+#define POP_REGION  POP_R, POP_C, POP_LAST_R, POP_LAST_C
+
+#define POP_LM      (POP_C + 3)     // Left margin
+#define POP_LI      (POP_C + 5)     // List indent
 
 #define SEL_W       32
 #define SEL_H       2
@@ -176,20 +182,20 @@ static void update_num_pages_to_test(void)
 
 static void clear_popup_row(int row)
 {
-    clear_screen_region(row, POP_C, row, POP_C + POP_W - 1);
+    clear_screen_region(row, POP_C, row, POP_LAST_C);
 }
 
 static void display_input_message(int row, const char *message)
 {
     clear_popup_row(row);
-    prints(row, POP_C+2, message);
+    prints(row, POP_LM, message);
 }
 
 static void display_error_message(int row, const char *message)
 {
     clear_popup_row(row);
     set_foreground_colour(YELLOW);
-    prints(row, POP_C+2, message);
+    prints(row, POP_LM, message);
     set_foreground_colour(WHITE);
 }
 
@@ -197,17 +203,17 @@ static void display_selection_header(int row, int max_num, int offset)
 {
     int i;
 
-    prints(row, POP_C+2, "Current selection:");
+    prints(row, POP_LM, "Current selection:");
     if (max_num >= SEL_AREA) {
-        prints(row, POP_C+20, "  (scroll U D)");
-        printc(row, POP_C+30, 0x18);
-        printc(row, POP_C+32, 0x19);
+        prints(row, POP_LM+18, "  (scroll U D)");
+        printc(row, POP_LM+28, 0x18);
+        printc(row, POP_LM+30, 0x19);
     }
     row++;
-    printi(row, POP_C, offset, 3, false, false);
+    printi(row, POP_LM-2, offset, 3, false, false);
     offset++;
     for (i = 1; i < SEL_W && offset < max_num; i++) {
-        printc(row, POP_C+2+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
+        printc(row, POP_LM+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
         offset++;
     }
     if (i == SEL_W) {
@@ -218,17 +224,17 @@ static void display_selection_header(int row, int max_num, int offset)
         row += data_rows + 1;
         offset += SEL_W * (data_rows - 2);
         for (i = 0; i < (SEL_W - 1) && offset < max_num; i++) {
-            printc(row, POP_C+2+i, i==0 ? 0xc0 : i%8 ? 0xc4 : 0xc1);
+            printc(row, POP_LM+i, i==0 ? 0xc0 : i%8 ? 0xc4 : 0xc1);
             offset++;
         }
     }
-    printi(row, POP_C+2+i, offset, 3, false, true);
+    printi(row, POP_LM+i, offset, 3, false, true);
 }
 
 static void display_enabled(int row, int n, bool enabled)
 {
     if (n >= 0 && n < SEL_AREA) {
-        printc(row + (n / SEL_W), POP_C+2 + (n % SEL_W), enabled ? '*' : '.');
+        printc(row + (n / SEL_W), POP_LM + (n % SEL_W), enabled ? '*' : '.');
     }
 }
 
@@ -246,7 +252,7 @@ static bool add_or_remove_test(bool add)
 {
     
     display_input_message(POP_R+14, "Enter test #");
-    int n = read_value(POP_R+14, POP_C+2+12, 2, 0);
+    int n = read_value(POP_R+14, POP_LM+12, 2, 0);
     if (n < 0 || n >= NUM_TEST_PATTERNS) {
         display_error_message(POP_R+14, "Invalid test number");
         return false;
@@ -260,13 +266,13 @@ static bool add_or_remove_test(bool add)
 static bool add_test_range()
 {
     display_input_message(POP_R+14, "Enter first test #");
-    int n1 = read_value(POP_R+14, POP_C+2+18, 2, 0);
+    int n1 = read_value(POP_R+14, POP_LM+18, 2, 0);
     if (n1 < 0 || n1 >= NUM_TEST_PATTERNS) {
         display_error_message(POP_R+14, "Invalid test number");
         return false;
     }
     display_input_message(POP_R+14, "Enter last test #");
-    int n2 = read_value(POP_R+14, POP_C+2+17, 2, 0);
+    int n2 = read_value(POP_R+14, POP_LM+17, 2, 0);
     if (n2 < n1 || n2 >= NUM_TEST_PATTERNS) {
         display_error_message(POP_R+14, "Invalid test range");
         return false;
@@ -282,13 +288,13 @@ static bool add_test_range()
 static void test_selection_menu(void)
 {
     clear_screen_region(POP_REGION);
-    prints(POP_R+1, POP_C+2, "Test Selection:");
-    prints(POP_R+3, POP_C+4, "<F1>  Clear selection");
-    prints(POP_R+4, POP_C+4, "<F2>  Remove one test");
-    prints(POP_R+5, POP_C+4, "<F3>  Add one test");
-    prints(POP_R+6, POP_C+4, "<F4>  Add test range");
-    prints(POP_R+7, POP_C+4, "<F5>  Add all tests");
-    prints(POP_R+8, POP_C+4, "<F10> Exit menu");
+    prints(POP_R+1, POP_LM, "Test Selection:");
+    prints(POP_R+3, POP_LI, "<F1>  Clear selection");
+    prints(POP_R+4, POP_LI, "<F2>  Remove one test");
+    prints(POP_R+5, POP_LI, "<F3>  Add one test");
+    prints(POP_R+6, POP_LI, "<F4>  Add test range");
+    prints(POP_R+7, POP_LI, "<F5>  Add all tests");
+    prints(POP_R+8, POP_LI, "<F10> Exit menu");
 
     display_selection_header(POP_R+10, NUM_TEST_PATTERNS - 1, 0);
     for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
@@ -343,12 +349,12 @@ static void test_selection_menu(void)
 static void address_range_menu(void)
 {
     clear_screen_region(POP_REGION);
-    prints(POP_R+1, POP_C+2, "Address Range:");
-    prints(POP_R+3, POP_C+4, "<F1>  Set lower limit");
-    prints(POP_R+4, POP_C+4, "<F2>  Set upper limit");
-    prints(POP_R+5, POP_C+4, "<F3>  Test all memory");
-    prints(POP_R+6, POP_C+4, "<F10> Exit menu");
-    printf(POP_R+8, POP_C+2, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
+    prints(POP_R+1, POP_LM, "Address Range:");
+    prints(POP_R+3, POP_LI, "<F1>  Set lower limit");
+    prints(POP_R+4, POP_LI, "<F2>  Set upper limit");
+    prints(POP_R+5, POP_LI, "<F3>  Test all memory");
+    prints(POP_R+6, POP_LI, "<F10> Exit menu");
+    printf(POP_R+8, POP_LM, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
 
     bool exit_menu = false;
     while (!exit_menu) {
@@ -356,7 +362,7 @@ static void address_range_menu(void)
         switch (get_key()) {
           case '1': {
             display_input_message(POP_R+10, "Enter lower limit: ");
-            uintptr_t page = read_value(POP_R+10, POP_C+2+19, 15, -PAGE_SHIFT);
+            uintptr_t page = read_value(POP_R+10, POP_LM+19, 15, -PAGE_SHIFT);
             if (page < pm_limit_upper) {
                 clear_popup_row(POP_R+10);
                 pm_limit_lower = page;
@@ -367,7 +373,7 @@ static void address_range_menu(void)
           } break;
           case '2': {
             display_input_message(POP_R+10, "Enter upper limit: ");
-            uintptr_t page = read_value(POP_R+10, POP_C+2+19, 15, -PAGE_SHIFT);
+            uintptr_t page = read_value(POP_R+10, POP_LM+19, 15, -PAGE_SHIFT);
             if (page > pm_limit_lower) {
                 clear_popup_row(POP_R+10);
                 pm_limit_upper = page;
@@ -391,7 +397,7 @@ static void address_range_menu(void)
         }
         if (changed) {
             clear_popup_row(POP_R+8);
-            printf(POP_R+8, POP_C+2, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
+            printf(POP_R+8, POP_LM, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
             update_num_pages_to_test();
             restart = true;
             changed = false;
@@ -404,12 +410,12 @@ static void address_range_menu(void)
 static void cpu_mode_menu(void)
 {
     clear_screen_region(POP_REGION);
-    prints(POP_R+1, POP_C+2, "CPU Sequencing Mode:");
-    prints(POP_R+3, POP_C+4, "<F1>  Parallel    (PAR)");
-    prints(POP_R+4, POP_C+4, "<F2>  Sequential  (SEQ)");
-    prints(POP_R+5, POP_C+4, "<F3>  Round robin (RR)");
-    prints(POP_R+6, POP_C+4, "<F10> Exit menu");
-    printc(POP_R+3+cpu_mode, POP_C+2, '*');
+    prints(POP_R+1, POP_LM, "CPU Sequencing Mode:");
+    prints(POP_R+3, POP_LI, "<F1>  Parallel    (PAR)");
+    prints(POP_R+4, POP_LI, "<F2>  Sequential  (SEQ)");
+    prints(POP_R+5, POP_LI, "<F3>  Round robin (RR)");
+    prints(POP_R+6, POP_LI, "<F10> Exit menu");
+    printc(POP_R+3+cpu_mode, POP_LM, '*');
 
     bool exit_menu = false;
     while (!exit_menu) {
@@ -418,9 +424,9 @@ static void cpu_mode_menu(void)
           case '1':
           case '2':
           case '3':
-            printc(POP_R+3+cpu_mode, POP_C+2, ' ');
+            printc(POP_R+3+cpu_mode, POP_LM, ' ');
             cpu_mode = ch - '1';
-            printc(POP_R+3+cpu_mode, POP_C+2, '*');
+            printc(POP_R+3+cpu_mode, POP_LM, '*');
             break;
           case '0':
             exit_menu = true;
@@ -437,13 +443,13 @@ static void cpu_mode_menu(void)
 static void error_mode_menu(void)
 {
     clear_screen_region(POP_REGION);
-    prints(POP_R+1, POP_C+2, "Error Reporting Mode:");
-    prints(POP_R+3, POP_C+4, "<F1>  Error counts only");
-    prints(POP_R+4, POP_C+4, "<F2>  Error summary");
-    prints(POP_R+5, POP_C+4, "<F3>  Individual errors");
-    prints(POP_R+6, POP_C+4, "<F4>  BadRAM patterns");
-    prints(POP_R+7, POP_C+4, "<F10> Exit menu");
-    printc(POP_R+3+error_mode, POP_C+2, '*');
+    prints(POP_R+1, POP_LM, "Error Reporting Mode:");
+    prints(POP_R+3, POP_LI, "<F1>  Error counts only");
+    prints(POP_R+4, POP_LI, "<F2>  Error summary");
+    prints(POP_R+5, POP_LI, "<F3>  Individual errors");
+    prints(POP_R+6, POP_LI, "<F4>  BadRAM patterns");
+    prints(POP_R+7, POP_LI, "<F10> Exit menu");
+    printc(POP_R+3+error_mode, POP_LM, '*');
 
     bool exit_menu = false;
     while (!exit_menu) {
@@ -453,9 +459,9 @@ static void error_mode_menu(void)
           case '2':
           case '3':
           case '4':
-            printc(POP_R+3+error_mode, POP_C+2, ' ');
+            printc(POP_R+3+error_mode, POP_LM, ' ');
             error_mode = ch - '1';
-            printc(POP_R+3+error_mode, POP_C+2, '*');
+            printc(POP_R+3+error_mode, POP_LM, '*');
             break;
           case '0':
             exit_menu = true;
@@ -483,7 +489,7 @@ static bool add_or_remove_cpu(bool add, int display_offset)
 {
     
     display_input_message(POP_R+16, "Enter CPU #");
-    int n = read_value(POP_R+16, POP_C+2+11, 2, 0);
+    int n = read_value(POP_R+16, POP_LM+11, 2, 0);
     if (n < 1 || n >= num_pcpus) {
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
@@ -497,13 +503,13 @@ static bool add_or_remove_cpu(bool add, int display_offset)
 static bool add_cpu_range(int display_offset)
 {
     display_input_message(POP_R+16, "Enter first CPU #");
-    int n1 = read_value(POP_R+16, POP_C+2+17, 2, 0);
+    int n1 = read_value(POP_R+16, POP_LM+17, 2, 0);
     if (n1 < 1 || n1 >= num_pcpus) {
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
     display_input_message(POP_R+16, "Enter last CPU #");
-    int n2 = read_value(POP_R+16, POP_C+2+16, 2, 0);
+    int n2 = read_value(POP_R+16, POP_LM+16, 2, 0);
     if (n2 < n1 || n2 >= num_pcpus) {
         display_error_message(POP_R+16, "Invalid CPU range");
         return false;
@@ -518,10 +524,10 @@ static bool add_cpu_range(int display_offset)
 
 static void display_cpu_selection(int display_offset)
 {
-    clear_screen_region(POP_R+11, POP_C, POP_R + POP_H - 1, POP_C + POP_W - 1);
+    clear_screen_region(POP_R+11, POP_C, POP_LAST_R, POP_LAST_C);
     display_selection_header(POP_R+10, num_pcpus - 1, display_offset);
     if (display_offset == 0) {
-        printc(POP_R+12, POP_C+2, 'B');
+        printc(POP_R+12, POP_LM, 'B');
     }
     for (int i = 1; i < num_pcpus; i++) {
         display_enabled(POP_R+12, i - display_offset, enable_pcpu[i]);
@@ -533,13 +539,13 @@ static void cpu_selection_menu(void)
     int display_offset = 0;
 
     clear_screen_region(POP_REGION);
-    prints(POP_R+1, POP_C+2, "CPU Selection:");
-    prints(POP_R+3, POP_C+4, "<F1>  Clear selection");
-    prints(POP_R+4, POP_C+4, "<F2>  Remove one CPU");
-    prints(POP_R+5, POP_C+4, "<F3>  Add one CPU");
-    prints(POP_R+6, POP_C+4, "<F4>  Add CPU range");
-    prints(POP_R+7, POP_C+4, "<F5>  Add all CPUs");
-    prints(POP_R+8, POP_C+4, "<F10> Exit menu");
+    prints(POP_R+1, POP_LM, "CPU Selection:");
+    prints(POP_R+3, POP_LI, "<F1>  Clear selection");
+    prints(POP_R+4, POP_LI, "<F2>  Remove one CPU");
+    prints(POP_R+5, POP_LI, "<F3>  Add one CPU");
+    prints(POP_R+6, POP_LI, "<F4>  Add CPU range");
+    prints(POP_R+7, POP_LI, "<F5>  Add all CPUs");
+    prints(POP_R+8, POP_LI, "<F10> Exit menu");
 
     display_cpu_selection(display_offset);
 
@@ -631,23 +637,23 @@ void config_menu(bool initial)
 
     bool exit_menu = false;
     while (!exit_menu) {
-        prints(POP_R+1,  POP_C+2, "Settings:");
-        prints(POP_R+3,  POP_C+4, "<F1>  Test selection");
-        prints(POP_R+4,  POP_C+4, "<F2>  Address range");
-        prints(POP_R+5,  POP_C+4, "<F3>  CPU sequencing mode");
-        prints(POP_R+6,  POP_C+4, "<F4>  Error reporting mode");
+        prints(POP_R+1,  POP_LM, "Settings:");
+        prints(POP_R+3,  POP_LI, "<F1>  Test selection");
+        prints(POP_R+4,  POP_LI, "<F2>  Address range");
+        prints(POP_R+5,  POP_LI, "<F3>  CPU sequencing mode");
+        prints(POP_R+6,  POP_LI, "<F4>  Error reporting mode");
         if (initial) {
             if (num_pcpus < 2)  set_foreground_colour(BOLD+BLACK);
-            prints(POP_R+7,  POP_C+4, "<F5>  CPU selection");
+            prints(POP_R+7,  POP_LI, "<F5>  CPU selection");
             if (num_pcpus < 2)  set_foreground_colour(WHITE);
             if (no_temperature) set_foreground_colour(BOLD+BLACK);
-            printf(POP_R+8,  POP_C+4, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
+            printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
             if (no_temperature) set_foreground_colour(WHITE);
-            printf(POP_R+9,  POP_C+4, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
-            prints(POP_R+10, POP_C+4, "<F10> Exit menu");
+            printf(POP_R+9,  POP_LI, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
+            prints(POP_R+10, POP_LI, "<F10> Exit menu");
         } else {
-            prints(POP_R+7,  POP_C+4, "<F5>  Skip current test");
-            prints(POP_R+8 , POP_C+4, "<F10> Exit menu");
+            prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
+            prints(POP_R+8 , POP_LI, "<F10> Exit menu");
         }
 
         switch (get_key()) {
