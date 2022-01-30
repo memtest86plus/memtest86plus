@@ -85,19 +85,19 @@ static const char legacy_keymap[] = {
     /* 0x44 */ '0',  // F10
     /* 0x45 */   0,
     /* 0x46 */   0,
-    /* 0x47 */ '7',  // keypad
-    /* 0x48 */ '8',  // keypad
-    /* 0x49 */ '9',  // keypad
+    /* 0x47 */   0,  // keypad
+    /* 0x48 */ 'u',  // keypad
+    /* 0x49 */   0,  // keypad
     /* 0x4a */ '-',  // keypad
-    /* 0x4b */ '4',  // keypad
-    /* 0x4c */ '5',  // keypad
-    /* 0x4d */ '6',  // keypad
+    /* 0x4b */ 'l',  // keypad
+    /* 0x4c */   0,  // keypad
+    /* 0x4d */ 'r',  // keypad
     /* 0x4e */ '+',  // keypad
-    /* 0x4f */ '1',  // keypad
-    /* 0x50 */ '2',  // keypad
-    /* 0x51 */ '3',  // keypad
-    /* 0x52 */ '0',  // keypad
-    /* 0x53 */ '.',  // keypad
+    /* 0x4f */   0,  // keypad
+    /* 0x50 */ 'd',  // keypad
+    /* 0x51 */   0,  // keypad
+    /* 0x52 */   0,  // keypad
+    /* 0x53 */   0,  // keypad
 };
 
 // Convert USB HID keycodes to characters.
@@ -191,17 +191,17 @@ static const char usb_hid_keymap[] = {
     /* 0x56 */ '-',  // keypad
     /* 0x57 */ '+',  // keypad
     /* 0x58 */ '\n', // keypad
-    /* 0x59 */ '1',  // keypad
-    /* 0x5a */ '2',  // keypad
-    /* 0x5b */ '3',  // keypad
-    /* 0x5c */ '4',  // keypad
-    /* 0x5d */ '5',  // keypad
-    /* 0x5e */ '6',  // keypad
-    /* 0x5f */ '7',  // keypad
-    /* 0x60 */ '8',  // keypad
-    /* 0x61 */ '9',  // keypad
-    /* 0x62 */ '0',  // keypad
-    /* 0x63 */ '.',  // keypad
+    /* 0x59 */   0,  // keypad
+    /* 0x5a */ 'd',  // keypad
+    /* 0x5b */   0,  // keypad
+    /* 0x5c */ 'l',  // keypad
+    /* 0x5d */   0,  // keypad
+    /* 0x5e */ 'r',  // keypad
+    /* 0x5f */   0,  // keypad
+    /* 0x60 */ 'u',  // keypad
+    /* 0x61 */   0,  // keypad
+    /* 0x62 */   0,  // keypad
+    /* 0x63 */   0,  // keypad
     /* 0x64 */ '\\', // Non-US
 };
 
