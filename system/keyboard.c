@@ -181,10 +181,10 @@ static const char usb_hid_keymap[] = {
     /* 0x4c */   0,  // Page Up
     /* 0x4d */   0,  // Delete
     /* 0x4e */   0,  // Page Down
-    /* 0x4f */   0,  // Cursor Right
-    /* 0x50 */   0,  // Cursor Left
-    /* 0x51 */   0,  // Cursor Down
-    /* 0x52 */   0,  // Cursor Up
+    /* 0x4f */ 'r',  // Cursor Right
+    /* 0x50 */ 'l',  // Cursor Left
+    /* 0x51 */ 'd',  // Cursor Down
+    /* 0x52 */ 'u',  // Cursor Up
     /* 0x53 */   0,  // Number Lock
     /* 0x54 */ '/',  // keypad
     /* 0x55 */ '*',  // keypad
@@ -231,13 +231,26 @@ char get_key(void)
         }
     }
 
+    static bool escaped = false;
     if (keyboard_types & KT_LEGACY) {
         uint8_t c = inb(0x64);
         if (c & 0x01) {
             c = inb(0x60);
+            if (escaped) {
+                escaped = false;
+                switch (c) {
+                  case 0x48 : return 'u';
+                  case 0x4b : return 'l';
+                  case 0x4d : return 'r';
+                  case 0x50 : return 'd';
+                  default   : return 0;
+                }
+            }
             if (c < sizeof(legacy_keymap)) {
                 return legacy_keymap[c];
             }
+            escaped = (c == 0xe0);
+
             // Ignore keys we don't recognise and key up codes
         }
     }
