@@ -17,8 +17,7 @@
 
 /*
  * The maximum number of active physical CPUs. There must be room in
- * low memory for the program and all the CPU stacks and also enough
- * rows in the config pop-up window to display the enabled state.
+ * low memory for the program and all the CPU stacks.
  */
 #define MAX_PCPUS   256
 

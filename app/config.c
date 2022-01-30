@@ -45,13 +45,18 @@
 
 // Origin and size of the pop-up window.
 
-#define POP_R    2
-#define POP_C    22
+#define POP_R       3
+#define POP_C       22
 
-#define POP_W    36
-#define POP_H    20
+#define POP_W       36
+#define POP_H       18
 
 #define POP_REGION  POP_R, POP_C, POP_R + POP_H - 1, POP_C + POP_W - 1
+
+#define SEL_W       32
+#define SEL_H       2
+
+#define SEL_AREA    (SEL_W * SEL_H)
 
 static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
 
@@ -188,27 +193,43 @@ static void display_error_message(int row, const char *message)
     set_foreground_colour(WHITE);
 }
 
-static void display_selection_header(int row, int max_num)
+static void display_selection_header(int row, int max_num, int offset)
 {
-    prints(row+0, POP_C+2, "Current selection:");
-    if (max_num < 32) {
-        printc(row+1, POP_C+2, '0');
-    } else {
-        printc(row+1, POP_C+2, 0xda);
+    int i;
+
+    prints(row, POP_C+2, "Current selection:");
+    if (max_num >= SEL_AREA) {
+        prints(row, POP_C+20, "  (scroll U D)");
+        printc(row, POP_C+30, 0x18);
+        printc(row, POP_C+32, 0x19);
     }
-    for (int i = 1; i < max_num; i++) {
-        printc(row+1, POP_C+2+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
+    row++;
+    printi(row, POP_C, offset, 3, false, false);
+    offset++;
+    for (i = 1; i < SEL_W && offset < max_num; i++) {
+        printc(row, POP_C+2+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
+        offset++;
     }
-    if (max_num < 32) {
-        printi(row+1, POP_C+2+max_num, max_num, 2, false, true);
-    } else {
-        printc(row+1, POP_C+2+max_num, 0xc4);
+    if (i == SEL_W) {
+        int data_rows = (max_num + SEL_W) / SEL_W;
+        if (data_rows > SEL_H) {
+            data_rows = SEL_H;
+        }
+        row += data_rows + 1;
+        offset += SEL_W * (data_rows - 2);
+        for (i = 0; i < (SEL_W - 1) && offset < max_num; i++) {
+            printc(row, POP_C+2+i, i==0 ? 0xc0 : i%8 ? 0xc4 : 0xc1);
+            offset++;
+        }
     }
+    printi(row, POP_C+2+i, offset, 3, false, true);
 }
 
 static void display_enabled(int row, int n, bool enabled)
 {
-    printc(row+(n/32), POP_C+2+(n%32), enabled ? '*' : '.');
+    if (n >= 0 && n < SEL_AREA) {
+        printc(row + (n / SEL_W), POP_C+2 + (n % SEL_W), enabled ? '*' : '.');
+    }
 }
 
 static bool set_all_tests(bool enabled)
@@ -269,7 +290,7 @@ static void test_selection_menu(void)
     prints(POP_R+7, POP_C+4, "<F5>  Add all tests");
     prints(POP_R+8, POP_C+4, "<F10> Exit menu");
 
-    display_selection_header(POP_R+10, NUM_TEST_PATTERNS - 1);
+    display_selection_header(POP_R+10, NUM_TEST_PATTERNS - 1, 0);
     for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
         display_enabled(POP_R+12, i, test_list[i].enabled);
     }
@@ -448,55 +469,69 @@ static void error_mode_menu(void)
     clear_screen_region(POP_REGION);
 }
 
-static bool set_all_cpus(bool enabled)
+static bool set_all_cpus(bool enabled, int display_offset)
 {
-    clear_popup_row(POP_R+14);
+    clear_popup_row(POP_R+16);
     for (int i = 1; i < num_pcpus; i++) {
         enable_pcpu[i] = enabled;
-        display_enabled(POP_R+12, i, enabled);
+        display_enabled(POP_R+12, i - display_offset, enabled);
     }
     return true;
 }
 
-static bool add_or_remove_cpu(bool add)
+static bool add_or_remove_cpu(bool add, int display_offset)
 {
     
-    display_input_message(POP_R+14, "Enter CPU #");
-    int n = read_value(POP_R+14, POP_C+2+11, 2, 0);
+    display_input_message(POP_R+16, "Enter CPU #");
+    int n = read_value(POP_R+16, POP_C+2+11, 2, 0);
     if (n < 1 || n >= num_pcpus) {
-        display_error_message(POP_R+14, "Invalid CPU number");
+        display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
     enable_pcpu[n] = add;
-    display_enabled(POP_R+12, n, add);
-    clear_popup_row(POP_R+14);
+    display_enabled(POP_R+12, n - display_offset, add);
+    clear_popup_row(POP_R+16);
     return true;
 }
 
-static bool add_cpu_range()
+static bool add_cpu_range(int display_offset)
 {
-    display_input_message(POP_R+14, "Enter first CPU #");
-    int n1 = read_value(POP_R+14, POP_C+2+17, 2, 0);
+    display_input_message(POP_R+16, "Enter first CPU #");
+    int n1 = read_value(POP_R+16, POP_C+2+17, 2, 0);
     if (n1 < 1 || n1 >= num_pcpus) {
-        display_error_message(POP_R+14, "Invalid CPU number");
+        display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
-    display_input_message(POP_R+14, "Enter last CPU #");
-    int n2 = read_value(POP_R+14, POP_C+2+16, 2, 0);
+    display_input_message(POP_R+16, "Enter last CPU #");
+    int n2 = read_value(POP_R+16, POP_C+2+16, 2, 0);
     if (n2 < n1 || n2 >= num_pcpus) {
-        display_error_message(POP_R+14, "Invalid CPU range");
+        display_error_message(POP_R+16, "Invalid CPU range");
         return false;
     }
     for (int i = n1; i <= n2; i++) {
         enable_pcpu[i] = true;
-        display_enabled(POP_R+12, i, true);
+        display_enabled(POP_R+12, i - display_offset, true);
     }
-    clear_popup_row(POP_R+14);
+    clear_popup_row(POP_R+16);
     return true;
+}
+
+static void display_cpu_selection(int display_offset)
+{
+    clear_screen_region(POP_R+11, POP_C, POP_R + POP_H - 1, POP_C + POP_W - 1);
+    display_selection_header(POP_R+10, num_pcpus - 1, display_offset);
+    if (display_offset == 0) {
+        printc(POP_R+12, POP_C+2, 'B');
+    }
+    for (int i = 1; i < num_pcpus; i++) {
+        display_enabled(POP_R+12, i - display_offset, enable_pcpu[i]);
+    }
 }
 
 static void cpu_selection_menu(void)
 {
+    int display_offset = 0;
+
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_C+2, "CPU Selection:");
     prints(POP_R+3, POP_C+4, "<F1>  Clear selection");
@@ -506,30 +541,38 @@ static void cpu_selection_menu(void)
     prints(POP_R+7, POP_C+4, "<F5>  Add all CPUs");
     prints(POP_R+8, POP_C+4, "<F10> Exit menu");
 
-    display_selection_header(POP_R+10, num_pcpus - 1);
-    printc(POP_R+12, POP_C+2, 'B');
-    for (int i = 1; i < num_pcpus; i++) {
-        display_enabled(POP_R+12, i, enable_pcpu[i]);
-    }
+    display_cpu_selection(display_offset);
 
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
         switch (get_key()) {
           case '1':
-            changed = set_all_cpus(false);
+            changed = set_all_cpus(false, display_offset);
             break;
           case '2':
-            changed = add_or_remove_cpu(false);
+            changed = add_or_remove_cpu(false, display_offset);
             break;
           case '3':
-            changed = add_or_remove_cpu(true);
+            changed = add_or_remove_cpu(true, display_offset);
             break;
           case '4':
-            changed = add_cpu_range();
+            changed = add_cpu_range(display_offset);
             break;
           case '5':
-            changed = set_all_cpus(true);
+            changed = set_all_cpus(true, display_offset);
+            break;
+          case 'u':
+            if (display_offset >= SEL_W) {
+                display_offset -= SEL_W;
+                display_cpu_selection(display_offset);
+            }
+            break;
+          case 'd':
+            if (display_offset < (num_pcpus - SEL_AREA)) {
+                display_offset += SEL_W;
+                display_cpu_selection(display_offset);
+            }
             break;
           case '0':
             clear_popup_row(POP_R+14);
