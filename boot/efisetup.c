@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from Linux 5.6 arch/x86/boot/compressed/eboot.c and extracts
 // from drivers/firmware/efi/libstub:
@@ -540,6 +540,8 @@ boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg,
         }
         memset(boot_params, 0, sizeof(boot_params_t));
     }
+
+    boot_params->code32_start = (uintptr_t)startup32;
 
     status = set_screen_info(boot_params);
     if (status != EFI_SUCCESS) {

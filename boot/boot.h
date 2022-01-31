@@ -49,6 +49,8 @@
 
 extern uint8_t	_start[];
 
+extern uint8_t	startup32[];
+
 extern uint8_t	startup[];
 
 extern uint64_t	pml4[];

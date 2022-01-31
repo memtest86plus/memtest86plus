@@ -31,7 +31,7 @@
 startup32:
 	cld
 	cli
-	jmp	startup
+	jmp	first_start
 
 # The Linux 32-bit EFI handover point.
 
@@ -62,18 +62,28 @@ efi_handover:
 	call	efi_setup
 
 	# Fall though to the shared 32-bit entry point with the boot
-	# params pointer in %esi.
+	# params pointer in %esi...
 
 	movl	%eax, %esi
+
+	# ...and with the startup address in %edi.
+
+first_start:
+	movl	0x214(%esi), %ebx	# bootparams.code32_start
+	leal	(startup - startup32)(%ebx), %edi
 
 # The 32-bit entry point for AP boot and for restart after relocation.
 
 	.globl	startup
 startup:
-	# Use a temporary stack until we pick the correct one. We can
-	# safely use the high address, even if we are loaded low.
+	# Use the startup stack until we pick the correct one. We
+	# need to take the mutex to protect our use of the stack.
 
-	movl	$(HIGH_LOAD_ADDR + startup_stack_top - startup32), %esp
+	leal	(startup_stack_mutex - startup)(%edi), %eax
+0: lock bts	$0, (%eax)
+	jc	0b
+
+	leal	(startup_stack_top - startup)(%edi), %esp
 
 	# Load the GOT pointer.
 
@@ -97,6 +107,10 @@ startup:
 	addl	$BSP_STACK_SIZE, %eax
 	leal	_end@GOTOFF(%ebx), %esp
 	addl	%eax, %esp
+
+	# Release the mutex that protects the startup stack.
+
+	movl	$0, startup_stack_mutex@GOTOFF(%ebx)
 
 	# Initialise the GDT descriptor.
 
@@ -495,15 +509,15 @@ ap_trampoline:
 	movw	%cs, %ax
 	movw	%ax, %ds
 
-	# Patch the jump address.
+	# Load the startup address and use it to patch the jump address.
 
-	movl	(ap_startup_addr - ap_trampoline), %ebx
-	movl	%ebx, (ap_jump - ap_trampoline + 2)
+	movl	(ap_startup_addr - ap_trampoline), %edi
+	movl	%edi, (ap_jump - ap_trampoline + 2)
 
 	# Patch and load the GDT descriptor. It should point to the main
 	# GDT descriptor, which has already been initialised by the BSP.
 
-	movl	%ebx, %eax
+	movl	%edi, %eax
 	addl	$(gdt - startup), %eax
 	movl	%eax, (ap_gdt_descr - ap_trampoline + 2)
 	lgdt	ap_gdt_descr - ap_trampoline
@@ -544,9 +558,13 @@ ap_trampoline_end:
 # Variables.
 
 	.data
+	.align	4
 
 	.globl	boot_params_addr
 boot_params_addr:
+	.long	0
+
+startup_stack_mutex:
 	.long	0
 
 first_boot:

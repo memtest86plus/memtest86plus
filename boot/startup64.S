@@ -32,18 +32,17 @@ startup32:
 	cld
 	cli
 
-	# Use a temporary stack until we pick the correct one. We can
-	# safely use the high address, even if we are loaded low.
-
-	movl	$(HIGH_LOAD_ADDR + startup_stack_top - startup32), %esp
-
 	# Get the load address.
 
-	movl	0x214(%esi), %ebx
+	movl	0x214(%esi), %ebx	# bootparams.code32_start
 
 	# Save the boot params pointer.
 
 	movl	%esi, (boot_params_addr - startup32)(%ebx)
+
+	# Use the startup stack until we pick the correct one.
+
+	leal	(startup_stack_top - startup32)(%ebx), %esp
 
 	# Initialise the pml4 and pdp tables.
 
@@ -143,8 +142,11 @@ efi_handover:
 
 	.globl	startup
 startup:
-	# Use a temporary stack until we pick the correct one.
+	# Use the startup stack until we pick the correct one. We
+	# need to take a mutex to protect our use of the stack.
 
+0: lock bts	$0, startup_stack_mutex(%rip)
+	jc	0b
 	leaq	startup_stack_top(%rip), %rsp
 
 	# Pick the correct stack. The stacks are allocated immediately
@@ -157,6 +159,9 @@ startup:
 	addq	$BSP_STACK_SIZE, %rax
 	leaq	_end(%rip), %rsp
 	addq	%rax, %rsp
+
+	# Release the mutex that protects the startup stack.
+	movl	$0, startup_stack_mutex(%rip)
 
 	# Initialise the pml4 and pdp tables.
 
@@ -589,10 +594,14 @@ ap_trampoline_end:
 # Variables.
 
 	.data
+	.align	4
 
 	.globl	boot_params_addr
 boot_params_addr:
 	.quad	0
+
+startup_stack_mutex:
+	.long	0
 
 first_boot:
 	.long	1

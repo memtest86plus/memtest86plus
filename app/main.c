@@ -126,9 +126,10 @@ static void run_at(uintptr_t addr, int my_pcpu)
     }
     BARRIER(true);
 
-    // We use a lock to ensure that only one CPU at a time jumps to
-    // the new code. Some of the startup stuff is not thread safe!
-    spin_lock(start_mutex);
+#ifndef __x86_64__
+    // The 32-bit startup code needs to know where it is located.
+    __asm__ __volatile__("movl %0, %%edi" : : "r" (new_start_addr));
+#endif
 
     goto *new_start_addr;
 }
@@ -384,9 +385,6 @@ void main(void)
         } else {
             pcpu_state[my_pcpu] = CPU_STATE_RUNNING;
         }
-    } else {
-        // Release the lock taken in run_at().
-        spin_unlock(start_mutex);
     }
     BARRIER(true);
     init_state = 2;
