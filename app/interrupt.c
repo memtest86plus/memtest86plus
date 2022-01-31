@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from extract of memtest86+ lib.c:
 //
@@ -119,7 +119,7 @@ void interrupt(struct trap_regs *trap_regs)
 
     clear_message_area();
 
-    display_pinned_message(0, 0, "Unexpected interrupt on CPU %i", smp_my_pcpu_num());
+    display_pinned_message(0, 0, "Unexpected interrupt on CPU %i", smp_my_cpu_num());
     if (trap_regs->vect <= 19) {
         display_pinned_message(2, 0, "Type: %s", codes[trap_regs->vect]);
     } else {

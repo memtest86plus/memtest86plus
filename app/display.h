@@ -59,9 +59,9 @@
 #define display_cpu_mode(str) \
     prints(8, 11, str)
 
-#define display_active_cpu(pcpu_num) \
+#define display_active_cpu(cpu_num) \
     prints(8, 25, "core #"); \
-    printi(8, 31, pcpu_num, 3, false, true)
+    printi(8, 31, cpu_num, 3, false, true)
 
 #define display_all_active \
     prints(8, 25, "all cores")
@@ -188,8 +188,8 @@ void toggle_scroll_lock(void);
 
 void scroll(void);
 
-void do_tick(int my_vcpu);
+void do_tick(int my_cpu);
 
-void do_trace(int my_vcpu, const char *fmt, ...);
+void do_trace(int my_cpu, const char *fmt, ...);
 
 #endif // DISPLAY_H

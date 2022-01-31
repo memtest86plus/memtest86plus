@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -27,18 +27,18 @@
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_block_move(int my_vcpu, int iterations)
+int test_block_move(int my_cpu, int iterations)
 {
     int ticks = 0;
 
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         display_test_pattern_name("block move");
     }
 
     // Initialize memory with the initial pattern.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
-        calculate_chunk(&start, &end, my_vcpu, i, 16 * sizeof(testword_t));
+        calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -53,10 +53,10 @@ int test_block_move(int my_vcpu, int iterations)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             testword_t pattern1 = 1;
             do {
                 testword_t pattern2 = ~pattern1;
@@ -78,17 +78,17 @@ int test_block_move(int my_vcpu, int iterations)
                 write_word(p + 15, pattern2);
                 pattern1 = pattern1 << 1 | pattern1 >> (TESTWORD_WIDTH - 1);  // rotate left
             } while (p <= (pe - 16) && (p += 16)); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
-    flush_caches(my_vcpu);
+    flush_caches(my_cpu);
 
     // Now move the data around. First move the data up half of the segment size 
     // we are testing. Then move the data to the original location + 32 bytes.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
-        calculate_chunk(&start, &end, my_vcpu, i, 16 * sizeof(testword_t));
+        calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -107,10 +107,10 @@ int test_block_move(int my_vcpu, int iterations)
 
             for (int j = 0; j < iterations; j++) {
                 ticks++;
-                if (my_vcpu < 0) {
+                if (my_cpu < 0) {
                     continue;
                 }
-                test_addr[my_vcpu] = (uintptr_t)p;
+                test_addr[my_cpu] = (uintptr_t)p;
 #ifdef __x86_64__
                 __asm__ __volatile__ (
                     "cld\n"
@@ -188,19 +188,19 @@ int test_block_move(int my_vcpu, int iterations)
                     : "edi", "esi", "ecx"
                 );
 #endif
-                do_tick(my_vcpu);
+                do_tick(my_cpu);
                 BAILOUT;
             }
         } while (!at_end && ++pe); // advance pe to next start point
     }
 
-    flush_caches(my_vcpu);
+    flush_caches(my_cpu);
 
     // Now check the data. The error checking is rather crude.  We just check that the
     // adjacent words are the same.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
-        calculate_chunk(&start, &end, my_vcpu, i, 16 * sizeof(testword_t));
+        calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -215,10 +215,10 @@ int test_block_move(int my_vcpu, int iterations)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
                 testword_t p0 = read_word(p + 0);
                 testword_t p1 = read_word(p + 1);
@@ -226,7 +226,7 @@ int test_block_move(int my_vcpu, int iterations)
                     data_error(p, p0, p1, false);
                 }
             } while (p <= (pe - 2) && (p += 2)); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }

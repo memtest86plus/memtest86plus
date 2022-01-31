@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -27,20 +27,20 @@
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
+int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
 {
     int ticks = 0;
 
     testword_t pattern = (testword_t)1 << offset;
 
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         display_test_pattern_value(inverse ? ~pattern : pattern);
     }
 
     // Initialize memory with the initial pattern.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
-        calculate_chunk(&start, &end, my_vcpu, i, sizeof(testword_t));
+        calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
 
         volatile testword_t *p  = start;
         volatile testword_t *pe = start;
@@ -55,15 +55,15 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
                 write_word(p, inverse ? ~pattern : pattern);
                 pattern = pattern << 1 | pattern >> (TESTWORD_WIDTH - 1);  // rotate left
             } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
@@ -73,11 +73,11 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
     for (int i = 0; i < iterations; i++) {
         pattern = (testword_t)1 << offset;
 
-        flush_caches(my_vcpu);
+        flush_caches(my_cpu);
 
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
-            calculate_chunk(&start, &end, my_vcpu, j, sizeof(testword_t));
+            calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
 
             volatile testword_t *p  = start;
             volatile testword_t *pe = start;
@@ -92,10 +92,10 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                     pe = end;
                 }
                 ticks++;
-                if (my_vcpu < 0) {
+                if (my_cpu < 0) {
                     continue;
                 }
-                test_addr[my_vcpu] = (uintptr_t)p;
+                test_addr[my_cpu] = (uintptr_t)p;
                 do {
                     testword_t expect = inverse ? ~pattern : pattern;
                     testword_t actual = read_word(p);
@@ -105,16 +105,16 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                     write_word(p, ~expect);
                     pattern = pattern << 1 | pattern >> (TESTWORD_WIDTH - 1);  // rotate left
                 } while (p++ < pe); // test before increment in case pointer overflows
-                do_tick(my_vcpu);
+                do_tick(my_cpu);
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
         }
 
-        flush_caches(my_vcpu);
+        flush_caches(my_cpu);
 
         for (int j = vm_map_size - 1; j >= 0; j--) {
             testword_t *start, *end;
-            calculate_chunk(&start, &end, my_vcpu, j, sizeof(testword_t));
+            calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
 
             volatile testword_t *p  = end;
             volatile testword_t *ps = end;
@@ -129,10 +129,10 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                     ps = start;
                 }
                 ticks++;
-                if (my_vcpu < 0) {
+                if (my_cpu < 0) {
                     continue;
                 }
-                test_addr[my_vcpu] = (uintptr_t)ps;
+                test_addr[my_cpu] = (uintptr_t)ps;
                 do {
                     pattern = pattern >> 1 | pattern << (TESTWORD_WIDTH - 1);  // rotate right
                     testword_t expect = inverse ? pattern : ~pattern;
@@ -142,7 +142,7 @@ int test_mov_inv_walk1(int my_vcpu, int iterations, int offset, bool inverse)
                     }
                     write_word(p, ~expect);
                 } while (p-- > ps); // test before decrement in case pointer overflows
-                do_tick(my_vcpu);
+                do_tick(my_cpu);
                 BAILOUT;
             } while (!at_start && --ps); // advance ps to next start point
         }

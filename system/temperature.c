@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ init.c:
 //
@@ -32,7 +32,7 @@ int get_cpu_temperature(void)
     }
 
     // Intel CPU
-    if (cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.max_vcpuid >= 6) {
+    if (cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.max_cpuid >= 6) {
         if (cpuid_info.dts_pmp & 1) {
             uint32_t msrl, msrh;
 

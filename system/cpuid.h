@@ -4,7 +4,7 @@
 /*
  * Provides access to the CPUID information.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  *
  * Derived from memtest86+ cpuid.h
  * (original contained no copyright statement)
@@ -129,7 +129,7 @@ typedef union {
 } cpuid_custom_features;
 
 typedef struct {
-    uint32_t                max_vcpuid;
+    uint32_t                max_cpuid;
     uint32_t                max_xcpuid;
     uint32_t                dts_pmp;
     cpuid_version_t         version;

@@ -4,32 +4,27 @@
 /*
  * Provides types and variables used when performing the memory tests.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "pmem.h"
+#include "smp.h"
 
 #include "barrier.h"
 #include "spinlock.h"
 
 /*
- * The maximum number of virtual CPUs supported. Note that the display can
- * only show the state of a maximum of 32 vCPUs.
+ * The number of CPU cores being used for the current test.
  */
-#define MAX_VCPUS   32
+extern volatile int num_active_cpus;
 
 /*
- * The number of activated virtual CPUs.
+ * The current master CPU.
  */
-extern int num_vcpus;
-
-/*
- * The current master virtual CPU.
- */
-extern volatile int master_vcpu;
+extern volatile int master_cpu;
 
 /*
  * A barrier used when running tests.
@@ -100,6 +95,6 @@ extern volatile bool        bail;
 /*
  * The base address of the block of memory currently being tested.
  */
-extern volatile uintptr_t   test_addr[MAX_VCPUS];
+extern volatile uintptr_t   test_addr[MAX_CPUS];
 
 #endif // TEST_H

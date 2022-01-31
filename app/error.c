@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ error.c
 //
@@ -268,7 +268,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
 
             set_foreground_colour(YELLOW);
             display_scrolled_message(0, " %2i   %4i   %2i   %09x%03x (%kB)",
-                                     smp_my_pcpu_num(), pass_num, test_num, page, offset, page << 2);
+                                     smp_my_cpu_num(), pass_num, test_num, page, offset, page << 2);
             if (type == PARITY_ERROR) {
                 display_scrolled_message(41, "%s", "Parity error detected near this address");
             } else {
@@ -349,7 +349,7 @@ void parity_error(void)
 {
     // We don't know the real address that caused the parity error,
     // so use the last recorded test address.
-    common_err(PARITY_ERROR, test_addr[my_vcpu_num()], 0, 0, false);
+    common_err(PARITY_ERROR, test_addr[my_cpu_num()], 0, 0, false);
 }
 #endif
 

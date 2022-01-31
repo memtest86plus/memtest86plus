@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ main.c:
 //
@@ -74,16 +74,16 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
 //------------------------------------------------------------------------------
 
 #define BARRIER \
-    if (my_vcpu >= 0) { \
+    if (my_cpu >= 0) { \
         if (TRACE_BARRIERS) { \
-            trace(my_vcpu, "Run barrier wait at %s line %i", __FILE__, __LINE__); \
+            trace(my_cpu, "Run barrier wait at %s line %i", __FILE__, __LINE__); \
         } \
         barrier_wait(run_barrier); \
     }
 
-int run_test(int my_vcpu, int test, int stage, int iterations)
+int run_test(int my_cpu, int test, int stage, int iterations)
 {
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         if ((uintptr_t)&_start > LOW_LOAD_ADDR) {
             // Relocated so we need to test all selected lower memory.
             vm_map[0].start = first_word_mapping(pm_limit_lower);
@@ -107,20 +107,20 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
         // Address test, walking ones.
       case 0:
         cache_off();
-        ticks += test_addr_walk1(my_vcpu);
+        ticks += test_addr_walk1(my_cpu);
         cache_on();
         BAILOUT;
         break;
 
         // Address test, own address in window.
       case 1:
-        ticks += test_own_addr1(my_vcpu);
+        ticks += test_own_addr1(my_cpu);
         BAILOUT;
         break;
 
         // Address test, own address + window.
       case 2:
-        ticks += test_own_addr2(my_vcpu, stage);
+        ticks += test_own_addr2(my_cpu, stage);
         BAILOUT;
         break;
 
@@ -130,11 +130,11 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
         testword_t pattern2 = ~pattern1;
 
         BARRIER;
-        ticks += test_mov_inv_fixed(my_vcpu, iterations, pattern1, pattern2);
+        ticks += test_mov_inv_fixed(my_cpu, iterations, pattern1, pattern2);
         BAILOUT;
 
         BARRIER;
-        ticks += test_mov_inv_fixed(my_vcpu, iterations, pattern2, pattern1);
+        ticks += test_mov_inv_fixed(my_cpu, iterations, pattern2, pattern1);
         BAILOUT;
       } break;
 
@@ -149,11 +149,11 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
             testword_t pattern2 = ~pattern1;
 
             BARRIER;
-            ticks += test_mov_inv_fixed(my_vcpu, iterations, pattern1, pattern2);
+            ticks += test_mov_inv_fixed(my_cpu, iterations, pattern1, pattern2);
             BAILOUT;
 
             BARRIER;
-            ticks += test_mov_inv_fixed(my_vcpu, iterations, pattern2, pattern1);
+            ticks += test_mov_inv_fixed(my_cpu, iterations, pattern2, pattern1);
             BAILOUT;
 
             pattern1 >>= 1;
@@ -163,16 +163,16 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
         // Moving inversions, fixed random pattern.
       case 5:
         if (cpuid_info.flags.rdtsc) {
-            random_seed(my_vcpu, get_tsc());
+            random_seed(my_cpu, get_tsc());
         } else {
-            random_seed(my_vcpu, UINT64_C(0x12345678) * (1 + pass_num));
+            random_seed(my_cpu, UINT64_C(0x12345678) * (1 + pass_num));
         }
         for (int i = 0; i < iterations; i++) {
-            testword_t pattern1 = random(my_vcpu);
+            testword_t pattern1 = random(my_cpu);
             testword_t pattern2 = ~pattern1;
 
             BARRIER;
-            ticks += test_mov_inv_fixed(my_vcpu, 2, pattern1, pattern2);
+            ticks += test_mov_inv_fixed(my_cpu, 2, pattern1, pattern2);
             BAILOUT;
         }
         break;
@@ -181,18 +181,18 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
       case 6:
         for (int offset = 0; offset < TESTWORD_WIDTH; offset++) {
             BARRIER;
-            ticks += test_mov_inv_walk1(my_vcpu, iterations, offset, false);
+            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, false);
             BAILOUT;
 
             BARRIER;
-            ticks += test_mov_inv_walk1(my_vcpu, iterations, offset, true);
+            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, true);
             BAILOUT;
         }
         break;
 
         // Block move.
       case 7:
-        ticks += test_block_move(my_vcpu, iterations);
+        ticks += test_block_move(my_cpu, iterations);
         BAILOUT;
         break;
 
@@ -200,7 +200,7 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
       case 8:
         for (int i = 0; i < iterations; i++) {
             BARRIER;
-            ticks += test_mov_inv_random(my_vcpu);
+            ticks += test_mov_inv_random(my_cpu);
             BAILOUT;
         }
         break;
@@ -208,21 +208,21 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
         // Modulo 20 check, fixed random pattern.
       case 9:
         if (cpuid_info.flags.rdtsc) {
-            random_seed(my_vcpu, get_tsc());
+            random_seed(my_cpu, get_tsc());
         } else {
-            random_seed(my_vcpu, UINT64_C(0x12345678) * (1 + pass_num));
+            random_seed(my_cpu, UINT64_C(0x12345678) * (1 + pass_num));
         }
         for (int i = 0; i < iterations; i++) {
             for (int offset = 0; offset < MODULO_N; offset++) {
-                testword_t pattern1 = random(my_vcpu);
+                testword_t pattern1 = random(my_cpu);
                 testword_t pattern2 = ~pattern1;
 
                 BARRIER;
-                ticks += test_modulo_n(my_vcpu, 2, pattern1, pattern2, MODULO_N, offset);
+                ticks += test_modulo_n(my_cpu, 2, pattern1, pattern2, MODULO_N, offset);
                 BAILOUT;
 
                 BARRIER;
-                ticks += test_modulo_n(my_vcpu, 2, pattern2, pattern1, MODULO_N, offset);
+                ticks += test_modulo_n(my_cpu, 2, pattern2, pattern1, MODULO_N, offset);
                 BAILOUT;
             }
         }
@@ -230,7 +230,7 @@ int run_test(int my_vcpu, int test, int stage, int iterations)
 
         // Bit fade test.
       case 10:
-        ticks += test_bit_fade(my_vcpu, stage, iterations);
+        ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
         break;
     }

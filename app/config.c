@@ -87,7 +87,7 @@ cpu_mode_t      cpu_mode = PAR;
 
 error_mode_t    error_mode = ERROR_MODE_NONE;
 
-cpu_state_t     pcpu_state[MAX_PCPUS];
+cpu_state_t     cpu_state[MAX_CPUS];
 
 bool            enable_temperature = false;
 bool            enable_trace       = false;
@@ -508,8 +508,8 @@ static void error_mode_menu(void)
 static bool set_all_cpus(cpu_state_t state, int display_offset)
 {
     clear_popup_row(POP_R+16);
-    for (int i = 1; i < num_pcpus; i++) {
-        pcpu_state[i] = state;
+    for (int i = 1; i < num_available_cpus; i++) {
+        cpu_state[i] = state;
         display_enabled(POP_R+12, i - display_offset, state == CPU_STATE_ENABLED);
     }
     return true;
@@ -520,11 +520,11 @@ static bool add_or_remove_cpu(bool add, int display_offset)
     
     display_input_message(POP_R+16, "Enter CPU #");
     int n = read_value(POP_R+16, POP_LM+11, 2, 0);
-    if (n < 1 || n >= num_pcpus) {
+    if (n < 1 || n >= num_available_cpus) {
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
-    pcpu_state[n] = add ? CPU_STATE_ENABLED : CPU_STATE_DISABLED;
+    cpu_state[n] = add ? CPU_STATE_ENABLED : CPU_STATE_DISABLED;
     display_enabled(POP_R+12, n - display_offset, add);
     clear_popup_row(POP_R+16);
     return true;
@@ -534,18 +534,18 @@ static bool add_cpu_range(int display_offset)
 {
     display_input_message(POP_R+16, "Enter first CPU #");
     int n1 = read_value(POP_R+16, POP_LM+17, 2, 0);
-    if (n1 < 1 || n1 >= num_pcpus) {
+    if (n1 < 1 || n1 >= num_available_cpus) {
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
     display_input_message(POP_R+16, "Enter last CPU #");
     int n2 = read_value(POP_R+16, POP_LM+16, 2, 0);
-    if (n2 < n1 || n2 >= num_pcpus) {
+    if (n2 < n1 || n2 >= num_available_cpus) {
         display_error_message(POP_R+16, "Invalid CPU range");
         return false;
     }
     for (int i = n1; i <= n2; i++) {
-        pcpu_state[i] = CPU_STATE_ENABLED;
+        cpu_state[i] = CPU_STATE_ENABLED;
         display_enabled(POP_R+12, i - display_offset, true);
     }
     clear_popup_row(POP_R+16);
@@ -555,12 +555,12 @@ static bool add_cpu_range(int display_offset)
 static void display_cpu_selection(int display_offset)
 {
     clear_screen_region(POP_R+11, POP_C, POP_LAST_R, POP_LAST_C);
-    display_selection_header(POP_R+10, num_pcpus - 1, display_offset);
+    display_selection_header(POP_R+10, num_available_cpus - 1, display_offset);
     if (display_offset == 0) {
         printc(POP_R+12, POP_LM, 'B');
     }
-    for (int i = 1; i < num_pcpus; i++) {
-        display_enabled(POP_R+12, i - display_offset, pcpu_state[i] == CPU_STATE_ENABLED);
+    for (int i = 1; i < num_available_cpus; i++) {
+        display_enabled(POP_R+12, i - display_offset, cpu_state[i] == CPU_STATE_ENABLED);
     }
 }
 
@@ -605,7 +605,7 @@ static void cpu_selection_menu(void)
             }
             break;
           case 'd':
-            if (display_offset < (num_pcpus - SEL_AREA)) {
+            if (display_offset < (num_available_cpus - SEL_AREA)) {
                 display_offset += SEL_W;
                 display_cpu_selection(display_offset);
             }
@@ -641,8 +641,8 @@ void config_init(void)
 
     error_mode = ERROR_MODE_ADDRESS;
 
-    for (int i = 0; i < MAX_PCPUS; i++) {
-        pcpu_state[i] = CPU_STATE_ENABLED;
+    for (int i = 0; i < MAX_CPUS; i++) {
+        cpu_state[i] = CPU_STATE_ENABLED;
     }
 
     enable_temperature = !no_temperature;
@@ -673,9 +673,9 @@ void config_menu(bool initial)
         prints(POP_R+5,  POP_LI, "<F3>  CPU sequencing mode");
         prints(POP_R+6,  POP_LI, "<F4>  Error reporting mode");
         if (initial) {
-            if (num_pcpus < 2)  set_foreground_colour(BOLD+BLACK);
+            if (num_available_cpus < 2)  set_foreground_colour(BOLD+BLACK);
             prints(POP_R+7,  POP_LI, "<F5>  CPU selection");
-            if (num_pcpus < 2)  set_foreground_colour(WHITE);
+            if (num_available_cpus < 2)  set_foreground_colour(WHITE);
             if (no_temperature) set_foreground_colour(BOLD+BLACK);
             printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
             if (no_temperature) set_foreground_colour(WHITE);
@@ -701,7 +701,7 @@ void config_menu(bool initial)
             break;
           case '5':
             if (initial) {
-                if (num_pcpus > 1) {
+                if (num_available_cpus > 1) {
                     cpu_selection_menu();
                 }
             } else {

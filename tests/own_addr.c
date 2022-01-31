@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -27,11 +27,11 @@
 // Private Functions
 //------------------------------------------------------------------------------
 
-static int pattern_fill(int my_vcpu, testword_t offset)
+static int pattern_fill(int my_cpu, testword_t offset)
 {
     int ticks = 0;
 
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         display_test_pattern_name("own address");
     }
 
@@ -53,24 +53,24 @@ static int pattern_fill(int my_vcpu, testword_t offset)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
                 write_word(p, (testword_t)p + offset);
             } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
 
-    flush_caches(my_vcpu);
+    flush_caches(my_cpu);
 
     return ticks;
 }
 
-static int pattern_check(int my_vcpu, testword_t offset)
+static int pattern_check(int my_cpu, testword_t offset)
 {
     int ticks = 0;
 
@@ -92,10 +92,10 @@ static int pattern_check(int my_vcpu, testword_t offset)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
                 testword_t expect = (testword_t)p + offset;
                 testword_t actual = read_word(p);
@@ -103,7 +103,7 @@ static int pattern_check(int my_vcpu, testword_t offset)
                     data_error(p, expect, actual, true);
                 }
             } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
@@ -115,17 +115,17 @@ static int pattern_check(int my_vcpu, testword_t offset)
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_own_addr1(int my_vcpu)
+int test_own_addr1(int my_cpu)
 {
     int ticks = 0;
 
-    ticks += pattern_fill(my_vcpu, 0);
-    ticks += pattern_check(my_vcpu, 0);
+    ticks += pattern_fill(my_cpu, 0);
+    ticks += pattern_check(my_cpu, 0);
 
     return ticks;
 }
 
-int test_own_addr2(int my_vcpu, int stage)
+int test_own_addr2(int my_cpu, int stage)
 {
     static testword_t offset = 0;
     static int last_stage = -1;
@@ -136,10 +136,10 @@ int test_own_addr2(int my_vcpu, int stage)
 
     switch (stage) {
       case 0:
-        ticks = pattern_fill(my_vcpu, offset);
+        ticks = pattern_fill(my_cpu, offset);
         break;
       case 1:
-        ticks = pattern_check(my_vcpu, offset);
+        ticks = pattern_check(my_cpu, offset);
         break;
       default:
         break;

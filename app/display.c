@@ -229,17 +229,17 @@ void scroll(void)
     }
 }
 
-void do_tick(int my_vcpu)
+void do_tick(int my_cpu)
 {
     barrier_wait(run_barrier);
-    if (master_vcpu == my_vcpu) {
+    if (master_cpu == my_cpu) {
         check_input();
         error_update();
     }
     barrier_wait(run_barrier);
 
     // Only the master CPU does the update.
-    if (master_vcpu != my_vcpu) {
+    if (master_cpu != my_cpu) {
         return;
     }
 

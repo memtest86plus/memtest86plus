@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ init.c:
 //
@@ -65,7 +65,7 @@ static void determine_cache_size()
         l3_cache = 0;
 
         // Use CPUID(4) if it is available.
-        if (cpuid_info.max_vcpuid > 3) {
+        if (cpuid_info.max_cpuid > 3) {
             cpuid4_eax_t eax;
             cpuid4_ebx_t ebx;
             cpuid4_ecx_t ecx;

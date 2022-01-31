@@ -62,10 +62,10 @@
 
 static volatile int         init_state = 0;
 
+static int                  num_enabled_cpus = 1;
+
 static barrier_t            *start_barrier = NULL;
 static spinlock_t           *start_mutex   = NULL;
-
-static int8_t               pcpu_num_to_vcpu_num[MAX_PCPUS];
 
 static volatile bool        start_run  = false;
 static volatile bool        start_pass = false;
@@ -86,9 +86,9 @@ static volatile int         test_stage = 0;
 
 // These are exposed in test.h.
 
-int                 num_vcpus = 1;
+volatile int        num_active_cpus = 1;
 
-volatile int        master_vcpu = 0;
+volatile int        master_cpu = 0;
 
 barrier_t           *run_barrier = NULL;
 
@@ -103,7 +103,7 @@ volatile int        test_num = 0;
 volatile bool       restart = false;
 volatile bool       bail    = false;
 
-volatile uintptr_t  test_addr[MAX_VCPUS];
+volatile uintptr_t  test_addr[MAX_CPUS];
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -112,16 +112,16 @@ volatile uintptr_t  test_addr[MAX_VCPUS];
 #define BARRIER(enabled) \
     if (enabled) { \
         if (TRACE_BARRIERS) { \
-            trace(my_pcpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
+            trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
         } \
         barrier_wait(start_barrier); \
     }
 
-static void run_at(uintptr_t addr, int my_pcpu)
+static void run_at(uintptr_t addr, int my_cpu)
 {
     uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
 
-    if (my_pcpu == 0) {
+    if (my_cpu == 0) {
         memmove((void *)addr, &_start, _end - _start);
     }
     BARRIER(true);
@@ -164,18 +164,17 @@ static void global_init(void)
 
     clear_message_area();
 
-    display_available_cpus(num_pcpus);
+    display_available_cpus(num_available_cpus);
 
-    num_vcpus = 0;
-    for (int i = 0; i < num_pcpus; i++) {
-        if (pcpu_state[i] == CPU_STATE_ENABLED) {
-            pcpu_num_to_vcpu_num[i] = num_vcpus;
-            num_vcpus++;
+    num_enabled_cpus = 0;
+    for (int i = 0; i < num_available_cpus; i++) {
+        if (cpu_state[i] == CPU_STATE_ENABLED) {
+            num_enabled_cpus++;
         }
     }
-    display_enabled_cpus(num_vcpus);
+    display_enabled_cpus(num_enabled_cpus);
 
-    master_vcpu = 0;
+    master_cpu = 0;
 
     if (enable_temperature) {
         int temp = get_cpu_temperature();
@@ -199,13 +198,13 @@ static void global_init(void)
         trace(0, "ACPI RSDP found in %s at %0*x", rsdp_source, 2*sizeof(uintptr_t), rsdp_addr);
     }
 
-    start_barrier = smp_alloc_barrier(num_vcpus);
-    run_barrier   = smp_alloc_barrier(num_vcpus);
+    start_barrier = smp_alloc_barrier(num_enabled_cpus);
+    run_barrier   = smp_alloc_barrier(num_enabled_cpus);
 
     start_mutex   = smp_alloc_mutex();
     error_mutex   = smp_alloc_mutex();
 
-    int failed = smp_start(pcpu_state);
+    int failed = smp_start(cpu_state);
     if (failed) {
         const char *message = "Failed to start CPU core %i. Press any key to reboot...";
         display_notice_with_args(strlen(message), message, failed);
@@ -253,22 +252,22 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
     }
 }
 
-static void test_all_windows(int my_pcpu, int my_vcpu)
+static void test_all_windows(int my_cpu)
 {
-    int  active_cpus = 1;
-    bool i_am_master = (my_vcpu == master_vcpu) || dummy_run;
+    num_active_cpus = 1;
+    bool i_am_master = (my_cpu == master_cpu) || dummy_run;
     bool i_am_active = i_am_master;
     if (!dummy_run) {
         if (cpu_mode == PAR && test_list[test_num].cpu_mode == PAR) {
-            active_cpus = num_vcpus;
+            num_active_cpus = num_enabled_cpus;
             i_am_active = true;
         }
     }
     if (i_am_master) {
-        barrier_init(run_barrier, active_cpus);
+        barrier_init(run_barrier, num_active_cpus);
         if (!dummy_run) {
-            if (active_cpus == 1) {
-                display_active_cpu(my_pcpu);
+            if (num_active_cpus == 1) {
+                display_active_cpu(my_cpu);
             } else {
                 display_all_active;
             }
@@ -304,16 +303,16 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
         // Relocate if necessary.
         if (window_num > 0) {
             if (!dummy_run && (uintptr_t)&_start != LOW_LOAD_ADDR) {
-                run_at(LOW_LOAD_ADDR, my_pcpu);
+                run_at(LOW_LOAD_ADDR, my_cpu);
             }
         } else {
             if (!dummy_run && (uintptr_t)&_start != HIGH_LOAD_ADDR) {
-                run_at(HIGH_LOAD_ADDR, my_pcpu);
+                run_at(HIGH_LOAD_ADDR, my_cpu);
             }
         }
 
         if (i_am_master) {
-            trace(my_vcpu, "start window %i", window_num);
+            trace(my_cpu, "start window %i", window_num);
             switch (window_num) {
               case 0:
                 window_start = 0;
@@ -352,7 +351,7 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
                 // Either there is no PAE or we are at the PAE limit.
                 break;
             }
-            run_test(my_vcpu, test_num, test_stage, iterations);
+            run_test(my_cpu, test_num, test_stage, iterations);
         }
 
         if (i_am_master) {
@@ -369,33 +368,31 @@ static void test_all_windows(int my_pcpu, int my_vcpu)
 
 void main(void)
 {
-    int my_pcpu;
+    int my_cpu;
     if (init_state == 0) {
         // If this is the first time here, we must be CPU 0, as the APs haven't been started yet.
-        my_pcpu = 0;
+        my_cpu = 0;
     } else {
-        my_pcpu = smp_my_pcpu_num();
+        my_cpu = smp_my_cpu_num();
     }
 
     if (init_state < 2) {
         // Global initialisation is done by the boot CPU.
-        if (my_pcpu == 0) {
+        if (my_cpu == 0) {
             init_state = 1;
             global_init();
         } else {
-            pcpu_state[my_pcpu] = CPU_STATE_RUNNING;
+            cpu_state[my_cpu] = CPU_STATE_RUNNING;
         }
     }
     BARRIER(true);
     init_state = 2;
 
 #if TEST_INTERRUPT
-    if (my_pcpu == 0) {
+    if (my_cpu == 0) {
         __asm__ __volatile__ ("int $1");
     }
 #endif
-
-    int my_vcpu = pcpu_num_to_vcpu_num[my_pcpu];
 
     // Due to the need to relocate ourselves in the middle of tests, the following
     // code cannot be written in the natural way as a set of nested loops. So we
@@ -403,8 +400,8 @@ void main(void)
     // where we left off after each relocation.
 
     while (1) {
-        BARRIER((my_vcpu != 0) || !dummy_run);
-        if (my_vcpu == 0) {
+        BARRIER((my_cpu != 0) || !dummy_run);
+        if (my_cpu == 0) {
             if (start_run) {
                 pass_num = 0;
                 start_pass = true;
@@ -424,7 +421,7 @@ void main(void)
                 }
             }
             if (start_test) {
-                trace(my_vcpu, "start test %i", test_num);
+                trace(my_cpu, "start test %i", test_num);
                 test_stage = 0;
                 rerun_test = true;
                 if (dummy_run) {
@@ -446,17 +443,17 @@ void main(void)
         }
         BARRIER(!dummy_run);
         if (test_list[test_num].enabled) {
-            test_all_windows(my_pcpu, my_vcpu);
+            test_all_windows(my_cpu);
         }
         BARRIER(!dummy_run);
-        if (my_vcpu != 0) {
+        if (my_cpu != 0) {
             continue;
         }
 
         check_input();
         if (restart) {
             // The configuration has been changed.
-            master_vcpu = 0;
+            master_cpu = 0;
             start_run = true;
             dummy_run = true;
             restart = false;
@@ -474,19 +471,19 @@ void main(void)
             switch (cpu_mode) {
               case PAR:
                 if (test_list[test_num].cpu_mode == SEQ) {
-                    master_vcpu = (master_vcpu + 1) % num_vcpus;
-                    if (master_vcpu != 0) {
+                    master_cpu = (master_cpu + 1) % num_enabled_cpus;
+                    if (master_cpu != 0) {
                         rerun_test = true;
                         continue;
                     }
                 }
                 break;
               case ONE:
-                master_vcpu = (master_vcpu + 1) % num_vcpus;
+                master_cpu = (master_cpu + 1) % num_enabled_cpus;
                 break;
               case SEQ:
-                master_vcpu = (master_vcpu + 1) % num_vcpus;
-                if (master_vcpu != 0) {
+                master_cpu = (master_cpu + 1) % num_enabled_cpus;
+                if (master_cpu != 0) {
                     rerun_test = true;
                     continue;
                 }

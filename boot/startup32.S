@@ -101,7 +101,7 @@ startup:
 	# Pick the correct stack. The stacks are allocated immediately
 	# after the end of the loaded program, BSP first, then APs.
 
-	call	smp_my_pcpu_num
+	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
 	addl	$BSP_STACK_SIZE, %eax

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ cpuid.h
 // (original contained no copyright statement)
@@ -25,7 +25,7 @@ void cpuid_init(void)
 
     // Get the max standard cpuid & vendor ID.
     cpuid(0x0, 0,
-        &cpuid_info.max_vcpuid,
+        &cpuid_info.max_cpuid,
         &cpuid_info.vendor_id.raw[0],
         &cpuid_info.vendor_id.raw[2],
         &cpuid_info.vendor_id.raw[1]
@@ -33,7 +33,7 @@ void cpuid_init(void)
     cpuid_info.vendor_id.str[CPUID_VENDOR_STR_LENGTH - 1] = '\0';
 
     // Get the processor family information & feature flags.
-    if (cpuid_info.max_vcpuid >= 1) {
+    if (cpuid_info.max_cpuid >= 1) {
         cpuid(0x1, 0,
             &cpuid_info.version.raw,
             &cpuid_info.proc_info.raw,
@@ -43,7 +43,7 @@ void cpuid_init(void)
     }
 
     // Get the digital thermal sensor & power management status bits.
-    if (cpuid_info.max_vcpuid >= 6) {
+    if (cpuid_info.max_cpuid >= 6) {
         cpuid(0x6, 0,
             &cpuid_info.dts_pmp,
             &dummy[0],

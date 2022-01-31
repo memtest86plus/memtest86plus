@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -26,20 +26,20 @@
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_addr_walk1(int my_vcpu)
+int test_addr_walk1(int my_cpu)
 {
     int ticks = 0;
 
     // There isn't a meaningful address for this test.
-    test_addr[my_vcpu] = 0;
+    test_addr[my_cpu] = 0;
 
     testword_t invert = 0;
     for (int i = 0; i < 2; i++) {
-        if (my_vcpu == master_vcpu) {
+        if (my_cpu == master_cpu) {
             display_test_pattern_value(invert);
         }
         ticks++;
-        if (my_vcpu < 0) {
+        if (my_cpu < 0) {
             continue;
         }
 
@@ -83,7 +83,7 @@ int test_addr_walk1(int my_vcpu)
 
         invert = ~invert;
 
-        do_tick(my_vcpu);
+        do_tick(my_cpu);
         BAILOUT;
     }
 

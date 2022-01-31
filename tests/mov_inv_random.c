@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -30,7 +30,7 @@
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_mov_inv_random(int my_vcpu)
+int test_mov_inv_random(int my_cpu)
 {
     int ticks = 0;
 
@@ -41,15 +41,15 @@ int test_mov_inv_random(int my_vcpu)
         seed = UINT64_C(0x12345678) * (1 + pass_num);
     }
 
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         display_test_pattern_value(seed);
     }
 
     // Initialize memory with the initial pattern.
-    random_seed(my_vcpu, seed);
+    random_seed(my_cpu, seed);
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
-        calculate_chunk(&start, &end, my_vcpu, i, sizeof(testword_t));
+        calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
 
         volatile testword_t *p  = start;
         volatile testword_t *pe = start;
@@ -64,14 +64,14 @@ int test_mov_inv_random(int my_vcpu)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
-                write_word(p, random(my_vcpu));
+                write_word(p, random(my_cpu));
             } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
@@ -80,12 +80,12 @@ int test_mov_inv_random(int my_vcpu)
     // memory location. Repeat.
     testword_t invert = 0;
     for (int i = 0; i < 2; i++) {
-        flush_caches(my_vcpu);
+        flush_caches(my_cpu);
 
-        random_seed(my_vcpu, seed);
+        random_seed(my_cpu, seed);
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
-            calculate_chunk(&start, &end, my_vcpu, j, sizeof(testword_t));
+            calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
 
             volatile testword_t *p  = start;
             volatile testword_t *pe = start;
@@ -100,19 +100,19 @@ int test_mov_inv_random(int my_vcpu)
                     pe = end;
                 }
                 ticks++;
-                if (my_vcpu < 0) {
+                if (my_cpu < 0) {
                     continue;
                 }
-                test_addr[my_vcpu] = (uintptr_t)p;
+                test_addr[my_cpu] = (uintptr_t)p;
                 do {
-                    testword_t expect = random(my_vcpu) ^ invert;
+                    testword_t expect = random(my_cpu) ^ invert;
                     testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);
                     }
                     write_word(p, ~expect);
                 } while (p++ < pe); // test before increment in case pointer overflows
-                do_tick(my_vcpu);
+                do_tick(my_cpu);
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
         }

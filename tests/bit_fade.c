@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -29,11 +29,11 @@
 // Private Functions
 //------------------------------------------------------------------------------
 
-static int pattern_fill(int my_vcpu, testword_t pattern)
+static int pattern_fill(int my_cpu, testword_t pattern)
 {
     int ticks = 0;
 
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         display_test_pattern_value(pattern);
     }
 
@@ -54,24 +54,24 @@ static int pattern_fill(int my_vcpu, testword_t pattern)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
                 write_word(p, pattern);
             } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
 
-    flush_caches(my_vcpu);
+    flush_caches(my_cpu);
 
     return ticks;
 }
 
-static int pattern_check(int my_vcpu, testword_t pattern)
+static int pattern_check(int my_cpu, testword_t pattern)
 {
     int ticks = 0;
 
@@ -92,17 +92,17 @@ static int pattern_check(int my_vcpu, testword_t pattern)
                 pe = end;
             }
             ticks++;
-            if (my_vcpu < 0) {
+            if (my_cpu < 0) {
                 continue;
             }
-            test_addr[my_vcpu] = (uintptr_t)p;
+            test_addr[my_cpu] = (uintptr_t)p;
             do {
                 testword_t actual = read_word(p);
                 if (unlikely(actual != pattern)) {
                     data_error(p, pattern, actual, true);
                 }
             } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_vcpu);
+            do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
@@ -110,21 +110,21 @@ static int pattern_check(int my_vcpu, testword_t pattern)
     return ticks;
 }
 
-static int fade_delay(int my_vcpu, int sleep_secs)
+static int fade_delay(int my_cpu, int sleep_secs)
 {
     int ticks = 0;
 
-    if (my_vcpu == master_vcpu) {
+    if (my_cpu == master_cpu) {
         display_test_stage_description("fade over %i seconds", sleep_secs);
     }
     while (sleep_secs > 0) {
         sleep_secs--;
         ticks++;
-        if (my_vcpu < 0) {
+        if (my_cpu < 0) {
             continue;
         }
         sleep(1);
-        do_tick(my_vcpu);
+        do_tick(my_cpu);
         BAILOUT;
     }
 
@@ -135,7 +135,7 @@ static int fade_delay(int my_vcpu, int sleep_secs)
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_bit_fade(int my_vcpu, int stage, int sleep_secs)
+int test_bit_fade(int my_cpu, int stage, int sleep_secs)
 {
     const testword_t all_zero = 0;
     const testword_t all_ones = ~all_zero;
@@ -146,28 +146,28 @@ int test_bit_fade(int my_vcpu, int stage, int sleep_secs)
 
     switch (stage) {
       case 0:
-        ticks = pattern_fill(my_vcpu, all_zero);
+        ticks = pattern_fill(my_cpu, all_zero);
         break;
       case 1:
         // Only sleep once.
         if (stage != last_stage) {
-            ticks = fade_delay(my_vcpu, sleep_secs);
+            ticks = fade_delay(my_cpu, sleep_secs);
         }
         break;
       case 2:
-        ticks = pattern_check(my_vcpu, all_zero);
+        ticks = pattern_check(my_cpu, all_zero);
         break;
       case 3:
-        ticks = pattern_fill(my_vcpu, all_ones);
+        ticks = pattern_fill(my_cpu, all_ones);
         break;
       case 4:
         // Only sleep once.
         if (stage != last_stage) {
-            ticks = fade_delay(my_vcpu, sleep_secs);
+            ticks = fade_delay(my_cpu, sleep_secs);
         }
         break;
       case 5:
-        ticks = pattern_check(my_vcpu, all_ones);
+        ticks = pattern_check(my_cpu, all_ones);
         break;
       default:
         break;

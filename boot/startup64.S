@@ -153,7 +153,7 @@ startup:
 	# after the end of the loaded program, BSP first, then APs.
 
 	xorq	%rax, %rax
-	call	smp_my_pcpu_num
+	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
 	addq	$BSP_STACK_SIZE, %rax

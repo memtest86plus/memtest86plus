@@ -236,9 +236,9 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 static volatile apic_register_t *apic = NULL;
 
-static int8_t           apic_id_to_pcpu_num[MAX_APIC_IDS];
+static int8_t           apic_id_to_cpu_num[MAX_APIC_IDS];
 
-static uint8_t          pcpu_num_to_apic_id[MAX_PCPUS];
+static uint8_t          cpu_num_to_apic_id[MAX_CPUS];
 
 static uintptr_t        smp_heap_page = 0;
 
@@ -248,7 +248,7 @@ static uintptr_t        alloc_addr = 0;
 // Variables
 //------------------------------------------------------------------------------
 
-int num_pcpus = 1;  // There is always at least one CPU, the BSP
+int num_available_cpus = 1;  // There is always at least one CPU, the BSP
 
 const char *rsdp_source = "";
 
@@ -345,15 +345,15 @@ static bool read_mp_config_table(uintptr_t addr)
 
             if (entry->cpu_flag & CPU_BOOTPROCESSOR) {
                 // BSP is CPU 0
-                pcpu_num_to_apic_id[0] = entry->apic_id;
-            } else if (num_pcpus < MAX_PCPUS) {
-                pcpu_num_to_apic_id[num_pcpus] = entry->apic_id;
-                num_pcpus++;
+                cpu_num_to_apic_id[0] = entry->apic_id;
+            } else if (num_available_cpus < MAX_CPUS) {
+                cpu_num_to_apic_id[num_available_cpus] = entry->apic_id;
+                num_available_cpus++;
             }
 
             // we cannot handle non-local 82489DX apics
             if ((entry->apic_ver & 0xf0) != 0x10) {
-                num_pcpus = 1;   // reset to initial value
+                num_available_cpus = 1;   // reset to initial value
                 return false;
             }
 
@@ -375,7 +375,7 @@ static bool read_mp_config_table(uintptr_t addr)
             tab_entry_ptr += sizeof(mp_local_interrupt_entry_t);
             break;
         default:
-            num_pcpus = 1;   // reset to initial value
+            num_available_cpus = 1;   // reset to initial value
             return false;
         }
     }
@@ -407,9 +407,9 @@ static bool find_cpus_in_floating_mp_struct(void)
     if (fp->feature[0] > 0 && fp->feature[0] <= 7) {
         // This is a default config, so plug in the numbers.
         apic = (volatile apic_register_t *)0xFEE00000;
-        pcpu_num_to_apic_id[0] = 0;
-        pcpu_num_to_apic_id[1] = 1;
-        num_pcpus = 2;
+        cpu_num_to_apic_id[0] = 0;
+        cpu_num_to_apic_id[1] = 1;
+        num_available_cpus = 2;
         return true;
     }
 
@@ -459,11 +459,11 @@ static bool parse_madt(void *addr)
         madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
         if (entry->type == MP_PROCESSOR) {
             if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
-                if (num_pcpus < MAX_PCPUS) {
-                    pcpu_num_to_apic_id[found_cpus] = entry->apic_id;
+                if (num_available_cpus < MAX_CPUS) {
+                    cpu_num_to_apic_id[found_cpus] = entry->apic_id;
                     // The first CPU is the BSP, don't increment.
                     if (found_cpus > 0) {
-                        num_pcpus++;
+                        num_available_cpus++;
                     }
                 }
                 found_cpus++;
@@ -611,11 +611,11 @@ static bool find_cpus_in_rsdp(void)
     return false;
 }
 
-static bool start_cpu(int pcpu_num)
+static bool start_cpu(int cpu_num)
 {
     // This implements the universal algorithm described in section B.4 of the Intel Multiprocessor specification.
 
-    int apic_id = pcpu_num_to_apic_id[pcpu_num];
+    int apic_id = cpu_num_to_apic_id[cpu_num];
 
     // Pulse the INIT IPI.
     apic_write(APICR_ESR, 0);
@@ -647,21 +647,21 @@ static bool start_cpu(int pcpu_num)
 void smp_init(bool smp_enable)
 {
     for (int i = 0; i < MAX_APIC_IDS; i++) {
-        apic_id_to_pcpu_num[i] = 0;
+        apic_id_to_cpu_num[i] = 0;
     }
 
-    for (int i = 0; i < MAX_PCPUS; i++) {
-        pcpu_num_to_apic_id[i] = 0;
+    for (int i = 0; i < MAX_CPUS; i++) {
+        cpu_num_to_apic_id[i] = 0;
     }
 
-    num_pcpus = 1;
+    num_available_cpus = 1;
 
     if (smp_enable) {
         (void)(find_cpus_in_rsdp() || find_cpus_in_floating_mp_struct());
     }
 
-    for (int i = 0; i < num_pcpus; i++) {
-        apic_id_to_pcpu_num[pcpu_num_to_apic_id[i]] = i;
+    for (int i = 0; i < num_available_cpus; i++) {
+        apic_id_to_cpu_num[cpu_num_to_apic_id[i]] = i;
     }
 
     // Reserve last page of first segment for AP trampoline and sync objects.
@@ -676,37 +676,37 @@ void smp_init(bool smp_enable)
     alloc_addr = HEAP_BASE_ADDR + ap_trampoline_size;
 }
 
-int smp_start(cpu_state_t pcpu_state[MAX_PCPUS])
+int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 {
-    int pcpu_num;
+    int cpu_num;
 
-    pcpu_state[0] = CPU_STATE_RUNNING;  // we don't support disabling the boot CPU
+    cpu_state[0] = CPU_STATE_RUNNING;  // we don't support disabling the boot CPU
 
-    for (pcpu_num = 1; pcpu_num < num_pcpus; pcpu_num++) {
-        if (pcpu_state[pcpu_num] == CPU_STATE_ENABLED) {
-            if (!start_cpu(pcpu_num)) {
-                return pcpu_num;
+    for (cpu_num = 1; cpu_num < num_available_cpus; cpu_num++) {
+        if (cpu_state[cpu_num] == CPU_STATE_ENABLED) {
+            if (!start_cpu(cpu_num)) {
+                return cpu_num;
             }
         }
     }
 
     int timeout = 100000;
     while (timeout > 0) {
-        for (pcpu_num = 1; pcpu_num < num_pcpus; pcpu_num++) {
-            if (pcpu_state[pcpu_num] == CPU_STATE_ENABLED) break;
+        for (cpu_num = 1; cpu_num < num_available_cpus; cpu_num++) {
+            if (cpu_state[cpu_num] == CPU_STATE_ENABLED) break;
         }
-        if (pcpu_num == num_pcpus) {
+        if (cpu_num == num_available_cpus) {
             return 0;
         }
         usleep(10);
         timeout--;
     }
-    return pcpu_num;
+    return cpu_num;
 }
 
-int smp_my_pcpu_num(void)
+int smp_my_cpu_num(void)
 {
-    return num_pcpus > 1 ? apic_id_to_pcpu_num[my_apic_id()] : 0;
+    return num_available_cpus > 1 ? apic_id_to_cpu_num[my_apic_id()] : 0;
 }
 
 barrier_t *smp_alloc_barrier(int num_threads)

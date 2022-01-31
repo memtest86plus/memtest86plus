@@ -4,7 +4,7 @@
 /*
  * Provides the configuration settings and pop-up menu.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -34,7 +34,7 @@ extern cpu_mode_t   cpu_mode;
 
 extern error_mode_t error_mode;
 
-extern cpu_state_t  pcpu_state[MAX_PCPUS];
+extern cpu_state_t  cpu_state[MAX_CPUS];
 
 extern bool         enable_temperature;
 extern bool         enable_trace;

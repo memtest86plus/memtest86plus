@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Partly derived from an extract of memtest86+ test.c:
 //
@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "cache.h"
+#include "smp.h"
 
 #include "barrier.h"
 
@@ -40,22 +41,22 @@ typedef struct {
 // Private Variables
 //------------------------------------------------------------------------------
 
-static prsg_state_t prsg_state[MAX_VCPUS];
+static prsg_state_t prsg_state[MAX_CPUS];
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
-static inline uint32_t prsg(int my_vcpu)
+static inline uint32_t prsg(int my_cpu)
 {
     // This implements a 64 bit linear feedback shift register with XNOR
     // feedback from taps 64, 63, 61, 60. It generates 32 new bits each
     // time the function is called. Because the feedback taps are all in
     // the upper 32 bits, we can generate the new bits in parallel.
 
-    uint64_t lfsr = prsg_state[my_vcpu].lfsr;
+    uint64_t lfsr = prsg_state[my_cpu].lfsr;
     uint32_t feedback = ~((lfsr >> 32) ^ (lfsr >> 31) ^ (lfsr >> 29) ^ (lfsr >> 28));
-    prsg_state[my_vcpu].lfsr = (lfsr << 32) | feedback;
+    prsg_state[my_cpu].lfsr = (lfsr << 32) | feedback;
     return feedback;
 }
 
@@ -63,9 +64,9 @@ static inline uint32_t prsg(int my_vcpu)
 // Public Functions
 //------------------------------------------------------------------------------
 
-void random_seed(int my_vcpu, uint64_t seed)
+void random_seed(int my_cpu, uint64_t seed)
 {
-    if (my_vcpu < 0) {
+    if (my_cpu < 0) {
         return;
     }
 
@@ -73,38 +74,38 @@ void random_seed(int my_vcpu, uint64_t seed)
     if (~seed == 0) {
         seed = 0;
     }
-    prsg_state[my_vcpu].lfsr = seed;
+    prsg_state[my_cpu].lfsr = seed;
 }
 
-testword_t random(int my_vcpu)
+testword_t random(int my_cpu)
 {
-    if (my_vcpu < 0) {
+    if (my_cpu < 0) {
         return 0;
     }
 
-    testword_t value = prsg(my_vcpu);
+    testword_t value = prsg(my_cpu);
 #if TESTWORD_WIDTH > 32
-    value = value << 32 | prsg(my_vcpu);
+    value = value << 32 | prsg(my_cpu);
 #endif
     return value;
 }
 
-void calculate_chunk(testword_t **start, testword_t **end, int my_vcpu, int segment, size_t chunk_align)
+void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segment, size_t chunk_align)
 {
-    if (my_vcpu < 0) {
-        my_vcpu = 0;
+    if (my_cpu < 0) {
+        my_cpu = 0;
     }
 
     // If we are only running 1 CPU then test the whole segment.
-    if (num_vcpus == 1) {
+    if (num_active_cpus == 1) {
         *start = vm_map[segment].start;
         *end   = vm_map[segment].end;
     } else {
         uintptr_t segment_size = (vm_map[segment].end - vm_map[segment].start + 1) * sizeof(testword_t);
-        uintptr_t chunk_size   = round_down(segment_size / num_vcpus, chunk_align);
+        uintptr_t chunk_size   = round_down(segment_size / num_active_cpus, chunk_align);
 
         // Calculate chunk boundaries.
-        *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * my_vcpu);
+        *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * my_cpu);
         *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
 
         if (*end > vm_map[segment].end) {
@@ -113,11 +114,11 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_vcpu, int segm
     }
 }
 
-void flush_caches(int my_vcpu)
+void flush_caches(int my_cpu)
 {
-    if (my_vcpu >= 0) {
+    if (my_cpu >= 0) {
         barrier_wait(run_barrier);
-        if (my_vcpu == master_vcpu) {
+        if (my_cpu == master_cpu) {
             cache_flush();
         }
         barrier_wait(run_barrier);
