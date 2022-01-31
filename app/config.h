@@ -34,7 +34,7 @@ extern cpu_mode_t   cpu_mode;
 
 extern error_mode_t error_mode;
 
-extern bool         enable_pcpu[MAX_PCPUS];
+extern cpu_state_t  pcpu_state[MAX_PCPUS];
 
 extern bool         enable_temperature;
 extern bool         enable_trace;

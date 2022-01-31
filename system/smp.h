@@ -16,23 +16,23 @@
 #include "spinlock.h"
 
 /*
- * The maximum number of active physical CPUs. There must be room in
- * low memory for the program and all the CPU stacks.
+ * The maximum number of active CPU cores. In the current implementation this
+ * is limited to 256 both by the number of available APIC IDs and the need to
+ * fit both the program and the CPU stacks in low memory.
  */
-#define MAX_PCPUS   256
+#define MAX_PCPUS       256
 
 /*
- * An error code returned by smp_start().
+ * The current state of a CPU core.
  */
-typedef enum {
-    SMP_ERR_NONE                    = 0,
-    SMP_ERR_BOOT_TIMEOUT            = 1,
-    SMP_ERR_STARTUP_IPI_NOT_SENT    = 2,
-    SMP_ERR_STARTUP_IPI_ERROR       = 0x100 // error code will be added to this
-} smp_error_t;
+typedef enum  __attribute__ ((packed)) {
+    CPU_STATE_DISABLED  = 0,
+    CPU_STATE_ENABLED   = 1,
+    CPU_STATE_RUNNING   = 2
+} cpu_state_t;
 
 /*
- * The number of available physical CPUs. Initially this is 1, but may
+ * The number of available physical CPU cores. Initially this is 1, but may
  * increase after calling smp_init().
  */
 extern int num_pcpus;
@@ -52,14 +52,10 @@ extern uintptr_t rsdp_addr;
 void smp_init(bool smp_enable);
 
 /*
- * Starts the selected APs.
+ * Starts the APs listed as enabled in pcpu_state. Returns 0 on success
+ * or the index number of the lowest-numbered AP that failed to start.
  */
-smp_error_t smp_start(bool enable_pcpu[MAX_PCPUS]);
-
-/*
- * Signals that an AP has booted.
- */
-void smp_set_ap_booted(int pcpu_num);
+int smp_start(cpu_state_t pcpu_state[MAX_PCPUS]);
 
 /*
  * Returns the ordinal number of the calling PCPU.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ smp.c:
 //
@@ -240,8 +240,6 @@ static int8_t           apic_id_to_pcpu_num[MAX_APIC_IDS];
 
 static uint8_t          pcpu_num_to_apic_id[MAX_PCPUS];
 
-static volatile bool    cpu_started[MAX_PCPUS];
-
 static uintptr_t        smp_heap_page = 0;
 
 static uintptr_t        alloc_addr = 0;
@@ -275,7 +273,7 @@ static uint32_t apic_read(unsigned reg)
     return apic[reg][0];
 }
 
-static void send_ipi(unsigned apic_id, unsigned trigger, unsigned level, unsigned mode, uint8_t vector)
+static bool send_ipi(unsigned apic_id, unsigned trigger, unsigned level, unsigned mode, uint8_t vector)
 {
     uint32_t v;
 
@@ -289,6 +287,14 @@ static void send_ipi(unsigned apic_id, unsigned trigger, unsigned level, unsigne
     v |= mode           << APIC_ICRLO_DELMODE_OFFSET;
     v |= vector;
     apic_write(APICR_ICRLO, v);
+
+    for (int time = 0; time < 100; time++) {
+        usleep(1);
+        if (~apic_read(APICR_ICRLO) & APIC_ICRLO_STATUS_MASK) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static int checksum(const void *data, int length)
@@ -605,55 +611,33 @@ static bool find_cpus_in_rsdp(void)
     return false;
 }
 
-static smp_error_t start_cpu(int pcpu_num)
+static bool start_cpu(int pcpu_num)
 {
+    // This implements the universal algorithm described in section B.4 of the Intel Multiprocessor specification.
+
     int apic_id = pcpu_num_to_apic_id[pcpu_num];
 
-    // Clear the APIC ESR register.
-    apic_write(APICR_ESR, 0);
-    apic_read(APICR_ESR);
-
     // Pulse the INIT IPI.
-    send_ipi(apic_id, APIC_TRIGGER_LEVEL, 1, APIC_DELMODE_INIT, 0);
-    usleep(100000);
-    send_ipi(apic_id, APIC_TRIGGER_LEVEL, 0, APIC_DELMODE_INIT, 0);
+    apic_write(APICR_ESR, 0);
+    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 1, APIC_DELMODE_INIT, 0)) {
+        return false;
+    }
+    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 0, APIC_DELMODE_INIT, 0)) {
+        return false;
+    }
 
+    usleep(10000);
+
+    // Send two STARTUP_IPIs.
     for (int num_sipi = 0; num_sipi < 2; num_sipi++) {
         apic_write(APICR_ESR, 0);
-
-        send_ipi(apic_id, 0, 0, APIC_DELMODE_STARTUP, AP_TRAMPOLINE_PAGE);
-
-        bool send_pending;
-        int timeout = 0;
-        do {
-            usleep(10);
-            timeout++;
-            send_pending = (apic_read(APICR_ICRLO) & APIC_ICRLO_STATUS_MASK) != 0;
-        } while (send_pending && timeout < 1000);
-
-        if (send_pending) {
-            return SMP_ERR_STARTUP_IPI_NOT_SENT;
+        if (!send_ipi(apic_id, 0, 0, APIC_DELMODE_STARTUP, AP_TRAMPOLINE_PAGE)) {
+            return false;
         }
-
-        usleep(100000);
-
-        uint32_t error = apic_read(APICR_ESR) & 0xef;
-        if (error) {
-            return SMP_ERR_STARTUP_IPI_ERROR + error;
-        }
+        usleep(200);
     }
 
-    int timeout = 0;
-    do {
-        usleep(10);
-        timeout++;
-    } while (!cpu_started[pcpu_num] && timeout < 100000);
-
-    if (!cpu_started[pcpu_num]) {
-        return SMP_ERR_BOOT_TIMEOUT;
-    }
-
-    return SMP_ERR_NONE;
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -667,8 +651,7 @@ void smp_init(bool smp_enable)
     }
 
     for (int i = 0; i < MAX_PCPUS; i++) {
-        pcpu_num_to_apic_id[i]  = 0;
-        cpu_started[i] = false;
+        pcpu_num_to_apic_id[i] = 0;
     }
 
     num_pcpus = 1;
@@ -693,25 +676,32 @@ void smp_init(bool smp_enable)
     alloc_addr = HEAP_BASE_ADDR + ap_trampoline_size;
 }
 
-smp_error_t smp_start(bool enable_pcpu[MAX_PCPUS])
+int smp_start(cpu_state_t pcpu_state[MAX_PCPUS])
 {
-    enable_pcpu[0] = true;  // we don't support disabling the boot CPU
+    int pcpu_num;
 
-    for (int i = 1; i < num_pcpus; i++) {
-        if (enable_pcpu[i]) {
-            smp_error_t error = start_cpu(i);
-            if (error != SMP_ERR_NONE) {
-                return error;
+    pcpu_state[0] = CPU_STATE_RUNNING;  // we don't support disabling the boot CPU
+
+    for (pcpu_num = 1; pcpu_num < num_pcpus; pcpu_num++) {
+        if (pcpu_state[pcpu_num] == CPU_STATE_ENABLED) {
+            if (!start_cpu(pcpu_num)) {
+                return pcpu_num;
             }
         }
     }
 
-    return SMP_ERR_NONE;
-}
-
-void smp_set_ap_booted(int pcpu_num)
-{
-    cpu_started[pcpu_num] = true;
+    int timeout = 100000;
+    while (timeout > 0) {
+        for (pcpu_num = 1; pcpu_num < num_pcpus; pcpu_num++) {
+            if (pcpu_state[pcpu_num] == CPU_STATE_ENABLED) break;
+        }
+        if (pcpu_num == num_pcpus) {
+            return 0;
+        }
+        usleep(10);
+        timeout--;
+    }
+    return pcpu_num;
 }
 
 int smp_my_pcpu_num(void)

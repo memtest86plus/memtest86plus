@@ -87,7 +87,7 @@ cpu_mode_t      cpu_mode = PAR;
 
 error_mode_t    error_mode = ERROR_MODE_NONE;
 
-bool            enable_pcpu[MAX_PCPUS];
+cpu_state_t     pcpu_state[MAX_PCPUS];
 
 bool            enable_temperature = false;
 bool            enable_trace       = false;
@@ -505,12 +505,12 @@ static void error_mode_menu(void)
     clear_screen_region(POP_REGION);
 }
 
-static bool set_all_cpus(bool enabled, int display_offset)
+static bool set_all_cpus(cpu_state_t state, int display_offset)
 {
     clear_popup_row(POP_R+16);
     for (int i = 1; i < num_pcpus; i++) {
-        enable_pcpu[i] = enabled;
-        display_enabled(POP_R+12, i - display_offset, enabled);
+        pcpu_state[i] = state;
+        display_enabled(POP_R+12, i - display_offset, state == CPU_STATE_ENABLED);
     }
     return true;
 }
@@ -524,7 +524,7 @@ static bool add_or_remove_cpu(bool add, int display_offset)
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
-    enable_pcpu[n] = add;
+    pcpu_state[n] = add ? CPU_STATE_ENABLED : CPU_STATE_DISABLED;
     display_enabled(POP_R+12, n - display_offset, add);
     clear_popup_row(POP_R+16);
     return true;
@@ -545,7 +545,7 @@ static bool add_cpu_range(int display_offset)
         return false;
     }
     for (int i = n1; i <= n2; i++) {
-        enable_pcpu[i] = true;
+        pcpu_state[i] = CPU_STATE_ENABLED;
         display_enabled(POP_R+12, i - display_offset, true);
     }
     clear_popup_row(POP_R+16);
@@ -560,7 +560,7 @@ static void display_cpu_selection(int display_offset)
         printc(POP_R+12, POP_LM, 'B');
     }
     for (int i = 1; i < num_pcpus; i++) {
-        display_enabled(POP_R+12, i - display_offset, enable_pcpu[i]);
+        display_enabled(POP_R+12, i - display_offset, pcpu_state[i] == CPU_STATE_ENABLED);
     }
 }
 
@@ -642,7 +642,7 @@ void config_init(void)
     error_mode = ERROR_MODE_ADDRESS;
 
     for (int i = 0; i < MAX_PCPUS; i++) {
-        enable_pcpu[i] = true;
+        pcpu_state[i] = CPU_STATE_ENABLED;
     }
 
     enable_temperature = !no_temperature;

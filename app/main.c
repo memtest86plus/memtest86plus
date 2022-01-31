@@ -167,7 +167,7 @@ static void global_init(void)
 
     num_vcpus = 0;
     for (int i = 0; i < num_pcpus; i++) {
-        if (enable_pcpu[i]) {
+        if (pcpu_state[i] == CPU_STATE_ENABLED) {
             pcpu_num_to_vcpu_num[i] = num_vcpus;
             num_vcpus++;
         }
@@ -204,8 +204,10 @@ static void global_init(void)
     start_mutex   = smp_alloc_mutex();
     error_mutex   = smp_alloc_mutex();
 
-    if (smp_start(enable_pcpu) != SMP_ERR_NONE) {
-        display_notice("Failed to start other CPUs. Press any key to reboot...");
+    int failed = smp_start(pcpu_state);
+    if (failed) {
+        const char *message = "Failed to start CPU core %i. Press any key to reboot...";
+        display_notice_with_args(strlen(message), message, failed);
         while (get_key() == 0) { }
         reboot();
     }
@@ -380,7 +382,7 @@ void main(void)
             init_state = 1;
             global_init();
         } else {
-            smp_set_ap_booted(my_pcpu);
+            pcpu_state[my_pcpu] = CPU_STATE_RUNNING;
         }
     } else {
         // Release the lock taken in run_at().
