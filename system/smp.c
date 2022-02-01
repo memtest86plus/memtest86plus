@@ -236,7 +236,7 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 static volatile apic_register_t *apic = NULL;
 
-static int8_t           apic_id_to_cpu_num[MAX_APIC_IDS];
+static uint8_t          apic_id_to_cpu_num[MAX_APIC_IDS];
 
 static uint8_t          cpu_num_to_apic_id[MAX_CPUS];
 
