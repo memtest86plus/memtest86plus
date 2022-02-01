@@ -105,7 +105,7 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         uintptr_t chunk_size   = round_down(segment_size / num_active_cpus, chunk_align);
 
         // Calculate chunk boundaries.
-        *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * my_cpu);
+        *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * chunk_index[my_cpu]);
         *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
 
         if (*end > vm_map[segment].end) {

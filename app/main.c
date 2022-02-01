@@ -86,6 +86,8 @@ static volatile int         test_stage = 0;
 
 // These are exposed in test.h.
 
+uint8_t             chunk_index[MAX_CPUS];
+
 volatile int        num_active_cpus = 1;
 
 volatile int        master_cpu = 0;
@@ -169,6 +171,7 @@ static void global_init(void)
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
+            chunk_index[i] = num_enabled_cpus;
             num_enabled_cpus++;
         }
     }
@@ -254,24 +257,26 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 
 static void test_all_windows(int my_cpu)
 {
-    num_active_cpus = 1;
+    bool parallel_test = false;
     bool i_am_master = (my_cpu == master_cpu) || dummy_run;
     bool i_am_active = i_am_master;
     if (!dummy_run) {
         if (cpu_mode == PAR && test_list[test_num].cpu_mode == PAR) {
-            num_active_cpus = num_enabled_cpus;
+            parallel_test = true;
             i_am_active = true;
         }
     }
     if (i_am_master) {
-        barrier_init(run_barrier, num_active_cpus);
+        num_active_cpus = 1;
         if (!dummy_run) {
-            if (num_active_cpus == 1) {
-                display_active_cpu(my_cpu);
-            } else {
+            if (parallel_test) {
+                num_active_cpus = num_enabled_cpus;
                 display_all_active;
+            } else {
+                display_active_cpu(my_cpu);
             }
         }
+        barrier_init(run_barrier, num_active_cpus);
     }
 
     int iterations = test_list[test_num].iterations;
@@ -358,6 +363,13 @@ static void test_all_windows(int my_cpu)
             window_num++;
         }
     } while (window_end < pm_map[pm_map_size - 1].end);
+}
+
+static void select_next_master(void)
+{
+    do {
+        master_cpu = (master_cpu + 1) % num_available_cpus;
+    } while (cpu_state[master_cpu] != CPU_STATE_RUNNING);
 }
 
 //------------------------------------------------------------------------------
@@ -471,7 +483,7 @@ void main(void)
             switch (cpu_mode) {
               case PAR:
                 if (test_list[test_num].cpu_mode == SEQ) {
-                    master_cpu = (master_cpu + 1) % num_enabled_cpus;
+                    select_next_master();
                     if (master_cpu != 0) {
                         rerun_test = true;
                         continue;
@@ -479,10 +491,10 @@ void main(void)
                 }
                 break;
               case ONE:
-                master_cpu = (master_cpu + 1) % num_enabled_cpus;
+                select_next_master();
                 break;
               case SEQ:
-                master_cpu = (master_cpu + 1) % num_enabled_cpus;
+                select_next_master();
                 if (master_cpu != 0) {
                     rerun_test = true;
                     continue;

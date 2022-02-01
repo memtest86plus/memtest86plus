@@ -17,12 +17,20 @@
 #include "spinlock.h"
 
 /*
- * The number of CPU cores being used for the current test.
+ * A mapping from a CPU core number to the index number of the memory chunk
+ * it operates on when performing a memory test in parallel across all the
+ * enabled cores.
  */
+extern uint8_t chunk_index[MAX_CPUS];
+
+ /*
+  * The number of CPU cores being used for the current test. This is always
+  * either 1 or the full number of enabled CPU cores.
+  */
 extern volatile int num_active_cpus;
 
 /*
- * The current master CPU.
+ * The current master CPU core.
  */
 extern volatile int master_cpu;
 
