@@ -111,13 +111,11 @@ volatile uintptr_t  test_addr[MAX_CPUS];
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define BARRIER(enabled) \
-    if (enabled) { \
-        if (TRACE_BARRIERS) { \
-            trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
-        } \
-        barrier_wait(start_barrier); \
-    }
+#define BARRIER \
+    if (TRACE_BARRIERS) { \
+        trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
+    } \
+    barrier_wait(start_barrier);
 
 static void run_at(uintptr_t addr, int my_cpu)
 {
@@ -126,7 +124,7 @@ static void run_at(uintptr_t addr, int my_cpu)
     if (my_cpu == 0) {
         memmove((void *)addr, &_start, _end - _start);
     }
-    BARRIER(true);
+    BARRIER;
 
 #ifndef __x86_64__
     // The 32-bit startup code needs to know where it is located.
@@ -201,19 +199,11 @@ static void global_init(void)
         trace(0, "ACPI RSDP found in %s at %0*x", rsdp_source, 2*sizeof(uintptr_t), rsdp_addr);
     }
 
-    start_barrier = smp_alloc_barrier(num_enabled_cpus);
-    run_barrier   = smp_alloc_barrier(num_enabled_cpus);
+    start_barrier = smp_alloc_barrier(1);
+    run_barrier   = smp_alloc_barrier(1);
 
     start_mutex   = smp_alloc_mutex();
     error_mutex   = smp_alloc_mutex();
-
-    int failed = smp_start(cpu_state);
-    if (failed) {
-        const char *message = "Failed to start CPU core %i. Press any key to reboot...";
-        display_notice_with_args(strlen(message), message, failed);
-        while (get_key() == 0) { }
-        reboot();
-    }
 
     start_run = true;
     dummy_run = true;
@@ -287,7 +277,7 @@ static void test_all_windows(int my_cpu)
 
     // Loop through all possible windows.
     do {
-        BARRIER(!dummy_run);
+        BARRIER;
         if (bail) {
             break;
         }
@@ -303,7 +293,7 @@ static void test_all_windows(int my_cpu)
                 window_num = 1;
             }
         }
-        BARRIER(!dummy_run);
+        BARRIER;
 
         // Relocate if necessary.
         if (window_num > 0) {
@@ -333,7 +323,7 @@ static void test_all_windows(int my_cpu)
             }
             setup_vm_map(window_start, window_end);
         }
-        BARRIER(!dummy_run);
+        BARRIER;
 
         if (!i_am_active) {
             continue;
@@ -369,7 +359,7 @@ static void select_next_master(void)
 {
     do {
         master_cpu = (master_cpu + 1) % num_available_cpus;
-    } while (cpu_state[master_cpu] != CPU_STATE_RUNNING);
+    } while (cpu_state[master_cpu] == CPU_STATE_DISABLED);
 }
 
 //------------------------------------------------------------------------------
@@ -384,21 +374,15 @@ void main(void)
     if (init_state == 0) {
         // If this is the first time here, we must be CPU 0, as the APs haven't been started yet.
         my_cpu = 0;
+        global_init();
+        init_state = 1;
     } else {
         my_cpu = smp_my_cpu_num();
     }
-
-    if (init_state < 2) {
-        // Global initialisation is done by the boot CPU.
-        if (my_cpu == 0) {
-            init_state = 1;
-            global_init();
-        } else {
-            cpu_state[my_cpu] = CPU_STATE_RUNNING;
-        }
+    if (init_state < 2 && my_cpu > 0) {
+        cpu_state[my_cpu] = CPU_STATE_RUNNING;
     }
-    BARRIER(true);
-    init_state = 2;
+    BARRIER;
 
 #if TEST_INTERRUPT
     if (my_cpu == 0) {
@@ -412,7 +396,7 @@ void main(void)
     // where we left off after each relocation.
 
     while (1) {
-        BARRIER((my_cpu != 0) || !dummy_run);
+        BARRIER;
         if (my_cpu == 0) {
             if (start_run) {
                 pass_num = 0;
@@ -453,11 +437,11 @@ void main(void)
             start_test = false;
             rerun_test = false;
         }
-        BARRIER(!dummy_run);
+        BARRIER;
         if (test_list[test_num].enabled) {
             test_all_windows(my_cpu);
         }
-        BARRIER(!dummy_run);
+        BARRIER;
         if (my_cpu != 0) {
             continue;
         }
@@ -519,6 +503,16 @@ void main(void)
         if (dummy_run && pass_num == NUM_PASS_TYPES) {
             start_run = true;
             dummy_run = false;
+            barrier_init(start_barrier, num_enabled_cpus);
+            int failed = smp_start(cpu_state);
+            if (failed) {
+                const char *message = "Failed to start CPU core %i. Press any key to reboot...";
+                display_notice_with_args(strlen(message), message, failed);
+                while (get_key() == 0) { }
+                reboot();
+            }
+            init_state = 2;
+            BARRIER;
             continue;
         }
 
