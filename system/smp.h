@@ -47,7 +47,7 @@ extern const char *rsdp_source;
 extern uintptr_t rsdp_addr;
 
 /*
- * Initialises the SMP state and detects the number of available CPUs.
+ * Initialises the SMP state and detects the number of available CPU cores.
  */
 void smp_init(bool smp_enable);
 
@@ -58,7 +58,7 @@ void smp_init(bool smp_enable);
 int smp_start(cpu_state_t cpu_state[MAX_CPUS]);
 
 /*
- * Returns the ordinal number of the calling CPU.
+ * Returns the ordinal number of the calling CPU core.
  */
 int smp_my_cpu_num(void);
 
