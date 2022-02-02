@@ -8,8 +8,18 @@
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
+/*
+ * NOTE: Increasing the value of MAX_APS would require:
+ *  - relocating the stacks when the program is loaded in low memory
+ *  - modifying smp.c to support the x2APIC architecture
+ *  - adjusting the display if more than 3 digits are needed for CPU IDs
+ */
+#define	MAX_APS		255		/* Maximum number of active APs */
+
 #define BSP_STACK_SIZE	16384		/* Stack size for the BSP */
 #define AP_STACK_SIZE	1024		/* Stack size for each AP */
+
+#define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */
@@ -69,6 +79,8 @@ extern uint8_t	ap_trampoline[];
 extern uint32_t	ap_startup_addr;
 
 extern uint8_t	ap_trampoline_end[];
+
+extern uint8_t	_stacks[];
 
 extern uint8_t	_end[];
 

@@ -149,15 +149,14 @@ startup:
 	jc	0b
 	leaq	startup_stack_top(%rip), %rsp
 
-	# Pick the correct stack. The stacks are allocated immediately
-	# after the end of the loaded program, BSP first, then APs.
+	# Pick the correct stack.
 
 	xorq	%rax, %rax
 	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
 	addq	$BSP_STACK_SIZE, %rax
-	leaq	_end(%rip), %rsp
+	leaq	_stacks(%rip), %rsp
 	addq	%rax, %rsp
 
 	# Release the mutex that protects the startup stack.
@@ -616,5 +615,14 @@ first_boot:
 startup_stack_base:
 	. = . + 64
 startup_stack_top:
+
+	.previous
+
+# Main stack area.
+
+	.section    ".stacks", "aw", @nobits
+	.align  256
+
+	. = . + STACKS_SIZE
 
 	.previous

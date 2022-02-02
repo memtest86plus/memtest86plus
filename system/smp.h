@@ -16,11 +16,9 @@
 #include "spinlock.h"
 
 /*
- * The maximum number of CPU cores that can be used. Currently this is limited
- * to 256 both by the number of available APIC IDs and the need to fit both
- * the program and the CPU stacks in low memory.
+ * The maximum number of CPU cores that can be used.
  */
-#define MAX_CPUS       256
+#define MAX_CPUS       (1 + MAX_APS)
 
 /*
  * The current state of a CPU core.

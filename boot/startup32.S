@@ -98,14 +98,13 @@ startup:
 	movl	%esi, boot_params_addr@GOTOFF(%ebx)
 1:
 
-	# Pick the correct stack. The stacks are allocated immediately
-	# after the end of the loaded program, BSP first, then APs.
+	# Pick the correct stack.
 
 	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
 	addl	$BSP_STACK_SIZE, %eax
-	leal	_end@GOTOFF(%ebx), %esp
+	leal	_stacks@GOTOFF(%ebx), %esp
 	addl	%eax, %esp
 
 	# Release the mutex that protects the startup stack.
@@ -580,5 +579,14 @@ first_boot:
 startup_stack_base:
 	. = . + 64
 startup_stack_top:
+
+	.previous
+
+# Main stack area.
+
+	.section    "stacks", "aw", @progbits
+	.align  256
+
+	. = . + STACKS_SIZE
 
 	.previous

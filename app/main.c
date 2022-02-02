@@ -64,6 +64,9 @@ static volatile int         init_state = 0;
 
 static int                  num_enabled_cpus = 1;
 
+static uintptr_t            low_load_addr;
+static uintptr_t            high_load_addr;
+
 static barrier_t            *start_barrier = NULL;
 static spinlock_t           *start_mutex   = NULL;
 
@@ -122,7 +125,8 @@ static void run_at(uintptr_t addr, int my_cpu)
     uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
 
     if (my_cpu == 0) {
-        memmove((void *)addr, &_start, _end - _start);
+        // Copy the program code and all data except the stacks.
+        memcpy((void *)addr, &_start, _stacks - _start);
     }
     BARRIER;
 
@@ -132,6 +136,33 @@ static void run_at(uintptr_t addr, int my_cpu)
 #endif
 
     goto *new_start_addr;
+}
+
+static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t lower_limit, uintptr_t upper_limit)
+{
+    uintptr_t current_start = (uintptr_t)_start;
+    if (current_start >= lower_limit && current_start < upper_limit) {
+        *load_addr = current_start;
+        return true;
+    }
+
+    for (int i = 0; i < pm_map_size; i++) {
+        uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
+        uintptr_t try_limit = pm_map[i].end   << PAGE_SHIFT;
+        if (try_start == 0) try_start = 0x1000;
+        uintptr_t try_end   = try_start + program_size;
+        if (try_end > try_limit) continue;
+
+        if (try_start >= upper_limit) break;
+        if (try_end   <  lower_limit) continue;
+
+        *load_addr = try_start;
+        return true;
+    }
+
+    enable_trace = true;
+    trace(0, "Insufficient free space in range 0x%x to 0x%x", lower_limit, upper_limit - 1);
+    return false;
 }
 
 static void global_init(void)
@@ -192,11 +223,24 @@ static void global_init(void)
         set_scroll_lock(true);
     }
 
+    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
+
+    bool load_addr_ok = set_load_addr(& low_load_addr, program_size,            0, SIZE_C(1,MB))
+                     && set_load_addr(&high_load_addr, program_size, SIZE_C(1,MB), SIZE_C(2,GB));
+
+    trace(0, "program size %ikB", (int)(program_size / 1024));
+    trace(0, " low_load_addr %0*x", 2*sizeof(uintptr_t),  low_load_addr);
+    trace(0, "high_load_addr %0*x", 2*sizeof(uintptr_t), high_load_addr);
     for (int i = 0; i < pm_map_size; i++) {
         trace(0, "pm %0*x - %0*x", 2*sizeof(uintptr_t), pm_map[i].start, 2*sizeof(uintptr_t), pm_map[i].end);
     }
     if (rsdp_addr != 0) {
         trace(0, "ACPI RSDP found in %s at %0*x", rsdp_source, 2*sizeof(uintptr_t), rsdp_addr);
+    }
+    if (!load_addr_ok) {
+        trace(0, "Cannot relocate program. Press any key to reboot...");
+        while (get_key() == 0) { }
+        reboot();
     }
 
     start_barrier = smp_alloc_barrier(1);
@@ -288,7 +332,7 @@ static void test_all_windows(int my_cpu)
                 // Relocation may disrupt the test.
                 window_num = 1;
             }
-            if (window_num == 0 && pm_limit_lower >= HIGH_LOAD_ADDR) {
+            if (window_num == 0 && pm_limit_lower >= high_load_addr) {
                 // Avoid unnecessary relocation.
                 window_num = 1;
             }
@@ -297,12 +341,12 @@ static void test_all_windows(int my_cpu)
 
         // Relocate if necessary.
         if (window_num > 0) {
-            if (!dummy_run && (uintptr_t)&_start != LOW_LOAD_ADDR) {
-                run_at(LOW_LOAD_ADDR, my_cpu);
+            if (!dummy_run && (uintptr_t)&_start != low_load_addr) {
+                run_at(low_load_addr, my_cpu);
             }
         } else {
-            if (!dummy_run && (uintptr_t)&_start != HIGH_LOAD_ADDR) {
-                run_at(HIGH_LOAD_ADDR, my_cpu);
+            if (!dummy_run && (uintptr_t)&_start != high_load_addr) {
+                run_at(high_load_addr, my_cpu);
             }
         }
 
@@ -311,10 +355,10 @@ static void test_all_windows(int my_cpu)
             switch (window_num) {
               case 0:
                 window_start = 0;
-                window_end   = (HIGH_LOAD_ADDR >> PAGE_SHIFT);
+                window_end   = (high_load_addr >> PAGE_SHIFT);
                 break;
               case 1:
-                window_start = (HIGH_LOAD_ADDR >> PAGE_SHIFT);
+                window_start = (high_load_addr >> PAGE_SHIFT);
                 window_end   = VM_WINDOW_SIZE;
                 break;
               default:
