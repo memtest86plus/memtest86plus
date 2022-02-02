@@ -19,6 +19,7 @@
 
 #include "cache.h"
 #include "cpuid.h"
+#include "memsize.h"
 #include "tsc.h"
 #include "vmem.h"
 
@@ -84,7 +85,7 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
 int run_test(int my_cpu, int test, int stage, int iterations)
 {
     if (my_cpu == master_cpu) {
-        if ((uintptr_t)&_start > LOW_LOAD_ADDR) {
+        if ((uintptr_t)&_start > SIZE_C(1,MB)) {
             // Relocated so we need to test all selected lower memory.
             vm_map[0].start = first_word_mapping(pm_limit_lower);
 
