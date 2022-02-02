@@ -80,7 +80,7 @@ startup:
 	# need to take the mutex to protect our use of the stack.
 
 	leal	(startup_stack_mutex - startup)(%edi), %eax
-0: lock bts	$0, (%eax)
+0: lock btsl	$0, (%eax)
 	jc	0b
 
 	leal	(startup_stack_top - startup)(%edi), %esp

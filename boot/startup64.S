@@ -145,7 +145,7 @@ startup:
 	# Use the startup stack until we pick the correct one. We
 	# need to take a mutex to protect our use of the stack.
 
-0: lock bts	$0, startup_stack_mutex(%rip)
+0: lock btsl	$0, startup_stack_mutex(%rip)
 	jc	0b
 	leaq	startup_stack_top(%rip), %rsp
 
