@@ -45,6 +45,7 @@ SECTIONS {
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
+		. = ALIGN(16);
 		_stacks = .;
 		*(.stacks)
 		/* _end must be at least 256 byte aligned */

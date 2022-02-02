@@ -621,7 +621,7 @@ startup_stack_top:
 # Main stack area.
 
 	.section    ".stacks", "aw", @nobits
-	.align  256
+	.align  16
 
 	. = . + STACKS_SIZE
 
