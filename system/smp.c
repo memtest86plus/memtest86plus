@@ -19,12 +19,15 @@
 #include "bootparams.h"
 #include "efi.h"
 
+#include "cpuid.h"
 #include "memsize.h"
 #include "pmem.h"
 #include "string.h"
 #include "unistd.h"
 
 #include "smp.h"
+
+#define SEQUENTIAL_AP_START         0
 
 //------------------------------------------------------------------------------
 // Constants
@@ -34,39 +37,11 @@
 
 // APIC registers
 
-#define APICR_ID                    0x02
-#define APICR_ESR                   0x28
-#define APICR_ICRLO                 0x30
-#define APICR_ICRHI                 0x31
-
-// APIC destination shorthands
-
-#define APIC_DEST_DEST              0
-#define APIC_DEST_LOCAL             1
-#define APIC_DEST_ALL_INC           2
-#define APIC_DEST_ALL_EXC           3
-
-// APIC IPI Command Register format
-
-#define APIC_ICRHI_RESERVED         0x00ffffff
-#define APIC_ICRHI_DEST_MASK        0xff000000
-#define APIC_ICRHI_DEST_OFFSET      24
-
-#define APIC_ICRLO_RESERVED         0xfff32000
-#define APIC_ICRLO_DEST_MASK        0x000c0000
-#define APIC_ICRLO_DEST_OFFSET      18
-#define APIC_ICRLO_TRIGGER_MASK     0x00008000
-#define APIC_ICRLO_TRIGGER_OFFSET   15
-#define APIC_ICRLO_LEVEL_MASK       0x00004000
-#define APIC_ICRLO_LEVEL_OFFSET     14
-#define APIC_ICRLO_STATUS_MASK      0x00001000
-#define APIC_ICRLO_STATUS_OFFSET    12
-#define APIC_ICRLO_DESTMODE_MASK    0x00000800
-#define APIC_ICRLO_DESTMODE_OFFSET  11
-#define APIC_ICRLO_DELMODE_MASK     0x00000700
-#define APIC_ICRLO_DELMODE_OFFSET   8
-#define APIC_ICRLO_VECTOR_MASK      0x000000ff
-#define APIC_ICRLO_VECTOR_OFFSET    0
+#define APIC_REG_ID                 0x02
+#define APIC_REG_VER                0x03
+#define APIC_REG_ESR                0x28
+#define APIC_REG_ICRLO              0x30
+#define APIC_REG_ICRHI              0x31
 
 // APIC trigger types
 
@@ -126,7 +101,7 @@
 // Types
 //------------------------------------------------------------------------------
 
-typedef uint32_t apic_register_t[4];
+typedef volatile uint32_t apic_register_t[4];
 
 typedef struct {
     uint32_t    signature;      // "_MP_"
@@ -234,7 +209,7 @@ typedef struct {
 static const efi_guid_t EFI_ACPI_1_RDSP_GUID = { 0xeb9d2d30, 0x2d88, 0x11d3, {0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d} };
 static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0xbc, 0x22, 0x00, 0x80, 0xc7, 0x3c, 0x88, 0x81} };
 
-static volatile apic_register_t *apic = NULL;
+static apic_register_t  *apic = NULL;
 
 static uint8_t          apic_id_to_cpu_num[MAX_APIC_IDS];
 
@@ -260,41 +235,17 @@ uintptr_t rsdp_addr = 0;
 
 static int my_apic_id(void)
 {
-    return (apic[APICR_ID][0]) >> 24;
+    return apic[APIC_REG_ID][0] >> 24;
 }
 
-static void apic_write(unsigned reg, uint32_t val)
+static void apic_write(int reg, uint32_t val)
 {
     apic[reg][0] = val;
 }
 
-static uint32_t apic_read(unsigned reg)
+static uint32_t apic_read(int reg)
 {
     return apic[reg][0];
-}
-
-static bool send_ipi(unsigned apic_id, unsigned trigger, unsigned level, unsigned mode, uint8_t vector)
-{
-    uint32_t v;
-
-    v = apic_read(APICR_ICRHI) & 0x00ffffff;
-    apic_write(APICR_ICRHI, v | (apic_id << 24));
-
-    v = apic_read(APICR_ICRLO) & ~0xcdfff;
-    v |= APIC_DEST_DEST << APIC_ICRLO_DEST_OFFSET;
-    v |= trigger        << APIC_ICRLO_TRIGGER_OFFSET;
-    v |= level          << APIC_ICRLO_LEVEL_OFFSET;
-    v |= mode           << APIC_ICRLO_DELMODE_OFFSET;
-    v |= vector;
-    apic_write(APICR_ICRLO, v);
-
-    for (int time = 0; time < 100; time++) {
-        usleep(1);
-        if (~apic_read(APICR_ICRLO) & APIC_ICRLO_STATUS_MASK) {
-            return true;
-        }
-    }
-    return false;
 }
 
 static int checksum(const void *data, int length)
@@ -611,30 +562,83 @@ static bool find_cpus_in_rsdp(void)
     return false;
 }
 
+static bool send_ipi(int apic_id, int trigger, int level, int mode, uint8_t vector, int delay_before_poll)
+{
+    apic_write(APIC_REG_ICRHI, apic_id << 24);
+
+    apic_write(APIC_REG_ICRLO, trigger << 15 | level << 14 | mode << 8 | vector);
+
+    usleep(delay_before_poll);
+
+    // Wait for send complete or timeout after 100ms.
+    int timeout = 1000;
+    while (timeout > 0) {
+        bool send_pending = (apic_read(APIC_REG_ICRLO) & 0x00001000);
+        if (!send_pending) {
+            return true;
+        }
+        usleep(100);
+        timeout--;
+    }
+    return false;
+}
+
+static uint32_t read_apic_esr(bool is_p5)
+{
+    if (!is_p5) {
+        apic_write(APIC_REG_ESR, 0);
+    }
+    return apic_read(APIC_REG_ESR);
+}
+
 static bool start_cpu(int cpu_num)
 {
-    // This implements the universal algorithm described in section B.4 of the Intel Multiprocessor specification.
+    // This is based on the method used in Linux 5.14. We don't support non-integrated APICs, so can simplify it a bit.
 
     int apic_id = cpu_num_to_apic_id[cpu_num];
 
-    // Pulse the INIT IPI.
-    apic_write(APICR_ESR, 0);
-    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 1, APIC_DELMODE_INIT, 0)) {
-        return false;
-    }
-    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 0, APIC_DELMODE_INIT, 0)) {
-        return false;
+    uint32_t apic_ver = apic_read(APIC_REG_VER);
+    uint32_t max_lvt = (apic_ver >> 16) & 0x7f;
+    bool is_p5 = (max_lvt == 3);
+
+    bool use_long_delays = true;
+    if ((cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.version.family == 6)      // Intel P6 or later
+    ||  (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family >= 15)) {  // AMD Hammer or later
+        use_long_delays = false;
     }
 
-    usleep(10000);
+    // Clear APIC errors.
+    (void)read_apic_esr(is_p5);
+
+    // Pulse the INIT IPI.
+    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 1, APIC_DELMODE_INIT, 0, 0)) {
+        return false;
+    }
+    if (use_long_delays) {
+        usleep(10*1000);  // 10ms
+    }
+    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 0, APIC_DELMODE_INIT, 0, 0)) {
+        return false;
+    }
 
     // Send two STARTUP_IPIs.
     for (int num_sipi = 0; num_sipi < 2; num_sipi++) {
-        apic_write(APICR_ESR, 0);
-        if (!send_ipi(apic_id, 0, 0, APIC_DELMODE_STARTUP, AP_TRAMPOLINE_PAGE)) {
+        // Clear APIC errors.
+        (void)read_apic_esr(is_p5);
+
+        // Send the STARTUP IPI.
+        if (!send_ipi(apic_id, 0, 0, APIC_DELMODE_STARTUP, AP_TRAMPOLINE_PAGE, use_long_delays ? 300 : 10)) {
             return false;
         }
-        usleep(200);
+
+        // Give the other CPU some time to accept the IPI.
+        usleep(use_long_delays ? 200 : 10);
+
+        // Check the IPI was accepted.
+        uint32_t status = read_apic_esr(is_p5) & 0xef;
+        if (status != 0) {
+            return false;
+        }
     }
 
     return true;
@@ -658,6 +662,7 @@ void smp_init(bool smp_enable)
 
     if (smp_enable) {
         (void)(find_cpus_in_rsdp() || find_cpus_in_floating_mp_struct());
+
     }
 
     for (int i = 0; i < num_available_cpus; i++) {
@@ -688,9 +693,23 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
                 return cpu_num;
             }
         }
+#if SEQUENTIAL_AP_START
+        int timeout = 10000;
+        while (timeout > 0) {
+            if (cpu_state[cpu_num] == CPU_STATE_RUNNING) break;
+            usleep(100);
+            timeout--;
+        }
+        if (cpu_state[cpu_num] != CPU_STATE_RUNNING) {
+            return cpu_num;
+        }
+#endif
     }
 
-    int timeout = 100000;
+#if SEQUENTIAL_AP_START
+    return 0;
+#else
+    int timeout = 10000;
     while (timeout > 0) {
         for (cpu_num = 1; cpu_num < num_available_cpus; cpu_num++) {
             if (cpu_state[cpu_num] == CPU_STATE_ENABLED) break;
@@ -698,10 +717,11 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
         if (cpu_num == num_available_cpus) {
             return 0;
         }
-        usleep(10);
+        usleep(100);
         timeout--;
     }
     return cpu_num;
+#endif
 }
 
 int smp_my_cpu_num(void)
