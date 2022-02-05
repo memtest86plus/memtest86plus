@@ -68,7 +68,6 @@ static uintptr_t            low_load_addr;
 static uintptr_t            high_load_addr;
 
 static barrier_t            *start_barrier = NULL;
-static spinlock_t           *start_mutex   = NULL;
 
 static volatile bool        start_run  = false;
 static volatile bool        start_pass = false;
@@ -246,7 +245,6 @@ static void global_init(void)
     start_barrier = smp_alloc_barrier(1);
     run_barrier   = smp_alloc_barrier(1);
 
-    start_mutex   = smp_alloc_mutex();
     error_mutex   = smp_alloc_mutex();
 
     start_run = true;
