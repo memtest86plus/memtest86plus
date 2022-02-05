@@ -422,10 +422,6 @@ void main(void)
         my_cpu = smp_my_cpu_num();
     }
     if (init_state < 2 && my_cpu > 0) {
-        if (cpu_state[my_cpu] == CPU_STATE_RUNNING) {
-            enable_trace = true;
-            trace(my_cpu, "started more than once");
-        }
         cpu_state[my_cpu] = CPU_STATE_RUNNING;
         while (init_state < 2) {
             usleep(10);
