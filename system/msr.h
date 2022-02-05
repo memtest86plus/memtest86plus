@@ -4,7 +4,7 @@
 /*
  * Provides access to the CPU machine-specific registers.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #define MSR_PLATFORM_INFO               0xce
@@ -12,6 +12,7 @@
 #define MSR_EBC_FREQUENCY_ID            0x2c
 
 #define MSR_IA32_PLATFORM_ID            0x17
+#define MSR_IA32_APIC_BASE              0x1b
 #define MSR_IA32_EBL_CR_POWERON         0x2a
 #define MSR_IA32_MCG_CTL                0x17b
 #define MSR_IA32_PERF_STATUS            0x198

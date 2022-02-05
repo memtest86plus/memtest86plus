@@ -21,6 +21,7 @@
 
 #include "cpuid.h"
 #include "memsize.h"
+#include "msr.h"
 #include "pmem.h"
 #include "string.h"
 #include "unistd.h"
@@ -57,6 +58,11 @@
 #define APIC_DELMODE_INIT           5
 #define APIC_DELMODE_STARTUP        6
 #define APIC_DELMODE_EXTINT         7
+
+// IA32_APIC_BASE MSR bits
+
+#define IA32_APIC_ENABLED           (1 << 11)
+#define IA32_APIC_EXTENDED          (1 << 10)
 
 // Table signatures
 
@@ -659,6 +665,15 @@ void smp_init(bool smp_enable)
     }
 
     num_available_cpus = 1;
+
+    if (cpuid_info.flags.x2apic) {
+        uint32_t msrl, msrh;
+        rdmsr(MSR_IA32_APIC_BASE, msrl, msrh);
+        if ((msrl & IA32_APIC_ENABLED) && (msrl & IA32_APIC_EXTENDED)) {
+            // We don't currently support x2APIC mode.
+            smp_enable = false;
+        }
+    }
 
     if (smp_enable) {
         (void)(find_cpus_in_rsdp() || find_cpus_in_floating_mp_struct());
