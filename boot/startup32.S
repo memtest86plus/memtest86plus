@@ -76,12 +76,14 @@ first_start:
 
 	.globl	startup
 startup:
-	# Use the startup stack until we pick the correct one. We
-	# need to take the mutex to protect our use of the stack.
+	# Some of the startup actions are not thread safe. Use a mutex
+	# to protect this section of code.
 
-	leal	(startup_stack_mutex - startup)(%edi), %eax
+	leal	(startup_mutex - startup)(%edi), %eax
 0: lock btsl	$0, (%eax)
 	jc	0b
+
+	# Use the startup stack until we pick the correct one.
 
 	leal	(startup_stack_top - startup)(%edi), %esp
 
@@ -106,10 +108,6 @@ startup:
 	addl	$BSP_STACK_SIZE, %eax
 	leal	_stacks@GOTOFF(%ebx), %esp
 	addl	%eax, %esp
-
-	# Release the mutex that protects the startup stack.
-
-	movl	$0, startup_stack_mutex@GOTOFF(%ebx)
 
 	# Initialise the GDT descriptor.
 
@@ -227,6 +225,10 @@ flush:	movw	$KERNEL_DS, %ax
 	movl	%eax, %cr0
 
 1:	movl	%edi, %ebx
+
+	# Release the startup mutex.
+
+	movl	$0, startup_mutex@GOTOFF(%ebx)
 
 	# Run the application.
 
@@ -563,7 +565,7 @@ ap_trampoline_end:
 boot_params_addr:
 	.long	0
 
-startup_stack_mutex:
+startup_mutex:
 	.long	0
 
 first_boot:

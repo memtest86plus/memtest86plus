@@ -142,11 +142,14 @@ efi_handover:
 
 	.globl	startup
 startup:
-	# Use the startup stack until we pick the correct one. We
-	# need to take a mutex to protect our use of the stack.
+	# Some of the startup actions are not thread safe. Use a mutex
+	# to protect this section of code.
 
-0: lock btsl	$0, startup_stack_mutex(%rip)
+0: lock btsl	$0, startup_mutex(%rip)
 	jc	0b
+
+	# Use the startup stack until we pick the correct one.
+
 	leaq	startup_stack_top(%rip), %rsp
 
 	# Pick the correct stack.
@@ -158,9 +161,6 @@ startup:
 	addq	$BSP_STACK_SIZE, %rax
 	leaq	_stacks(%rip), %rsp
 	addq	%rax, %rsp
-
-	# Release the mutex that protects the startup stack.
-	movl	$0, startup_stack_mutex(%rip)
 
 	# Initialise the pml4 and pdp tables.
 
@@ -266,6 +266,10 @@ flush:	movw	$KERNEL_DS, %ax
 	# Call the dynamic linker to fix up the addresses in the GOT.
 
 	call	reloc
+
+	# Release the startup mutex.
+
+	movl	$0, startup_mutex(%rip)
 
 	# Run the application.
 
@@ -599,7 +603,7 @@ ap_trampoline_end:
 boot_params_addr:
 	.quad	0
 
-startup_stack_mutex:
+startup_mutex:
 	.long	0
 
 first_boot:
