@@ -31,6 +31,8 @@
 #include "temperature.h"
 #include "vmem.h"
 
+#include "unistd.h"
+
 #include "badram.h"
 #include "config.h"
 #include "display.h"
@@ -424,7 +426,7 @@ void main(void)
     if (init_state < 2 && my_cpu > 0) {
         cpu_state[my_cpu] = CPU_STATE_RUNNING;
         while (init_state < 2) {
-            usleep(10);
+            usleep(100);
         }
     }
     BARRIER;
