@@ -429,7 +429,6 @@ void main(void)
             usleep(100);
         }
     }
-    BARRIER;
 
 #if TEST_INTERRUPT
     if (my_cpu == 0) {
@@ -559,7 +558,6 @@ void main(void)
                 reboot();
             }
             init_state = 2;
-            BARRIER;
             continue;
         }
 
