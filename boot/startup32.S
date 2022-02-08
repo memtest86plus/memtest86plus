@@ -20,6 +20,8 @@
 
 #include "boot.h"
 
+#define	INT64_CS	0x08
+
 #define NUM_INT_VEC	20
 
 	.text
@@ -31,7 +33,13 @@
 startup32:
 	cld
 	cli
-	jmp	first_start
+
+	# Jump to the shared 32-bit entry point with the boot params pointer
+	# in %esi and the startup address in %edi.
+
+	movl	0x214(%esi), %ebx	# bootparams.code32_start
+	leal	(startup - startup32)(%ebx), %edi
+	jmp	startup
 
 # The Linux 32-bit EFI handover point.
 
@@ -61,16 +69,12 @@ efi_handover:
 
 	call	efi_setup
 
-	# Fall though to the shared 32-bit entry point with the boot
-	# params pointer in %esi...
+	# Fall through to the shared 32-bit entry point with the boot params
+	# pointer in %esi and the startup address in %edi.
 
 	movl	%eax, %esi
-
-	# ...and with the startup address in %edi.
-
-first_start:
 	movl	0x214(%esi), %ebx	# bootparams.code32_start
-	leal	(startup - startup32)(%ebx), %edi
+	leal	(startup - startup32), %edi
 
 # The 32-bit entry point for AP boot and for restart after relocation.
 
@@ -93,13 +97,26 @@ startup:
 0:	popl	%ebx
 	addl	$_GLOBAL_OFFSET_TABLE_+[.-0b], %ebx
 
-	# Save the boot params pointer (if first boot).
+	# If first boot, save the boot params pointer...
 
 	cmpl	$1, first_boot@GOTOFF(%ebx)
 	jnz	1f
 	movl	%esi, boot_params_addr@GOTOFF(%ebx)
-1:
 
+	# ...and check if the processor supports long mode.
+
+	pushl	%ebx			# ebx is overwritten by cpuid
+	movl	$0x80000000, %eax	# check if function 0x80000001 is available
+	cpuid
+	cmpl	$0x80000001, %eax
+	jb	1f
+	movl	$0x80000001, %eax	# test the LM flag
+	cpuid
+	andl	$0x20000000, %edx
+	popl	%ebx			# restore ebx
+	jz	1f
+	movl	$1, use_long_mode@GOTOFF(%ebx)
+1:
 	# Pick the correct stack.
 
 	call	smp_my_cpu_num
@@ -128,24 +145,18 @@ flush:	movw	$KERNEL_DS, %ax
 	movw	%ax, %gs
 	movw	%ax, %ss
 
-	# Initialise the IDT.
+	# Initialise the IDT. If we are going to operate in long mode, we need
+	# a 64-bit IDT, otherwise we need a 32-bit IDT.
 
 	leal	idt@GOTOFF(%ebx), %edi
-	leal	vec0@GOTOFF(%ebx), %esi
-	movw	$NUM_INT_VEC, %cx
-0:	movl	%esi, %edx
-	movl	$(KERNEL_CS << 16), %eax
-	movw	%dx, %ax		# selector = 0x0010 = cs
-	movw	$0x8E00, %dx		# interrupt gate - dpl=0, present
-	movl	%eax, (%edi)
-	movl	%edx, 4(%edi)
-	addl	$(vec1-vec0), %esi
-	addl	$8, %edi
-	dec	%cx
-	jnz	0b
+	cmpl	$1, use_long_mode@GOTOFF(%ebx)
+	jz	init_idt64
+	jmp	init_idt32
 
 	# Initialise the IDT descriptor.
 
+init_idt_descr:
+	movw	%ax, idt_descr@GOTOFF(%ebx)
 	leal	idt@GOTOFF(%ebx), %eax
 	movl	%eax, 2 + idt_descr@GOTOFF(%ebx)
 
@@ -184,48 +195,39 @@ flush:	movw	$KERNEL_DS, %ax
 
 	# Enable PAE if supported.
 
-	movl	%ebx, %edi		# ebx is overwritten by cpuid
-
+	pushl	%ebx			# ebx is overwritten by cpuid
 	movl	$0x00000001, %eax	# test the PAE flag
 	cpuid
 	andl	$0x00000040, %edx
+	popl	%ebx			# restore ebx
 	jz	1f			# bail if not supported
 
 	movl	%cr4, %eax		# enable PAE
 	orl	$0x00000020, %eax
 	movl	%eax, %cr4
 
-	leal	pdp@GOTOFF(%edi), %eax	# set the page directory base address
+	leal	pdp@GOTOFF(%ebx), %eax	# set the page directory base address
 	movl	%eax, %cr3
 
 	# Enable long mode if supported.
 
-	movl	$0x80000000, %eax	# check if function 0x80000001 is available
-	cpuid
-	cmpl	$0x80000001, %eax
-	jb	0f			# bail if not supported
-
-	mov	$0x80000001, %eax	# test the LM flag
-	cpuid
-	andl	$0x20000000, %edx
-	jz	0f			# bail if not supported
+	cmpl	$1, use_long_mode@GOTOFF(%ebx)
+	jnz	0f
 
 	movl	$0xc0000080, %ecx	# enable long mode
 	rdmsr
 	orl	$0x00000100, %eax
 	wrmsr
 
-	leal	pml4@GOTOFF(%edi), %eax # set the page directory base address
+	leal	pml4@GOTOFF(%ebx), %eax # set the page directory base address
 	movl	%eax, %cr3
 
-	# Enable paging.
+	# Enable paging and protection.
 
 0:	movl	%cr0, %eax
-	orl	$0x80000000, %eax
+	orl	$0x80000001, %eax
 	movl	%eax, %cr0
-
-1:	movl	%edi, %ebx
-
+1:
 	# Release the startup mutex.
 
 	movl	$0, startup_mutex@GOTOFF(%ebx)
@@ -241,7 +243,7 @@ flush:	movw	$KERNEL_DS, %ax
 	call	0f
 0:	pushl	$0	# error code
 	pushl	$257	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
 # The EFI PE32 boot entry point.
 
@@ -258,113 +260,267 @@ efi_boot:
 
 	call	efi_handover		# never returns
 
-# Individual interrupt vector handlers. These need to be spaced equally, to
-# allow the IDT initialisation loop above to work, so we use noops to pad out
-# where required.
+# Initialise the 64-bit IDT.
 
-vec0:
+init_idt64:
+	leal	vec64_0@GOTOFF(%ebx), %esi
+	movw	$NUM_INT_VEC, %cx
+0:	movl	%esi, %edx
+	movl	$(INT64_CS << 16), %eax
+	movw	%dx, %ax		# selector = 0x0008 = long mode cs
+	movw	$0x8E00, %dx		# interrupt gate - dpl=0, present
+	movl	%eax, (%edi)
+	movl	%edx, 4(%edi)
+	addl	$(vec64_1-vec64_0), %esi
+	addl	$16, %edi
+	dec	%cx
+	jnz	0b
+
+	movw	$(NUM_INT_VEC*16 - 1), %ax
+	jmp	init_idt_descr
+
+# Initialise the 32-bit IDT.
+
+init_idt32:
+	leal	vec32_0@GOTOFF(%ebx), %esi
+	movw	$NUM_INT_VEC, %cx
+0:	movl	%esi, %edx
+	movl	$(KERNEL_CS << 16), %eax
+	movw	%dx, %ax		# selector = 0x0010 = cs
+	movw	$0x8E00, %dx		# interrupt gate - dpl=0, present
+	movl	%eax, (%edi)
+	movl	%edx, 4(%edi)
+	addl	$(vec32_1-vec32_0), %esi
+	addl	$8, %edi
+	dec	%cx
+	jnz	0b
+
+	movw	$(NUM_INT_VEC*8 - 1), %ax
+	jmp	init_idt_descr
+
+# Individual interrupt vector handlers for long mode. These need to be
+# spaced equally, to allow the IDT initialisation loop above to work,
+# so we use noops to pad out where required.
+
+	.code64
+
+vec64_0:
+	pushq	$0	# error code
+	pushq	$0	# vector
+	jmp	int_handler64
+
+vec64_1:
+	pushq	$0	# error code
+	pushq	$1	# vector
+	jmp	int_handler64
+
+vec64_2:
+	pushq	$0	# error code
+	pushq	$2	# vector
+	jmp	int_handler64
+
+vec64_3:
+	pushq	$0	# error code
+	pushq	$3	# vector
+	jmp	int_handler64
+
+vec64_4:
+	pushq	$0	# error code
+	pushq	$4	# vector
+	jmp	int_handler64
+
+vec64_5:
+	pushq	$0	# error code
+	pushq	$5	# vector
+	jmp	int_handler64
+
+vec64_6:
+	pushq	$0	# error code
+	pushq	$6	# vector
+	jmp	int_handler64
+
+vec64_7:
+	pushq	$0	# error code
+	pushq	$7	# vector
+	jmp	int_handler64
+
+vec64_8:
+	nop;nop 	# error code already provided
+	pushq	$8	# vector
+	jmp	int_handler64
+
+vec64_9:
+	pushq	$0	# error code
+	pushq	$9	# vector
+	jmp	int_handler64
+
+vec64_10:
+	nop;nop 	# error code already provided
+	pushq	$10	# vector
+	jmp	int_handler64
+
+vec64_11:
+	nop;nop 	# error code already provided
+	pushq	$11	# vector
+	jmp	int_handler64
+
+vec64_12:
+	nop;nop 	# error code already provided
+	pushq	$12	# vector
+	jmp	int_handler64
+
+vec64_13:
+	nop;nop 	# error code already provided
+	pushq	$13	# vector
+	jmp	int_handler64
+
+vec64_14:
+	nop;nop 	# error code already provided
+	pushq	$14	# vector
+	jmp	int_handler64
+
+vec64_15:
+	pushq	$0	# error code
+	pushq	$15	# vector
+	jmp	int_handler64
+
+vec64_16:
+	pushq	$0	# error code
+	pushq	$16	# vector
+	jmp	int_handler64
+
+vec64_17:
+	nop;nop 	# error code
+	pushq	$17	# vector
+	jmp	int_handler64
+
+vec64_18:
+	pushq	$0	# error code
+	pushq	$18	# vector
+	jmp	int_handler64
+
+vec64_19:
+	pushq	$0	# error code
+	pushq	$19	# vector
+	jmp	int_handler64
+
+# The common interrupt handler code for long mode. Pass the register state
+# to the application interrupt handler.
+
+int_handler64:
+	addq	$16, %rsp
+	iretq
+
+# Individual interrupt vector handlers for protected mode. These need to be
+# spaced equally, to allow the IDT initialisation loop above to work, so we
+# use noops to pad out where required.
+
+	.code32
+
+vec32_0:
 	pushl	$0	# error code
 	pushl	$0	# vector
-	jmp int_handler
-vec1:
+	jmp	int_handler32
+
+vec32_1:
 	pushl	$0	# error code
 	pushl	$1	# vector
-	jmp int_handler
+	jmp	int_handler32
 
-vec2:
+vec32_2:
 	pushl	$0	# error code
 	pushl	$2	# vector
-	jmp int_handler
+	jmp	int_handler32
 
-vec3:
+vec32_3:
 	pushl	$0	# error code
 	pushl	$3	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec4:
+vec32_4:
 	pushl	$0	# error code
 	pushl	$4	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec5:
+vec32_5:
 	pushl	$0	# error code
 	pushl	$5	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec6:
+vec32_6:
 	pushl	$0	# error code
 	pushl	$6	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec7:
+vec32_7:
 	pushl	$0	# error code
 	pushl	$7	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec8:
+vec32_8:
 	nop;nop 	# error code already provided
 	pushl	$8	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec9:
+vec32_9:
 	pushl	$0	# error code
 	pushl	$9	# vector
-	jmp int_handler
+	jmp	int_handler32
 
-vec10:
+vec32_10:
 	nop;nop 	# error code already provided
 	pushl	$10	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec11:
+vec32_11:
 	nop;nop 	# error code already provided
 	pushl	$11	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec12:
+vec32_12:
 	nop;nop 	# error code already provided
 	pushl	$12	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec13:
+vec32_13:
 	nop;nop 	# error code already provided
 	pushl	$13	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec14:
+vec32_14:
 	nop;nop 	# error code already provided
 	pushl	$14	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec15:
+vec32_15:
 	pushl	$0	# error code
 	pushl	$15	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec16:
+vec32_16:
 	pushl	$0	# error code
 	pushl	$16	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec17:
+vec32_17:
 	nop;nop 	# error code
 	pushl	$17	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec18:
+vec32_18:
 	pushl	$0	# error code
 	pushl	$18	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-vec19:
+vec32_19:
 	pushl	$0	# error code
 	pushl	$19	# vector
-	jmp	int_handler
+	jmp	int_handler32
 
-# The common interrupt handler code. Pass the register state to the
-# application interrupt handler.
+# The common interrupt handler code for protected mode. Pass the register
+# state to the application interrupt handler.
 
-int_handler:
+int_handler32:
 	pushl	%eax
 	pushl	%ebx
 	pushl	%ecx
@@ -393,20 +549,24 @@ int_handler:
 	addl	$8, %esp
 	iret
 
-# The interrupt descriptor table.
+# The interrupt descriptor table, used for both long mode and protected mode.
 
 	.align	4
 	.word	0			# for alignment
+	.globl	idt_descr
 idt_descr:
-	.word	idt_end - idt - 1	# size
-	.long	0			# addr: filled in at run time
+	.word	0			# size: filled in at run time
+	.quad	0			# addr: filled in at run time
 
+	.align	8
+	.globl	idt
 idt:
-	.fill	NUM_INT_VEC, 8, 0	# filled in at run time
+	.fill	2*NUM_INT_VEC, 8, 0	# filled in at run time
 idt_end:
 
 # The global descriptor table.
 
+	.align	4
 	.word	0			# for alignment
 gdt_descr:
 	.word	gdt_end - gdt - 1	# size
@@ -416,9 +576,9 @@ gdt_descr:
 	.globl	gdt
 gdt:
 	.quad	0x0000000000000000	# NULL descriptor
-	.quad	0x0000000000000000	# not used
-	.quad	0x00cf9b000000ffff	# 0x10 main 4gb code at 0x000000
-	.quad	0x00cf93000000ffff	# 0x18 main 4gb data at 0x000000
+	.quad	0x00209a0000000000	# 0x08 64-bit code at 0x000000
+	.quad	0x00cf9a000000ffff	# 0x10 main 4gb code at 0x000000
+	.quad	0x00cf92000000ffff	# 0x18 main 4gb data at 0x000000
 
 	.globl	gdt_end
 gdt_end:
@@ -537,7 +697,7 @@ ap_flush:
 	movw	%ax, %gs
 	movw	%ax, %ss
 
-	# Jump to the main entry point.
+	# Jump to the main entry point with the startup address in %edi.
 ap_jump:
 data32	ljmp	$KERNEL_CS, $0
 
@@ -570,6 +730,9 @@ startup_mutex:
 
 first_boot:
 	.long	1
+
+use_long_mode:
+	.long	0
 
 	.previous
 
