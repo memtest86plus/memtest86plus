@@ -214,11 +214,11 @@ flush:	movw	$KERNEL_DS, %ax
 	movl	$(KERNEL_CS << 16), %eax
 	movw	%dx, %ax		# selector = 0x0010 = cs
 	movw	$0x8E00, %dx		# interrupt gate - dpl=0, present
-	movl	%eax, (%edi)
-	movl	%edx, 4(%edi)
+	movl	%eax, (%rdi)
+	movl	%edx, 4(%rdi)
 	shrq	$32, %rdx
-	movl	%edx, 8(%edi)
-	movl	$0,  12(%edi)
+	movl	%edx, 8(%rdi)
+	movl	$0,  12(%rdi)
 	addq	$(vec1-vec0), %rsi
 	addq	$16, %rdi
 	dec	%cx
@@ -293,16 +293,17 @@ flush:	movw	$KERNEL_DS, %ax
 vec0:
 	pushq	$0	# error code
 	pushq	$0	# vector
-	jmp int_handler
+	jmp	int_handler
+
 vec1:
 	pushq	$0	# error code
 	pushq	$1	# vector
-	jmp int_handler
+	jmp	int_handler
 
 vec2:
 	pushq	$0	# error code
 	pushq	$2	# vector
-	jmp int_handler
+	jmp	int_handler
 
 vec3:
 	pushq	$0	# error code
@@ -337,7 +338,7 @@ vec8:
 vec9:
 	pushq	$0	# error code
 	pushq	$9	# vector
-	jmp int_handler
+	jmp	int_handler
 
 vec10:
 	nop;nop 	# error code already provided
@@ -402,7 +403,7 @@ int_handler:
 	pushq	%rbp
 
 	# original stack pointer
-	leaq	96(%rsp), %rax
+	leaq	104(%rsp), %rax
 	pushq	%rax
 	xorq	%rax, %rax
 	movw	%ds, %ax
