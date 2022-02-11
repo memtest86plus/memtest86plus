@@ -390,40 +390,47 @@ vec19:
 	pushq	$19	# vector
 	jmp	int_handler
 
-# The common interrupt handler code. Pass the register state to the
-# application interrupt handler.
+# The common interrupt handler code. Pass the register state to the application
+# interrupt handler. On entry this expects the stack to contain:
+#
+#	rsp+30	ss
+#	rsp+28	rsp
+#	rsp+20	rflags
+#	rsp+18	cs
+#	rsp+10	rip
+#	rsp+08	error code
+#	rsp+00	vector number
+#
+# It adds the additional state expected by the application to the bottom of the
+# stack frame.
 
 int_handler:
-	pushq	%rax
-	pushq	%rbx
-	pushq	%rcx
-	pushq	%rdx
-	pushq	%rdi
-	pushq	%rsi
 	pushq	%rbp
-
-	# original stack pointer
-	leaq	104(%rsp), %rax
+	pushq	%rsi
+	pushq	%rdi
+	pushq	%rdx
+	pushq	%rcx
+	pushq	%rbx
 	pushq	%rax
 	xorq	%rax, %rax
-	movw	%ds, %ax
+	movw	%ss, %ax
 	pushq	%rax
 	movw	%es, %ax
 	pushq	%rax
-	movw	%ss, %ax
+	movw	%ds, %ax
 	pushq	%rax
-	movq	%rsp, %rdi # pointer to trap regs struct on the stack
+	movq	%rsp, %rdi		# pointer to trap regs struct on the stack
+	cld
 	call	interrupt
-	addq	$32, %rsp
-
-	popq	%rbp
-	popq	%rsi
-	popq	%rdi
-	popq	%rdx
-	popq	%rcx
-	popq	%rbx
+	addq	$24, %rsp
 	popq	%rax
-	addq	$16, %rsp
+	popq	%rbx
+	popq	%rcx
+	popq	%rdx
+	popq	%rdi
+	popq	%rsi
+	popq	%rbp
+	addq	$16, %rsp		# discard the vector number and error code
 	iretq
 
 # The interrupt descriptor table.

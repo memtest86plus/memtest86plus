@@ -68,22 +68,29 @@ typedef uint32_t    reg_t;
 #endif
 
 struct trap_regs {
-    reg_t   ss;
-    reg_t   es;
     reg_t   ds;
-    reg_t   sp;
-    reg_t   bp;
-    reg_t   si;
-    reg_t   di;
-    reg_t   dx;
-    reg_t   cx;
-    reg_t   bx;
+    reg_t   es;
+    reg_t   ss;
     reg_t   ax;
+    reg_t   bx;
+    reg_t   cx;
+    reg_t   dx;
+    reg_t   di;
+    reg_t   si;
+#ifndef __x86_64__
+    reg_t   reserved1;
+    reg_t   reserved2;
+    reg_t   sp;
+#endif
+    reg_t   bp;
     reg_t   vect;
     reg_t   code;
     reg_t   ip;
     reg_t   cs;
     reg_t   flags;
+#ifdef __x86_64__
+    reg_t   sp;
+#endif
 };
 
 //------------------------------------------------------------------------------

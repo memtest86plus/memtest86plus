@@ -404,11 +404,42 @@ vec64_19:
 	pushq	$19	# vector
 	jmp	int_handler64
 
-# The common interrupt handler code for long mode. Pass the register state
-# to the application interrupt handler.
+# The interrupt handler code for long mode. Pass the register state to the
+# common interrupt handler. On entry this expects the stack to contain:
+#
+#	rsp+30	ss
+#	rsp+28	rsp
+#	rsp+20	rflags
+#	rsp+18	cs
+#	rsp+10	rip
+#	rsp+08	error code
+#	rsp+00	vector number
+#
+# We create a new stack frame in the format expected by int_handler. We can
+# reuse the space currently occupied by the vector number and the error code,
+# as they are not needed on return.
 
 int_handler64:
-	addq	$16, %rsp
+	subq	$16, %rsp
+	movl	%ebp, 0x04(%rsp)	# save the state of ebp
+	leal	0x48(%rsp), %ebp	# save the state of esp before the interrupt
+	movl	%ebp, 0x00(%rsp)
+	movl	0x10(%rsp), %ebp	# save the vector number
+	movl	%ebp, 0x08(%rsp)
+	movl	0x18(%rsp), %ebp	# save the error code
+	movl	%ebp, 0x0c(%rsp)
+	movl	0x20(%rsp), %ebp	# save the state of eip
+	movl	%ebp, 0x10(%rsp)
+	movl	0x28(%rsp), %ebp	# save the state of cs
+	movl	%ebp, 0x14(%rsp)
+	movl	0x30(%rsp), %ebp	# save the state of eflags
+	movl	%ebp, 0x18(%rsp)
+	leal	int_handler(%rip), %ebp
+	movw	$KERNEL_CS, -2(%rsp)
+	movl	%ebp, -6(%rsp)
+	lcall	*-6(%rsp)
+	movl	0x04(%rsp), %ebp	# restore the saved state of ebp
+	addq	$32, %rsp		# discard the stack frame we created
 	iretq
 
 # Individual interrupt vector handlers for protected mode. These need to be
@@ -517,37 +548,66 @@ vec32_19:
 	pushl	$19	# vector
 	jmp	int_handler32
 
-# The common interrupt handler code for protected mode. Pass the register
-# state to the application interrupt handler.
+# The interrupt handler code for protected mode. Pass the register state to
+# the common interrupt handler. On entry this expects the stack to contain:
+#
+#	esp+10	eflags
+#	esp+0c	cs
+#	esp+08	eip
+#	esp+04	error code
+#	esp+00	vector number
+#
+# It adds the additional state expected by int_handler to the bottom of the
+# stack frame.
 
 int_handler32:
-	pushl	%eax
-	pushl	%ebx
-	pushl	%ecx
-	pushl	%edx
-	pushl	%edi
-	pushl	%esi
+	pushl	%ebp		# save the state of ebp
+	leal	24(%esp), %ebp	# save the state of esp before the interrupt
 	pushl	%ebp
-
-	# original stack pointer
-	leal	48(%esp), %eax
-	pushl	%eax
-	pushl	%ds
-	pushl	%es
-	pushl	%ss
-	pushl	%esp # pointer to trap regs struct on the stack
-	call	interrupt
-	addl	$20, %esp
-
-	popl	%ebp
-	popl	%esi
-	popl	%edi
-	popl	%edx
-	popl	%ecx
-	popl	%ebx
-	popl	%eax
-	addl	$8, %esp
+	leal	int_handler@GOTOFF(%ebx), %ebp
+	movw	$KERNEL_CS, -2(%esp)
+	movl	%ebp, -6(%esp)
+	lcall	*-6(%esp)
+	popl	%ebp		# discard the saved state of esp
+	popl	%ebp		# restore the saved state of ebp
+	addl	$8, %esp	# discard the vector number and error code
 	iret
+
+# The common interrupt handler code. Pass the register state to the application
+# interrupt handler. On entry this expects the stack to contain:
+#
+#	esp+18	eflags
+#	esp+14	cs
+#	esp+10	eip
+#	esp+0c	error code
+#	esp+08	vector number
+#	esp+04	ebp
+#	esp+00	esp
+#
+# It adds the additional state expected by the application to the bottom of the
+# stack frame.
+
+int_handler:
+	pushl	%esi
+	pushl	%edi
+	pushl	%edx
+	pushl	%ecx
+	pushl	%ebx
+	pushl	%eax
+	pushl	%ss
+	pushl	%es
+	pushl	%ds
+	pushl	%esp		# pointer to trap regs struct on the stack
+	cld
+	call	interrupt
+	addl	$16, %esp
+	popl	%eax
+	popl	%ebx
+	popl	%ecx
+	popl	%edx
+	popl	%edi
+	popl	%esi
+	lret
 
 # The interrupt descriptor table, used for both long mode and protected mode.
 
