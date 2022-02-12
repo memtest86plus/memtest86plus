@@ -20,6 +20,7 @@
 #include "efi.h"
 
 #include "cpuid.h"
+#include "memrw32.h"
 #include "memsize.h"
 #include "msr.h"
 #include "pmem.h"
@@ -241,17 +242,17 @@ uintptr_t rsdp_addr = 0;
 
 static int my_apic_id(void)
 {
-    return apic[APIC_REG_ID][0] >> 24;
+    return read32(&apic[APIC_REG_ID][0]) >> 24;
 }
 
 static void apic_write(int reg, uint32_t val)
 {
-    apic[reg][0] = val;
+    write32(&apic[reg][0], val);
 }
 
 static uint32_t apic_read(int reg)
 {
-    return apic[reg][0];
+    return read32(&apic[reg][0]);
 }
 
 static int checksum(const void *data, int length)
