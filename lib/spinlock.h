@@ -22,7 +22,6 @@ static inline void spin_wait(spinlock_t *lock)
     if (lock) {
         while (*lock) {
             __builtin_ia32_pause();
-            for (volatile int i = 0; i < 100; i++) { }  // this reduces power consumption
         }
     }
 }
@@ -36,7 +35,6 @@ static inline void spin_lock(spinlock_t *lock)
         while (!__sync_bool_compare_and_swap(lock, false, true)) {
             do {
                 __builtin_ia32_pause();
-                for (volatile int i = 0; i < 100; i++) { }  // this reduces power consumption
             } while (*lock);
         }
         __sync_synchronize();
