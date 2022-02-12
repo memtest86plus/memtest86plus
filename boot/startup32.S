@@ -100,7 +100,7 @@ startup:
 	# If first boot, save the boot params pointer...
 
 	cmpl	$1, first_boot@GOTOFF(%ebx)
-	jnz	1f
+	jne	1f
 	movl	%esi, boot_params_addr@GOTOFF(%ebx)
 
 	# ...and check if the processor supports long mode.
@@ -150,7 +150,7 @@ flush:	movw	$KERNEL_DS, %ax
 
 	leal	idt@GOTOFF(%ebx), %edi
 	cmpl	$1, use_long_mode@GOTOFF(%ebx)
-	jz	init_idt64
+	je	init_idt64
 	jmp	init_idt32
 
 	# Initialise the IDT descriptor.
@@ -167,7 +167,7 @@ init_idt_descr:
 	# Zero the BSS (if first boot).
 
 	cmpl	$1, first_boot@GOTOFF(%ebx)
-	jnz	1f
+	jne	1f
 	xorl	%eax, %eax
 	leal	_bss@GOTOFF(%ebx), %edi
 	leal	_end@GOTOFF(%ebx), %ecx
@@ -212,7 +212,7 @@ init_idt_descr:
 	# Enable long mode if supported.
 
 	cmpl	$1, use_long_mode@GOTOFF(%ebx)
-	jnz	0f
+	jne	0f
 
 	movl	$0xc0000080, %ecx	# enable long mode
 	rdmsr

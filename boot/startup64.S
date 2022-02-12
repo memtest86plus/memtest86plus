@@ -236,7 +236,7 @@ flush:	movw	$KERNEL_DS, %ax
 	# Zero the BSS (if first boot).
 
 	cmpl	$1, first_boot(%rip)
-	jnz	1f
+	jne	1f
 	xorq	%rax, %rax
 	leaq	_bss(%rip), %rdi
 	leaq	_end(%rip), %rcx
