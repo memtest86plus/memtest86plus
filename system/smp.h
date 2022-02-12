@@ -26,7 +26,8 @@
 typedef enum  __attribute__ ((packed)) {
     CPU_STATE_DISABLED  = 0,
     CPU_STATE_ENABLED   = 1,
-    CPU_STATE_RUNNING   = 2
+    CPU_STATE_RUNNING   = 2,
+    CPU_STATE_HALTED    = 3
 } cpu_state_t;
 
 /*
@@ -54,6 +55,12 @@ void smp_init(bool smp_enable);
  * or the index number of the lowest-numbered AP that failed to start.
  */
 int smp_start(cpu_state_t cpu_state[MAX_CPUS]);
+
+/*
+ * Sends a non-maskable interrupt to the CPU core whose ordinal number
+ * is cpu_num.
+ */
+bool smp_send_nmi(int cpu_num);
 
 /*
  * Returns the ordinal number of the calling CPU core.

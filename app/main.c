@@ -71,6 +71,8 @@ static uintptr_t            high_load_addr;
 
 static barrier_t            *start_barrier = NULL;
 
+static spinlock_t           *halt_mutex = NULL;
+
 static volatile bool        start_run  = false;
 static volatile bool        start_pass = false;
 static volatile bool        start_test = false;
@@ -81,6 +83,8 @@ static volatile bool        dummy_run  = false;
 static volatile int         window_num   = 0;
 static volatile uintptr_t   window_start = 0;
 static volatile uintptr_t   window_end   = 0;
+
+static volatile bool        halt_if_inactive = false;
 
 static volatile int         test_stage = 0;
 
@@ -247,6 +251,7 @@ static void global_init(void)
     start_barrier = smp_alloc_barrier(1);
     run_barrier   = smp_alloc_barrier(1);
 
+    halt_mutex    = smp_alloc_mutex();
     error_mutex   = smp_alloc_mutex();
 
     start_run = true;
@@ -254,7 +259,7 @@ static void global_init(void)
     restart = false;
 }
 
-static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
+static size_t setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 {
     vm_map_size = 0;
 
@@ -266,11 +271,12 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
         win_end = pm_limit_upper;
     }
     if (win_start >= win_end) {
-        return;
+        return 0;
     }
 
     // Now initialise the virtual memory map with the intersection
     // of the window and the physical memory segments.
+    size_t num_mapped_pages = 0;
     for (int i = 0; i < pm_map_size; i++) {
         uintptr_t seg_start = pm_map[i].start;
         uintptr_t seg_end   = pm_map[i].end;
@@ -281,12 +287,14 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
             seg_end = win_end;
         }
         if (seg_start < seg_end && seg_start < win_end && seg_end > win_start) {
+            num_mapped_pages += seg_end - seg_start;
             vm_map[vm_map_size].pm_base_addr = seg_start;
             vm_map[vm_map_size].start        = first_word_mapping(seg_start);
             vm_map[vm_map_size].end          = last_word_mapping(seg_end - 1, sizeof(testword_t));
             vm_map_size++;
         }
     }
+    return num_mapped_pages;
 }
 
 static void test_all_windows(int my_cpu)
@@ -365,11 +373,24 @@ static void test_all_windows(int my_cpu)
                 window_start = window_end;
                 window_end  += VM_WINDOW_SIZE;
             }
-            setup_vm_map(window_start, window_end);
+            size_t num_mapped_pages = setup_vm_map(window_start, window_end);
+            // There is a significant overhead in restarting halted CPU cores, so only enable
+            // halting if the memory present in the window is a reasonable size.
+            halt_if_inactive = enable_halt && num_enabled_cpus > num_active_cpus && num_mapped_pages > PAGE_C(16,MB);
         }
         BARRIER;
 
         if (!i_am_active) {
+            // Guard against a race between halting and being woken up.
+            spin_lock(halt_mutex);
+            if (halt_if_inactive) {
+                cpu_state[my_cpu] = CPU_STATE_HALTED;
+                spin_unlock(halt_mutex);
+                __asm__ __volatile__ ("hlt");
+                cpu_state[my_cpu] = CPU_STATE_RUNNING;
+            } else {
+                spin_unlock(halt_mutex);
+            }
             continue;
         }
 
@@ -394,6 +415,16 @@ static void test_all_windows(int my_cpu)
         }
 
         if (i_am_master) {
+            if (!dummy_run && halt_if_inactive) {
+                spin_lock(halt_mutex);
+                halt_if_inactive = false;
+                spin_unlock(halt_mutex);
+                for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+                    if (cpu_state[cpu_num] == CPU_STATE_HALTED) {
+                        smp_send_nmi(cpu_num);
+                    }
+                }
+            }
             window_num++;
         }
     } while (window_end < pm_map[pm_map_size - 1].end);

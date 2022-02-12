@@ -91,6 +91,7 @@ cpu_state_t     cpu_state[MAX_CPUS];
 
 bool            enable_temperature = false;
 bool            enable_trace       = false;
+bool            enable_halt        = true;
 
 bool            pause_at_start     = true;
 
@@ -113,6 +114,8 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
+    } else if (strncmp(option, "nohalt", 7) == 0) {
+        enable_halt = false;
     } else if (strncmp(option, "smp", 4) == 0) {
         smp_enabled = true;
     }

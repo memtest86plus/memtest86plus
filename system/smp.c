@@ -740,6 +740,11 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 #endif
 }
 
+bool smp_send_nmi(int cpu_num)
+{
+    return send_ipi(cpu_num_to_apic_id[cpu_num], 0, 0, APIC_DELMODE_NMI, 0, 200);
+}
+
 int smp_my_cpu_num(void)
 {
     return num_available_cpus > 1 ? apic_id_to_cpu_num[my_apic_id()] : 0;

@@ -38,6 +38,7 @@ extern cpu_state_t  cpu_state[MAX_CPUS];
 
 extern bool         enable_temperature;
 extern bool         enable_trace;
+extern bool         enable_halt;
 
 extern bool         pause_at_start;
 

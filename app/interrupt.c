@@ -24,6 +24,8 @@
 // Constants
 //------------------------------------------------------------------------------
 
+#define HLT_OPCODE  0xf4
+
 #ifdef __x86_64__
 #define REG_PREFIX  'r'
 #define REG_DIGITS  16
@@ -115,12 +117,17 @@ void interrupt(struct trap_regs *trap_regs)
 #endif
     }
 
-#if REPORT_PARITY_ERRORS
     if (trap_regs->vect == 2) {
+        uint8_t *pc = (uint8_t *)trap_regs->ip;
+        if (pc[-1] == HLT_OPCODE) {
+            // Assume this is a wakeup signal sent via IPI.
+            return;
+        }
+#if REPORT_PARITY_ERRORS
         parity_error();
         return;
-    }
 #endif
+    }
 
     spin_lock(error_mutex);
 
