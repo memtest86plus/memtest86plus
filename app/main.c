@@ -120,10 +120,12 @@ volatile uintptr_t  test_addr[MAX_CPUS];
 //------------------------------------------------------------------------------
 
 #define BARRIER \
-    if (TRACE_BARRIERS) { \
-        trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
-    } \
-    barrier_wait(start_barrier);
+    if (!dummy_run) { \
+        if (TRACE_BARRIERS) { \
+            trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
+        } \
+        barrier_wait(start_barrier); \
+    }
 
 static void run_at(uintptr_t addr, int my_cpu)
 {
@@ -580,15 +582,17 @@ void main(void)
         if (dummy_run && pass_num == NUM_PASS_TYPES) {
             start_run = true;
             dummy_run = false;
-            barrier_init(start_barrier, num_enabled_cpus);
-            int failed = smp_start(cpu_state);
-            if (failed) {
-                const char *message = "Failed to start CPU core %i. Press any key to reboot...";
-                display_notice_with_args(strlen(message), message, failed);
-                while (get_key() == 0) { }
-                reboot();
+            if (init_state < 2) {
+                barrier_init(start_barrier, num_enabled_cpus);
+                int failed = smp_start(cpu_state);
+                if (failed) {
+                    const char *message = "Failed to start CPU core %i. Press any key to reboot...";
+                    display_notice_with_args(strlen(message), message, failed);
+                    while (get_key() == 0) { }
+                    reboot();
+                }
+                init_state = 2;
             }
-            init_state = 2;
             continue;
         }
 
