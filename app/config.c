@@ -708,6 +708,7 @@ void config_menu(bool initial)
                     cpu_selection_menu();
                 }
             } else {
+                exit_menu = true;
                 bail = true;
             }
             break;
