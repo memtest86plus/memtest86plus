@@ -710,7 +710,7 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
             }
         }
 #if SEQUENTIAL_AP_START
-        int timeout = 10000;
+        int timeout = 10*1000*10;
         while (timeout > 0) {
             if (cpu_state[cpu_num] == CPU_STATE_RUNNING) break;
             usleep(100);
@@ -725,7 +725,7 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 #if SEQUENTIAL_AP_START
     return 0;
 #else
-    int timeout = 10000;
+    int timeout = 10*1000*10;
     while (timeout > 0) {
         for (cpu_num = 1; cpu_num < num_available_cpus; cpu_num++) {
             if (cpu_state[cpu_num] == CPU_STATE_ENABLED) break;
