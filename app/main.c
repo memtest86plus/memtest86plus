@@ -361,7 +361,7 @@ static void test_all_windows(int my_cpu)
         }
 
         if (i_am_master) {
-            trace(my_cpu, "start window %i", window_num);
+            //trace(my_cpu, "start window %i", window_num);
             switch (window_num) {
               case 0:
                 window_start = 0;
@@ -457,6 +457,7 @@ void main(void)
         my_cpu = smp_my_cpu_num();
     }
     if (init_state < 2 && my_cpu > 0) {
+        trace(my_cpu, "AP started");
         cpu_state[my_cpu] = CPU_STATE_RUNNING;
         while (init_state < 2) {
             usleep(100);
@@ -583,6 +584,10 @@ void main(void)
             start_run = true;
             dummy_run = false;
             if (init_state < 2) {
+                if (enable_trace && num_available_cpus > 1) {
+                    set_scroll_lock(false);
+                    trace(0, "starting other CPUs");
+                }
                 barrier_init(start_barrier, num_enabled_cpus);
                 int failed = smp_start(cpu_state);
                 if (failed) {
@@ -590,6 +595,10 @@ void main(void)
                     display_notice_with_args(strlen(message), message, failed);
                     while (get_key() == 0) { }
                     reboot();
+                }
+                if (enable_trace && num_available_cpus > 1) {
+                    trace(0, "all other CPUs started");
+                    set_scroll_lock(true);
                 }
                 init_state = 2;
             }
