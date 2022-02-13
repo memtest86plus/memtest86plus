@@ -487,7 +487,7 @@ static void set_e820_map(boot_params_t *params)
     for (size_t i = 0; i < num_descs && num_entries < E820_MAP_SIZE; i++) {
         efi_memory_desc_t *mem_desc = get_memory_desc(mem_map_addr, mem_desc_size, i);
 
-        e820_type_t e820_type = E820_NONE;
+        e820_type_t e820_type = E820_RESERVED;
         switch (mem_desc->type) {
           case EFI_ACPI_RECLAIM_MEMORY:
             e820_type = E820_ACPI;
