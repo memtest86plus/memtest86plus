@@ -107,9 +107,9 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     switch (test) {
         // Address test, walking ones.
       case 0:
-        cache_off();
+        if (my_cpu >= 0) cache_off();
         ticks += test_addr_walk1(my_cpu);
-        cache_on();
+        if (my_cpu >= 0) cache_on();
         BAILOUT;
         break;
 
