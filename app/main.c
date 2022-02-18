@@ -118,12 +118,10 @@ volatile uintptr_t  test_addr[MAX_CPUS];
 //------------------------------------------------------------------------------
 
 #define BARRIER \
-    if (!dummy_run) { \
-        if (TRACE_BARRIERS) { \
-            trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
-        } \
-        barrier_wait(start_barrier); \
-    }
+    if (TRACE_BARRIERS) { \
+        trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
+    } \
+    barrier_wait(start_barrier);
 
 static void run_at(uintptr_t addr, int my_cpu)
 {
@@ -299,7 +297,7 @@ static size_t setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 static void test_all_windows(int my_cpu)
 {
     bool parallel_test = false;
-    bool i_am_master = (my_cpu == master_cpu) || dummy_run;
+    bool i_am_master = (my_cpu == master_cpu);
     bool i_am_active = i_am_master;
     if (!dummy_run) {
         if (cpu_mode == PAR && test_list[test_num].cpu_mode == PAR) {
@@ -455,16 +453,36 @@ void main(void)
     if (init_state == 0) {
         // If this is the first time here, we must be CPU 0, as the APs haven't been started yet.
         my_cpu = 0;
-        global_init();
-        init_state = 1;
     } else {
         my_cpu = smp_my_cpu_num();
     }
-    if (init_state < 2 && my_cpu > 0) {
-        trace(my_cpu, "AP started");
-        cpu_state[my_cpu] = CPU_STATE_RUNNING;
-        while (init_state < 2) {
-            usleep(100);
+    if (init_state < 2) {
+        if (my_cpu == 0) {
+            global_init();
+            init_state = 1;
+            if (enable_trace && num_enabled_cpus > 1) {
+                set_scroll_lock(false);
+                trace(0, "starting other CPUs");
+            }
+            barrier_init(start_barrier, num_enabled_cpus);
+            int failed = smp_start(cpu_state);
+            if (failed) {
+                const char *message = "Failed to start CPU core %i. Press any key to reboot...";
+                display_notice_with_args(strlen(message), message, failed);
+                while (get_key() == 0) { }
+                reboot();
+            }
+            if (enable_trace && num_enabled_cpus > 1) {
+                trace(0, "all other CPUs started");
+                set_scroll_lock(true);
+            }
+            init_state = 2;
+        } else {
+            trace(my_cpu, "AP started");
+            cpu_state[my_cpu] = CPU_STATE_RUNNING;
+            while (init_state < 2) {
+                usleep(100);
+            }
         }
     }
 
@@ -587,25 +605,6 @@ void main(void)
         if (dummy_run && pass_num == NUM_PASS_TYPES) {
             start_run = true;
             dummy_run = false;
-            if (init_state < 2) {
-                if (enable_trace && num_available_cpus > 1) {
-                    set_scroll_lock(false);
-                    trace(0, "starting other CPUs");
-                }
-                barrier_init(start_barrier, num_enabled_cpus);
-                int failed = smp_start(cpu_state);
-                if (failed) {
-                    const char *message = "Failed to start CPU core %i. Press any key to reboot...";
-                    display_notice_with_args(strlen(message), message, failed);
-                    while (get_key() == 0) { }
-                    reboot();
-                }
-                if (enable_trace && num_available_cpus > 1) {
-                    trace(0, "all other CPUs started");
-                    set_scroll_lock(true);
-                }
-                init_state = 2;
-            }
             continue;
         }
 
