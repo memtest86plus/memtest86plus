@@ -71,8 +71,6 @@ static uintptr_t            high_load_addr;
 
 static barrier_t            *start_barrier = NULL;
 
-static spinlock_t           *halt_mutex = NULL;
-
 static volatile bool        start_run  = false;
 static volatile bool        start_pass = false;
 static volatile bool        start_test = false;
@@ -253,7 +251,6 @@ static void global_init(void)
     start_barrier = smp_alloc_barrier(1);
     run_barrier   = smp_alloc_barrier(1);
 
-    halt_mutex    = smp_alloc_mutex();
     error_mutex   = smp_alloc_mutex();
 
     start_run = true;
@@ -383,15 +380,9 @@ static void test_all_windows(int my_cpu)
         BARRIER;
 
         if (!i_am_active) {
-            // Guard against a race between halting and being woken up.
-            spin_lock(halt_mutex);
-            if (halt_if_inactive) {
+            if (!dummy_run && halt_if_inactive) {
                 cpu_state[my_cpu] = CPU_STATE_HALTED;
-                spin_unlock(halt_mutex);
                 __asm__ __volatile__ ("hlt");
-                cpu_state[my_cpu] = CPU_STATE_RUNNING;
-            } else {
-                spin_unlock(halt_mutex);
             }
             continue;
         }
@@ -418,13 +409,26 @@ static void test_all_windows(int my_cpu)
 
         if (i_am_master) {
             if (!dummy_run && halt_if_inactive) {
-                spin_lock(halt_mutex);
-                halt_if_inactive = false;
-                spin_unlock(halt_mutex);
-                for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+                int cpu_num = 0;
+                int retries = 0;
+                while (cpu_num < num_available_cpus) {
+                    if (cpu_num == my_cpu) {
+                        cpu_num++;
+                        continue;
+                    }
+                    if (cpu_state[cpu_num] == CPU_STATE_ENABLED) {
+                        // This catches a potential race between the inactive CPU halting and the master CPU waking
+                        // it up. This should be an unlikely event, so just spin until the inactive CPU catches up.
+                        usleep(10);
+                        if (++retries < 1000) {
+                            continue;
+                        }
+                    }
                     if (cpu_state[cpu_num] == CPU_STATE_HALTED) {
                         smp_send_nmi(cpu_num);
                     }
+                    retries = 0;
+                    cpu_num++;
                 }
             }
             window_num++;
