@@ -82,7 +82,7 @@ static volatile int         window_num   = 0;
 static volatile uintptr_t   window_start = 0;
 static volatile uintptr_t   window_end   = 0;
 
-static volatile bool        halt_if_inactive = false;
+static volatile size_t      num_mapped_pages = 0;
 
 static volatile int         test_stage = 0;
 
@@ -256,9 +256,11 @@ static void global_init(void)
     restart = false;
 }
 
-static size_t setup_vm_map(uintptr_t win_start, uintptr_t win_end)
+static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 {
     vm_map_size = 0;
+
+    num_mapped_pages = 0;
 
     // Reduce the window to fit in the user-specified limits.
     if (win_start < pm_limit_lower) {
@@ -268,12 +270,11 @@ static size_t setup_vm_map(uintptr_t win_start, uintptr_t win_end)
         win_end = pm_limit_upper;
     }
     if (win_start >= win_end) {
-        return 0;
+        return;
     }
 
     // Now initialise the virtual memory map with the intersection
     // of the window and the physical memory segments.
-    size_t num_mapped_pages = 0;
     for (int i = 0; i < pm_map_size; i++) {
         uintptr_t seg_start = pm_map[i].start;
         uintptr_t seg_end   = pm_map[i].end;
@@ -291,7 +292,6 @@ static size_t setup_vm_map(uintptr_t win_start, uintptr_t win_end)
             vm_map_size++;
         }
     }
-    return num_mapped_pages;
 }
 
 static void test_all_windows(int my_cpu)
@@ -370,13 +370,13 @@ static void test_all_windows(int my_cpu)
                 window_start = window_end;
                 window_end  += VM_WINDOW_SIZE;
             }
-            size_t num_mapped_pages = setup_vm_map(window_start, window_end);
-            // There is a significant overhead in restarting halted CPU cores, so only enable
-            // halting if the memory present in the window is a reasonable size.
-            halt_if_inactive = enable_halt && num_enabled_cpus > num_active_cpus && num_mapped_pages > PAGE_C(16,MB);
+            setup_vm_map(window_start, window_end);
         }
         BARRIER;
 
+        // There is a significant overhead in restarting halted CPU cores, so only enable
+        // halting if the memory present in the window is a reasonable size.
+        bool halt_if_inactive = enable_halt && num_enabled_cpus > num_active_cpus && num_mapped_pages > PAGE_C(16,MB);
         if (!i_am_active) {
             if (!dummy_run && halt_if_inactive) {
                 cpu_state[my_cpu] = CPU_STATE_HALTED;
@@ -385,7 +385,7 @@ static void test_all_windows(int my_cpu)
             continue;
         }
 
-        if (vm_map_size == 0) {
+        if (num_mapped_pages == 0) {
             // No memory to test in this window.
             if (i_am_master) {
                 window_num++;
