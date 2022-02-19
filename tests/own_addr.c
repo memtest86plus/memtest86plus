@@ -40,8 +40,8 @@ static int pattern_fill(int my_cpu, testword_t offset)
         testword_t *start = vm_map[i].start;
         testword_t *end   = vm_map[i].end;
 
-        volatile testword_t *p  = start;
-        volatile testword_t *pe = start;
+        testword_t *p  = start;
+        testword_t *pe = start;
 
         bool at_end = false;
         do {
@@ -79,8 +79,8 @@ static int pattern_check(int my_cpu, testword_t offset)
         testword_t *start = vm_map[i].start;
         testword_t *end   = vm_map[i].end;
 
-        volatile testword_t *p  = start;
-        volatile testword_t *pe = start;
+        testword_t *p  = start;
+        testword_t *pe = start;
 
         bool at_end = false;
         do {

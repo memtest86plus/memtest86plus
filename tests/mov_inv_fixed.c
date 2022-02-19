@@ -42,8 +42,8 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
 
-        volatile testword_t *p  = start;
-        volatile testword_t *pe = start;
+        testword_t *p  = start;
+        testword_t *pe = start;
 
         bool at_end = false;
         do {
@@ -100,8 +100,8 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
 
-            volatile testword_t *p  = start;
-            volatile testword_t *pe = start;
+            testword_t *p  = start;
+            testword_t *pe = start;
 
             bool at_end = false;
             do {
@@ -135,8 +135,8 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
 
-            volatile testword_t *p  = end;
-            volatile testword_t *ps = end;
+            testword_t *p  = end;
+            testword_t *ps = end;
 
             bool at_start = false;
             do {

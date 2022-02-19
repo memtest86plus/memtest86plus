@@ -51,8 +51,8 @@ int test_mov_inv_random(int my_cpu)
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
 
-        volatile testword_t *p  = start;
-        volatile testword_t *pe = start;
+        testword_t *p  = start;
+        testword_t *pe = start;
 
         bool at_end = false;
         do {
@@ -87,8 +87,8 @@ int test_mov_inv_random(int my_cpu)
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
 
-            volatile testword_t *p  = start;
-            volatile testword_t *pe = start;
+            testword_t *p  = start;
+            testword_t *pe = start;
 
             bool at_end = false;
             do {

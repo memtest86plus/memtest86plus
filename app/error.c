@@ -324,12 +324,12 @@ void error_init(void)
     error_count = 0;
 }
 
-void addr_error(volatile testword_t *addr1, volatile testword_t *addr2, testword_t good, testword_t bad)
+void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_t bad)
 {
     common_err(ADDR_ERROR, (uintptr_t)addr1, good, bad, false); (void)addr2;
 }
 
-void data_error(volatile testword_t *addr, testword_t good, testword_t bad, bool use_for_badram)
+void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_badram)
 {
 #if USB_WORKAROUND
     /* Skip any errrors that appear to be due to the BIOS using location

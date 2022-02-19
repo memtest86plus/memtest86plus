@@ -25,12 +25,12 @@ void error_init(void);
 /*
  * Adds an address error to the error reports.
  */
-void addr_error(volatile testword_t *addr1, volatile testword_t *addr2, testword_t good, testword_t bad);
+void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_t bad);
 
 /*
  * Adds a data error to the error reports.
  */
-void data_error(volatile testword_t *addr, testword_t good, testword_t bad, bool use_for_badram);
+void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_badram);
 
 #if REPORT_PARITY_ERRORS
 /*

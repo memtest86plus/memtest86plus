@@ -50,7 +50,7 @@ int test_addr_walk1(int my_cpu)
             // Walking one on our first address.
             uintptr_t mask1 = sizeof(testword_t);
             do {
-                volatile testword_t *p1 = (testword_t *)(pb | mask1);
+                testword_t *p1 = (testword_t *)(pb | mask1);
                 mask1 <<= 1;
                 if (p1 > (testword_t *)pe) {
                     break;
@@ -61,7 +61,7 @@ int test_addr_walk1(int my_cpu)
                 // Walking one on our second address.
                 uintptr_t mask2 = sizeof(testword_t);
                 do {
-                    volatile testword_t *p2 = (testword_t *)(pb | mask2);
+                    testword_t *p2 = (testword_t *)(pb | mask2);
                     mask2 <<= 1;
                     if (p2 == p1) {
                         continue;
