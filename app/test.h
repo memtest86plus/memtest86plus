@@ -27,12 +27,12 @@ extern uint8_t chunk_index[MAX_CPUS];
   * The number of CPU cores being used for the current test. This is always
   * either 1 or the full number of enabled CPU cores.
   */
-extern volatile int num_active_cpus;
+extern int num_active_cpus;
 
 /*
  * The current master CPU core.
  */
-extern volatile int master_cpu;
+extern int master_cpu;
 
 /*
  * A barrier used when running tests.
@@ -67,42 +67,42 @@ typedef uintptr_t testword_t;
  * A virtual memory segment descriptor.
  */
 typedef struct {
-    uintptr_t           pm_base_addr;
-    testword_t          *start;
-    testword_t          *end;
+    uintptr_t   pm_base_addr;
+    testword_t  *start;
+    testword_t  *end;
 } vm_map_t;
 
 /*
  * The list of memory segments currently mapped into virtual memory.
  */
-extern volatile vm_map_t    vm_map[MAX_MEM_SEGMENTS];
+extern vm_map_t vm_map[MAX_MEM_SEGMENTS];
 /*
  * The number of memory segments currently mapped into virtual memory.
  */
-extern volatile int         vm_map_size;
+extern int vm_map_size;
 
 /*
  * The number of completed test passes.
  */
-extern volatile int         pass_num;
+extern int pass_num;
 /*
  * The current test number.
  */
-extern volatile int         test_num;
+extern int test_num;
 
 /*
  * A flag indicating that testing should be restarted due to a configuration
  * change.
  */
-extern volatile bool        restart;
+extern bool restart;
 /*
  * A flag indicating that the current test should be aborted.
  */
-extern volatile bool        bail;
+extern bool bail;
 
 /*
  * The base address of the block of memory currently being tested.
  */
-extern volatile uintptr_t   test_addr[MAX_CPUS];
+extern uintptr_t test_addr[MAX_CPUS];
 
 #endif // TEST_H

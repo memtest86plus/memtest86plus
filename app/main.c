@@ -62,29 +62,29 @@
 // The following variables are written by the current "master" CPU, but may
 // be read by all active CPUs.
 
-static volatile int         init_state = 0;
+static volatile int     init_state = 0;
 
-static int                  num_enabled_cpus = 1;
+static int              num_enabled_cpus = 1;
 
-static uintptr_t            low_load_addr;
-static uintptr_t            high_load_addr;
+static uintptr_t        low_load_addr;
+static uintptr_t        high_load_addr;
 
-static barrier_t            *start_barrier = NULL;
+static barrier_t        *start_barrier = NULL;
 
-static volatile bool        start_run  = false;
-static volatile bool        start_pass = false;
-static volatile bool        start_test = false;
-static volatile bool        rerun_test = false;
+static bool             start_run  = false;
+static bool             start_pass = false;
+static bool             start_test = false;
+static bool             rerun_test = false;
 
-static volatile bool        dummy_run  = false;
+static bool             dummy_run  = false;
 
-static volatile int         window_num   = 0;
-static volatile uintptr_t   window_start = 0;
-static volatile uintptr_t   window_end   = 0;
+static int              window_num   = 0;
+static uintptr_t        window_start = 0;
+static uintptr_t        window_end   = 0;
 
-static volatile size_t      num_mapped_pages = 0;
+static size_t           num_mapped_pages = 0;
 
-static volatile int         test_stage = 0;
+static int              test_stage = 0;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -92,26 +92,26 @@ static volatile int         test_stage = 0;
 
 // These are exposed in test.h.
 
-uint8_t             chunk_index[MAX_CPUS];
+uint8_t     chunk_index[MAX_CPUS];
 
-volatile int        num_active_cpus = 1;
+int         num_active_cpus = 0;
 
-volatile int        master_cpu = 0;
+int         master_cpu = 0;
 
-barrier_t           *run_barrier = NULL;
+barrier_t   *run_barrier = NULL;
 
-spinlock_t          *error_mutex = NULL;
+spinlock_t  *error_mutex = NULL;
 
-volatile vm_map_t   vm_map[MAX_MEM_SEGMENTS];
-volatile int        vm_map_size = 0;
+vm_map_t    vm_map[MAX_MEM_SEGMENTS];
+int         vm_map_size = 0;
 
-volatile int        pass_num = 0;
-volatile int        test_num = 0;
+int         pass_num = 0;
+int         test_num = 0;
 
-volatile bool       restart = false;
-volatile bool       bail    = false;
+bool        restart = false;
+bool        bail    = false;
 
-volatile uintptr_t  test_addr[MAX_CPUS];
+uintptr_t   test_addr[MAX_CPUS];
 
 //------------------------------------------------------------------------------
 // Private Functions
