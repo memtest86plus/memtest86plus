@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 
 #include <stdint.h>
 
@@ -20,7 +20,6 @@ void usleep(unsigned int usec)
         uint64_t t0 = get_tsc();
         do {
             __builtin_ia32_pause();
-            for (volatile int i = 0; i < 100; i++) { }  // this reduces power consumption
         } while ((get_tsc() - t0) < cycles);
     } else {
         // This will be highly inaccurate, but should give at least the requested delay.
