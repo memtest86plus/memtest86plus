@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef TESTS_H
 #define TESTS_H
-/*
+/**
+ * \file
+ *
  * Provides support for identifying and running the memory tests.
  *
  * Copyright (C) 2020-2022 Martin Whitaker.

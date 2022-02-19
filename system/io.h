@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef IO_H
 #define IO_H
-/*
+/**
+ * \file
+ *
  * Provides macro definitions for the x86 IO instructions
  * inb/inw/inl/outb/outw/outl and the "string versions" of the same
  * (insb/insw/insl/outsb/outsw/outsl). You can also use "pausing"
@@ -78,7 +80,7 @@ __OUTS(b)
 __OUTS(w)
 __OUTS(l)
 
-/*
+/**
  * Note that due to the way __builtin_constant_p() works, you
  *  - can't use it inside a inline function (it will never be true)
  *  - you don't have to worry about side effects within the __builtin..

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef MEMSIZE_H
 #define MEMSIZE_H
-/*
+/**
+ * \file
+ *
  * Provides some convenient constants and constant constructors.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stddef.h>

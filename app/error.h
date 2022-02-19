@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef ERROR_H
 #define ERROR_H
-/*
+/**
+ * \file
+ *
  * Provides functions that can be called by the memory tests to report errors.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -12,34 +14,34 @@
 
 #include "test.h"
 
-/*
+/**
  * The number of errors recorded during the current run.
  */
 extern uint64_t error_count;
 
-/*
+/**
  * Initialises the error records.
  */
 void error_init(void);
 
-/*
+/**
  * Adds an address error to the error reports.
  */
 void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_t bad);
 
-/*
+/**
  * Adds a data error to the error reports.
  */
 void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_badram);
 
 #if REPORT_PARITY_ERRORS
-/*
+/**
  * Adds a parity error to the error reports.
  */
 void parity_error(void);
 #endif
 
-/*
+/**
  * Refreshes the error display after the error mode is changed.
  */
 void error_update(void);

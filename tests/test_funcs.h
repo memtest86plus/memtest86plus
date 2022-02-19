@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef TEST_FUNCS_H
 #define TEST_FUNCS_H
-/*
+/**
+ * \file
+ *
  * Provides the prototypes for the basic test functions used to implement
  * the tests.
  *

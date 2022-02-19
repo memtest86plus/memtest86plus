@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef USB_H
 #define USB_H
-/*
+/**
+ * \file
+ *
  * Provides definitions of various values and data structures defined by the
  * USB specifications.
  *

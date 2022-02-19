@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef MSR_H
 #define MSR_H
-/*
+/**
+ * \file
+ *
  * Provides access to the CPU machine-specific registers.
  *
  * Copyright (C) 2020-2022 Martin Whitaker.

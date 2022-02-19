@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef BOOTPARAMS_H
 #define BOOTPARAMS_H
-/*
+/**
+ * \file
+ *
  * Provides definitions for the boot params structure passed to us by
  * intermediate bootloaders when using the Linux boot protocol. This matches
  * the Linux boot_params struct, although we only define the fields we are
  * interested in.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdint.h>

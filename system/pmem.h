@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef PMEM_H
 #define PMEM_H
-/*
+/**
+ * \file
+ *
  * Provides a description of the system physical memory map.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stddef.h>

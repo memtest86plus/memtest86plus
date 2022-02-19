@@ -18,3 +18,5 @@ memtest_shared.bin
 
 # Directories
 grub-iso
+html
+latex

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef EFI_H
 #define EFI_H
-/*
+/**
+ * \file
+ *
  * Provides definitions for accessing the UEFI boot services and configuration
  * tables.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdint.h>
@@ -16,7 +18,7 @@
 #define NATIVE_MSB              0x80000000
 #endif
 
-/*
+/**
  * EFI_STATUS values.
  */
 #define EFI_SUCCESS             0
@@ -27,17 +29,17 @@
 #define EFI_NOT_FOUND           (NATIVE_MSB | 14)
 #define EFI_ABORTED             (NATIVE_MSB | 21)
 
-/*
+/**
  * EFI_LOCATE_SEARCH_TYPE values.
  */
 #define EFI_LOCATE_BY_PROTOCOL  2
 
-/*
+/**
  * EFI_ALLOCATE_TYPE values.
  */
 #define EFI_ALLOCATE_ADDRESS    2
 
-/*
+/**
  * EFI_MEMORY_TYPE values.
  */
 #define EFI_LOADER_CODE         1
@@ -47,7 +49,7 @@
 #define EFI_CONVENTIONAL_MEMORY 7
 #define EFI_ACPI_RECLAIM_MEMORY 9
 
-/*
+/**
  * EFI_GRAPHICS_PIXEL_FORMAT values.
  */
 #define PIXEL_RGB_RESERVED_8BIT_PER_COLOR   0

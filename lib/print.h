@@ -1,28 +1,30 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef PRINT_H
 #define PRINT_H
-/*
+/**
+ * \file
+ *
  * Provides functions to print strings and formatted values to the screen.
  *
- * Copyright (C) 2020 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-/*
+/**
  * Prints a single character on screen at location (row,col) and returns col+1.
  */
 int printc(int row, int col, char c);
 
-/*
+/**
  * Prints a string on screen starting at location (row,col) and returns the
  * next column after the string.
  */
 int prints(int row, int col, const char *str);
 
-/*
+/**
  * Prints a signed decimal number on screen starting at location (row,col) in
  * a field of at least length characters, optionally padding the number with
  * leading zeros, and optionally left-justifying instead of right-justifying
@@ -30,7 +32,7 @@ int prints(int row, int col, const char *str);
  */
 int printi(int row, int col, int value, int length, bool pad, bool left);
 
-/*
+/**
  * Prints an unsigned decimal number on screen starting at location (row,col)
  * in a field of at least length characters, optionally padding the number with
  * leading zeros, and optionally left-justifying instead of right-justifying in
@@ -38,7 +40,7 @@ int printi(int row, int col, int value, int length, bool pad, bool left);
  */
 int printu(int row, int col, uintptr_t value, int length, bool pad, bool left);
 
-/*
+/**
  * Prints an unsigned hexadecimal number on screen starting at location (row,col)
  * in a field of at least length characters, optionally padding the number with
  * leading zeros, and optionally left-justifying instead of right-justifying in
@@ -46,7 +48,7 @@ int printu(int row, int col, uintptr_t value, int length, bool pad, bool left);
  */
 int printx(int row, int col, uintptr_t value, int length, bool pad, bool left);
 
-/*
+/**
  * Prints a K<unit> value on screen starting at location (row,col) in a field of
  * at least length characters, optionally padding the number with leading zeros,
  * and optionally left-justifying instead of right-justifying in the field. The
@@ -55,7 +57,7 @@ int printx(int row, int col, uintptr_t value, int length, bool pad, bool left);
  */
 int printk(int row, int col, uintptr_t value, int length, bool pad, bool left);
 
-/*
+/**
  * Emulates the standard printf function. Printing starts at location (row,col).
  *
  * The conversion flags supported are:
@@ -77,7 +79,7 @@ int printk(int row, int col, uintptr_t value, int length, bool pad, bool left);
  */
 int printf(int row, int col, const char *fmt, ...);
 
-/*
+/**
  * The alternate form of printf.
  */
 int vprintf(int row, int col, const char *fmt, va_list args);

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef CONFIG_H
 #define CONFIG_H
-/*
+/**
+ * \file
+ *
  * Provides the configuration settings and pop-up menu.
  *
  * Copyright (C) 2020-2022 Martin Whitaker.

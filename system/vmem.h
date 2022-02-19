@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef VMEM_H
 #define VMEM_H
-/*
+/**
+ * \file
+ *
  * Provides functions to handle physical memory page mapping into virtual
  * memory.
  *
- * Copyright (C) 2020-2021 Martin Whitaker.
+ * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
 #include <stdbool.h>

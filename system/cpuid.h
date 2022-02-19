@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef CPUID_H
 #define CPUID_H
-/*
+/**
+ * \file
+ *
  * Provides access to the CPUID information.
  *
  * Copyright (C) 2020-2022 Martin Whitaker.
@@ -12,7 +14,7 @@
 
 #include <stdint.h>
 
-/*
+/**
  * Structures that hold the collected CPUID information.
  */
 
@@ -172,17 +174,17 @@ typedef union {
     };
 } cpuid4_ecx_t;
 
-/*
+/**
  * The CPUID information collected by cpuid_init();
  */
 extern cpuid_info_t cpuid_info;
 
-/*
+/**
  * Reads the CPUID information and stores it in cpuid_info.
  */
 void cpuid_init(void);
 
-/*
+/**
  * Executes the cpuid instruction.
  */
 static inline void cpuid(uint32_t op, uint32_t count, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)

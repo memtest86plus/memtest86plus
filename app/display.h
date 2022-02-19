@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef DISPLAY_H
 #define DISPLAY_H
-/*
+/**
+ * \file
+ *
  * Provides (macro) functions that implement the UI display.
  * All knowledge about the display layout is encapsulated here.
  *

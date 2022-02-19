@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef BOOT_H
 #define BOOT_H
-/*
- * Definitions used in the boot code. Also defines exported symbols needed
- * in the main code.
+/**
+ * \file
+ *
+ * Provides definitions used in the boot code. Also defines exported symbols
+ * needed in the main code.
  *
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
