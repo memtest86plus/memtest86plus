@@ -1,0 +1,22 @@
+# Prerequisites
+*.d
+
+# Preprocessed assembler
+*.s
+
+# Object files
+*.o
+
+# Binaries
+memtest_shared
+memtest_shared.bin
+*.bin
+*.efi
+*.img
+*.iso
+*.mbr
+
+# Directories
+grub-iso
+html
+latex
