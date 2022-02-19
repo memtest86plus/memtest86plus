@@ -118,6 +118,8 @@ static void parse_option(const char *option, const char *params)
         enable_halt = false;
     } else if (strncmp(option, "smp", 4) == 0) {
         smp_enabled = true;
+    } else if (strncmp(option, "trace", 6) == 0) {
+        enable_trace = true;
     }
 }
 
