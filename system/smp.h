@@ -6,6 +6,7 @@
  *
  * Provides support for multi-threaded operation.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

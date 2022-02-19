@@ -7,6 +7,7 @@
  * Provides the display interface. It provides an 80x25 VGA-compatible text
  * display.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

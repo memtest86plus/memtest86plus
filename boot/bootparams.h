@@ -9,6 +9,7 @@
  * the Linux boot_params struct, although we only define the fields we are
  * interested in.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -15,6 +15,7 @@
  * over and over again with slight variations and possibly making a
  * mistake somewhere.
  *
+ *//*
  * Derived from memtest86+ io.h.
  * (original contained no copyright statement)
  */

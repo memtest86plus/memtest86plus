@@ -7,6 +7,7 @@
  * Provides functions to handle physical memory page mapping into virtual
  * memory.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

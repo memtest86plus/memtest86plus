@@ -6,6 +6,7 @@
  *
  * Provides information about the CPU type, clock speed and cache sizes.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

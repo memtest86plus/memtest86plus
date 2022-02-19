@@ -6,6 +6,7 @@
  *
  * Provides functions to perform PCI configuration space reads and writes.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

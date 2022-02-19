@@ -7,6 +7,7 @@
  * Provides definitions used in the boot code. Also defines exported symbols
  * needed in the main code.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides types and variables used when performing the memory tests.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -7,6 +7,7 @@
  * Provides the keyboard interface. It converts incoming key codes to
  * ASCII characters.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

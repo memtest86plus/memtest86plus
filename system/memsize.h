@@ -6,6 +6,7 @@
  *
  * Provides some convenient constants and constant constructors.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

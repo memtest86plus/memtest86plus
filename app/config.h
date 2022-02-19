@@ -6,6 +6,7 @@
  *
  * Provides the configuration settings and pop-up menu.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides access to the CPU timestamp counter.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

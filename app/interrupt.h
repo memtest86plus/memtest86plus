@@ -6,6 +6,7 @@
  *
  * Provides the interrupt handler.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

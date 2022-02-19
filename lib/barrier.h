@@ -6,6 +6,7 @@
  *
  * Provides a barrier synchronisation primitive.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

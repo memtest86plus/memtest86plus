@@ -7,6 +7,7 @@
  * Provides the prototypes for the basic test functions used to implement
  * the tests.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides a subset of the functions normally provided by <string.h>.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

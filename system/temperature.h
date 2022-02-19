@@ -6,6 +6,7 @@
  *
  * Provides a function to read the CPU core temperature.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

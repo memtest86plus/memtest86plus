@@ -7,6 +7,7 @@
  * Provides (macro) functions that implement the UI display.
  * All knowledge about the display layout is encapsulated here.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides access to the CPUID information.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  *
  * Derived from memtest86+ cpuid.h

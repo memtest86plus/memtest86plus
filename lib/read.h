@@ -6,6 +6,7 @@
  *
  * Provides a function to read a numeric value.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

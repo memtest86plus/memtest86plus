@@ -6,6 +6,7 @@
  *
  * Provides miscellaneous hardware control functions.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

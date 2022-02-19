@@ -8,6 +8,7 @@
  * optimizing accesses which need to be ordered and atomic. Mostly used
  * for accessing memory-mapped hardware registers.
  *
+ *//*
  * Copyright (C) 2021-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides a description of the system physical memory map.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides the font used for framebuffer display.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

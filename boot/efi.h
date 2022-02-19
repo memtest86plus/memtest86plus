@@ -7,6 +7,7 @@
  * Provides definitions for accessing the UEFI boot services and configuration
  * tables.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

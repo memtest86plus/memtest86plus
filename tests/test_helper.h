@@ -7,6 +7,7 @@
  * Provides some common definitions and helper functions for the memory
  * tests.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

@@ -6,6 +6,7 @@
  *
  * Provides functions that can be called by the memory tests to report errors.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

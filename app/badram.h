@@ -6,6 +6,7 @@
  *
  * Provides functions for generating patterns for the Linux kernel BadRAM extension.
  *
+ *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 

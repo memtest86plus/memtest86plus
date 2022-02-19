@@ -7,6 +7,7 @@
  * Provides definitions of various values and data structures defined by the
  * USB specifications.
  *
+ *//*
  * Copyright (C) 2021-2022 Martin Whitaker.
  */
 
