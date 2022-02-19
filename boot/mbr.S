@@ -163,7 +163,7 @@ dap_lba_start:
 	.quad	0
 
 boot_msg:
-	.ascii	"Loading PCMemTest\r\n"
+	.ascii	"Loading Memtest86+\r\n"
 boot_msg_end:
 
 error_msg:

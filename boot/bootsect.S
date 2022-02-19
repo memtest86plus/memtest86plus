@@ -345,7 +345,7 @@ sectors:
 	.word	0
 
 boot_msg:
-	.ascii	"Loading PCMemTest"
+	.ascii	"Loading Memtest86+"
 boot_msg_end:
 
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.

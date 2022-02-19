@@ -71,9 +71,9 @@ void display_init(void)
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
 #if TESTWORD_WIDTH > 32
-    prints( 0, 0, "    PCMemTest-64  v1.6-devel");
+    prints(0, 0, "     Memtest86+64  v6.0pre");
 #else
-    prints( 0, 0, "    PCMemTest-32  v1.6-devel");
+    prints(0, 0, "     Memtest86+32  v6.0pre");
 #endif
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);

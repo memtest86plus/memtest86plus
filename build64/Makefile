@@ -128,7 +128,7 @@ esp.img: memtest.efi
 memtest.iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
 	cp floppy.img iso/boot/floppy.img
-	xorrisofs -pad -R -J -volid PCMemTest64 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
+	xorrisofs -pad -R -J -volid Memtest86+64 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /boot=./iso/boot /EFI=./iso/EFI
@@ -166,7 +166,7 @@ grub-bootx64.efi:
 
 grub-esp.img: memtest.efi grub-bootx64.efi ../grub/grub-efi.cfg
 	@mkdir -p grub-iso/EFI/BOOT/grub/x86_64-efi grub-iso/EFI/BOOT/grub/fonts
-	cp memtest.efi grub-iso/EFI/BOOT/pcmemtest
+	cp memtest.efi grub-iso/EFI/BOOT/memtest
 	cp grub-bootx64.efi grub-iso/EFI/BOOT/bootx64.efi
 	cp ../grub/grub-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
@@ -177,12 +177,12 @@ grub-esp.img: memtest.efi grub-bootx64.efi ../grub/grub-efi.cfg
 
 grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/grub-legacy.cfg grub-esp.img
 	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
-	cp memtest.bin grub-iso/boot/pcmemtest
+	cp memtest.bin grub-iso/boot/memtest
 	cp grub-eltorito.img grub-iso/boot/eltorito.img
 	cp ../grub/grub-legacy.cfg grub-iso/boot/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
 	cp $(GRUB_LIB_DIR)/i386-pc/*.mod grub-iso/boot/grub/i386-pc/
-	xorrisofs -pad -R -J -volid PCMemTest64 -graft-points -hide-rr-moved \
+	xorrisofs -pad -R -J -volid Memtest86+64 -graft-points -hide-rr-moved \
 		  --grub2-mbr $(GRUB_LIB_DIR)/i386-pc/boot_hybrid.img \
 		  -b /boot/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
 		  --efi-boot --interval:appended_partition_2:all:: \

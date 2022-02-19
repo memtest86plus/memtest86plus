@@ -1,6 +1,6 @@
 # Developer's Guide
 
-This is the developer's guide to the PCMemTest source code. The user's guide
+This is the developer's guide to the Memtest86+ source code. The user's guide
 can be found in the README.md file in the top level directory.
 
 ## Code Organisation
@@ -14,12 +14,12 @@ subdirectory of the same name:
 
 * boot
 
-    The code that transitions from the BIOS or bootloader entry point to the
+    The code that runs from the BIOS or bootloader entry point to the
     start of the main application.
 
 * lib
 
-    The subset of the C standard library that is used by PCMemTest plus other
+    The subset of the C standard library that is used by Memtest86+ plus other
     hardware-independent low-level support functions.
 
 * system
@@ -31,7 +31,7 @@ subdirectory of the same name:
     The individual memory tests.
 
 The boot code is mostly written in AT&T syntax x86 assembly language. The
-remaining code is written in C.
+remaining code is written in C with a smattering of inline assembly code.
 
 Each category is further subdivided into multiple source files, splitting the
 code into small units of closely related functionality. For the C code, the

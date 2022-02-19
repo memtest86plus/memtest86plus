@@ -1,10 +1,10 @@
-# PCMemTest
+# Memtest86+
 
-PCMemTest is a stand-alone memory tester for x86 and x86-64 architecture
+Memtest86+ is a stand-alone memory tester for x86 and x86-64 architecture
 computers. It provides a more thorough memory check than that provided by
 BIOS memory tests.
 
-PCMemTest can be loaded and run either directly by a PC BIOS (legacy or UEFI)
+Memtest86+ can be loaded and run either directly by a PC BIOS (legacy or UEFI)
 or via an intermediate bootloader that supports the Linux 16-bit, 32-bit,
 64-bit, or EFI handover boot protocol. It should work on any Pentium class or
 later 32-bit or 64-bit CPU.
@@ -21,34 +21,32 @@ later 32-bit or 64-bit CPU.
   * [Trouble-shooting Memory Errors](#trouble-shooting-memory-errors)
   * [Execution Time](#execution-time)
   * [Memory Testing Philosophy](#memory-testing-philosophy)
-  * [PCMemTest Test Algorithms](#pcmemtest-test-algorithms)
+  * [Memtest86+ Test Algorithms](#memtest86+-test-algorithms)
   * [Individual Test Descriptions](#individual-test-descriptions)
   * [Known Limitations and Bugs](#known-limitations-and-bugs)
   * [Acknowledgments](#acknowledgments)
 
 ## Origins
 
-PCMemTest is a fork and rewrite of Memtest86+, which in turn was a fork of
-Memtest86. The purpose of the rewrite was to:
+Memtest86+ v6.0 was based on PCMemTest, which was a fork and rewrite of the
+earlier Memtest86+ v5.01, which in turn was a fork of Memtest86. The purpose
+of the PCMemTest rewrite was to:
 
   * make the code more readable and easier to maintain
   * make the code 64-bit clean and support UEFI boot
   * fix failures seen when building with newer versions of GCC
 
-In the process, a number of features of Memtest86+ that are not required for
-the main purpose of PCMemTest (testing the system memory) have been dropped.
-In particular, no attempt is made to measure the cache and main memory speed,
-or to identify and report the DRAM type. This should allow PCMemTest to work
-without modification on future hardware.
-
-PCMemTest is based on the v5.01 release of Memtest86+, which was the last
-public release at the time of the fork.
+In the process of creating PCMemTest, a number of features of Memtest86+ v5.01
+that were not strictly required for testing the system memory were dropped. In
+particular, no attempt is made to measure the cache and main memory speed, or
+to identify and report the DRAM type. Some of these features will be added back
+in future releases.
 
 ## Licensing
 
-PCMemTest is released under the terms of the GNU General Public License version
-2 (GPLv2). Other than the provisions of the GPL there are no restrictions for
-use, private or commercial. See the LICENSE file for details.
+Memtest86+ is released under the terms of the GNU General Public License
+version 2 (GPLv2). Other than the provisions of the GPL there are no
+restrictions for use, private or commercial. See the LICENSE file for details.
 
 ## Build and Installation
 
@@ -92,8 +90,8 @@ When using an intermediate bootloader, either the `memtest.bin` file or the
 access, and the bootloader configuration should be updated to boot from
 that file as if it were a Linux kernel with no initial RAM disk. Several
 boot command line options are recognised, as described below. If using the
-16-bit boot protocol, PCMemTest will use the display in text mode (640x400).
-If using the 32-bit or 64-bit boot protocols, PCMemTest will use the display
+16-bit boot protocol, Memtest86+ will use the display in text mode (640x400).
+If using the 32-bit or 64-bit boot protocols, Memtest86+ will use the display
 in either text mode or graphics mode, as specified in the `boot_params` struct
 passed to it by the bootloader. If in graphics mode, the supplied framebuffer
 must be at least 640x400 pixels; if larger, the display will be centred. If
@@ -107,12 +105,12 @@ on your build system. You may need to adjust some path and file names in
 the make file to match the naming on your system.
 
 The GRUB configuration files contained in the `grub` directory are there for
-use on the test ISO, but also serve as an example of how to boot PCMemTest
+use on the test ISO, but also serve as an example of how to boot Memtest86+
 from GRUB.
 
 ## Boot Options
 
-An intermediate bootloader may pass a boot command line to PCMemTest. The
+An intermediate bootloader may pass a boot command line to Memtest86+. The
 command line may contain one or more options, separated by spaces. Each
 option consists of an option name, optionally followed by an `=` sign and
 one or more parameters, separated by commas. The following options are
@@ -130,7 +128,7 @@ recognised:
 
 ## Keyboard Selection
 
-PCMemTest supports both the legacy keyboard interface (using I/O ports 0x60
+Memtest86+ supports both the legacy keyboard interface (using I/O ports 0x60
 and 0x64) and USB keyboards (using its own USB device drivers). One or the
 other can be selected via the boot command line, If neither is selected, the
 default is to use both. An additional option on the boot command line is
@@ -139,7 +137,7 @@ older USB devices.
 
 Older BIOSs usually support USB legacy keyboard emulation, which makes USB
 keyboards act like legacy keyboards connected to ports 0x60 and 0x64. This
-can often be enabled or disabled in the BIOS setup menus. If PCMemTest's
+can often be enabled or disabled in the BIOS setup menus. If Memtest86+'s
 USB device drivers are enabled, they will override this and access any USB
 keyboards directly. The downside of that is that the USB controllers and
 device drivers require some memory to be reserved for their private use,
@@ -151,17 +149,17 @@ emulation and add `keyboard=legacy` on the boot command line.
 you enable the Compatibility System Module (CSM) in the BIOS setup. Others
 only support it when actually booting in legacy mode.
 
-**NOTE**: PCMemTest's USB device drivers are work in progress. Not all USB
-devices are supported yet.
+**NOTE**: Memtest86+'s USB device drivers are work in progress. Not all USB
+devices are supported yet, and there may be problems on some hardware.
 
 ## Operation
 
-Once booted, PCMemTest will initialise its display, then pause for a few
+Once booted, Memtest86+ will initialise its display, then pause for a few
 seconds to allow the user to configure its operation. If no key is pressed,
 it will automatically start running all tests using a single CPU core,
 continuing indefinitely until the user reboots or halts the machine.
 
-At startup, and when running tests, PCMemTest responds to the following keys:
+At startup, and when running tests, Memtest86+ responds to the following keys:
 
   * F1
     * enters the configuration menu
@@ -281,7 +279,7 @@ results.
 
 ## Trouble-shooting Memory Errors
 
-Please be aware that not all errors reported by PCMemTest are due to bad
+Please be aware that not all errors reported by Memtest86+ are due to bad
 memory. The test implicitly tests the CPU, caches, and motherboard. It is
 impossible for the test to determine what causes the failure to occur. Most
 failures will be due to a problem with memory. When it is not, the only option
@@ -320,8 +318,8 @@ module may work fine in one system and not in another. This is not uncommon
 and is a source of confusion. The components are not necessarily bad but
 certain combinations may need to be avoided.
 
-In the vast majority of cases errors reported by PCMemTest are valid. There
-are some systems that cause PCMemTest to be confused about the size of memory
+In the vast majority of cases errors reported by Memtest86+ are valid. There
+are some systems that cause Memtest86+ to be confused about the size of memory
 and it will try to test non-existent memory. This will cause a large number of
 consecutive addresses to be reported as bad and generally there will be many
 bits in error. If you have a relatively small number of failing addresses and
@@ -332,14 +330,14 @@ All valid memory errors should be corrected. It is possible that a particular
 error will never show up in normal operation. However, operating with marginal
 memory is risky and can result in data loss and even disk corruption.
 
-PCMemTest can not diagnose many types of PC failures. For example a faulty CPU
-that causes your OS to crash will most likely just cause PCMemTest to crash in
+Memtest86+ can not diagnose many types of PC failures. For example a faulty CPU
+that causes your OS to crash will most likely just cause Memtest86+ to crash in
 the same way.
 
 ## Execution Time
 
-The time required for a complete pass of PCMemTest will vary greatly depending
-on CPU speed, memory speed, and memory size. PCMemTest executes indefinitely.
+The time required for a complete pass of Memtest86+ will vary greatly depending
+on CPU speed, memory speed, and memory size. Memtest86+ executes indefinitely.
 The pass counter increments each time that all of the selected tests have been
 run. Generally a single pass is sufficient to catch all but the most obscure
 errors. However, for complete confidence when intermittent errors are suspected
@@ -370,9 +368,9 @@ number of possible chip layouts for different chip types and manufacturers
 making this strategy impractical. However, there are testing algorithms that
 can approximate this ideal strategy.
 
-## PCMemTest Test Algorithms
+## Memtest86+ Test Algorithms
 
-PCMemTest uses two algorithms that provide a reasonable approximation of the
+Memtest86+ uses two algorithms that provide a reasonable approximation of the
 ideal test strategy above. The first of these strategies is called moving
 inversions. The moving inversion tests work as follows:
 
@@ -419,7 +417,7 @@ strides may be more effective but would take longer to execute. The choice of
 
 ## Individual Test Descriptions
 
-PCMemTest executes a series of numbered tests to check for errors. These tests
+Memtest86+ executes a series of numbered tests to check for errors. These tests
 consist of a combination of test algorithm, data pattern and caching. The
 execution order for these tests were arranged so that errors will be detected
 as rapidly as possible. A description of each test follows.
@@ -515,22 +513,23 @@ of all zeros and all ones.
 
 ## Acknowledgments
 
-PCMemTest was based on Memtest86+, developed by Samuel Demeulemeester, which
-in turn was based on Memtest86, developed by Chris Brady with the resources
-and assistance listed below:
+Memtest86+ v6.0 was based on PCMemTest, developed by Martin Whitaker, which
+was based on Memtest86+ v5.01, developed by Samuel Demeulemeester, which in
+turn was based on Memtest86, developed by Chris Brady with the resources and
+assistance listed below:
 
  * The initial versions of the source files bootsect.S, setup.S, head.S and
    build.c are from the Linux 1.2.1 kernel and have been heavily modified.
 
  * Doug Sisk provided code to support a console connected via a serial port.
-   (not used by PCMemTest)
+   (not currently used)
 
  * Code to create BadRAM patterns was provided by Rick van Rein.
 
  * The block move test is based on Robert Redelmeier's burnBX test.
 
  * Screen buffer code was provided by Jani Averbach.
-   (not used by PCMemTest)
+   (not used by Memtest86+ v6.0)
 
  * Eric Biederman provided all of the feature content for version 3.0
    plus many bugfixes and significant code cleanup.
