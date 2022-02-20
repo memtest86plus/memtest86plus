@@ -30,6 +30,7 @@
 //------------------------------------------------------------------------------
 
 typedef enum {
+    NOT_HCI         = -1,
     UHCI            = 0,
     OHCI            = 1,
     EHCI            = 2,
@@ -583,6 +584,86 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     return keyboard_found;
 }
 
+static void probe_usb_controller(int bus, int dev, int func, hci_type_t controller_type)
+{
+    uint16_t vendor_id  = pci_config_read16(bus, dev, func, 0x00);
+    uint16_t device_id  = pci_config_read16(bus, dev, func, 0x02);
+    uint16_t pci_status = pci_config_read16(bus, dev, func, 0x06);
+
+    // Disable the device while we probe it.
+    uint16_t control = pci_config_read16(bus, dev, func, 0x04);
+    pci_config_write16(bus, dev, func, 0x04, control & ~0x0007);
+
+    int bar = (controller_type == UHCI) ? 0x20 : 0x10;
+    uintptr_t base_addr = pci_config_read32(bus, dev, func, bar);
+    pci_config_write32(bus, dev, func, bar, 0xffffffff);
+    uintptr_t mmio_size = pci_config_read32(bus, dev, func, bar);
+    pci_config_write32(bus, dev, func, bar, base_addr);
+#ifdef __x86_64__
+    if (base_addr & 0x4) {
+        base_addr += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
+        pci_config_write32(bus, dev, func, bar + 4, 0xffffffff);
+        mmio_size += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
+        pci_config_write32(bus, dev, func, bar + 4, base_addr >> 32);
+    } else {
+        mmio_size += (uintptr_t)0xffffffff << 32;
+    }
+#endif
+    base_addr &= ~(uintptr_t)0xf;
+    mmio_size &= ~(uintptr_t)0xf;
+    mmio_size = ~mmio_size + 1;
+
+    print_usb_info("Found %s controller %04x:%04x at %08x size %08x", hci_name[controller_type],
+                   (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size);
+
+    base_addr = map_device(base_addr, mmio_size);
+    if (base_addr == 0) {
+        print_usb_info(" Failed to map device into virtual memory");
+        return;
+    }
+
+    // Search for power management capability.
+    //uint8_t pm_cap_ptr;
+    if (pci_status & 0x10) {
+        uint8_t cap_ptr = pci_config_read8(bus, dev, func, 0x34) & 0xfe;
+        while (cap_ptr != 0) {
+            uint8_t cap_id = pci_config_read8(bus, dev, func, cap_ptr);
+            if (cap_id == 1) {
+                uint16_t pm_status = pci_config_read16(bus, dev, func, cap_ptr+2);
+                // Power on if necessary.
+                if ((pm_status & 0x3) != 0) {
+                    pci_config_write16(bus, dev, func, cap_ptr+2, 0x8000);
+                    usleep(10000);
+                }
+                //pm_cap_ptr = cap_ptr;
+                break;
+            }
+            cap_ptr = pci_config_read8(bus, dev, func, cap_ptr+1) & 0xfe;
+        }
+    }
+
+    // Enable the device.
+    pci_config_write16(bus, dev, func, 0x04, control | 0x0007);
+
+    // Initialise the device according to its type.
+    bool keyboards_found = false;
+    if (controller_type == UHCI) {
+        print_usb_info(" This controller type is not supported yet");
+    }
+    if (controller_type == OHCI) {
+        keyboards_found = ohci_init(base_addr, &usb_controllers[num_usb_controllers]);
+    }
+    if (controller_type == EHCI) {
+        keyboards_found = ehci_init(bus, dev, func, base_addr, &usb_controllers[num_usb_controllers]);
+    }
+    if (controller_type == XHCI) {
+        keyboards_found = xhci_init(base_addr, &usb_controllers[num_usb_controllers]);
+    }
+    if (keyboards_found) {
+        num_usb_controllers++;
+    }
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -595,100 +676,28 @@ void find_usb_keyboards(bool pause_at_end)
     num_usb_controllers = 0;
     for (int bus = 0; bus < PCI_MAX_BUS; bus++) {
         for (int dev = 0; dev < PCI_MAX_DEV; dev++) {
+            hci_type_t controller_type[PCI_MAX_FUNC];
             for (int func = 0; func < PCI_MAX_FUNC; func++) {
-                uint16_t vendor_id = pci_config_read16(bus, dev, func, 0x00);
-
+                controller_type[func] = NOT_HCI;
+            }
+            for (int func = 0; func < PCI_MAX_FUNC; func++) {
                 // Test for device/function present.
+                uint16_t vendor_id = pci_config_read16(bus, dev, func, 0x00);
+                uint8_t  hdr_type  = pci_config_read8 (bus, dev, func, 0x0e);
                 if (vendor_id != 0xffff) {
-                    uint16_t device_id  = pci_config_read16(bus, dev, func, 0x02);
-                    uint16_t pci_status = pci_config_read16(bus, dev, func, 0x06);
-                    uint16_t class_code = pci_config_read16(bus, dev, func, 0x0a);
-                    uint8_t  hdr_type   = pci_config_read8 (bus, dev, func, 0x0e);
-
                     // Test for a USB controller.
+                    uint16_t class_code = pci_config_read16(bus, dev, func, 0x0a);
                     if (class_code == 0x0c03) {
-                        // Disable the device while we probe it.
-                        uint16_t control = pci_config_read16(bus, dev, func, 0x04);
-                        pci_config_write16(bus, dev, func, 0x04, control & ~0x0007);
-
-                        hci_type_t controller_type = pci_config_read8(bus, dev, func, 0x09) >> 4;
-                        if (controller_type >= MAX_HCI_TYPE) break;
-
-                        int bar = (controller_type == UHCI) ? 0x20 : 0x10;
-                        uintptr_t base_addr = pci_config_read32(bus, dev, func, bar);
-                        pci_config_write32(bus, dev, func, bar, 0xffffffff);
-                        uintptr_t mmio_size = pci_config_read32(bus, dev, func, bar);
-                        pci_config_write32(bus, dev, func, bar, base_addr);
-#ifdef __x86_64__
-                        if (base_addr & 0x4) {
-                            base_addr += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
-                            pci_config_write32(bus, dev, func, bar + 4, 0xffffffff);
-                            mmio_size += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
-                            pci_config_write32(bus, dev, func, bar + 4, base_addr >> 32);
-                        } else {
-                            mmio_size += (uintptr_t)0xffffffff << 32;
-                        }
-#endif
-                        base_addr &= ~(uintptr_t)0xf;
-                        mmio_size &= ~(uintptr_t)0xf;
-                        mmio_size = ~mmio_size + 1;
-
-                        print_usb_info("Found %s controller %04x:%04x at %08x size %08x", hci_name[controller_type],
-                                       (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size);
-
-                        base_addr = map_device(base_addr, mmio_size);
-                        if (base_addr == 0) {
-                            print_usb_info(" Failed to map device into virtual memory");
-                            break;
-                        }
-
-                        // Search for power management capability.
-                        //uint8_t pm_cap_ptr;
-                        if (pci_status & 0x10) {
-                            uint8_t cap_ptr = pci_config_read8(bus, dev, func, 0x34) & 0xfe;
-                            while (cap_ptr != 0) {
-                                uint8_t cap_id = pci_config_read8(bus, dev, func, cap_ptr);
-                                if (cap_id == 1) {
-                                    uint16_t pm_status = pci_config_read16(bus, dev, func, cap_ptr+2);
-                                    // Power on if necessary.
-                                    if ((pm_status & 0x3) != 0) {
-                                        pci_config_write16(bus, dev, func, cap_ptr+2, 0x8000);
-                                        usleep(10000);
-                                    }
-                                    //pm_cap_ptr = cap_ptr;
-                                    break;
-                                }
-                                cap_ptr = pci_config_read8(bus, dev, func, cap_ptr+1) & 0xfe;
-                            }
-                        }
-
-                        // Enable the device.
-                        pci_config_write16(bus, dev, func, 0x04, control | 0x0007);
-
-                        // Initialise the device according to its type.
-                        bool keyboards_found = false;
-                        if (controller_type == UHCI) {
-                            print_usb_info(" This controller type is not supported yet");
-                        }
-                        if (controller_type == OHCI) {
-                            keyboards_found = ohci_init(base_addr, &usb_controllers[num_usb_controllers]);
-                        }
-                        if (controller_type == EHCI) {
-                            if (func == 0) {
-                                keyboards_found = ehci_init(bus, dev, func, base_addr, &usb_controllers[num_usb_controllers]);
-                            } else {
-                                print_usb_info(" Skipping");
-                            }
-                        }
-                        if (controller_type == XHCI) {
-                            keyboards_found = xhci_init(base_addr, &usb_controllers[num_usb_controllers]);
-                        }
-                        if (keyboards_found) {
-                            num_usb_controllers++;
+                        controller_type[func] = pci_config_read8(bus, dev, func, 0x09) >> 4;
+                        // We need to initialise EHCI controllers before initialising any of their companion
+                        // controllers, so do it now.
+                        if (controller_type[func] == EHCI) {
+                            probe_usb_controller(bus, dev, func, controller_type[func]);
                             // If we've filled the controller table, abort now.
                             if (num_usb_controllers == MAX_USB_CONTROLLERS) {
                                 return;
                             }
+                            controller_type[func] = NOT_HCI;  // prevent reprobing
                         }
                     }
                     // Break out if this is a single function device.
@@ -699,6 +708,15 @@ void find_usb_keyboards(bool pause_at_end)
                     // Break out if no device is present.
                     if (func == 0) {
                         break;
+                    }
+                }
+            }
+            for (int func = 0; func < PCI_MAX_FUNC; func++) {
+                if (controller_type[func] != NOT_HCI) {
+                    probe_usb_controller(bus, dev, func, controller_type[func]);
+                    // If we've filled the controller table, abort now.
+                    if (num_usb_controllers == MAX_USB_CONTROLLERS) {
+                        return;
                     }
                 }
             }

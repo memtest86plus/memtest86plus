@@ -72,6 +72,12 @@
 #define EHCI_PORT_SC_PP         0x00001000      // Port Power
 #define EHCI_PORT_SC_PO         0x00002000      // Port Owner
 
+#define EHCI_PORT_SC_LS_MASK    0x00000c00      // Line Status
+#define EHCI_PORT_SC_LS_SE0     0x00000000      // Line Status is SE0
+#define EHCI_PORT_SC_LS_K       0x00000400      // Line Status is K-state
+#define EHCI_PORT_SC_LS_J       0x00000800      // Line Status is J-state
+#define EHCI_PORT_SC_LS_U       0x00000c00      // Line Status is undefined
+
 // Link Pointer 
 
 #define EHCI_LP_TERMINATE       0x00000001      // Terminate (T) bit
@@ -245,6 +251,11 @@ int num_ehci_ports(uint32_t hcs_params)
     return (hcs_params >> 0) & 0xf;
 }
 
+int num_ehci_companions(uint32_t hcs_params)
+{
+    return (hcs_params >> 12) & 0xf;
+}
+
 int ehci_ext_cap_ptr(uint32_t hcc_params)
 {
     return (hcc_params >> 8) & 0xff;
@@ -303,6 +314,12 @@ static void disable_ehci_port(ehci_op_regs_t *op_regs, int port_idx)
     uint32_t port_status = read32(&op_regs->port_sc[port_idx]);
     write32(&op_regs->port_sc[port_idx], port_status & ~EHCI_PORT_SC_PED);
     (void)wait_until_clr(&op_regs->port_sc[port_idx], EHCI_PORT_SC_PED, 1000*MILLISEC);
+}
+
+static void release_ehci_port(ehci_op_regs_t *op_regs, int port_idx)
+{
+    uint32_t port_status = read32(&op_regs->port_sc[port_idx]);
+    write32(&op_regs->port_sc[port_idx], port_status | EHCI_PORT_SC_PO);
 }
 
 static void build_ehci_qtd(ehci_qtd_t *this_qtd, const ehci_qtd_t *final_qtd, uint8_t control, uint16_t dt,
@@ -589,10 +606,13 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
 
     usleep(100*MILLISEC);  // USB maximum device attach time
 
+    bool i_have_companions = (num_ehci_companions(hcs_params) > 0);
+
     // Scan the ports, looking for hubs and keyboards.
     usb_ep_t keyboards[MAX_KEYBOARDS];
     int num_keyboards = 0;
-    int num_devices = 0;
+    int num_ls_devices = 0;
+    int num_hs_devices = 0;
     for (int port_idx = 0; port_idx < root_hub.num_ports; port_idx++) {
         // If we've filled the keyboard info table, abort now.
         if (num_keyboards >= MAX_KEYBOARDS) break;
@@ -605,6 +625,15 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
         // Check if anything is connected to this port.
         if (~port_status & EHCI_PORT_SC_CCS) continue;
 
+        // Check for low speed device.
+        if ((port_status & EHCI_PORT_SC_LS_MASK) == EHCI_PORT_SC_LS_K) {
+            if (i_have_companions) {
+                release_ehci_port(op_regs, port_idx);
+            }
+            num_ls_devices++;
+            continue;
+        }
+
         // Reset the port.
         if (!reset_ehci_port(op_regs, port_idx)) continue;
 
@@ -612,14 +641,20 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
 
         port_status = read32(&op_regs->port_sc[port_idx]);
 
-        // Check the port is active.
-        if (~port_status & EHCI_PORT_SC_PED) continue;
+        // Check for full speed device.
+        if (~port_status & EHCI_PORT_SC_PED) {
+            if (i_have_companions) {
+                release_ehci_port(op_regs, port_idx);
+            }
+            num_ls_devices++;
+            continue;
+        }
 
-        num_devices++;
+        num_hs_devices++;
 
         // Look for keyboards attached directly or indirectly to this port.
-        if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, USB_SPEED_HIGH, num_devices,
-                                        &num_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
+        if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, USB_SPEED_HIGH, num_hs_devices,
+                                        &num_hs_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
             continue;
         }
 
@@ -627,9 +662,13 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
         disable_ehci_port(op_regs, port_idx);
     }
 
-    print_usb_info(" Found %i device%s, %i keyboard%s",
-                   num_devices,   num_devices   != 1 ? "s" : "",
-                   num_keyboards, num_keyboards != 1 ? "s" : "");
+    print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s",
+                   num_ls_devices, num_ls_devices != 1 ? "s" : "",
+                   num_hs_devices, num_hs_devices != 1 ? "s" : "",
+                   num_keyboards,  num_keyboards  != 1 ? "s" : "");
+    if (num_ls_devices > 0 && i_have_companions) {
+        print_usb_info(" Handed over low/full speed devices to companion controllers");
+    }
 
     if (num_keyboards == 0) {
         // Halt the host controller.
