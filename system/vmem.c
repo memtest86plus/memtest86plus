@@ -40,7 +40,7 @@
 // Private Variables
 //------------------------------------------------------------------------------
 
-static int          device_pages_used = 0;
+static unsigned int device_pages_used = 0;
 
 static uintptr_t    mapped_window = 2;
 
@@ -76,16 +76,29 @@ static void load_pdbr()
 uintptr_t map_device(uintptr_t base_addr, size_t size)
 {
     uintptr_t last_addr = base_addr + size - 1;
+    // Check if the requested region is permanently mapped.
     if (last_addr < VM_WINDOW_START || (base_addr > VM_DEVICE_END && last_addr <= VM_SPACE_END)) {
         return base_addr;
     }
-    uintptr_t first_virt_page = device_pages_used;
+    // Check if the requested region is already mapped.
+    uintptr_t first_virt_page = 0;
     uintptr_t first_phys_page = base_addr >> VM_PAGE_SHIFT;
     uintptr_t last_phys_page  = last_addr >> VM_PAGE_SHIFT;
-    // Compute the page table entries.
-    for (uintptr_t page = first_phys_page; page <= last_phys_page; page++) {
+    uintptr_t curr_virt_page  = first_virt_page;
+    uintptr_t curr_phys_page  = first_phys_page;
+    while (curr_virt_page < device_pages_used && curr_phys_page <= last_phys_page) {
+        uintptr_t mapped_phys_page = pd3[curr_virt_page++] >> VM_PAGE_SHIFT;
+        if (mapped_phys_page == curr_phys_page) {
+            curr_phys_page++;
+        } else {
+            first_virt_page = curr_virt_page;
+            curr_phys_page = first_phys_page;
+        }
+    }
+    // If not, map it. Note that this will extend a partial match at the end of the current map.
+    while (curr_phys_page <= last_phys_page) {
         if (device_pages_used == MAX_DEVICE_PAGES) return 0;
-        pd3[device_pages_used++] = (page << VM_PAGE_SHIFT) + 0x83;
+        pd3[device_pages_used++] = (curr_phys_page++ << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
     load_pdbr();
