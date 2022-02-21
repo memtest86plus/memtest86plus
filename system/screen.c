@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker
+// Copyright (C) 2020-2022 Martin Whitaker
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -209,12 +209,12 @@ void screen_init(void)
 #endif
         lfb_stride = screen_info->lfb_linelength;
 
-        // Clip the framebuffer size to make sure we can map it into the 1GB device region.
+        // Clip the framebuffer size to make sure we can map it into the 0.5GB device region.
         // This will produce a garbled display, but that's better than nothing.
-        if (lfb_width  > 16384) lfb_width  = 16384;
-        if (lfb_height > 16384) lfb_height = 16384;
+        if (lfb_width  > 8192) lfb_width  = 8192;
+        if (lfb_height > 8192) lfb_height = 8192;
 
-        // This is the first device we map, so the above clipping should guarantee it never fails.
+        // The above clipping should guarantee the mapping never fails.
         lfb_base = map_device(lfb_base, lfb_height * lfb_width * lfb_bytes_per_pixel);
 
         // Blank the whole framebuffer.
