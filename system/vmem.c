@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ vmem.c
 //
@@ -18,6 +18,23 @@
 #include "cpuid.h"
 
 #include "vmem.h"
+
+//------------------------------------------------------------------------------
+// Constants
+//------------------------------------------------------------------------------
+
+// The startup code sets up the paging tables to give us 4GB of virtual address
+// space, using 2MB pages, initially identity mapped to the first 4GB of physical
+// memory. We use the third GB to map the physical memory window we are currently
+// testing, and the following 512MB to map the screen frame buffer and any hardware
+// devices we need to access that are not in the permanently mapped regions.
+
+#define MAX_DEVICE_PAGES    256     // VM pages
+
+#define VM_WINDOW_START     SIZE_C(2,GB)
+#define VM_DEVICE_START     (VM_WINDOW_START + SIZE_C(1,GB))
+#define VM_DEVICE_END       (VM_DEVICE_START + MAX_DEVICE_PAGES * VM_PAGE_SIZE - 1)
+#define VM_SPACE_END        0xffffffff
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -58,18 +75,22 @@ static void load_pdbr()
 
 uintptr_t map_device(uintptr_t base_addr, size_t size)
 {
+    uintptr_t last_addr = base_addr + size - 1;
+    if (last_addr < VM_WINDOW_START || (base_addr > VM_DEVICE_END && last_addr <= VM_SPACE_END)) {
+        return base_addr;
+    }
     uintptr_t first_virt_page = device_pages_used;
     uintptr_t first_phys_page = base_addr >> VM_PAGE_SHIFT;
-    uintptr_t last_phys_page  = (base_addr + size - 1) >> VM_PAGE_SHIFT;
+    uintptr_t last_phys_page  = last_addr >> VM_PAGE_SHIFT;
     // Compute the page table entries.
     for (uintptr_t page = first_phys_page; page <= last_phys_page; page++) {
-        if (device_pages_used == 512) return 0;
+        if (device_pages_used == MAX_DEVICE_PAGES) return 0;
         pd3[device_pages_used++] = (page << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
     load_pdbr();
     // Return the mapped address.
-    return ADDR_C(3,GB) + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
+    return VM_DEVICE_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
 bool map_window(uintptr_t start_page)
