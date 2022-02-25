@@ -47,6 +47,7 @@ extern cpu_state_t  cpu_state[MAX_CPUS];
 
 extern bool         enable_temperature;
 extern bool         enable_trace;
+extern bool         enable_cpucache;
 
 extern bool         enable_sm;
 extern bool         enable_tty;

@@ -130,6 +130,7 @@ void display_init(void)
     } else if (cpuid_info.flags.pae) {
         display_cpu_addr_mode("(PAE)");
     }
+    display_cpu_cache_mode();
     if (l1_cache) {
         display_l1_cache_size(l1_cache);
     }

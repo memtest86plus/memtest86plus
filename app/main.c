@@ -466,7 +466,12 @@ void main(void)
         my_cpu = smp_my_cpu_num();
     }
     if (init_state < 2) {
-        cache_on();
+        if (enable_cpucache) {
+            cache_on();
+        }
+        else {
+            cache_off();
+        }
         if (my_cpu == 0) {
             global_init();
             init_state = 1;

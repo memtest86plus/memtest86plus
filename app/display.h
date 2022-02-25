@@ -41,6 +41,11 @@
 #define display_cpu_addr_mode(str) \
     prints(1, 20, str)
 
+#define display_cpu_cache_mode() \
+    if (!enable_cpucache) { \
+        prints(1, 25, " UC"); \
+    }
+
 #define display_l1_cache_size(size) \
     printf(2, 10, "%kB", (uintptr_t)(size))
 

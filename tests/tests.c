@@ -115,7 +115,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
       case 0:
         if (my_cpu >= 0) cache_off();
         ticks += test_addr_walk1(my_cpu);
-        if (my_cpu >= 0) cache_on();
+        if (my_cpu >= 0 && enable_cpucache) cache_on();
         BAILOUT;
         break;
 
