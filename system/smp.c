@@ -26,6 +26,7 @@
 #include "pmem.h"
 #include "string.h"
 #include "unistd.h"
+#include "vmem.h"
 
 #include "smp.h"
 
@@ -36,6 +37,8 @@
 //------------------------------------------------------------------------------
 
 #define MAX_APIC_IDS                256
+
+#define APIC_REGS_SIZE              SIZE_C(4,KB)
 
 // APIC registers
 
@@ -285,13 +288,18 @@ static floating_pointer_struct_t *scan_for_floating_ptr_struct(uintptr_t addr, i
 
 static bool read_mp_config_table(uintptr_t addr)
 {
-    mp_config_table_header_t *mpc = (mp_config_table_header_t *)addr;
+    mp_config_table_header_t *mpc = (mp_config_table_header_t *)map_region(addr, sizeof(mp_config_table_header_t), true);
+    if (mpc == NULL) return false;
+
+    mpc = (mp_config_table_header_t *)map_region(addr, mpc->length, true);
+    if (mpc == NULL) return false;
 
     if (mpc->signature != MPCSignature || checksum(mpc, mpc->length) != 0) {
         return false;
     }
 
-    apic = (volatile apic_register_t *)((uintptr_t)mpc->lapic_addr);
+    apic = (volatile apic_register_t *)map_region(mpc->lapic_addr, APIC_REGS_SIZE, false);
+    if (apic == NULL) return false;
 
     uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(mp_config_table_header_t);
     uint8_t *mpc_table_end = (uint8_t *)mpc + mpc->length;
@@ -364,7 +372,8 @@ static bool find_cpus_in_floating_mp_struct(void)
 
     if (fp->feature[0] > 0 && fp->feature[0] <= 7) {
         // This is a default config, so plug in the numbers.
-        apic = (volatile apic_register_t *)0xFEE00000;
+        apic = (volatile apic_register_t *)map_region(0xFEE00000, APIC_REGS_SIZE, false);
+        if (apic == NULL) return false;
         cpu_num_to_apic_id[0] = 0;
         cpu_num_to_apic_id[1] = 1;
         num_available_cpus = 2;
@@ -399,15 +408,20 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
     return NULL;
 }
 
-static bool parse_madt(void *addr)
+static bool parse_madt(uintptr_t addr)
 {
-    mp_config_table_header_t *mpc = (mp_config_table_header_t *)addr;
+    mp_config_table_header_t *mpc = (mp_config_table_header_t *)map_region(addr, sizeof(mp_config_table_header_t), true);
+    if (mpc == NULL) return false;
+
+    mpc = (mp_config_table_header_t *)map_region(addr, mpc->length, true);
+    if (mpc == NULL) return false;
 
     if (checksum(mpc, mpc->length) != 0) {
         return false;
     }
 
-    apic = (volatile apic_register_t *)((uintptr_t)mpc->lapic_addr);
+    apic = (volatile apic_register_t *)map_region(mpc->lapic_addr, APIC_REGS_SIZE, false);
+    if (apic == NULL) return false;
 
     int found_cpus = 0;
 
@@ -434,7 +448,8 @@ static bool parse_madt(void *addr)
 
 static rsdp_t *find_rsdp_in_efi32_system_table(efi32_system_table_t *system_table)
 {
-    efi32_config_table_t *config_tables = (efi32_config_table_t *)((uintptr_t)system_table->config_tables);
+    efi32_config_table_t *config_tables = (efi32_config_table_t *)map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi32_config_table_t), true);
+    if (config_tables == NULL) return NULL;
 
     uintptr_t table_addr = 0;
     for (uint32_t i = 0; i < system_table->num_config_tables; i++) {
@@ -452,7 +467,8 @@ static rsdp_t *find_rsdp_in_efi32_system_table(efi32_system_table_t *system_tabl
 #ifdef __x86_64__
 static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_table)
 {
-    efi64_config_table_t *config_tables = (efi64_config_table_t *)((uintptr_t)system_table->config_tables);
+    efi64_config_table_t *config_tables = (efi64_config_table_t *)map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi64_config_table_t), true);
+    if (config_tables == NULL) return NULL;
 
     uintptr_t table_addr = 0;
     for (uint32_t i = 0; i < system_table->num_config_tables; i++) {
@@ -476,21 +492,27 @@ static bool find_cpus_in_rsdp(void)
 
     // Search for the RSDP
     rsdp_t *rp = NULL;
-    if (boot_params->acpi_rsdp_addr != 0) {
+    uintptr_t acpi_rsdp_addr = map_region(boot_params->acpi_rsdp_addr, 0x8, true);
+    if (acpi_rsdp_addr != 0) {
         // Validate it
-        rp = scan_for_rsdp(boot_params->acpi_rsdp_addr, 0x8);
+        rp = scan_for_rsdp(acpi_rsdp_addr, 0x8);
         if (rp) rsdp_source = "boot parameters";
     }
     if (rp == NULL && efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
-        uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab;
-        rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
-        if (rp) rsdp_source = "EFI32 system table";
+        uintptr_t system_table_addr = map_region(efi_info->sys_tab, sizeof(efi32_system_table_t), true);
+        if (system_table_addr != 0) {
+            rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
+            if (rp) rsdp_source = "EFI32 system table";
+        }
     }
 #ifdef __x86_64__
     if (rp == NULL && efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
-        rp = find_rsdp_in_efi64_system_table((efi64_system_table_t *)system_table_addr);
-        if (rp) rsdp_source = "EFI64 system table";
+        system_table_addr = map_region(system_table_addr, sizeof(efi64_system_table_t), true);
+        if (system_table_addr != 0) {
+            rp = find_rsdp_in_efi64_system_table((efi64_system_table_t *)system_table_addr);
+            if (rp) rsdp_source = "EFI64 system table";
+        }
     }
 #endif
     if (rp == NULL) {
@@ -515,15 +537,16 @@ static bool find_cpus_in_rsdp(void)
     // Found the RSDP, now get either the RSDT or XSDT and scan it for a pointer to the MADT.
     rsdt_header_t *rt;
     if (rp->revision >= 2) {
-        rt = (rsdt_header_t *)((uintptr_t)rp->xsdt_addr);
-        if (rt == 0) {
+        rt = (rsdt_header_t *)map_region(rp->xsdt_addr, sizeof(rsdt_header_t), true);
+        if (rt == NULL) {
             return false;
         }
         // Validate the XSDT.
         if (*(uint32_t *)rt != XSDTSignature) {
             return false;
         }
-        if (checksum(rt, rt->length) != 0) {
+        rt = (rsdt_header_t *)map_region(rp->xsdt_addr, rt->length, true);
+        if (rt == NULL || checksum(rt, rt->length) != 0) {
             return false;
         }
         // Scan the XSDT for a pointer to the MADT.
@@ -531,24 +554,25 @@ static bool find_cpus_in_rsdp(void)
         uint64_t *tab_end = (uint64_t *)((uint8_t *)rt + rt->length);
 
         while (tab_ptr < tab_end) {
-            uint32_t *ptr = (uint32_t *)((uintptr_t)(*tab_ptr++));  // read the next table entry
+            uint32_t *ptr = (uint32_t *)map_region(*tab_ptr++, sizeof(uint32_t), true);  // read the next table entry
 
             if (ptr && *ptr == MADTSignature) {
-                if (parse_madt(ptr)) {
+                if (parse_madt((uintptr_t)ptr)) {
                     return true;
                 }
             }
         }
     } else {
-        rt = (rsdt_header_t *)((uintptr_t)rp->rsdt_addr);
-        if (rt == 0) {
+        rt = (rsdt_header_t *)map_region(rp->rsdt_addr, sizeof(rsdt_header_t), true);
+        if (rt == NULL) {
             return false;
         }
         // Validate the RSDT.
         if (*(uint32_t *)rt != RSDTSignature) {
             return false;
         }
-        if (checksum(rt, rt->length) != 0) {
+        rt = (rsdt_header_t *)map_region(rp->rsdt_addr, rt->length, true);
+        if (rt == NULL || checksum(rt, rt->length) != 0) {
             return false;
         }
         // Scan the RSDT for a pointer to the MADT.
@@ -556,10 +580,10 @@ static bool find_cpus_in_rsdp(void)
         uint32_t *tab_end = (uint32_t *)((uint8_t *)rt + rt->length);
 
         while (tab_ptr < tab_end) {
-            uint32_t *ptr = (uint32_t *)((uintptr_t)(*tab_ptr++));  // read the next table entry
+            uint32_t *ptr = (uint32_t *)map_region(*tab_ptr++, sizeof(uint32_t), true);  // read the next table entry
 
             if (ptr && *ptr == MADTSignature) {
-                if (parse_madt(ptr)) {
+                if (parse_madt((uintptr_t)ptr)) {
                     return true;
                 }
             }
