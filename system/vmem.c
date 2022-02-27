@@ -26,14 +26,15 @@
 // The startup code sets up the paging tables to give us 4GB of virtual address
 // space, using 2MB pages, initially identity mapped to the first 4GB of physical
 // memory. We use the third GB to map the physical memory window we are currently
-// testing, and the following 512MB to map the screen frame buffer and any hardware
-// devices we need to access that are not in the permanently mapped regions.
+// testing, and the following 512MB to map the screen frame buffer, ACPI tables,
+// and any hardware devices we need to access that are not in the permanently
+// mapped regions.
 
-#define MAX_DEVICE_PAGES    256     // VM pages
+#define MAX_REGION_PAGES    256     // VM pages
 
 #define VM_WINDOW_START     SIZE_C(2,GB)
-#define VM_DEVICE_START     (VM_WINDOW_START + SIZE_C(1,GB))
-#define VM_DEVICE_END       (VM_DEVICE_START + MAX_DEVICE_PAGES * VM_PAGE_SIZE - 1)
+#define VM_REGION_START     (VM_WINDOW_START + SIZE_C(1,GB))
+#define VM_REGION_END       (VM_REGION_START + MAX_REGION_PAGES * VM_PAGE_SIZE - 1)
 #define VM_SPACE_END        0xffffffff
 
 //------------------------------------------------------------------------------
@@ -73,11 +74,11 @@ static void load_pdbr()
 // Public Functions
 //------------------------------------------------------------------------------
 
-uintptr_t map_device(uintptr_t base_addr, size_t size)
+uintptr_t map_region(uintptr_t base_addr, size_t size)
 {
     uintptr_t last_addr = base_addr + size - 1;
     // Check if the requested region is permanently mapped.
-    if (last_addr < VM_WINDOW_START || (base_addr > VM_DEVICE_END && last_addr <= VM_SPACE_END)) {
+    if (last_addr < VM_WINDOW_START || (base_addr > VM_REGION_END && last_addr <= VM_SPACE_END)) {
         return base_addr;
     }
     // Check if the requested region is already mapped.
@@ -97,13 +98,13 @@ uintptr_t map_device(uintptr_t base_addr, size_t size)
     }
     // If not, map it. Note that this will extend a partial match at the end of the current map.
     while (curr_phys_page <= last_phys_page) {
-        if (device_pages_used == MAX_DEVICE_PAGES) return 0;
+        if (device_pages_used == MAX_REGION_PAGES) return 0;
         pd3[device_pages_used++] = (curr_phys_page++ << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
     load_pdbr();
     // Return the mapped address.
-    return VM_DEVICE_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
+    return VM_REGION_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
 bool map_window(uintptr_t start_page)

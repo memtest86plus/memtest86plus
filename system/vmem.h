@@ -19,7 +19,7 @@
 
 #define VM_WINDOW_SIZE     PAGE_C(1,GB)
 
-uintptr_t map_device(uintptr_t base_addr, size_t size);
+uintptr_t map_region(uintptr_t base_addr, size_t size);
 
 bool map_window(uintptr_t start_page);
 

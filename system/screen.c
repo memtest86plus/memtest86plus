@@ -215,7 +215,7 @@ void screen_init(void)
         if (lfb_height > 8192) lfb_height = 8192;
 
         // The above clipping should guarantee the mapping never fails.
-        lfb_base = map_device(lfb_base, lfb_height * lfb_width * lfb_bytes_per_pixel);
+        lfb_base = map_region(lfb_base, lfb_height * lfb_width * lfb_bytes_per_pixel);
 
         // Blank the whole framebuffer.
         int pixels_per_word = sizeof(uint32_t) / lfb_bytes_per_pixel;
