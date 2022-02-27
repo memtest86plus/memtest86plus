@@ -492,13 +492,7 @@ static bool find_cpus_in_rsdp(void)
 
     // Search for the RSDP
     rsdp_t *rp = NULL;
-    uintptr_t acpi_rsdp_addr = map_region(boot_params->acpi_rsdp_addr, 0x8, true);
-    if (acpi_rsdp_addr != 0) {
-        // Validate it
-        rp = scan_for_rsdp(acpi_rsdp_addr, 0x8);
-        if (rp) rsdp_source = "boot parameters";
-    }
-    if (rp == NULL && efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
+    if (efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = map_region(efi_info->sys_tab, sizeof(efi32_system_table_t), true);
         if (system_table_addr != 0) {
             rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
