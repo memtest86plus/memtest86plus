@@ -74,11 +74,12 @@ static void load_pdbr()
 // Public Functions
 //------------------------------------------------------------------------------
 
-uintptr_t map_region(uintptr_t base_addr, size_t size)
+uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
 {
     uintptr_t last_addr = base_addr + size - 1;
-    // Check if the requested region is permanently mapped.
-    if (last_addr < VM_WINDOW_START || (base_addr > VM_REGION_END && last_addr <= VM_SPACE_END)) {
+    // Check if the requested region is permanently mapped. If it is only needed during startup,
+    // this includes the region we will eventually use for the memory test window.
+    if (last_addr < (only_for_startup ? VM_REGION_START : VM_WINDOW_START) || (base_addr > VM_REGION_END && last_addr <= VM_SPACE_END)) {
         return base_addr;
     }
     // Check if the requested region is already mapped.

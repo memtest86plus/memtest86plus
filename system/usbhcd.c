@@ -616,7 +616,7 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     print_usb_info("Found %s controller %04x:%04x at %08x size %08x", hci_name[controller_type],
                    (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size);
 
-    base_addr = map_region(base_addr, mmio_size);
+    base_addr = map_region(base_addr, mmio_size, false);
     if (base_addr == 0) {
         print_usb_info(" Failed to map device into virtual memory");
         return;
