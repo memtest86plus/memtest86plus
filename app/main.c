@@ -176,8 +176,6 @@ static void global_init(void)
 
     floppy_off();
 
-    cache_on();
-
     cpuid_init();
 
     screen_init();
@@ -461,6 +459,7 @@ void main(void)
         my_cpu = smp_my_cpu_num();
     }
     if (init_state < 2) {
+        cache_on();
         if (my_cpu == 0) {
             global_init();
             init_state = 1;
