@@ -96,6 +96,11 @@
 #define CPU_ENABLED                 1
 #define CPU_BOOTPROCESSOR           2
 
+// MADT entry types
+
+#define MADT_PROCESSOR              0
+#define MADT_LAPIC_ADDR             5
+
 // MADT processor flag values
 
 #define MADT_PF_ENABLED             0x1
@@ -207,10 +212,22 @@ typedef struct {
 typedef struct {
     uint8_t     type;
     uint8_t     length;
+} madt_entry_header_t;
+
+typedef struct {
+    uint8_t     type;
+    uint8_t     length;
     uint8_t     acpi_id;
     uint8_t     apic_id;
     uint32_t    flags;
 } madt_processor_entry_t;
+
+typedef struct {
+    uint8_t     type;
+    uint8_t     length;
+    uint16_t    reserved;
+    uint64_t    lapic_addr;
+} madt_lapic_addr_entry_t;
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -420,16 +437,16 @@ static bool parse_madt(uintptr_t addr)
         return false;
     }
 
-    apic = (volatile apic_register_t *)map_region(mpc->lapic_addr, APIC_REGS_SIZE, false);
-    if (apic == NULL) return false;
+    uintptr_t apic_addr = mpc->lapic_addr;
 
     int found_cpus = 0;
 
     uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(mp_config_table_header_t);
     uint8_t *mpc_table_end = (uint8_t *)mpc + mpc->length;
     while (tab_entry_ptr < mpc_table_end) {
-        madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
-        if (entry->type == MP_PROCESSOR) {
+        madt_entry_header_t *entry_header = (madt_entry_header_t *)tab_entry_ptr;
+        if (entry_header->type == MADT_PROCESSOR) {
+            madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
                 if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[found_cpus] = entry->apic_id;
@@ -441,7 +458,17 @@ static bool parse_madt(uintptr_t addr)
                 found_cpus++;
             }
         }
-        tab_entry_ptr += entry->length;
+        if (entry_header->type == MADT_LAPIC_ADDR) {
+            madt_lapic_addr_entry_t *entry = (madt_lapic_addr_entry_t *)tab_entry_ptr;
+            apic_addr = (uintptr_t)entry->lapic_addr;
+        }
+        tab_entry_ptr += entry_header->length;
+    }
+
+    apic = (volatile apic_register_t *)map_region(apic_addr, APIC_REGS_SIZE, false);
+    if (apic == NULL) {
+        num_available_cpus = 1;
+        return false;
     }
     return true;
 }
