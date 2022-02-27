@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "boot.h"
+#include "bootparams.h"
 
 #include "cache.h"
 #include "cpuid.h"
@@ -170,6 +171,9 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
 
 static void global_init(void)
 {
+    // This is the first region we map, so is guaranteed not to fail.
+    boot_params_addr = map_region(boot_params_addr, sizeof(boot_params_t), true);
+
     floppy_off();
 
     cache_on();
