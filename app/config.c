@@ -26,6 +26,7 @@
 #include "screen.h"
 #include "smp.h"
 #include "usbhcd.h"
+#include "vmem.h"
 
 #include "read.h"
 #include "print.h"
@@ -658,7 +659,10 @@ void config_init(void)
     if (cmd_line_addr != 0) {
         int cmd_line_size = boot_params->cmd_line_size;
         if (cmd_line_size == 0) cmd_line_size = 255;
-        parse_command_line((char *)cmd_line_addr, cmd_line_size);
+        cmd_line_addr = map_region(cmd_line_addr, cmd_line_size, true);
+        if (cmd_line_addr != 0) {
+            parse_command_line((char *)cmd_line_addr, cmd_line_size);
+        }
     }
 }
 
