@@ -40,7 +40,6 @@ static inline void spin_lock(spinlock_t *lock)
                 __builtin_ia32_pause();
             } while (*lock);
         }
-        __sync_synchronize();
     }
 }
 
