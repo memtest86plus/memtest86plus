@@ -118,21 +118,42 @@ uintptr_t   test_addr[MAX_CPUS];
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define BARRIER \
+#define SHORT_BARRIER \
     if (TRACE_BARRIERS) { \
         trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
     } \
-    barrier_wait(start_barrier);
+    if (power_save < POWER_SAVE_HIGH) { \
+        barrier_spin_wait(start_barrier); \
+    } else { \
+        barrier_halt_wait(start_barrier); \
+    }
+
+#define LONG_BARRIER \
+    if (TRACE_BARRIERS) { \
+        trace(my_cpu, "Start barrier wait at %s line %i", __FILE__, __LINE__); \
+    } \
+    if (power_save > POWER_SAVE_OFF) { \
+        barrier_halt_wait(start_barrier); \
+    } else { \
+        barrier_spin_wait(start_barrier); \
+    }
 
 static void run_at(uintptr_t addr, int my_cpu)
 {
     uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
 
+
     if (my_cpu == 0) {
         // Copy the program code and all data except the stacks.
-        memcpy((void *)addr, &_start, _stacks - _start);
+        memcpy((void *)addr, (void *)_start, _stacks - _start);
+        // Copy the thread-local storage.
+        size_t locals_offset = _stacks - _start + BSP_STACK_SIZE - LOCALS_SIZE;
+        for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+            memcpy((void *)(addr + locals_offset), (void *)(_start + locals_offset), LOCALS_SIZE);
+            locals_offset += AP_STACK_SIZE;
+        }
     }
-    BARRIER;
+    LONG_BARRIER;
 
 #ifndef __x86_64__
     // The 32-bit startup code needs to know where it is located.
@@ -317,7 +338,7 @@ static void test_all_windows(int my_cpu)
                 display_active_cpu(my_cpu);
             }
         }
-        barrier_init(run_barrier, num_active_cpus);
+        barrier_reset(run_barrier, num_active_cpus);
     }
 
     int iterations = test_list[test_num].iterations;
@@ -328,7 +349,7 @@ static void test_all_windows(int my_cpu)
 
     // Loop through all possible windows.
     do {
-        BARRIER;
+        LONG_BARRIER;
         if (bail) {
             break;
         }
@@ -344,7 +365,7 @@ static void test_all_windows(int my_cpu)
                 window_num = 1;
             }
         }
-        BARRIER;
+        SHORT_BARRIER;
 
         // Relocate if necessary.
         if (window_num > 0) {
@@ -374,16 +395,9 @@ static void test_all_windows(int my_cpu)
             }
             setup_vm_map(window_start, window_end);
         }
-        BARRIER;
+        SHORT_BARRIER;
 
-        // There is a significant overhead in restarting halted CPU cores, so only enable
-        // halting if the memory present in the window is a reasonable size.
-        bool halt_if_inactive = enable_halt && num_enabled_cpus > num_active_cpus && num_mapped_pages > PAGE_C(16,MB);
         if (!i_am_active) {
-            if (!dummy_run && halt_if_inactive) {
-                cpu_state[my_cpu] = CPU_STATE_HALTED;
-                __asm__ __volatile__ ("hlt");
-            }
             continue;
         }
 
@@ -408,29 +422,6 @@ static void test_all_windows(int my_cpu)
         }
 
         if (i_am_master) {
-            if (!dummy_run && halt_if_inactive) {
-                int cpu_num = 0;
-                int retries = 0;
-                while (cpu_num < num_available_cpus) {
-                    if (cpu_num == my_cpu) {
-                        cpu_num++;
-                        continue;
-                    }
-                    if (cpu_state[cpu_num] == CPU_STATE_ENABLED) {
-                        // This catches a potential race between the inactive CPU halting and the master CPU waking
-                        // it up. This should be an unlikely event, so just spin until the inactive CPU catches up.
-                        usleep(10);
-                        if (++retries < 1000) {
-                            continue;
-                        }
-                    }
-                    if (cpu_state[cpu_num] == CPU_STATE_HALTED) {
-                        smp_send_nmi(cpu_num);
-                    }
-                    retries = 0;
-                    cpu_num++;
-                }
-            }
             window_num++;
         }
     } while (window_end < pm_map[pm_map_size - 1].end);
@@ -467,7 +458,7 @@ void main(void)
                 set_scroll_lock(false);
                 trace(0, "starting other CPUs");
             }
-            barrier_init(start_barrier, num_enabled_cpus);
+            barrier_reset(start_barrier, num_enabled_cpus);
             int failed = smp_start(cpu_state);
             if (failed) {
                 const char *message = "Failed to start CPU core %i. Press any key to reboot...";
@@ -501,7 +492,7 @@ void main(void)
     // where we left off after each relocation.
 
     while (1) {
-        BARRIER;
+        SHORT_BARRIER;
         if (my_cpu == 0) {
             if (start_run) {
                 pass_num = 0;
@@ -542,11 +533,11 @@ void main(void)
             start_test = false;
             rerun_test = false;
         }
-        BARRIER;
+        SHORT_BARRIER;
         if (test_list[test_num].enabled) {
             test_all_windows(my_cpu);
         }
-        BARRIER;
+        SHORT_BARRIER;
         if (my_cpu != 0) {
             continue;
         }

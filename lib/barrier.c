@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
-//
-// Derived from an extract of memtest86+ smp.c:
-//
-// MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
-// ------------------------------------------------
-// smp.c - MemTest-86  Version 3.5
-//
-// Released under version 2 of the Gnu Public License.
-// By Chris Brady
+// Copyright (C) 2020-2022 Martin Whitaker.
 
+#include <stdbool.h>
 #include <stddef.h>
+
+#include "cpulocal.h"
+#include "smp.h"
+
+#include "assert.h"
 
 #include "barrier.h"
 
@@ -22,34 +17,67 @@
 
 void barrier_init(barrier_t *barrier, int num_threads)
 {
-    barrier->num_threads = num_threads;
-    barrier->count = num_threads;
-    spin_unlock(&barrier->lock);
-    spin_unlock(&barrier->st1);
-    spin_unlock(&barrier->st2);
-    spin_lock(&barrier->st2);
+    barrier->flag_num = allocate_local_flag();
+    assert(barrier->flag_num >= 0);
+
+    barrier_reset(barrier, num_threads);
 }
 
-void barrier_wait(barrier_t *barrier)
+void barrier_reset(barrier_t *barrier, int num_threads)
+{
+    barrier->num_threads = num_threads;
+    barrier->count       = num_threads;
+
+    local_flag_t *waiting_flags = local_flags(barrier->flag_num);
+    for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+        waiting_flags[cpu_num].flag = false;
+    }
+}
+
+void barrier_spin_wait(barrier_t *barrier)
 {
     if (barrier == NULL || barrier->num_threads < 2) {
         return;
     }
-    spin_wait(&barrier->st1);            // Wait if the barrier is active.
-    spin_lock(&barrier->lock);           // Get lock for barrier struct.
-    if (--barrier->count == 0) {         // Last process?
-        spin_lock(&barrier->st1);        // Hold up any processes re-entering.
-        spin_unlock(&barrier->st2);      // Release the other processes.
-        barrier->count++;
-        spin_unlock(&barrier->lock);
-    } else {
-        spin_unlock(&barrier->lock);
-        spin_wait(&barrier->st2);        // Wait for peers to arrive.
-        spin_lock(&barrier->lock);
-        if (++barrier->count == barrier->num_threads) {
-            spin_unlock(&barrier->st1);
-            spin_lock(&barrier->st2);
+    local_flag_t *waiting_flags = local_flags(barrier->flag_num);
+    int my_cpu = smp_my_cpu_num();
+    waiting_flags[my_cpu].flag = true;
+    if (__sync_fetch_and_sub(&barrier->count, 1) > 1) {
+        volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
+        while (*i_am_blocked) {
+            __builtin_ia32_pause();
         }
-        spin_unlock(&barrier->lock);
+        return;
+    }
+    // Last one here, so reset the barrier and wake the others. No need to
+    // check if a CPU core is actually waiting - just clear all the flags.
+    barrier->count = barrier->num_threads;
+    __sync_synchronize();
+    for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+        waiting_flags[cpu_num].flag = false;
+    }
+}
+
+void barrier_halt_wait(barrier_t *barrier)
+{
+    if (barrier == NULL || barrier->num_threads < 2) {
+        return;
+    }
+    local_flag_t *waiting_flags = local_flags(barrier->flag_num);
+    int my_cpu = smp_my_cpu_num();
+    waiting_flags[my_cpu].flag = true;
+    if (__sync_fetch_and_sub(&barrier->count, 1) > 1) {
+        __asm__ __volatile__ ("hlt");
+        return;
+    }
+    // Last one here, so reset the barrier and wake the others.
+    barrier->count = barrier->num_threads;
+    __sync_synchronize();
+    waiting_flags[my_cpu].flag = false;
+    for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+        if (waiting_flags[cpu_num].flag) {
+            waiting_flags[cpu_num].flag = false;
+            smp_send_nmi(cpu_num);
+        }
     }
 }

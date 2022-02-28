@@ -28,6 +28,12 @@ typedef enum {
     ERROR_MODE_BADRAM
 } error_mode_t;
 
+typedef enum {
+    POWER_SAVE_OFF,
+    POWER_SAVE_LOW,
+    POWER_SAVE_HIGH
+} power_save_t;
+
 extern uintptr_t    pm_limit_lower;
 extern uintptr_t    pm_limit_upper;
 
@@ -41,9 +47,10 @@ extern cpu_state_t  cpu_state[MAX_CPUS];
 
 extern bool         enable_temperature;
 extern bool         enable_trace;
-extern bool         enable_halt;
 
 extern bool         pause_at_start;
+
+extern power_save_t power_save;
 
 void config_init(void);
 

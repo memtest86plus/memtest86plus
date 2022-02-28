@@ -79,7 +79,11 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
         if (TRACE_BARRIERS) { \
             trace(my_cpu, "Run barrier wait at %s line %i", __FILE__, __LINE__); \
         } \
-        barrier_wait(run_barrier); \
+        if (power_save < POWER_SAVE_HIGH) { \
+            barrier_spin_wait(run_barrier); \
+        } else { \
+            barrier_halt_wait(run_barrier); \
+        } \
     }
 
 int run_test(int my_cpu, int test, int stage, int iterations)

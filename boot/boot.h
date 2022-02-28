@@ -24,6 +24,8 @@
 
 #define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
+#define	LOCALS_SIZE	16		/* Stack region reserved for thread-local storage */
+
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */
 

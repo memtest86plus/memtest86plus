@@ -10,6 +10,8 @@
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
 
+#include "cpulocal.h"
+
 #include "spinlock.h"
 
 /**
@@ -17,21 +19,31 @@
  */
 typedef struct
 {
-    int             num_threads;
-    volatile int    count;
-    spinlock_t      lock;
-    spinlock_t      st1;
-    spinlock_t      st2;
+    int     flag_num;
+    int     num_threads;
+    int     count;
 } barrier_t;
 
 /**
- * Initialises the barrier to block the specified number of threads.
+ * Initialises a new barrier to block the specified number of threads.
  */
 void barrier_init(barrier_t *barrier, int num_threads);
 
 /**
- * Waits for all threads to arrive at the barrier.
+ * Resets an existing barrier to block the specified number of threads.
  */
-void barrier_wait(barrier_t *barrier);
+void barrier_reset(barrier_t *barrier, int num_threads);
+
+/**
+ * Waits for all threads to arrive at the barrier. A CPU core spins in an
+ * idle loop when waiting.
+ */
+void barrier_spin_wait(barrier_t *barrier);
+
+/**
+ * Waits for all threads to arrive at the barrier. A CPU core halts when
+ * waiting.
+ */
+void barrier_halt_wait(barrier_t *barrier);
 
 #endif // BARRIER_H

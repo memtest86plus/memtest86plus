@@ -8,6 +8,7 @@ INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app
 
 SYS_OBJS = system/cpuid.o \
            system/cpuinfo.o \
+           system/cpulocal.o \
            system/ehci.o \
            system/font.o \
            system/hwctrl.o \

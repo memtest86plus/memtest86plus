@@ -122,7 +122,7 @@ startup:
 	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
-	addl	$BSP_STACK_SIZE, %eax
+	addl	$(BSP_STACK_SIZE - LOCALS_SIZE), %eax
 	leal	_stacks@GOTOFF(%ebx), %esp
 	addl	%eax, %esp
 

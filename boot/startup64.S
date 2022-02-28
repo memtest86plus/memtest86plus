@@ -158,7 +158,7 @@ startup:
 	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
-	addq	$BSP_STACK_SIZE, %rax
+	addq	$(BSP_STACK_SIZE - LOCALS_SIZE), %rax
 	leaq	_stacks(%rip), %rsp
 	addq	%rax, %rsp
 

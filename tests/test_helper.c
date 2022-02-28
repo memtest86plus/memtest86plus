@@ -117,10 +117,19 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
 void flush_caches(int my_cpu)
 {
     if (my_cpu >= 0) {
-        barrier_wait(run_barrier);
+        bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
+        if (use_spin_wait) {
+            barrier_spin_wait(run_barrier);
+        } else {
+            barrier_halt_wait(run_barrier);
+        }
         if (my_cpu == master_cpu) {
             cache_flush();
         }
-        barrier_wait(run_barrier);
+        if (use_spin_wait) {
+            barrier_spin_wait(run_barrier);
+        } else {
+            barrier_halt_wait(run_barrier);
+        }
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from memtest86+ reloc.c:
 //
@@ -10,6 +10,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
+#include "assert.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -61,13 +63,6 @@ typedef struct
 //------------------------------------------------------------------------------
 
 #define ELF64_R_TYPE(r_info)    ((r_info) & 0xffffffff)
-
-static inline void assert(int expr)
-{
-    if (!expr) {
-        __asm__ __volatile__ ("int $3");
-    }
-}
 
 /*
  * Return the run-time load address of the shared object.

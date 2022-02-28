@@ -63,6 +63,10 @@
 #define APIC_DELMODE_STARTUP        6
 #define APIC_DELMODE_EXTINT         7
 
+// APIC ICR busy flag
+
+#define	APIC_ICR_BUSY               (1 << 12)
+
 // IA32_APIC_BASE MSR bits
 
 #define IA32_APIC_ENABLED           (1 << 11)
@@ -614,18 +618,23 @@ static bool find_cpus_in_rsdp(void)
     return false;
 }
 
-static bool send_ipi(int apic_id, int trigger, int level, int mode, uint8_t vector, int delay_before_poll)
+static inline void send_ipi(int apic_id, int trigger, int level, int mode, uint8_t vector)
 {
     apic_write(APIC_REG_ICRHI, apic_id << 24);
 
     apic_write(APIC_REG_ICRLO, trigger << 15 | level << 14 | mode << 8 | vector);
+}
+
+static bool send_ipi_and_wait(int apic_id, int trigger, int level, int mode, uint8_t vector, int delay_before_poll)
+{
+    send_ipi(apic_id, trigger, level, mode, vector);
 
     usleep(delay_before_poll);
 
     // Wait for send complete or timeout after 100ms.
     int timeout = 1000;
     while (timeout > 0) {
-        bool send_pending = (apic_read(APIC_REG_ICRLO) & 0x00001000);
+        bool send_pending = (apic_read(APIC_REG_ICRLO) & APIC_ICR_BUSY);
         if (!send_pending) {
             return true;
         }
@@ -663,13 +672,13 @@ static bool start_cpu(int cpu_num)
     (void)read_apic_esr(is_p5);
 
     // Pulse the INIT IPI.
-    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 1, APIC_DELMODE_INIT, 0, 0)) {
+    if (!send_ipi_and_wait(apic_id, APIC_TRIGGER_LEVEL, 1, APIC_DELMODE_INIT, 0, 0)) {
         return false;
     }
     if (use_long_delays) {
         usleep(10*1000);  // 10ms
     }
-    if (!send_ipi(apic_id, APIC_TRIGGER_LEVEL, 0, APIC_DELMODE_INIT, 0, 0)) {
+    if (!send_ipi_and_wait(apic_id, APIC_TRIGGER_LEVEL, 0, APIC_DELMODE_INIT, 0, 0)) {
         return false;
     }
 
@@ -679,7 +688,7 @@ static bool start_cpu(int cpu_num)
         (void)read_apic_esr(is_p5);
 
         // Send the STARTUP IPI.
-        if (!send_ipi(apic_id, 0, 0, APIC_DELMODE_STARTUP, AP_TRAMPOLINE_PAGE, use_long_delays ? 300 : 10)) {
+        if (!send_ipi_and_wait(apic_id, 0, 0, APIC_DELMODE_STARTUP, AP_TRAMPOLINE_PAGE, use_long_delays ? 300 : 10)) {
             return false;
         }
 
@@ -785,9 +794,12 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 #endif
 }
 
-bool smp_send_nmi(int cpu_num)
+void smp_send_nmi(int cpu_num)
 {
-    return send_ipi(cpu_num_to_apic_id[cpu_num], 0, 0, APIC_DELMODE_NMI, 0, 200);
+    while (apic_read(APIC_REG_ICRLO) & APIC_ICR_BUSY) {
+        __builtin_ia32_pause();
+    }
+    send_ipi(cpu_num_to_apic_id[cpu_num], 0, 0, APIC_DELMODE_NMI, 0);
 }
 
 int smp_my_cpu_num(void)

@@ -92,9 +92,10 @@ cpu_state_t     cpu_state[MAX_CPUS];
 
 bool            enable_temperature = false;
 bool            enable_trace       = false;
-bool            enable_halt        = true;
 
 bool            pause_at_start     = true;
+
+power_save_t    power_save = POWER_SAVE_HIGH;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -115,8 +116,14 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
-    } else if (strncmp(option, "nohalt", 7) == 0) {
-        enable_halt = false;
+    } else if (strncmp(option, "powersave", 10) == 0) {
+        if (strncmp(params, "off", 4) == 0) {
+            power_save = POWER_SAVE_OFF;
+        } else if (strncmp(params, "low", 4) == 0) {
+            power_save = POWER_SAVE_LOW;
+        } else if (strncmp(params, "high", 5) == 0) {
+            power_save = POWER_SAVE_HIGH;
+        }
     } else if (strncmp(option, "smp", 4) == 0) {
         smp_enabled = true;
     } else if (strncmp(option, "trace", 6) == 0) {
@@ -652,6 +659,8 @@ void config_init(void)
     }
 
     enable_temperature = !no_temperature;
+
+    power_save = POWER_SAVE_HIGH;
 
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 
