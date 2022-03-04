@@ -117,7 +117,7 @@
 #define OHCI_ED_DIR_IN          0x00001000      // Direction is IN
 #define OHCI_ED_SPD             0x00002000      // Speed
 #define OHCI_ED_SPD_FULL        0x00000000      // Speed is Full Speed
-#define OHCI_ED_SPD_LOW         0x00001000      // Speed is Low Speed
+#define OHCI_ED_SPD_LOW         0x00002000      // Speed is Low Speed
 #define OHCI_ED_SKIP            0x00004000      // Skip
 #define OHCI_ED_FMT             0x00008000      // Format
 #define OHCI_ED_FMT_GEN         0x00000000      // Format is General TD
