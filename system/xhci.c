@@ -8,6 +8,7 @@
 #include "memsize.h"
 #include "pmem.h"
 #include "usb.h"
+#include "vmem.h"
 
 #include "memory.h"
 #include "unistd.h"
@@ -663,8 +664,8 @@ static int allocate_slot(const usb_hcd_t *hcd)
     // Allocate and initialise a private workspace for this device.
     // TODO: check for heap overflow.
 
-    pm_map[heap_segment].end -= num_pages(DEVICE_WS_SIZE);
-    uintptr_t device_workspace_addr = pm_map[heap_segment].end << PAGE_SHIFT;
+    pm_map[0].end -= num_pages(DEVICE_WS_SIZE);
+    uintptr_t device_workspace_addr = pm_map[0].end << PAGE_SHIFT;
     ws->output_context_addr  = device_workspace_addr;
     ws->control_ep_tr_addr   = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE;
     ws->interrupt_ep_tr_addr = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE + sizeof(ep_tr_t);
@@ -683,7 +684,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
     enqueue_xhci_command(ws, XHCI_TRB_ENABLE_SLOT | XHCI_TRB_USB2_SLOT, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
     if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
-        pm_map[heap_segment].end += num_pages(DEVICE_WS_SIZE);
+        pm_map[0].end += num_pages(DEVICE_WS_SIZE);
         return 0;
     }
     int slot_id = event_slot_id(&event);
@@ -707,7 +708,7 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
 
     write64(&ws->device_context_index[slot_id], 0);
 
-    pm_map[heap_segment].end += num_pages(DEVICE_WS_SIZE);
+    pm_map[0].end += num_pages(DEVICE_WS_SIZE);
 
     return true;
 }
@@ -1052,9 +1053,14 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     uintptr_t scratchpad_size = num_scratchpad_buffers * xhci_page_size;
     pm_map[heap_segment].end -= num_pages(scratchpad_size);
     pm_map[heap_segment].end &= ~(xhci_page_mask >> PAGE_SHIFT);
-    uintptr_t scratchpad_addr = pm_map[heap_segment].end << PAGE_SHIFT;
+    uintptr_t scratchpad_paddr = pm_map[heap_segment].end << PAGE_SHIFT;
+    uintptr_t scratchpad_vaddr = map_region(scratchpad_paddr, scratchpad_size, true);
+    if (scratchpad_vaddr == 0) {
+        pm_map[heap_segment].end = heap_segment_end;
+        return false;
+    }
 
-    memset((void *)scratchpad_addr, 0, scratchpad_size);
+    memset((void *)scratchpad_vaddr, 0, scratchpad_size);
 
     // Allocate and initialise the device context base address and scratchpad buffer arrays on the heap.
     // Both need to be aligned on a 64 byte boundary.
@@ -1063,17 +1069,23 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     uintptr_t scratchpad_buffer_index_offs = round_up(device_context_index_size, 64);
     uintptr_t scratchpad_buffer_index_size = num_scratchpad_buffers * sizeof(uint64_t);
     pm_map[heap_segment].end -= num_pages(scratchpad_buffer_index_offs + scratchpad_buffer_index_size);
-    uintptr_t device_context_index_addr = pm_map[heap_segment].end << PAGE_SHIFT;
+    uintptr_t device_context_index_paddr = pm_map[heap_segment].end << PAGE_SHIFT;
+    uintptr_t device_context_index_vaddr = map_region(device_context_index_paddr, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, true);
+    if (device_context_index_vaddr == 0) {
+        pm_map[heap_segment].end = heap_segment_end;
+        return false;
+    }
 
-    memset((void *)device_context_index_addr, 0, device_context_index_size);
+    memset((void *)device_context_index_vaddr, 0, device_context_index_size);
 
-    uint64_t *device_context_index = (uint64_t *)device_context_index_addr;
+    uint64_t *device_context_index = (uint64_t *)device_context_index_vaddr;
     if (num_scratchpad_buffers > 0) {
-        uintptr_t scratchpad_buffer_index_addr = device_context_index_addr + scratchpad_buffer_index_offs;
-        device_context_index[0] = scratchpad_buffer_index_addr;
-        uint64_t *scratchpad_buffer_index = (uint64_t *)scratchpad_buffer_index_addr;
+        uintptr_t scratchpad_buffer_index_paddr = device_context_index_paddr + scratchpad_buffer_index_offs;
+        uintptr_t scratchpad_buffer_index_vaddr = device_context_index_vaddr + scratchpad_buffer_index_offs;
+        device_context_index[0] = scratchpad_buffer_index_paddr;
+        uint64_t *scratchpad_buffer_index = (uint64_t *)scratchpad_buffer_index_vaddr;
         for (uintptr_t i = 0; i < num_scratchpad_buffers; i++) {
-            scratchpad_buffer_index[i] = scratchpad_addr + i * xhci_page_size;
+            scratchpad_buffer_index[i] = scratchpad_paddr + i * xhci_page_size;
         }
     }
 
@@ -1111,7 +1123,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Initialise and start the controller.
     write64(&op_regs->cr_control, (read64(&op_regs->cr_control) & 0x30) | (uintptr_t)(&ws->cr) | 0x1);
-    write64(&op_regs->dcbaap,     device_context_index_addr);
+    write64(&op_regs->dcbaap,     device_context_index_paddr);
     write32(&op_regs->config,     (read32(&op_regs->config) & 0xfffffc00) | max_slots);
     if (!start_host_controller(op_regs)) {
         pm_map[0].end += num_pages(sizeof(workspace_t));
