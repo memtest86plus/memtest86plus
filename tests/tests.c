@@ -106,6 +106,8 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     }
     BARRIER;
 
+    testword_t prsg_state;
+
     int ticks = 0;
 
     switch (test) {
@@ -168,12 +170,16 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         // Moving inversions, fixed random pattern.
       case 5:
         if (cpuid_info.flags.rdtsc) {
-            random_seed(my_cpu, get_tsc());
+            prsg_state = get_tsc();
         } else {
-            random_seed(my_cpu, UINT64_C(0x12345678) * (1 + pass_num));
+            prsg_state = 1 + pass_num;
         }
+        prsg_state *= 0x12345678;
+
         for (int i = 0; i < iterations; i++) {
-            testword_t pattern1 = random(my_cpu);
+            prsg_state = prsg(prsg_state);
+
+            testword_t pattern1 = prsg_state;
             testword_t pattern2 = ~pattern1;
 
             BARRIER;
@@ -213,13 +219,17 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         // Modulo 20 check, fixed random pattern.
       case 9:
         if (cpuid_info.flags.rdtsc) {
-            random_seed(my_cpu, get_tsc());
+            prsg_state = get_tsc();
         } else {
-            random_seed(my_cpu, UINT64_C(0x12345678) * (1 + pass_num));
+            prsg_state = 1 + pass_num;
         }
+        prsg_state *= 0x87654321;
+
         for (int i = 0; i < iterations; i++) {
             for (int offset = 0; offset < MODULO_N; offset++) {
-                testword_t pattern1 = random(my_cpu);
+                prsg_state = prsg(prsg_state);
+
+                testword_t pattern1 = prsg_state;
                 testword_t pattern2 = ~pattern1;
 
                 BARRIER;

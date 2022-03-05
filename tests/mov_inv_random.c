@@ -34,19 +34,20 @@ int test_mov_inv_random(int my_cpu)
 {
     int ticks = 0;
 
-    uint64_t seed;
+    testword_t seed;
     if (cpuid_info.flags.rdtsc) {
         seed = get_tsc();
     } else {
-        seed = UINT64_C(0x12345678) * (1 + pass_num);
+        seed = 1 + pass_num;
     }
+    seed *= 0x87654321;
 
     if (my_cpu == master_cpu) {
         display_test_pattern_value(seed);
     }
 
     // Initialize memory with the initial pattern.
-    random_seed(my_cpu, seed);
+    testword_t prsg_state = seed;
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
@@ -69,7 +70,8 @@ int test_mov_inv_random(int my_cpu)
             }
             test_addr[my_cpu] = (uintptr_t)p;
             do {
-                write_word(p, random(my_cpu));
+                prsg_state = prsg(prsg_state);
+                write_word(p, prsg_state);
             } while (p++ < pe); // test before increment in case pointer overflows
             do_tick(my_cpu);
             BAILOUT;
@@ -82,7 +84,7 @@ int test_mov_inv_random(int my_cpu)
     for (int i = 0; i < 2; i++) {
         flush_caches(my_cpu);
 
-        random_seed(my_cpu, seed);
+        prsg_state = seed;
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
@@ -105,7 +107,8 @@ int test_mov_inv_random(int my_cpu)
                 }
                 test_addr[my_cpu] = (uintptr_t)p;
                 do {
-                    testword_t expect = random(my_cpu) ^ invert;
+                    prsg_state = prsg(prsg_state);
+                    testword_t expect = prsg_state ^ invert;
                     testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);

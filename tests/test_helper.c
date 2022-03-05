@@ -26,69 +26,8 @@
 #include "test_helper.h"
 
 //------------------------------------------------------------------------------
-// Types
-//------------------------------------------------------------------------------
-
-// We keep a separate LFSR for each CPU. Space them out by at least a cache line,
-// otherwise performance suffers.
-
-typedef struct {
-    uint64_t    lfsr;
-    uint64_t    pad[7];
-} prsg_state_t;
-
-//------------------------------------------------------------------------------
-// Private Variables
-//------------------------------------------------------------------------------
-
-static prsg_state_t prsg_state[MAX_CPUS];
-
-//------------------------------------------------------------------------------
-// Private Functions
-//------------------------------------------------------------------------------
-
-static inline uint32_t prsg(int my_cpu)
-{
-    // This implements a 64 bit linear feedback shift register with XNOR
-    // feedback from taps 64, 63, 61, 60. It generates 32 new bits each
-    // time the function is called. Because the feedback taps are all in
-    // the upper 32 bits, we can generate the new bits in parallel.
-
-    uint64_t lfsr = prsg_state[my_cpu].lfsr;
-    uint32_t feedback = ~((lfsr >> 32) ^ (lfsr >> 31) ^ (lfsr >> 29) ^ (lfsr >> 28));
-    prsg_state[my_cpu].lfsr = (lfsr << 32) | feedback;
-    return feedback;
-}
-
-//------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
-
-void random_seed(int my_cpu, uint64_t seed)
-{
-    if (my_cpu < 0) {
-        return;
-    }
-
-    // Avoid the PRSG illegal state.
-    if (~seed == 0) {
-        seed = 0;
-    }
-    prsg_state[my_cpu].lfsr = seed;
-}
-
-testword_t random(int my_cpu)
-{
-    if (my_cpu < 0) {
-        return 0;
-    }
-
-    testword_t value = prsg(my_cpu);
-#if TESTWORD_WIDTH > 32
-    value = value << 32 | prsg(my_cpu);
-#endif
-    return value;
-}
 
 void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segment, size_t chunk_align)
 {

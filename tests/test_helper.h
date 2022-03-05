@@ -63,16 +63,23 @@ static inline uintptr_t round_up(uintptr_t value, size_t align_size)
 }
 
 /**
- * Seeds the psuedo-random number generator for my_cpu.
+ * Returns the next word in a pseudo-random sequence where state was the
+ * previous word in that sequence.
  */
-void random_seed(int my_cpu, uint64_t seed);
-
-/**
- * Returns a psuedo-random number for my_cpu. The sequence of numbers returned
- * is repeatable for a given starting seed. The sequence repeats after 2^64 - 1
- * numbers. Within that period, no number is repeated.
- */
-testword_t random(int my_cpu);
+static inline testword_t prsg(testword_t state)
+{
+    // This uses the algorithms described at https://en.wikipedia.org/wiki/Xorshift
+#ifdef __x86_64__
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+#else
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+#endif
+    return state;
+}
 
 /**
  * Calculates the start and end word address for the chunk of segment that is
