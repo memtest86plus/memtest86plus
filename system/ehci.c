@@ -376,29 +376,24 @@ static void build_ehci_qhd(ehci_qhd_t *qhd, const ehci_qtd_t *qtd, const usb_ep_
     qhd->next_qtd_ptr = (uintptr_t)qtd;
 }
 
-static uint32_t get_ehci_done(const workspace_t *ws)
-{
-    ehci_op_regs_t *op_regs = ws->op_regs;
-    
-    uint32_t status = read32(&op_regs->usb_status) & (EHCI_USBSTS_INT | EHCI_USBSTS_ERR);
-    if (status != 0) {
-        write32(&op_regs->usb_status, EHCI_USBSTS_INT | EHCI_USBSTS_ERR);
-        (void)disable_async_schedule(op_regs);
-    }
-    return status;
-}
-
-static bool wait_for_ehci_done(const workspace_t *ws)
+static bool do_async_transfer(const workspace_t *ws, int num_tds)
 {
     // Rely on the controller to timeout if the device doesn't respond.
-    uint32_t status = 0;
-    while (true) {
-        status = get_ehci_done(ws);
-        if (status != 0) break;
-        usleep(10);
-    }
 
-    return ~status & EHCI_USBSTS_ERR;
+    bool ok = true;
+    enable_async_schedule(ws->op_regs);
+    for (int td_idx = 0; td_idx < num_tds; td_idx++) {
+        const ehci_qtd_t *qtd = &ws->qtd[td_idx];
+        while (qtd->status & EHCI_QTD_ACTIVE) {
+            usleep(10);
+        }
+        if (qtd->status & (EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS)) {
+            ok = false;
+            break;
+        }
+    }
+    disable_async_schedule(ws->op_regs);
+    return ok;
 }
 
 //------------------------------------------------------------------------------
@@ -431,11 +426,10 @@ static bool setup_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_se
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    build_ehci_qtd(&ws->qtd[0], &ws->qtd[1], EHCI_QTD_PID_SETUP | EHCI_QTD_IOC_N, EHCI_QTD_DT(0), setup_pkt, sizeof(usb_setup_pkt_t));
-    build_ehci_qtd(&ws->qtd[1], &ws->qtd[1], EHCI_QTD_PID_IN    | EHCI_QTD_IOC_Y, EHCI_QTD_DT(1), 0, 0);
+    build_ehci_qtd(&ws->qtd[0], &ws->qtd[1], EHCI_QTD_PID_SETUP, EHCI_QTD_DT(0), setup_pkt, sizeof(usb_setup_pkt_t));
+    build_ehci_qtd(&ws->qtd[1], &ws->qtd[1], EHCI_QTD_PID_IN,    EHCI_QTD_DT(1), 0, 0);
     build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
-    enable_async_schedule(ws->op_regs);
-    return wait_for_ehci_done(ws);
+    return do_async_transfer(ws, 2);
 }
 
 static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
@@ -443,48 +437,42 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    build_ehci_qtd(&ws->qtd[0], &ws->qtd[2], EHCI_QTD_PID_SETUP | EHCI_QTD_IOC_N, EHCI_QTD_DT(0), setup_pkt, sizeof(usb_setup_pkt_t));
-    build_ehci_qtd(&ws->qtd[1], &ws->qtd[2], EHCI_QTD_PID_IN    | EHCI_QTD_IOC_N, EHCI_QTD_DT(1), buffer, length);
-    build_ehci_qtd(&ws->qtd[2], &ws->qtd[2], EHCI_QTD_PID_OUT   | EHCI_QTD_IOC_Y, EHCI_QTD_DT(1), 0, 0);
+    build_ehci_qtd(&ws->qtd[0], &ws->qtd[2], EHCI_QTD_PID_SETUP, EHCI_QTD_DT(0), setup_pkt, sizeof(usb_setup_pkt_t));
+    build_ehci_qtd(&ws->qtd[1], &ws->qtd[2], EHCI_QTD_PID_IN,    EHCI_QTD_DT(1), buffer, length);
+    build_ehci_qtd(&ws->qtd[2], &ws->qtd[2], EHCI_QTD_PID_OUT,   EHCI_QTD_DT(1), 0, 0);
     build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
-    enable_async_schedule(ws->op_regs);
-    return wait_for_ehci_done(ws);
+    return do_async_transfer(ws, 3);
 }
 
 static uint8_t get_keycode(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    uint32_t status = read32(&ws->op_regs->usb_status) & (EHCI_USBSTS_INT | EHCI_USBSTS_ERR);
-    if (status != 0) {
-        write32(&ws->op_regs->usb_status, EHCI_USBSTS_INT | EHCI_USBSTS_ERR);
+    for (int kbd_idx = 0; kbd_idx < ws->num_keyboards; kbd_idx++) {
+        ehci_qtd_t *kbd_qtd = &ws->qtd[3 + kbd_idx];
 
-        for (int kbd_idx = 0; kbd_idx < ws->num_keyboards; kbd_idx++) {
-            ehci_qtd_t *kbd_qtd = &ws->qtd[3 + kbd_idx];
+        uint8_t status = kbd_qtd->status;
+        if (status & EHCI_QTD_ACTIVE) continue;
 
-            status = kbd_qtd->status;
-            if (status & EHCI_QTD_ACTIVE) continue;
+        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-            hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
-
-            uint32_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS;
-            if (~status & error_mask) {
-                uint8_t keycode = kbd_rpt->key_code[0];
-                if (keycode != 0) {
-                    int kc_index_i = ws->kc_index_i;
-                    int kc_index_n = (kc_index_i + 1) % WS_KC_BUFFER_SIZE;
-                    if (kc_index_n != ws->kc_index_o) {
-                        ws->kc_buffer[kc_index_i] = keycode;
-                        ws->kc_index_i = kc_index_n;
-                    }
+        uint32_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS;
+        if (~status & error_mask) {
+            uint8_t keycode = kbd_rpt->key_code[0];
+            if (keycode != 0) {
+                int kc_index_i = ws->kc_index_i;
+                int kc_index_n = (kc_index_i + 1) % WS_KC_BUFFER_SIZE;
+                if (kc_index_n != ws->kc_index_o) {
+                    ws->kc_buffer[kc_index_i] = keycode;
+                    ws->kc_index_i = kc_index_n;
                 }
             }
-
-            build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN | EHCI_QTD_IOC_Y, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
-
-            ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
-            kbd_qhd->next_qtd_ptr = (uintptr_t)kbd_qtd;
         }
+
+        build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
+
+        ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
+        kbd_qhd->next_qtd_ptr = (uintptr_t)kbd_qtd;
     }
 
     int kc_index_o = ws->kc_index_o;
@@ -696,7 +684,7 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-        build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN | EHCI_QTD_IOC_Y, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
+        build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
         build_ehci_qhd(kbd_qhd, kbd_qtd, kbd, true);
 
         kbd_qhd->next_qhd_ptr = first_qhd_ptr;
