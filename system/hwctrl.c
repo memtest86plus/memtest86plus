@@ -28,12 +28,12 @@ void reboot(void)
     outb(0xfe, 0x64);
     
     // If not working, use cf9 method after 100ms delay
-		usleep(100000);
-		uint8_t cf9 = inb(0xcf9) & ~6;
-		outb(cf9|2, 0xcf9); /* Request hard reset */
-		usleep(50);
-		outb(cf9|6, 0xcf9); /* Actually do the reset */
-		usleep(50);    
+    usleep(100000);
+    uint8_t cf9 = inb(0xcf9) & ~6;
+    outb(cf9|2, 0xcf9); /* Request hard reset */
+    usleep(50);
+    outb(cf9|6, 0xcf9); /* Actually do the reset */
+    usleep(50);    
     
 }
 
@@ -52,4 +52,3 @@ void cursor_off()
     outb(0x0e, 0x3d4);
     outb(0xff, 0x3d5);
 }
-
