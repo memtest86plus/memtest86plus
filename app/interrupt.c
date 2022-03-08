@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 
+#include "cpuid.h"
 #include "hwctrl.h"
 #include "keyboard.h"
 #include "screen.h"
@@ -25,6 +26,7 @@
 //------------------------------------------------------------------------------
 
 #define HLT_OPCODE  0xf4
+#define JE_OPCODE   0x74
 
 #ifdef __x86_64__
 #define REG_PREFIX  "r"
@@ -120,7 +122,27 @@ void interrupt(struct trap_regs *trap_regs)
     if (trap_regs->vect == 2) {
         uint8_t *pc = (uint8_t *)trap_regs->ip;
         if (pc[-1] == HLT_OPCODE) {
-            // Assume this is a wakeup signal sent via IPI.
+            // Assume this is a barrier wakeup signal sent via IPI.
+            return;
+        }
+        // Catch the rare case that a core will fail to reach the HLT instruction before
+        // its wakeup signal arrives. The barrier code contains an atomic decrement, a JE
+        // instruction (two bytes), and a HLT instruction (one byte). The atomic decrement
+        // must have completed if another core has reached the point of sending the wakeup
+        // signals, so we should find the HLT opcode either at pc[0] or at pc[2]. If we find
+        // it, adjust the interrupt return address to point to the following instruction.
+        if (pc[0] == HLT_OPCODE || (pc[0] == JE_OPCODE && pc[2] == HLT_OPCODE)) {
+            uintptr_t *return_addr;
+            if (cpuid_info.flags.lm == 1) {
+                return_addr = (uintptr_t *)(trap_regs->sp - 40);
+            } else {
+                return_addr = (uintptr_t *)(trap_regs->sp - 12);
+            }
+            if (pc[2] == HLT_OPCODE) {
+                *return_addr += 3;
+            } else {
+                *return_addr += 1;
+            }
             return;
         }
 #if REPORT_PARITY_ERRORS

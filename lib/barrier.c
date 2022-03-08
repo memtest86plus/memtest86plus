@@ -66,10 +66,29 @@ void barrier_halt_wait(barrier_t *barrier)
     local_flag_t *waiting_flags = local_flags(barrier->flag_num);
     int my_cpu = smp_my_cpu_num();
     waiting_flags[my_cpu].flag = true;
-    if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
-        __asm__ __volatile__ ("hlt");
-        return;
-    }
+    //
+    // There is a small window of opportunity for the wakeup signal to arrive
+    // between us decrementing the barrier count and halting. So code the
+    // following in assembler, both to ensure the window of opportunity is as
+    // small as possible, and also to allow us to detect and skip over the
+    // halt in the interrupt handler.
+    //
+    // if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
+    //     __asm__ __volatile__ ("hlt");
+    //     return;
+    // }
+    //
+    __asm__ goto ("\t"
+        "lock decl %0 \n\t"
+        "je 0f        \n\t"
+        "hlt          \n\t"
+        "jmp %l[end]  \n"
+        "0:           \n"
+        : /* no outputs */
+        : "m" (barrier->count)
+        : /* no clobbers */
+        : end
+    );
     // Last one here, so reset the barrier and wake the others.
     barrier->count = barrier->num_threads;
     __sync_synchronize();
@@ -80,4 +99,6 @@ void barrier_halt_wait(barrier_t *barrier)
             smp_send_nmi(cpu_num);
         }
     }
+end:
+    return;
 }
