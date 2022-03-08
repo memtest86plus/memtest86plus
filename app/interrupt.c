@@ -139,7 +139,7 @@ void interrupt(struct trap_regs *trap_regs)
     } else {
         display_pinned_message(2, 0, "Type: %i", trap_regs->vect);
     }
-    display_pinned_message(3, 0, "  PC: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ip);
+    display_pinned_message(3, 0, "  IP: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ip);
     display_pinned_message(4, 0, "  CS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->cs);
     display_pinned_message(5, 0, "Flag: %0" REG_DIGITS "x", (uintptr_t)trap_regs->flags);
     display_pinned_message(6, 0, "Code: %0" REG_DIGITS "x", (uintptr_t)trap_regs->code);
@@ -166,7 +166,7 @@ void interrupt(struct trap_regs *trap_regs)
         display_pinned_message(1 + i, 50, "%0" ADR_DIGITS "x %0" REG_DIGITS "x", addr, (uintptr_t)data);
     }
 
-    display_pinned_message(11, 0, "CS:PC:");
+    display_pinned_message(11, 0, "CS:IP:");
     uint8_t *pp = (uint8_t *)((uintptr_t)trap_regs->ip);
     for (int i = 0; i < 12; i++) {
         display_pinned_message(11, 7 + 3*i, "%02x", (uintptr_t)pp[i]);
