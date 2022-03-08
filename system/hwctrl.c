@@ -13,6 +13,7 @@
 #include "io.h"
 
 #include "hwctrl.h"
+#include "unistd.h"
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -25,6 +26,15 @@ void reboot(void)
 
     // Pulse the system reset signal.
     outb(0xfe, 0x64);
+    
+    // If not working, use cf9 method after 100ms delay
+    usleep(100000);
+    uint8_t cf9 = inb(0xcf9) & ~6;
+    outb(cf9|2, 0xcf9); /* Request hard reset */
+    usleep(50);
+    outb(cf9|6, 0xcf9); /* Actually do the reset */
+    usleep(50);    
+    
 }
 
 void floppy_off()
