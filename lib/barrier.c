@@ -42,7 +42,7 @@ void barrier_spin_wait(barrier_t *barrier)
     local_flag_t *waiting_flags = local_flags(barrier->flag_num);
     int my_cpu = smp_my_cpu_num();
     waiting_flags[my_cpu].flag = true;
-    if (__sync_fetch_and_sub(&barrier->count, 1) > 1) {
+    if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
         volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
         while (*i_am_blocked) {
             __builtin_ia32_pause();
@@ -66,7 +66,7 @@ void barrier_halt_wait(barrier_t *barrier)
     local_flag_t *waiting_flags = local_flags(barrier->flag_num);
     int my_cpu = smp_my_cpu_num();
     waiting_flags[my_cpu].flag = true;
-    if (__sync_fetch_and_sub(&barrier->count, 1) > 1) {
+    if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
         __asm__ __volatile__ ("hlt");
         return;
     }
