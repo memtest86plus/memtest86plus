@@ -49,15 +49,31 @@ int get_cpu_temperature(void)
         }
     }
 
-#if 0 // TODO: This doesn't give accurate results.
     // AMD CPU
-    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily > 0) {
-        uint32_t rtcr;
-        pci_conf_read(0, 24, 3, 0xA4, 4, &rtcr);
+    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily > 0 && cpuid_info.version.extendedFamily < 8) {
+
+        // Untested yet
+        uint32_t rtcr = pci_config_read32(0, 24, 3, 0xA4);
         int raw_temp = (rtcr >> 21) & 0x7FF;
+
         return raw_temp / 8;
+
+    } else if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily >= 8) {
+
+        // Grab CPU Temp. for ZEN CPUs using SNM
+
+        uint32_t tval = amd_smn_read(SMN_THM_TCON_CUR_TMP);
+
+        float offset;
+
+        if((tval >> 19) & 0x01)
+        {
+          offset = -49.0f;
+        }
+
+        return offset + 0.125f * (float)((tval >> 21) & 0x7FF);
+
     }
-#endif
 
     return 0;
 }

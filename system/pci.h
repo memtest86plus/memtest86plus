@@ -59,4 +59,18 @@ void pci_config_write16(int bus, int dev, int func, int reg, uint16_t value);
  */
 void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value);
 
+
+/*
+ * Add some SNM related function (S.DEMEULEMEESTER)
+ */
+
+#define SMN_SMUIO_THM               0x00059800
+#define SMN_THM_TCON_CUR_TMP        (SMN_SMUIO_THM + 0x00)
+
+/**
+ * Read & Write to AMD Family 17h SNM
+ */
+uint32_t amd_smn_read(uint32_t adr);
+void amd_smn_write(uint32_t adr, uint32_t data);
+
 #endif // PCI_H

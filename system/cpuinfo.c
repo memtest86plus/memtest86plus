@@ -271,6 +271,14 @@ static void determine_imc(void)
           case 0x7:
             imc_type = 0x0105; // Kabini & related (Family 16h)
             break;
+          case 0x8:
+            imc_type = 0x0110; // Zen & Zen2 (Family 17h)
+            break;
+          case 0x9:
+            imc_type = 0x0110; // Hygon (Family 18h)
+            break;
+          case 0xA:
+            imc_type = 0x0130; // Zen3 & Zen4(Family 19h)
           default:
             break;
         }
