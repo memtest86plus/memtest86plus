@@ -8,10 +8,10 @@
 #include "memrw32.h"
 #include "memsize.h"
 #include "pmem.h"
-
-#include "memory.h"
-#include "unistd.h"
 #include "usb.h"
+
+#include "string.h"
+#include "unistd.h"
 
 #include "ohci.h"
 

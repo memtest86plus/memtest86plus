@@ -10,7 +10,7 @@
 #include "usb.h"
 #include "vmem.h"
 
-#include "memory.h"
+#include "string.h"
 #include "unistd.h"
 
 #include "xhci.h"

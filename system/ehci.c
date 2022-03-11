@@ -11,7 +11,7 @@
 #include "pmem.h"
 #include "usb.h"
 
-#include "memory.h"
+#include "string.h"
 #include "unistd.h"
 
 #include "ehci.h"
