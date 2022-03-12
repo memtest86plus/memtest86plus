@@ -10,6 +10,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "pmem.h"
+#include "smbios.h"
 #include "temperature.h"
 #include "tsc.h"
 
@@ -71,9 +72,9 @@ void display_init(void)
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
 #if TESTWORD_WIDTH > 32
-    prints(0, 0, "     Memtest86+64  v6.0pre");
+    prints(0, 0, "  Memtest86+ v6.00pre (64b)");
 #else
-    prints(0, 0, "     Memtest86+32  v6.0pre");
+    prints(0, 0, "  Memtest86+ v6.00pre (32b)");
 #endif
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
@@ -134,6 +135,8 @@ void display_init(void)
         // Round to nearest MB.
         display_memory_size(1024 * ((num_pm_pages + 128) / 256));
     }
+
+    print_smbios_startup_info();
 
     scroll_message_row = ROW_SCROLL_T;
 }

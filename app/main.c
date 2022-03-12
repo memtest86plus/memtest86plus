@@ -28,6 +28,7 @@
 #include "memsize.h"
 #include "pci.h"
 #include "screen.h"
+#include "smbios.h"
 #include "smp.h"
 #include "temperature.h"
 #include "vmem.h"
@@ -206,6 +207,8 @@ static void global_init(void)
     pmem_init();
 
     pci_init();
+
+    smbios_init();
 
     badram_init();
 

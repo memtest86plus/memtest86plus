@@ -18,6 +18,7 @@ SYS_OBJS = system/cpuid.o \
            system/pmem.o \
            system/reloc.o \
            system/screen.o \
+           system/smbios.o \
            system/smp.o \
            system/temperature.o \
            system/usbhcd.o \

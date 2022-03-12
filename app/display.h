@@ -21,7 +21,7 @@
 #include "test.h"
 
 #define ROW_MESSAGE_T   10
-#define ROW_MESSAGE_B   (SCREEN_HEIGHT - 2)
+#define ROW_MESSAGE_B   (SCREEN_HEIGHT - 3) // Temp change
 
 #define ROW_SCROLL_T    (ROW_MESSAGE_T + 2)
 #define ROW_SCROLL_B    (SCREEN_HEIGHT - 2)
@@ -36,7 +36,7 @@
     prints(0, 30, str)
 
 #define display_cpu_clk(freq) \
-    printf(1, 10, "%iMHz", freq)
+    printf(1, 10, "%i MHz", freq)
 
 #define display_cpu_addr_mode(str) \
     prints(1, 20, str)
