@@ -4,7 +4,11 @@
 
 #include "stdint.h"
 #include "string.h"
+#ifndef FUZZING
 #include "display.h"
+#else
+#define prints(a,b,c) strlen(c)
+#endif
 static const uint8_t * table_start = NULL;
 static uint32_t table_length = 0; // 16-bit in SMBIOS v2, 32-bit in SMBIOS v3.
 
@@ -164,6 +168,7 @@ static int parse_dmi(uint16_t numstructs) {
     return 0;
 }
 
+#ifndef FUZZING
 int smbios_init(void) {
     uintptr_t smb_adr;
     const uint8_t * dmi_start;
@@ -201,6 +206,7 @@ int smbios_init(void) {
 
     return parse_dmi(eps->numstructs);
 }
+#endif
 
 void print_smbios_startup_info(void) {
     // Use baseboard info (struct type 2) as primary source of information, and fall back to system info (struct type 1).
@@ -229,3 +235,16 @@ void print_smbios_startup_info(void) {
         }
     }
 }
+
+#ifdef FUZZING_LIBFUZZER
+int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size) {
+    table_start = data;
+    table_length = size;
+    dmi_system_info = NULL;
+    dmi_baseboard_info = NULL;
+    if (!parse_dmi(65535)) {
+        print_smbios_startup_info();
+    }
+    return 0;  // Non-zero return values are reserved for future use.
+}
+#endif

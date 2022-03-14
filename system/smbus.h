@@ -94,8 +94,12 @@ typedef struct ram_infos {
 
 extern ram_info ram;
 
+#if !defined(TESTING_MAIN) && !defined(FUZZING)
 #define get_spd(smb_idx, slot_idx, spd_adr) \
     smbcontrollerops[smbcontrollers[smb_idx].ops].read_spd_byte(slot_idx, spd_adr)
+#else
+#define get_spd(smb_idx, slot_idx, spd_adr) spd_data[spd_adr]
+#endif
 
 /**
  * Print SMBUS Info

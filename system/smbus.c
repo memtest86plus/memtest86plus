@@ -2,7 +2,17 @@
 // Copyright (C) 2004-2022 Samuel Demeulemeester
 //
 
+#if !defined(TESTING_MAIN) && !defined(FUZZING)
 #include "display.h"
+#define printf_ printf
+#define PK "%k"
+#else
+#include <stdio.h>
+#define printc(a,b,c) putc(c, stdout)
+#define printf_(a,b,c,...) printf(c,__VA_ARGS__)
+#define prints(a,b,c) printf("%s",c)
+#define PK "%uK"
+#endif
 
 #include "io.h"
 #include "tsc.h"
@@ -18,6 +28,12 @@
 #define MAX_SPD_SLOT    8
 
 ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
+
+#if defined(TESTING_MAIN) || defined(FUZZING)
+#define SPD_DATA_MIN_VALID_SIZE 256
+#define SPD_DATA_SIZE 1024
+static uint8_t spd_data[SPD_DATA_SIZE];
+#endif
 
 int smbdev, smbfun;
 unsigned short smbusbase;
@@ -35,6 +51,7 @@ static spd_info parse_spd_ddr4       (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr5       (uint8_t smb_idx, uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
+#if !defined(TESTING_MAIN) && !defined(FUZZING)
 static int find_smb_controller(void);
 
 static void fch_zen_get_smb(void);
@@ -163,15 +180,63 @@ static const struct pci_smbus_controller smbcontrollers[] = {
 //  {0x8086, 0x7603,                       "82372FB PIIX5"           },
 //  {0x8086, 0x8119,                       "US15W"                   }, // US15W
 };
+#endif
 
-void print_smbus_startup_info(void) {
+static uint8_t parse_and_print_one_slot(int8_t index, uint8_t spdidx, uint8_t spd_line_idx) {
+    spd_info curspd;
+    curspd.isValid = false;
+    switch(get_spd(index, spdidx, 2))
+    {
+        default:
+            break;
+        case 0x12: // DDR5
+            curspd = parse_spd_ddr5(index, spdidx);
+            break;
+        case 0x0C: // DDR4
+            curspd = parse_spd_ddr4(index, spdidx);
+            break;
+        case 0x0B: // DDR3
+            curspd = parse_spd_ddr3(index, spdidx);
+            break;
+        case 0x09: // DDR2 FB-DIMM
+            curspd = parse_spd_ddr2_fbdimm(index, spdidx);
+            break;
+        case 0x08: // DDR2
+            curspd = parse_spd_ddr2(index, spdidx);
+            break;
+        case 0x07: // DDR
+            curspd = parse_spd_ddr(index, spdidx);
+            break;
+        case 0x04: // SDRAM
+            curspd = parse_spd_sdram(index, spdidx);
+            break;
+        case 0x01: // RAMBUS - RDRAM
+            if (get_spd(index, spdidx, 1) == 8) {
+                curspd = parse_spd_rdram(index, spdidx);
+            }
+            break;
+    }
 
+    if (curspd.isValid) {
+        if (spd_line_idx == 0) {
+            prints(LINE_SPD-2, 0, "Memory SPD Informations");
+            prints(LINE_SPD-1, 0, "-----------------------");
+        }
+
+        print_spdi(curspd, spd_line_idx);
+        spd_line_idx++;
+    }
+
+    return spd_line_idx;
+}
+
+#if !defined(TESTING_MAIN) && !defined(FUZZING)
+void print_smbus_startup_info(void)
+{
     int8_t index;
     uint8_t spdidx = 0, spd_line_idx = 0;
 
-    spd_info curspd;
     ram.freq = 0;
-    curspd.isValid = false;
 
     index = find_smb_controller();
 
@@ -182,52 +247,12 @@ void print_smbus_startup_info(void) {
     smbcontrollerops[smbcontrollers[index].ops].get_adr();
 
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
-
         if (get_spd(index, spdidx, 0) != 0xFF) {
-            switch(get_spd(index, spdidx, 2))
-            {
-                default:
-                    continue;
-                case 0x12: // DDR5
-                    curspd = parse_spd_ddr5(index, spdidx);
-                    break;
-                case 0x0C: // DDR4
-                    curspd = parse_spd_ddr4(index, spdidx);
-                    break;
-                case 0x0B: // DDR3
-                    curspd = parse_spd_ddr3(index, spdidx);
-                    break;
-                case 0x09: // DDR2 FB-DIMM
-                    curspd = parse_spd_ddr2_fbdimm(index, spdidx);
-                    break;
-                case 0x08: // DDR2
-                    curspd = parse_spd_ddr2(index, spdidx);
-                    break;
-                case 0x07: // DDR
-                    curspd = parse_spd_ddr(index, spdidx);
-                    break;
-                case 0x04: // SDRAM
-                    curspd = parse_spd_sdram(index, spdidx);
-                    break;
-                case 0x01: // RAMBUS - RDRAM
-                    if (get_spd(index, spdidx, 1) == 8) {
-                        curspd = parse_spd_rdram(index, spdidx);
-                    }
-                    break;
-            }
-
-            if (curspd.isValid) {
-                if (spd_line_idx == 0) {
-                    prints(LINE_SPD-2, 0, "Memory SPD Informations");
-                    prints(LINE_SPD-1, 0, "-----------------------");
-                }
-
-                print_spdi(curspd, spd_line_idx);
-                spd_line_idx++;
-            }
+            spd_line_idx = parse_and_print_one_slot(index, spdidx, spd_line_idx);
         }
     }
 }
+#endif
 
 static void print_spdi(spd_info spdi, uint8_t lidx)
 {
@@ -235,7 +260,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     uint16_t i;
 
     // Print Slot Index, Module Size, type & Max frequency (Jedec or XMP)
-    curcol = printf(LINE_SPD+lidx, 0, " - Slot %i : %kB %s-%i",
+    curcol = printf_(LINE_SPD+lidx, 0, " - Slot %i : " PK "B %s-%i",
                     spdi.slot_num,
                     spdi.module_size * 1024,
                     spdi.type,
@@ -257,14 +282,14 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     for (i = 0; i < JEP106_CNT ; i++) {
 
         if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(LINE_SPD+lidx, curcol, " - %s", jep106[i].name);
+            curcol = printf_(LINE_SPD+lidx, curcol, " - %s", jep106[i].name);
             break;
         }
     }
 
     // If not present in JEDEC106, display raw JEDEC ID
     if (i == JEP106_CNT && spdi.jedec_code != 0) {
-        curcol = printf(LINE_SPD+lidx, curcol, " - Unknown (0x%x)", spdi.jedec_code);
+        curcol = printf_(LINE_SPD+lidx, curcol, " - Unknown (0x%x)", spdi.jedec_code);
     }
 
     // Print SKU
@@ -273,10 +298,13 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 
     // Print Manufacturing date (only if valid)
-    if (curcol <= 72 && spdi.fab_year > 1 && spdi.fab_year < 32 && spdi.fab_week < 53) {
-        curcol = printf(LINE_SPD+lidx, curcol, " (W%02i'%02i)", spdi.fab_week, spdi.fab_year);
+    if (curcol <= 72 /*&& spdi.fab_year > 1*/ && spdi.fab_year < 32 && spdi.fab_week < 53) {
+        curcol = printf_(LINE_SPD+lidx, curcol, " (W%02i'%02i)", spdi.fab_week, spdi.fab_year);
     }
 
+#ifdef TESTING_MAIN
+    printf("\ntCL: %u\ttRCD: %u\ttRP: %u\ttRAS: %u\ttRC: %u\n", spdi.tCL, spdi.tRCD, spdi.tRP, spdi.tRAS, spdi.tRC);
+#else
     // Populate global ram var
     ram.type = spdi.type;
     if (ram.freq == 0 || ram.freq > spdi.freq) {
@@ -288,6 +316,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
         ram.tRP  = spdi.tRP;
         ram.tRAS = spdi.tRAS;
     }
+#endif
 }
 
 static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
@@ -1312,6 +1341,7 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
+#if !defined(TESTING_MAIN) && !defined(FUZZING)
 // --------------------------
 // Smbus Controller Functions
 // --------------------------
@@ -1492,3 +1522,23 @@ static void fch_zen_get_smb(void)
         smbusbase = pm_reg & 0xFF00;
     }
 }
+#endif
+
+#ifdef TESTING_MAIN
+int main(int argc, char ** argv)
+{
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <input file containing SPD data>\n", argv[0]);
+    }
+    else {
+        FILE * f = fopen(argv[1], "rb");
+        if (NULL != f) {
+            if (fread(spd_data, 1, SPD_DATA_SIZE, f) >= SPD_DATA_MIN_VALID_SIZE) {
+                (void)parse_and_print_one_slot(0, 0, 1);
+            }
+            fclose(f);
+        }
+    }
+    return 1;
+}
+#endif
