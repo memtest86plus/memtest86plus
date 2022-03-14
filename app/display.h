@@ -21,7 +21,7 @@
 #include "test.h"
 
 #define ROW_MESSAGE_T   10
-#define ROW_MESSAGE_B   (SCREEN_HEIGHT - 3) // Temp change
+#define ROW_MESSAGE_B   (SCREEN_HEIGHT - 2)
 
 #define ROW_SCROLL_T    (ROW_MESSAGE_T + 2)
 #define ROW_SCROLL_B    (SCREEN_HEIGHT - 2)
@@ -176,6 +176,8 @@
 extern int scroll_message_row;
 
 void display_init(void);
+
+void post_display_init(void);
 
 void display_start_run(void);
 

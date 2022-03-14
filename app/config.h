@@ -48,6 +48,8 @@ extern cpu_state_t  cpu_state[MAX_CPUS];
 extern bool         enable_temperature;
 extern bool         enable_trace;
 
+extern bool         enable_sm;
+
 extern bool         pause_at_start;
 
 extern power_save_t power_save;

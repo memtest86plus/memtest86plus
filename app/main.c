@@ -92,6 +92,8 @@ static int              test_stage = 0;
 // Public Variables
 //------------------------------------------------------------------------------
 
+efi_info_t  saved_efi_info;
+
 // These are exposed in test.h.
 
 uint8_t     chunk_index[MAX_CPUS];
@@ -250,6 +252,8 @@ static void global_init(void)
         display_pinned_message(0, 0,"CPU Trace");
         display_pinned_message(1, 0,"--- ----------------------------------------------------------------------------");
         set_scroll_lock(true);
+    } else if (enable_sm) {
+        post_display_init();
     }
 
     size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
@@ -270,6 +274,11 @@ static void global_init(void)
         trace(0, "Cannot relocate program. Press any key to reboot...");
         while (get_key() == 0) { }
         reboot();
+    }
+
+    boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
+    if(boot_params->efi_info.loader_signature){
+        saved_efi_info = boot_params->efi_info;
     }
 
     start_barrier = smp_alloc_barrier(1);

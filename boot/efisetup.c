@@ -52,6 +52,9 @@ static efi_system_table_t *sys_table = NULL;
 #define efi_call_bs(func, ...) \
     sys_table->boot_services->func(__VA_ARGS__)
 
+#define efi_call_rs(func, ...) \
+    sys_table->runtime_services->func(__VA_ARGS__)
+
 #define efi_get_num_handles(size) \
     (int)((size) / sizeof(efi_handle_t))
 

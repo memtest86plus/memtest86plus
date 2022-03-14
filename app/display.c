@@ -11,6 +11,7 @@
 #include "keyboard.h"
 #include "pmem.h"
 #include "smbios.h"
+#include "smbus.h"
 #include "temperature.h"
 #include "tsc.h"
 
@@ -136,16 +137,21 @@ void display_init(void)
         display_memory_size(1024 * ((num_pm_pages + 128) / 256));
     }
 
-    print_smbios_startup_info();
-
     scroll_message_row = ROW_SCROLL_T;
+}
+
+void post_display_init(void)
+{
+    print_smbios_startup_info();
+    print_smbus_startup_info();
 }
 
 void display_start_run(void)
 {
-    if (!enable_trace) {
+    if (!enable_trace && !enable_sm) {
         clear_message_area();
     }
+
     clear_screen_region(7, 47, 7, 57);                  // run time
     clear_screen_region(8, 47, 8, 57);                  // pass number
     clear_screen_region(8, 66, 8, SCREEN_WIDTH - 1);    // error count

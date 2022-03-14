@@ -73,7 +73,7 @@ static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
 
 static uint16_t popup_save_buffer[POP_W * POP_H];
 
-static bool smp_enabled = false;
+static bool smp_enabled = true;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -93,9 +93,11 @@ cpu_state_t     cpu_state[MAX_CPUS];
 bool            enable_temperature = false;
 bool            enable_trace       = false;
 
-bool            pause_at_start     = true;
+bool            enable_sm          = true;
 
-power_save_t    power_save = POWER_SAVE_HIGH;
+bool            pause_at_start     = false;
+
+power_save_t    power_save =  POWER_SAVE_HIGH;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -128,6 +130,8 @@ static void parse_option(const char *option, const char *params)
         smp_enabled = true;
     } else if (strncmp(option, "trace", 6) == 0) {
         enable_trace = true;
+    } else if (strncmp(option, "nosm", 5) == 0) {
+        enable_sm = false;
     }
 }
 

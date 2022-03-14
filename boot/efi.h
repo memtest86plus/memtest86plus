@@ -51,6 +51,13 @@
 #define EFI_ACPI_RECLAIM_MEMORY 9
 
 /**
+ * EFI_RESET_TYPE values.
+ */
+#define EFI_RESET_COLD 0
+#define EFI_RESET_WARM 1
+#define EFI_RESET_SHUTDOWN 2
+
+/**
  * EFI_GRAPHICS_PIXEL_FORMAT values.
  */
 #define PIXEL_RGB_RESERVED_8BIT_PER_COLOR   0
@@ -59,6 +66,7 @@
 #define PIXEL_BLT_ONLY                      3
 
 #define EFI_SYSTEM_TABLE_SIGNATURE UINT64_C(0x5453595320494249)
+#define EFI_RUNTIME_SERVICES_SIGNATURE UINT64_C(0x5652453544e5552)
 
 #define efiapi __attribute__((ms_abi))
 
@@ -196,6 +204,24 @@ typedef struct {
 } efi_boot_services_t;
 
 typedef struct {
+    efi_table_header_t header;
+    unsigned long get_time;
+    unsigned long set_time;
+    unsigned long get_wakeup_time;
+    unsigned long set_wakeup_time;
+    unsigned long set_virtual_address_map;
+    unsigned long convert_pointer;
+    unsigned long get_variable;
+    unsigned long get_next_variable;
+    unsigned long set_variable;
+    unsigned long get_next_high_mono_count;
+    efi_status_t (efiapi *reset_system)(int, int, int);
+    unsigned long update_capsule;
+    unsigned long query_capsule_caps;
+    unsigned long query_variable_info;
+} efi_runtime_services_t;
+
+typedef struct {
     efi_guid_t  guid;
     uint32_t    table;  
 } efi32_config_table_t;
@@ -253,7 +279,7 @@ typedef struct {
     efi_simple_text_out_t  *con_out;
     efi_handle_t            std_err_handle;
     efi_simple_text_out_t  *std_err;
-    void                   *runtime_services;
+    efi_runtime_services_t *runtime_services;
     efi_boot_services_t    *boot_services;
     uintn_t                 num_config_tables;
     efi_config_table_t     *config_tables;

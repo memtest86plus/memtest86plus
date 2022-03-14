@@ -115,7 +115,7 @@ static uintptr_t find_smbios_adr(void) {
             }
         }
     }
-    #ifdef __x86_64__
+#ifdef __x86_64__
     if (rp == NULL && efi_info -> loader_signature == EFI64_LOADER_SIGNATURE) {
         // EFI64
         if (rp == NULL && efi_info -> loader_signature == EFI64_LOADER_SIGNATURE) {
@@ -127,7 +127,7 @@ static uintptr_t find_smbios_adr(void) {
             }
         }
     }
-    #endif
+#endif
     if (rp == NULL) {
         // BIOS
         char * dmi, * dmi_search_start;
@@ -214,10 +214,8 @@ void print_smbios_startup_info(void) {
     sl2 = strlen(sys_sku);
 
     if (sl1 && sl2) {
-        dmicol = 40 - (sl1 + sl2) / 2;
-        prints(LINE_DMI, dmicol, sys_man);
-        dmicol += sl1 + 1;
-        prints(LINE_DMI, dmicol, sys_sku);
-        dmicol += sl2 + 1;
+        dmicol = 40 - ((sl1 + sl2) / 2);
+        dmicol = prints(LINE_DMI, dmicol, sys_man);
+        prints(LINE_DMI, dmicol + 1, sys_sku);
     }
 }
