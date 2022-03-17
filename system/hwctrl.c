@@ -14,6 +14,7 @@
 #include "bootparams.h"
 #include "efi.h"
 
+#include "hwctrl.h"
 #include "io.h"
 
 #include "unistd.h"
@@ -24,7 +25,7 @@
 
 extern efi_info_t saved_efi_info;
 
-static void efi_reset(void)
+static void efi_reset(uint8_t reset_type)
 {
     static efi_runtime_services_t *rs_table = NULL;
 
@@ -34,7 +35,7 @@ static void efi_reset(void)
         if (system_table_addr != 0) {
             efi64_system_table_t *sys_table = (efi64_system_table_t *)system_table_addr;
             rs_table = (efi_runtime_services_t *)sys_table->runtime_services;
-            rs_table->reset_system(EFI_RESET_COLD, 0, 0);
+            rs_table->reset_system(reset_type, 0, 0);
         }
     }
 #endif
@@ -43,7 +44,7 @@ static void efi_reset(void)
         if (system_table_addr != 0) {
             efi32_system_table_t *sys_table = (efi32_system_table_t *)system_table_addr;
             rs_table = (efi_runtime_services_t *)(uintptr_t)sys_table->runtime_services;
-            rs_table->reset_system(EFI_RESET_COLD, 0, 0);
+            rs_table->reset_system(reset_type, 0, 0);
         }
     }
 }
@@ -52,7 +53,7 @@ void reboot(void)
 {
 
     if(saved_efi_info.loader_signature) {
-        efi_reset();
+        efi_reset(EFI_RESET_COLD);
         usleep(1000000);
     }
 
