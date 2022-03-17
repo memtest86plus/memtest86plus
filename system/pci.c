@@ -246,17 +246,13 @@ void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value)
 
 uint32_t amd_smn_read(uint32_t adr)
 {
-
   pci_config_write32(0, 0, 0, 0x60, adr);
 
   return pci_config_read32(0, 0, 0, 0x64);
-
 }
 
 void amd_smn_write(uint32_t adr, uint32_t data)
 {
-
   pci_config_write32(0, 0, 0, 0x60, adr);
   pci_config_write32(0, 0, 0, 0x64, data);
-
 }

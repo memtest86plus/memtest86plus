@@ -61,18 +61,15 @@ int get_cpu_temperature(void)
     } else if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily >= 8) {
 
         // Grab CPU Temp. for ZEN CPUs using SNM
-
         uint32_t tval = amd_smn_read(SMN_THM_TCON_CUR_TMP);
 
-        float offset;
+        float offset = 0;
 
-        if((tval >> 19) & 0x01)
-        {
+        if((tval >> 19) & 0x01) {
           offset = -49.0f;
         }
 
         return offset + 0.125f * (float)((tval >> 21) & 0x7FF);
-
     }
 
     return 0;
