@@ -34,7 +34,7 @@
 
 const char  *cpu_model = NULL;
 
-uint32_t    imc_type = 0;
+uint16_t    imc_type = 0;
 
 int         l1_cache = 0;
 int         l2_cache = 0;
@@ -253,32 +253,32 @@ static void determine_imc(void)
         switch (cpuid_info.version.extendedFamily)
         {
           case 0x0:
-            imc_type = 0x0100; // Old K8
+            imc_type = IMC_K8;  // Old K8
             break;
           case 0x1:
           case 0x2:
-            imc_type = 0x0101; // K10 (Family 10h & 11h)
+            imc_type = IMC_K10; // K10 (Family 10h & 11h)
             break;
           case 0x3:
-            imc_type = 0x0102; // A-Series APU (Family 12h)
+            imc_type = IMC_K12; // A-Series APU (Family 12h)
             break;
           case 0x5:
-            imc_type = 0x0103; // C- / E- / Z- Series APU (Family 14h)
+            imc_type = IMC_K14; // C- / E- / Z- Series APU (Family 14h)
             break;
           case 0x6:
-            imc_type = 0x0104; // FX Series (Family 15h)
+            imc_type = IMC_K15; // FX Series (Family 15h)
             break;
           case 0x7:
-            imc_type = 0x0105; // Kabini & related (Family 16h)
+            imc_type = IMC_K16; // Kabini & related (Family 16h)
             break;
           case 0x8:
-            imc_type = 0x0110; // Zen & Zen2 (Family 17h)
+            imc_type = IMC_K17; // Zen & Zen2 (Family 17h)
             break;
           case 0x9:
-            imc_type = 0x0110; // Hygon (Family 18h)
+            imc_type = IMC_K18; // Hygon (Family 18h)
             break;
           case 0xA:
-            imc_type = 0x0130; // Zen3 & Zen4(Family 19h)
+            imc_type = IMC_K19; // Zen3 & Zen4(Family 19h)
           default:
             break;
         }
@@ -292,68 +292,171 @@ static void determine_imc(void)
           case 0x5:
             switch (cpuid_info.version.extendedModel) {
               case 2:
-                imc_type = 0x0003;      // Core i3/i5 1st Gen 45 nm (NHM)
+                imc_type = IMC_NHM;         // Core i3/i5 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
               case 3:
-                no_temperature = true;  // Atom Clover Trail
+                no_temperature = true;      // Atom Clover Trail
                 break;
               case 4:
-                imc_type = 0x0007;      // HSW-ULT
+                imc_type = IMC_HSW_ULT;     // Core 4th Gen (Haswell-ULT)
+                break;
+              case 5:
+                imc_type = IMC_SKL_SP;      // Skylake/Cascade Lake/Cooper Lake (Server)
                 break;
               default:
                 break;
             }
             break;
+
           case 0x6:
-            if (cpuid_info.version.extendedModel == 3) {
-                imc_type = 0x0009;      // Atom Cedar Trail
+            switch (cpuid_info.version.extendedModel) {
+              case 3:
+                imc_type = IMC_CDT;         // Atom Cedar Trail
                 no_temperature = true;
+                break;
+              case 4:
+                imc_type = IMC_HSW;         // Core 4th Gen (Haswell w/ GT3e)
+                break;
+              case 5:
+                imc_type = IMC_BDW_DE;      // Broadwell-DE (Server)
+                break;
+              case 6:
+                imc_type = IMC_CNL;         // Cannon Lake
+                break;
+              default:
+                break;
             }
             break;
+
           case 0x7:
-            if (cpuid_info.version.extendedModel == 3) {
-                imc_type = 0x000A;      // Atom Bay Trail
+            switch (cpuid_info.version.extendedModel) {
+              case 0x3:
+                imc_type = IMC_BYT;         // Atom Bay Trail
+                break;
+              case 0x4:
+                imc_type = IMC_BDW;         // Core 5th Gen (Broadwell)
+                break;
+              case 0x9:
+                imc_type = IMC_ADL;         // Core 12th Gen (Alder Lake-P)
+                break;
+              case 0xA:
+                imc_type = IMC_RKL;         // Core 11th Gen (Rocket Lake)
+                break;
+              case 0xB:
+                imc_type = IMC_RPL;         // Core 13th Gen (Raptor Lake)
+                break;
+              default:
+                break;
             }
             break;
+
           case 0xA:
             switch (cpuid_info.version.extendedModel) {
               case 0x1:
-                imc_type = 0x0001;      // Core i7 1st Gen 45 nm (NHME)
+                imc_type = IMC_NHM_E;       // Core i7 1st Gen 45 nm (NHME)
                 break;
               case 0x2:
-                imc_type = 0x0004;      // Core 2nd Gen (SNB)
+                imc_type = IMC_SNB;         // Core 2nd Gen (Sandy Bridge)
                 break;
               case 0x3:
-                imc_type = 0x0006;      // Core 3nd Gen (IVB)
+                imc_type = IMC_IVB;         // Core 3rd Gen (Ivy Bridge)
+                break;
+              case 0x6:
+                imc_type = IMC_ICL_SP;      // Ice Lake-SP/DE (Server)
+                break;
+              case 0x9:
+                imc_type = IMC_ADL;         // Core 12th Gen (Alder Lake-S)
                 break;
               default:
                 break;
             }
             break;
+
           case 0xC:
             switch (cpuid_info.version.extendedModel) {
               case 0x1:
                 if (cpuid_info.version.stepping > 9) {
-                    imc_type = 0x0008;  // Atom PineView
+                    imc_type = 0x0008;       // Atom PineView
                 }
                 no_temperature = true;
                 break;
               case 0x2:
-                imc_type = 0x0002;      // Core i7 1st Gen 32 nm (WMR)
+                imc_type = IMC_WMR;         // Core i7 1st Gen 32 nm (Westmere)
                 break;
               case 0x3:
-                imc_type = 0x0007;      // Core 4nd Gen (HSW)
+                imc_type = IMC_HSW;         // Core 4th Gen (Haswell)
+                break;
+              case 0x8:
+                imc_type = IMC_TGL;         // Core 11th Gen (Tiger Lake-U)
                 break;
               default:
                 break;
             }
             break;
+
           case 0xD:
-            imc_type = 0x0005;          // SNB-E
+            switch (cpuid_info.version.extendedModel) {
+              case 0x2:
+                imc_type = IMC_SNB_E;       // Core 2nd Gen (Sandy Bridge-E)
+                break;
+              case 0x7:
+                imc_type = IMC_ICL;         // Core 10th Gen (IceLake-Y)
+                break;
+              case 0x8:
+                imc_type = IMC_TGL;         // Core 11th Gen (Tiger Lake-Y)
+                break;
+              default:
+                break;
+            }
             break;
+
           case 0xE:
-            imc_type = 0x0001;          // Core i7 1st Gen 45 nm (NHM)
+            switch (cpuid_info.version.extendedModel) {
+              case 0x1:
+                imc_type = IMC_NHM;         // Core i7 1st Gen 45 nm (Nehalem/Bloomfield)
+                break;
+              case 0x2:
+                imc_type = IMC_SNB_E;       // Core 2nd Gen (Sandy Bridge-E)
+                break;
+              case 0x3:
+                imc_type = IMC_IVB_E;       // Core 3rd Gen (Ivy Bridge-E)
+                break;
+              case 0x4:
+                imc_type = IMC_SKL_UY;      // Core 6th Gen (Sky Lake-U/Y)
+                break;
+              case 0x5:
+                imc_type = IMC_SKL;         // Core 6th Gen (Sky Lake-S/H/E)
+                break;
+              case 0x7:
+                imc_type = IMC_ICL;         // Core 10th Gen (IceLake-U)
+                break;
+              case 0x8:
+                imc_type = IMC_KBL_UY;      // Core 7/8/9th Gen (Kaby/Coffee/Comet/Amber Lake-U/Y)
+                break;
+              case 0x9:
+                imc_type = IMC_KBL;         // Core 7/8/9th Gen (Kaby/Coffee/Comet Lake)
+                break;
+              default:
+                break;
+            }
             break;
+
+          case 0xF:
+            switch (cpuid_info.version.extendedModel) {
+              case 0x3:
+                imc_type = IMC_HSW_E;       // Core 3rd Gen (Haswell-E)
+                break;
+              case 0x4:
+                imc_type = IMC_BDW_E;       // Broadwell-E (Server)
+                break;
+              case 0x8:
+                imc_type = IMC_SPR;         // Sapphire Rapids (Server)
+                break;
+              default:
+                break;
+            }
+            break;
+
           default:
             break;
         }
@@ -762,7 +865,7 @@ static void measure_cpu_speed(void)
 
     // Make sure we have a credible result
     if (loops >= 4 && run_time >= 50000) {
-       clks_per_msec = run_time / 50; 
+       clks_per_msec = run_time / 50;
     }
 }
 
