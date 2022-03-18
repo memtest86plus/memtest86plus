@@ -1570,7 +1570,7 @@ static const struct spd_jedec_manufacturer jep106[] = {
 //  { 0x0C31, "GUANCUN" },
 //  { 0x0C32, "IPASON" },
 //  { 0x0C33, "Ayar Labs" },
-//  { 0x0C34, "Amazon" },
+    { 0x0C34, "Amazon" },
 //  { 0x0C35, "Shenzhen Xinxinshun Technology Co" },
 //  { 0x0C36, "Galois Inc" },
 //  { 0x0C37, "Ubilite Inc" },
