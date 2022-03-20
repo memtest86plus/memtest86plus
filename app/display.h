@@ -50,6 +50,18 @@
 #define display_l3_cache_size(size) \
     printf(4, 10, "%kB", (uintptr_t)(size))
 
+#define display_l1_cache_speed(size) \
+    printf(2, 19, "%kB/s", (uintptr_t)(size))
+
+#define display_l2_cache_speed(size) \
+    printf(3, 19, "%kB/s", (uintptr_t)(size))
+
+#define display_l3_cache_speed(size) \
+    printf(4, 19, "%kB/s", (uintptr_t)(size))
+
+#define display_ram_speed(size) \
+    printf(5, 19, "%kB/s", (uintptr_t)(size))
+
 #define display_memory_size(size) \
     printf(5, 10, "%kB", (uintptr_t)(size))
 

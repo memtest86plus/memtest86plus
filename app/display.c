@@ -132,6 +132,18 @@ void display_init(void)
     if (l3_cache) {
         display_l3_cache_size(l3_cache);
     }
+    if (l1_cache_speed) {
+        display_l1_cache_speed(l1_cache_speed);
+    }
+    if (l2_cache_speed) {
+        display_l2_cache_speed(l2_cache_speed);
+    }
+    if (l3_cache_speed) {
+        display_l3_cache_speed(l3_cache_speed);
+    }
+    if (ram_speed) {
+        display_ram_speed(ram_speed);
+    }
     if (num_pm_pages) {
         // Round to nearest MB.
         display_memory_size(1024 * ((num_pm_pages + 128) / 256));

@@ -20,6 +20,9 @@
 #include "io.h"
 #include "tsc.h"
 
+#include "pmem.h"
+#include "memsize.h"
+
 #include "cpuinfo.h"
 
 //------------------------------------------------------------------------------
@@ -39,6 +42,11 @@ uint16_t    imc_type = 0;
 int         l1_cache = 0;
 int         l2_cache = 0;
 int         l3_cache = 0;
+
+uint32_t    l1_cache_speed  = 0;
+uint32_t    l2_cache_speed  = 0;
+uint32_t    l3_cache_speed  = 0;
+uint32_t    ram_speed = 0;
 
 bool        no_temperature = false;
 
@@ -869,6 +877,167 @@ static void measure_cpu_speed(void)
     }
 }
 
+static uint32_t memspeed(uint64_t src, uint32_t len, uint16_t iter)
+{
+    uint64_t dst, wlen;
+    uint64_t start_time, end_time, run_time_clk, overhead;
+    uint16_t i;
+
+    dst = src + len;
+
+#ifdef __x86_64__
+    wlen = len / 8;
+    // Get number of clock cycles due to overhead
+    start_time = get_tsc();
+    for (i = 0; i < iter; i++) {
+        __asm__ __volatile__ (
+            "movq %0,%%rsi\n\t" \
+            "movq %1,%%rdi\n\t" \
+            "movq %2,%%rcx\n\t" \
+            "cld\n\t" \
+            "rep\n\t" \
+            "movsq\n\t" \
+            :: "g" (src), "g" (dst), "g" (0)
+            : "rsi", "rdi", "rcx"
+        );
+    }
+    end_time = get_tsc();
+
+    overhead = (end_time - start_time);
+
+    // Prime the cache
+    __asm__ __volatile__ (
+        "movq %0,%%rsi\n\t" \
+        "movq %1,%%rdi\n\t" \
+        "movq %2,%%rcx\n\t" \
+        "cld\n\t" \
+        "rep\n\t" \
+        "movsq\n\t" \
+        :: "g" (src), "g" (dst), "g" (wlen)
+        : "rsi", "rdi", "rcx"
+    );
+
+    // Write these bytes
+    start_time = get_tsc();
+    for (i = 0; i < iter; i++) {
+        __asm__ __volatile__ (
+            "movq %0,%%rsi\n\t" \
+            "movq %1,%%rdi\n\t" \
+            "movq %2,%%rcx\n\t" \
+            "cld\n\t" \
+            "rep\n\t" \
+            "movsq\n\t" \
+            :: "g" (src), "g" (dst), "g" (wlen)
+            : "rsi", "rdi", "rcx"
+          );
+    }
+    end_time = get_tsc();
+#else
+    wlen = len / 4;
+    // Get number of clock cycles due to overhead
+    start_time = get_tsc();
+    for (i = 0; i < iter; i++) {
+        __asm__ __volatile__ (
+            "movl %0,%%esi\n\t" \
+            "movl %1,%%edi\n\t" \
+            "movl %2,%%ecx\n\t" \
+            "cld\n\t" \
+            "rep\n\t" \
+            "movsl\n\t" \
+            :: "g" (src), "g" (dst), "g" (0)
+            : "esi", "edi", "ecx"
+        );
+    }
+    end_time = get_tsc();
+
+    overhead = (end_time - start_time);
+
+    // Prime the cache
+    __asm__ __volatile__ (
+        "movl %0,%%esi\n\t" \
+        "movl %1,%%edi\n\t" \
+        "movl %2,%%ecx\n\t" \
+        "cld\n\t" \
+        "rep\n\t" \
+        "movsl\n\t" \
+        :: "g" (src), "g" (dst), "g" (wlen)
+        : "esi", "edi", "ecx"
+    );
+
+    // Write these bytes
+    start_time = get_tsc();
+    for (i = 0; i < iter; i++) {
+          __asm__ __volatile__ (
+            "movl %0,%%esi\n\t" \
+            "movl %1,%%edi\n\t" \
+            "movl %2,%%ecx\n\t" \
+            "cld\n\t" \
+            "rep\n\t" \
+            "movsl\n\t" \
+            :: "g" (src), "g" (dst), "g" (wlen)
+            : "esi", "edi", "ecx"
+          );
+    }
+    end_time = get_tsc();
+#endif
+
+    if((end_time - start_time) > overhead)
+        run_time_clk = (end_time - start_time) - overhead;
+    else
+        return 0;
+
+    run_time_clk = ((len * iter) / run_time_clk) * clks_per_msec * 2;
+
+    return run_time_clk;
+}
+
+static void measure_memory_bandwidth(void)
+{
+    uint64_t bench_start_adr = 0;
+    uint32_t mem_test_len;
+    uint8_t i;
+
+    if(l3_cache){
+        mem_test_len = 4*l3_cache*1024;
+    } else if(l2_cache) {
+        mem_test_len = 4*l2_cache*1024;
+    } else {
+        mem_test_len = 1024*1024; // 1MB
+    }
+
+    // Locate enough free space for tests
+    for(i = 0; i < MAX_MEM_SEGMENTS; i++)
+    {
+        // Ugly and needs fix, but should work at this stage
+        if((pm_map[i].end - pm_map[i].start) > ((mem_test_len*2) >> (PAGE_SHIFT-4))) {
+            bench_start_adr = pm_map[i].start << (PAGE_SHIFT+4);
+            break;
+        }
+    }
+
+    if(bench_start_adr == 0){
+        return;
+    }
+
+    // Measure L1 BW using 1/4th of the total L1 cache size
+    if (l1_cache) {
+        l1_cache_speed = memspeed(bench_start_adr, (l1_cache/4)*1024, 300);
+    }
+
+    // Measure L2 BW using half the L2 cache size
+    if (l2_cache) {
+        l2_cache_speed = memspeed(bench_start_adr, l2_cache/2*1024, 300);
+    }
+
+    // Measure L3 BW using half the L3 cache size
+    if (l3_cache) {
+        l3_cache_speed = memspeed(bench_start_adr, l3_cache/2*1024, 300);
+    }
+
+    // Measure RAM BW
+    ram_speed = memspeed(bench_start_adr, mem_test_len, 25);
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -882,4 +1051,9 @@ void cpuinfo_init(void)
     determine_cpu_model();
 
     measure_cpu_speed();
+}
+
+void membw_init(void)
+{
+    measure_memory_bandwidth();
 }

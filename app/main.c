@@ -210,6 +210,10 @@ static void global_init(void)
 
     pci_init();
 
+    if(enable_sm) {
+        membw_init();
+    }
+
     smbios_init();
 
     badram_init();

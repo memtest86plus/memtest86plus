@@ -87,6 +87,26 @@ extern int l2_cache;
 extern int l3_cache;
 
 /**
+ * The bandwidth of the L1 cache
+ */
+extern uint32_t l1_cache_speed;
+
+/**
+ * The bandwidth of the L2 cache
+ */
+extern uint32_t l2_cache_speed;
+
+/**
+ * The bandwidth of the L3 cache
+ */
+extern uint32_t l3_cache_speed;
+
+/**
+ * The bandwidth of the RAM
+ */
+extern uint32_t ram_speed;
+
+/**
  * A flag indicating that we can't read the core temperature on this CPU.
  */
 extern bool no_temperature;
@@ -100,5 +120,10 @@ extern uint32_t clks_per_msec;
  * Determines the CPU info and stores it in the exported variables.
  */
 void cpuinfo_init(void);
+
+/**
+ * Determines the RAM & caches bandwidth and stores it in the exported variables.
+ */
+void membw_init(void);
 
 #endif // CPUINFO_H
