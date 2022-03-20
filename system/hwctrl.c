@@ -51,25 +51,27 @@ static void efi_reset(uint8_t reset_type)
 
 void reboot(void)
 {
+    // Use cf9 method as first try
+    uint8_t cf9 = inb(0xcf9) & ~6;
+    outb(cf9|2, 0xcf9); // Request hard reset
+    usleep(50);
+    outb(cf9|6, 0xcf9); // Actually do the reset
+    usleep(50);
 
+    // If we have UEFI, try EFI reset service
     if(saved_efi_info.loader_signature) {
         efi_reset(EFI_RESET_COLD);
         usleep(1000000);
     }
 
-    // Tell the BIOS to do a warm reboot.
-    *((uint16_t *)0x472) = 0x1234;
-
-    // Pulse the system reset signal.
+     // Still here? try the PORT 0x64 method
     outb(0xfe, 0x64);
+    usleep(150000);
 
-    // If not working, use cf9 method after 100ms delay
-    usleep(15000);
-    uint8_t cf9 = inb(0xcf9) & ~6;
-    outb(cf9|2, 0xcf9); // Request hard reset 
-    usleep(50);
-    outb(cf9|6, 0xcf9); // Actually do the reset
-    usleep(50);    
+    if(!saved_efi_info.loader_signature) {
+        // In last resort, (very) obsolete reboot method using BIOS
+        *((uint16_t *)0x472) = 0x1234;
+    }
 }
 
 void floppy_off()
