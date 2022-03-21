@@ -1,3 +1,8 @@
+---
+[DISCLAIMER] Memtest86+ v6.0 is NOT READY FOR PRODUCTION yet. The base code has basically been rewritten from scratch and many side functions are still under active development. A lot of additional beta-testing is needed. Please consider the actual code as experimental and expect crashes and freezes. Bugs reports are welcome and very helpful! The first binary beta release is planned for April (along with a new [memtest.org](https://memtest.org) website) and a first production-ready stable release this summer.
+
+---
+
 # Memtest86+
 
 Memtest86+ is a stand-alone memory tester for x86 and x86-64 architecture
@@ -17,11 +22,10 @@ later 32-bit or 64-bit CPU.
   * [Boot Options](#boot-options)
   * [Keyboard Selection](#keyboard-selection)
   * [Operation](#operation)
-  * [Error Display](#error-display)
+  * [Error Display](#error-reporting)
   * [Trouble-shooting Memory Errors](#trouble-shooting-memory-errors)
   * [Execution Time](#execution-time)
-  * [Memory Testing Philosophy](#memory-testing-philosophy)
-  * [Memtest86+ Test Algorithms](#memtest86+-test-algorithms)
+  * [Memtest86+ Test Algorithms](#memory-testing-philosophy)
   * [Individual Test Descriptions](#individual-test-descriptions)
   * [Known Limitations and Bugs](#known-limitations-and-bugs)
   * [Acknowledgments](#acknowledgments)
@@ -39,8 +43,8 @@ of the PCMemTest rewrite was to:
 In the process of creating PCMemTest, a number of features of Memtest86+ v5.01
 that were not strictly required for testing the system memory were dropped. In
 particular, no attempt is made to measure the cache and main memory speed, or
-to identify and report the DRAM type. Some of these features will be added back
-in future releases.
+to identify and report the DRAM type. These features will be added back
+in Memtest86+ v6.0 in an attempt to create an unified, fully-featured release.
 
 ## Licensing
 
@@ -118,6 +122,8 @@ recognised:
 
   * smp
     * enables the use of multiple CPU cores at startup
+  * nosm
+    * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
   * nopause
     * skips the pause for configuration at startup
   * keyboard=*type*
@@ -508,8 +514,11 @@ of all zeros and all ones.
 
 ## Known Limitations and Bugs
 
-  * The UHCI USB controller is not yet supported.
-  * Temperature reporting is currently only supported for Intel CPUs.
+  * Keyboard may not be detected at launch in UEFI mode
+  * Reboot may not work with some motherboard in UEFI mode
+  * SMP may not be detected on latest Ryzen motherboard
+
+Feel free to submit bug reports!
 
 ## Acknowledgments
 
