@@ -158,7 +158,7 @@ void print_smbus_startup_info(void) {
             }
 
             if (curspd.isValid) {
-                if(spd_line_idx == 0) {
+                if (spd_line_idx == 0) {
                     prints(LINE_SPD-2, 0, "Memory SPD Information");
                     prints(LINE_SPD-1, 0, "----------------------");
                 }
@@ -252,7 +252,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     // Compute module size for symmetric & assymetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
         uint32_t cur_rank = 0;
-        uint8_t sbyte =  get_spd(smb_idx, slot_idx, sbyte_adr * 4);
+        uint8_t sbyte = get_spd(smb_idx, slot_idx, sbyte_adr * 4);
 
         // SDRAM Density per die
         switch (sbyte & 0x1F)
@@ -287,7 +287,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
 
         // Die per package
         if ((sbyte >> 5) > 1 && (sbyte >> 5) <= 5) {
-            cur_rank *=  1 << (((sbyte >> 5) & 7) - 1);
+            cur_rank *= 1U << (((sbyte >> 5) & 7) - 1);
         }
 
         sbyte = get_spd(smb_idx, slot_idx, 235);
@@ -299,11 +299,11 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         }
 
         // Primary Bus Width per Channel
-        cur_rank *= 1 << ((sbyte & 3) + 3);
+        cur_rank *= 1U << ((sbyte & 3) + 3);
 
         // I/O Width
         sbyte = get_spd(smb_idx, slot_idx, (sbyte_adr * 4) + 2);
-        cur_rank /= 1 << (((sbyte >> 5) & 3) + 2);
+        cur_rank /= 1U << (((sbyte >> 5) & 3) + 2);
 
         // Add current rank to total package size
         spdi.module_size += cur_rank;
@@ -364,7 +364,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         // RAS# Precharge
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 722 + xmp_offset) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 721 + xmp_offset);
-        spdi.tRP= (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRP = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Active Time
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 724 + xmp_offset) << 8 |
@@ -393,7 +393,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         // RAS# Precharge
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 35) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 34);
-        spdi.tRP= (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRP = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Active Time
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 37) << 8 |
@@ -445,13 +445,13 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     spdi.sku_len = 0;
 
     // Compute module size in MB with shifts
-    spdi.module_size = 1 << (
-                             ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +
-                             ((get_spd(smb_idx, slot_idx, 13) & 0x7) + 3)  -
-                             ((get_spd(smb_idx, slot_idx, 12) & 0x7) + 2)  +
-                             ((get_spd(smb_idx, slot_idx, 12) >> 3) & 0x7) +
-                             ((get_spd(smb_idx, slot_idx, 6) >> 4) & 0x7)
-                            );
+    spdi.module_size = 1U << (
+                              ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)   +  // Total SDRAM capacity: (256 Mbits << byte4[3:0] with an oddity for values >= 8) / 1 KB
+                              ((get_spd(smb_idx, slot_idx, 13) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte13[2:0]
+                              ((get_spd(smb_idx, slot_idx, 12) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte12[2:0]
+                              ((get_spd(smb_idx, slot_idx, 12) >> 3) & 0x7) +  // Number of Ranks: byte12[5:3]
+                              ((get_spd(smb_idx, slot_idx, 6) >> 4) & 0x7)     // Die count - 1: byte6[6:4]
+                             );
 
     spdi.hasECC = (((get_spd(smb_idx, slot_idx, 13) >> 3) & 1) == 1);
 
@@ -500,7 +500,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
         // RAS# Precharge
         tns  = (uint8_t)get_spd(smb_idx, slot_idx, 403) * 0.125f +
                (int8_t)get_spd(smb_idx, slot_idx, 428)  * 0.001f;
-        spdi.tRP= (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
         tns = (uint8_t)get_spd(smb_idx, slot_idx, 405) * 0.125f +
@@ -530,7 +530,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
         // RAS# Precharge
         tns  = (uint8_t)get_spd(smb_idx, slot_idx, 26) * 0.125f +
                (int8_t)get_spd(smb_idx, slot_idx, 121) * 0.001f;
-        spdi.tRP= (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
         tns = (uint8_t)get_spd(smb_idx, slot_idx, 28) * 0.125f +
@@ -544,7 +544,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Module manufacturer
-    spdi.jedec_code = (get_spd(smb_idx, slot_idx, 320) & 0x1F) << 8;
+    spdi.jedec_code  = ((uint16_t)(get_spd(smb_idx, slot_idx, 320) & 0x1F)) << 8;
     spdi.jedec_code |= get_spd(smb_idx, slot_idx, 321) & 0x7F;
 
     // Module SKU
@@ -583,12 +583,12 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     spdi.XMP = 0;
 
     // Compute module size in MB with shifts
-    spdi.module_size = 1 << (
-                             ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +
-                             ((get_spd(smb_idx, slot_idx, 8) & 0x7) + 3)  -
-                             ((get_spd(smb_idx, slot_idx, 7) & 0x7) + 2)  +
-                             ((get_spd(smb_idx, slot_idx, 7) >> 3) & 0x7)
-                            );
+    spdi.module_size = 1U << (
+                              ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +  // Total SDRAM capacity: (256 Mbits << byte4[3:0]) / 1 KB
+                              ((get_spd(smb_idx, slot_idx, 8) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte8[2:0]
+                              ((get_spd(smb_idx, slot_idx, 7) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte7[2:0]
+                              ((get_spd(smb_idx, slot_idx, 7) >> 3) & 0x7)    // Number of Ranks: byte7[5:3]
+                             );
 
     spdi.hasECC = (((get_spd(smb_idx, slot_idx, 8) >> 3) & 1) == 1);
 
@@ -648,7 +648,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
 
         // RAS# Precharge
         tns  = get_spd(smb_idx, slot_idx, 191);
-        spdi.tRP= (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
         tns  = (uint16_t)(get_spd(smb_idx, slot_idx, 194) & 0xF0) << 4 |
@@ -680,7 +680,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
         // RAS# Precharge
         tns  = (uint8_t)get_spd(smb_idx, slot_idx, 20) * 0.125f +
                (int8_t)get_spd(smb_idx, slot_idx, 37) * 0.001f;
-        spdi.tRP= (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
         tns = (uint8_t)get_spd(smb_idx, slot_idx, 22) * 0.125f +
@@ -694,7 +694,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Module manufacturer
-    spdi.jedec_code= (get_spd(smb_idx, slot_idx, 117) & 0x1F) << 8;
+    spdi.jedec_code  = ((uint16_t)(get_spd(smb_idx, slot_idx, 117) & 0x1F)) << 8;
     spdi.jedec_code |= get_spd(smb_idx, slot_idx, 118) & 0x7F;
 
     // Module SKU
@@ -702,7 +702,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(smb_idx, slot_idx, 128+j);
 
-        if(sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
             spdi.sku_len--;
             break;
         } else {
@@ -767,7 +767,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     float tckns, tns;
     uint8_t tbyte;
 
-    // Module EPP Detection (we only support Full profiles
+    // Module EPP Detection (we only support Full profiles)
     uint8_t epp_offset = 0;
     if (get_spd(smb_idx, slot_idx, 99) == 0x6D && get_spd(smb_idx, slot_idx, 102) == 0xB1) {
         epp_offset = (get_spd(smb_idx, slot_idx, 103) & 0x3) * 12;
@@ -810,20 +810,20 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
 
         // RAS# to CAS# Latency
         tbyte = get_spd(smb_idx, slot_idx, 111 + epp_offset);
-        tns  = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
+        tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
         tbyte = get_spd(smb_idx, slot_idx, 112 + epp_offset);
-        tns  = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
-        spdi.tRP= (uint16_t)(tns/tckns);
+        tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
+        spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
         tns = get_spd(smb_idx, slot_idx, 113 + epp_offset);
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
-        tns = 0;
+        spdi.tRC = 0;
     } else {
         // Module Timings (JEDEC)
         // CAS# Latency
@@ -837,20 +837,20 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
 
         // RAS# to CAS# Latency
         tbyte = get_spd(smb_idx, slot_idx, 29);
-        tns  = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
+        tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
         tbyte = get_spd(smb_idx, slot_idx, 27);
-        tns  = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
-        spdi.tRP= (uint16_t)(tns/tckns);
+        tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
+        spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
         tns = get_spd(smb_idx, slot_idx, 30);
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
-        tns = 0;
+        spdi.tRC = 0;
     }
 
     // Module manufacturer
@@ -861,7 +861,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    spdi.jedec_code = (contcode - 64) << 8;
+    spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
     spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
 
     // Module SKU
@@ -938,7 +938,7 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
     uint8_t spd_byte9 = get_spd(smb_idx, slot_idx, 9);
     tckns = (spd_byte9 >> 4) + (spd_byte9 & 0xF) * 0.1f;
 
-    spdi.freq = (uint16_t)(1.0f / tckns* 1000.0f * 2.0f );
+    spdi.freq = (uint16_t)(1.0f / tckns * 1000.0f * 2.0f);
 
     // Module Timings
     uint8_t spd_byte18 = get_spd(smb_idx, slot_idx, 18);
@@ -949,13 +949,13 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    tns  = (get_spd(smb_idx, slot_idx, 29) >> 2) +
-           (get_spd(smb_idx, slot_idx, 29) & 0x3) * 0.25f;
+    tns = (get_spd(smb_idx, slot_idx, 29) >> 2) +
+          (get_spd(smb_idx, slot_idx, 29) & 0x3) * 0.25f;
     spdi.tRCD = (uint16_t)(tns/tckns);
 
-    tns  = (get_spd(smb_idx, slot_idx, 27) >> 2) +
-           (get_spd(smb_idx, slot_idx, 27) & 0x3) * 0.25f;
-    spdi.tRP= (uint16_t)(tns/tckns);
+    tns = (get_spd(smb_idx, slot_idx, 27) >> 2) +
+          (get_spd(smb_idx, slot_idx, 27) & 0x3) * 0.25f;
+    spdi.tRP = (uint16_t)(tns/tckns);
 
     spdi.tRAS = (uint16_t)(get_spd(smb_idx, slot_idx, 30)/tckns);
     spdi.tRC = 0;
@@ -1022,7 +1022,7 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
     spdi.module_size *= get_spd(smb_idx, slot_idx, 99);
 
     tbyte = get_spd(smb_idx, slot_idx, 4);
-    if(tbyte > 0x96) {
+    if (tbyte > 0x96) {
         spdi.module_size *= 1 + (((tbyte & 0xF0) >> 4) - 9) + ((tbyte & 0xF) - 6);
     }
 
@@ -1053,7 +1053,7 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
     // Module Timings
     spdi.tCL = get_spd(smb_idx, slot_idx, 14);
     spdi.tRCD = get_spd(smb_idx, slot_idx, 12);
-    spdi.tRP= get_spd(smb_idx, slot_idx, 10);
+    spdi.tRP = get_spd(smb_idx, slot_idx, 10);
     spdi.tRAS = get_spd(smb_idx, slot_idx, 11);
     spdi.tRC = 0;
 
@@ -1065,7 +1065,7 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    spdi.jedec_code = (contcode - 64) << 8;
+    spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
     spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
 
     // Module SKU
@@ -1226,7 +1226,7 @@ static void ich5_get_smb(void)
 
     // Enable I2C Bus
     uint8_t temp = pci_config_read8(0, smbdev, smbfun, 0x40);
-    if((temp & 4) == 0) {
+    if ((temp & 4) == 0) {
         pci_config_write8(0, smbdev, smbfun, 0x40, temp | 0x04);
     }
 
@@ -1357,11 +1357,11 @@ static void fch_zen_get_smb(void)
     }
 
     // Check if IO Smbus is enabled.
-    if((pm_reg & 0x10) == 0){
+    if ((pm_reg & 0x10) == 0) {
         return;
     }
 
-    if((pm_reg & 0xFF00) != 0) {
+    if ((pm_reg & 0xFF00) != 0) {
         smbusbase = pm_reg & 0xFF00;
     }
 }
