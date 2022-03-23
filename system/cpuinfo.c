@@ -20,6 +20,7 @@
 #include "io.h"
 #include "tsc.h"
 
+#include "boot.h"
 #include "pmem.h"
 #include "memsize.h"
 
@@ -993,29 +994,38 @@ static uint32_t memspeed(uint64_t src, uint32_t len, uint16_t iter)
 
 static void measure_memory_bandwidth(void)
 {
-    uint64_t bench_start_adr = 0;
-    uint32_t mem_test_len;
-    uint8_t i;
+    uintptr_t bench_start_adr = 0;
+    size_t mem_test_len;
 
-    if(l3_cache){
+    if (l3_cache) {
         mem_test_len = 4*l3_cache*1024;
-    } else if(l2_cache) {
+    } else if (l2_cache) {
         mem_test_len = 4*l2_cache*1024;
     } else {
         mem_test_len = 1024*1024; // 1MB
     }
 
-    // Locate enough free space for tests
-    for(i = 0; i < MAX_MEM_SEGMENTS; i++)
-    {
-        // Ugly and needs fix, but should work at this stage
-        if((pm_map[i].end - pm_map[i].start) > ((mem_test_len*2) >> (PAGE_SHIFT-4))) {
-            bench_start_adr = pm_map[i].start << (PAGE_SHIFT+4);
+    // Locate enough free space for tests. We require the space to be mapped into
+    // our virtual address space, which limits us to the first 3GB.
+    // FIXME: The 3GB limit should be defined by vmem.h
+    for (int i = 0; i < pm_map_size && pm_map[i].start < PAGE_C(3,GB); i++) {
+        uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
+        uintptr_t try_end   = try_start + mem_test_len;
+
+        // Avoid the memory region where the program is currently located.
+        if (try_start < (uintptr_t)_end && try_end > (uintptr_t)_start) {
+            try_start = (uintptr_t)_end;
+            try_end   = try_start + mem_test_len;
+        }
+
+        uintptr_t end_limit = pm_map[i].end < PAGE_C(3,GB) ? pm_map[i].end << PAGE_SHIFT : SIZE_C(3,GB);
+        if (try_end <= end_limit) {
+            bench_start_adr = try_start;
             break;
         }
     }
 
-    if(bench_start_adr == 0){
+    if (bench_start_adr == 0) {
         return;
     }
 
