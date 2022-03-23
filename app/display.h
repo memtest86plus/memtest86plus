@@ -65,6 +65,10 @@
 #define display_memory_size(size) \
     printf(5, 10, "%kB", (uintptr_t)(size))
 
+#define display_dmi_mb(sys_ma, sys_sku) \
+    dmicol = prints(23, dmicol, sys_man); \
+    prints(23, dmicol + 1, sys_sku);
+
 #define display_available_cpus(count) \
     printi(7, 10, count, 4, false, false)
 

@@ -9,6 +9,7 @@
 #include "bootparams.h"
 #include "efi.h"
 #include "vmem.h"
+#include "smbios.h"
 
 #define LINE_DMI 23
 
@@ -17,43 +18,8 @@ static const efi_guid_t SMBIOS2_GUID = { 0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16
 // SMBIOS v3 compliant FW must include an SMBIOS v2 table, but maybe parse SM3 table later...
 // static const efi_guid_t SMBIOS3_GUID = { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} };
 
-typedef struct {
-    uint8_t anchor[4];
-    int8_t checksum;
-    uint8_t length;
-    uint8_t majorversion;
-    uint8_t minorversion;
-    uint16_t maxstructsize;
-    uint8_t revision;
-    uint8_t pad[5];
-    uint8_t intanchor[5];
-    int8_t intchecksum;
-    uint16_t tablelength;
-    uint32_t tableaddress;
-    uint16_t numstructs;
-    uint8_t SMBIOSrev;
-}
-smbios_t;
-
-struct tstruct_header {
-    uint8_t type;
-    uint8_t length;
-    uint16_t handle;
-}
-__attribute__((packed));
-
-struct system_map {
-    struct tstruct_header header;
-    uint8_t manufacturer;
-    uint8_t productname;
-    uint8_t version;
-    uint8_t serialnumber;
-    uint8_t uuidbytes[16];
-    uint8_t wut;
-}
-__attribute__((packed));
-
-struct system_map * dmi_system_info;
+struct system_map *dmi_system_info;
+struct mem_dev *dmi_memory_device;
 
 char * get_tstruct_string(struct tstruct_header * header, int n) {
     if (n < 1)
@@ -144,7 +110,7 @@ static uintptr_t find_smbios_adr(void) {
 
 int smbios_init(void) {
 
-    char * dmi, * dmi_start, * table_start;
+    char * dmi, * dmi_start, *table_start;
     int tstruct_count = 0;
     uintptr_t smb_adr;
     smbios_t * eps;
@@ -162,7 +128,7 @@ int smbios_init(void) {
     // Verify checksum
     int8_t checksum = 0;
 
-    for (; dmi < (dmi_start + eps -> length); dmi++) {
+    for (; dmi < (dmi_start + eps->length); dmi++) {
         checksum += * dmi;
     }
 
@@ -178,23 +144,29 @@ int smbios_init(void) {
     table_start = (char * )(uintptr_t) eps -> tableaddress;
     dmi = (char * ) table_start;
 
-    // Parse all structs (currently restricted to Type 2 only)
+    // Parse all structs
     while (dmi < (table_start + eps -> tablelength)) {
-        struct tstruct_header * header = (struct tstruct_header * ) dmi;
+        struct tstruct_header * header = (struct tstruct_header *) dmi;
 
+        // Type 2 - Baseboard Information
         if (header -> type == 2) {
-            dmi_system_info = (struct system_map * ) dmi;
+            dmi_system_info = (struct system_map *) dmi;
+        }
+
+        // Type 17 - Memory Device
+        if (header->type == 17) {
+            dmi_memory_device = (struct mem_dev *) dmi;
         }
 
         dmi += header -> length;
 
-        while (!( * dmi == 0 && * (dmi + 1) == 0)) {
+        while (!(*dmi == 0 && *(dmi + 1) == 0)) {
             dmi++;
         }
 
         dmi += 2;
 
-        if (++tstruct_count > eps -> numstructs) {
+        if (++tstruct_count > eps->numstructs) {
             return -1;
         }
     }
@@ -203,19 +175,18 @@ int smbios_init(void) {
 }
 
 void print_smbios_startup_info(void) {
-    char * sys_man, * sys_sku;
+    char *sys_man, *sys_sku;
 
     int sl1, sl2, dmicol;
 
-    sys_man = get_tstruct_string( & dmi_system_info -> header, dmi_system_info -> manufacturer);
+    sys_man = get_tstruct_string(&dmi_system_info->header, dmi_system_info->manufacturer);
     sl1 = strlen(sys_man);
 
-    sys_sku = get_tstruct_string( & dmi_system_info -> header, dmi_system_info -> productname);
+    sys_sku = get_tstruct_string(&dmi_system_info->header, dmi_system_info->productname);
     sl2 = strlen(sys_sku);
 
     if (sl1 && sl2) {
         dmicol = 40 - ((sl1 + sl2) / 2);
-        dmicol = prints(LINE_DMI, dmicol, sys_man);
-        prints(LINE_DMI, dmicol + 1, sys_sku);
+        display_dmi_mb(sys_man, sys_sku)
     }
 }
