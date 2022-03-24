@@ -257,15 +257,29 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         sbyte = get_spd(smb_idx, slot_idx, (sbyte_adr * 4) + 2);
         cur_rank /= 1 << (((sbyte >> 5) & 3) + 2);
 
+        // Add current rank to total package size
         spdi.module_size += cur_rank;
+
+        // If not Asymmetrical, don't process the second rank
+        if((get_spd(smb_idx, slot_idx, 234) >> 6) == 0) {
+            break;
+        }
     }
 
-    // TODO
-    spdi.XMP = 0;
+    // Compute Frequency (including XMP)
+    uint16_t tCK;
 
-    // Compute Frequency
-    uint16_t tCK = get_spd(smb_idx, slot_idx, 21) << 8;
-    tCK |= get_spd(smb_idx, slot_idx, 20);
+    spdi.XMP = ((get_spd(smb_idx, slot_idx, 640) == 0x0C && get_spd(smb_idx, slot_idx, 641) == 0x4A)) ? 3 : 0;
+
+    if(spdi.XMP == 3) {
+        // XMP 3.0
+        tCK = get_spd(smb_idx, slot_idx, 710) << 8;
+        tCK |= get_spd(smb_idx, slot_idx, 709);
+    } else {
+        // JEDEC
+        tCK = get_spd(smb_idx, slot_idx, 21) << 8;
+        tCK |= get_spd(smb_idx, slot_idx, 20);
+    }
 
     spdi.freq = (float)(1.0f / tCK * 2.0f * 1000.0f * 1000.0f);
     spdi.freq = (spdi.freq + 50) / 100 * 100;
