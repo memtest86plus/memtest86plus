@@ -10,6 +10,7 @@
 #include "unistd.h"
 
 #include "smbus.h"
+#include "smbios.h"
 #include "jedec_id.h"
 
 #define LINE_SPD        13
@@ -18,77 +19,79 @@
 int smbdev, smbfun;
 unsigned short smbusbase;
 
-static bool isPage1 = false;
+static int8_t spd_page = -1;
+static int8_t last_adr = -1;
 
 static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
 
 static uint8_t ich5_process(void);
-static void ich5_get_smb(uint8_t idx);
+static void ich5_get_smb(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 
 static const struct pci_smbus_controller smbcontrollers[] = {
-    {0x8086, 0x24C3, "82801DB (ICH4)",          ich5_get_smb, ich5_read_spd_byte, HAS_DDR | HAS_DDR2},
-    {0x8086, 0x24D3, "82801E (ICH5)",           ich5_get_smb, ich5_read_spd_byte, HAS_DDR | HAS_DDR2},
-    {0x8086, 0x25A4, "6300ESB",                 ich5_get_smb, ich5_read_spd_byte, HAS_DDR | HAS_DDR2},
-    {0x8086, 0x266A, "82801F (ICH6)",           ich5_get_smb, ich5_read_spd_byte, HAS_DDR | HAS_DDR2},
-    {0x8086, 0x269B, "6310ESB/6320ESB",         ich5_get_smb, ich5_read_spd_byte, HAS_DDR2},
-    {0x8086, 0x27DA, "82801G (ICH7)",           ich5_get_smb, ich5_read_spd_byte, HAS_DDR2},
-    {0x8086, 0x283E, "82801H (ICH8)",           ich5_get_smb, ich5_read_spd_byte, HAS_DDR2},
-    {0x8086, 0x2930, "82801I (ICH9)",           ich5_get_smb, ich5_read_spd_byte, HAS_DDR2},
-    {0x8086, 0x5032, "EP80579 (Tolapai)",       ich5_get_smb, ich5_read_spd_byte, HAS_DDR2},
-    {0x8086, 0x3A30, "ICH10",                   ich5_get_smb, ich5_read_spd_byte, HAS_DDR2 | HAS_DDR3},
-    {0x8086, 0x3A60, "ICH10",                   ich5_get_smb, ich5_read_spd_byte, HAS_DDR2 | HAS_DDR3},
-    {0x8086, 0x3B30, "5/3400 Series (PCH)",     ich5_get_smb, ich5_read_spd_byte, HAS_DDR2 | HAS_DDR3},
-    {0x8086, 0x1C22, "6 Series (PCH)",          ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x1D22, "Patsburg (PCH)",          ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x1D70, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x1D71, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x1D72, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x2330, "DH89xxCC (PCH)",          ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x1E22, "Panther Point (PCH)",     ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x8C22, "Lynx Point (PCH)",        ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x9C22, "Lynx Point-LP (PCH)",     ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x1F3C, "Avoton (SOC)",            ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x8D22, "Wellsburg (PCH)",         ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x8D7D, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x8D7E, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x8D7F, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x23B0, "Coleto Creek (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x8CA2, "Wildcat Point (PCH)",     ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x9CA2, "Wildcat Point-LP (PCH)",  ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x0F12, "BayTrail (SOC)",          ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0x2292, "Braswell (SOC)",          ich5_get_smb, ich5_read_spd_byte, HAS_DDR3},
-    {0x8086, 0xA123, "Sunrise Point-H (PCH) ",  ich5_get_smb, ich5_read_spd_byte, HAS_DDR3 | HAS_DDR4},
-    {0x8086, 0x9D23, "Sunrise Point-LP (PCH)",  ich5_get_smb, ich5_read_spd_byte, HAS_DDR3 | HAS_DDR4},
-    {0x8086, 0x19DF, "Denverton  (SOC)",        ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x1BC9, "Emmitsburg (PCH)",        ich5_get_smb, ich5_read_spd_byte, HAS_DDR4 | HAS_DDR5},
-    {0x8086, 0xA1A3, "Lewisburg (PCH)",         ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0xA223, "Lewisburg Super (PCH)",   ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0xA2A3, "Kaby Lake (PCH-H)",       ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x31D4, "Gemini Lake (SOC)",       ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0xA323, "Cannon Lake-H (PCH)",     ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x9DA3, "Cannon Lake-LP (PCH)",    ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x18DF, "Cedar Fork (PCH)",        ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x34A3, "Ice Lake-LP (PCH)",       ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x38A3, "Ice Lake-N (PCH)",        ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x02A3, "Comet Lake (PCH)",        ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x06A3, "Comet Lake-H (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x4B23, "Elkhart Lake (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0xA0A3, "Tiger Lake-LP (PCH)",     ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x43A3, "Tiger Lake-H (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x4DA3, "Jasper Lake (SOC)",       ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0xA3A3, "Comet Lake-V (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4},
-    {0x8086, 0x7AA3, "Alder Lake-S (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4 | HAS_DDR5},
-    {0x8086, 0x51A3, "Alder Lake-P (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4 | HAS_DDR5},
-    {0x8086, 0x54A3, "Alder Lake-M (PCH)",      ich5_get_smb, ich5_read_spd_byte, HAS_DDR4 | HAS_DDR5},
+    {0x8086, 0x24C3, "82801DB (ICH4)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x24D3, "82801E (ICH5)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x25A4, "6300ESB",                 ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x266A, "82801F (ICH6)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x269B, "6310ESB/6320ESB",         ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x27DA, "82801G (ICH7)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x283E, "82801H (ICH8)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2930, "82801I (ICH9)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x5032, "EP80579 (Tolapai)",       ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x3A30, "ICH10",                   ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x3A60, "ICH10",                   ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x3B30, "5/3400 Series (PCH)",     ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1C22, "6 Series (PCH)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1D22, "Patsburg (PCH)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1D70, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1D71, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1D72, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2330, "DH89xxCC (PCH)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1E22, "Panther Point (PCH)",     ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x8C22, "Lynx Point (PCH)",        ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x9C22, "Lynx Point-LP (PCH)",     ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1F3C, "Avoton (SOC)",            ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x8D22, "Wellsburg (PCH)",         ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x8D7D, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x8D7E, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x8D7F, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x23B0, "Coleto Creek (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x8CA2, "Wildcat Point (PCH)",     ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x9CA2, "Wildcat Point-LP (PCH)",  ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x0F12, "BayTrail (SOC)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2292, "Braswell (SOC)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA123, "Sunrise Point-H (PCH) ",  ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x9D23, "Sunrise Point-LP (PCH)",  ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x19DF, "Denverton  (SOC)",        ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x1BC9, "Emmitsburg (PCH)",        ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA1A3, "Lewisburg (PCH)",         ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA223, "Lewisburg Super (PCH)",   ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA2A3, "Kaby Lake (PCH-H)",       ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x31D4, "Gemini Lake (SOC)",       ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA323, "Cannon Lake-H (PCH)",     ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x9DA3, "Cannon Lake-LP (PCH)",    ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x18DF, "Cedar Fork (PCH)",        ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x34A3, "Ice Lake-LP (PCH)",       ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x38A3, "Ice Lake-N (PCH)",        ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x02A3, "Comet Lake (PCH)",        ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x06A3, "Comet Lake-H (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x4B23, "Elkhart Lake (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA0A3, "Tiger Lake-LP (PCH)",     ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x43A3, "Tiger Lake-H (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x4DA3, "Jasper Lake (SOC)",       ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0xA3A3, "Comet Lake-V (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x7AA3, "Alder Lake-S (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x51A3, "Alder Lake-P (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x54A3, "Alder Lake-M (PCH)",      ich5_get_smb, ich5_read_spd_byte},
 
      // AMD SMBUS
-     {0, 0, "", NULL, NULL, 0}
+     {0, 0, "", NULL, NULL}
 };
 
 
@@ -105,7 +108,7 @@ void print_smbus_startup_info(void) {
         return;
     }
 
-    smbcontrollers[index].get_adr(index);
+    smbcontrollers[index].get_adr();
 
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
 
@@ -115,6 +118,9 @@ void print_smbus_startup_info(void) {
             {
                 default:
                     continue;
+                case 0x12: // DDR5
+                    curspd = parse_spd_ddr5(index, spdidx);
+                    break;
                 case 0x0C: // DDR4
                     curspd = parse_spd_ddr4(index, spdidx);
                     break;
@@ -147,7 +153,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     // Print Slot Index, Module Size, type & Max frequency (Jedec or XMP)
     curcol = printf(LINE_SPD+lidx, 0, " - Slot %i : %kB %s-%i",
                     spdi.slot_num,
-                    spdi.module_size,
+                    spdi.module_size * 1024,
                     spdi.type,
                     spdi.freq);
 
@@ -186,21 +192,124 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 }
 
-static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
 {
-
     spd_info spdi;
 
-    uint8_t tck, bcd;
-    int8_t j;
+    spdi.type = "DDR5";
+    spdi.slot_num = slot_idx;
+    spdi.sku_len = 0;
+
+    // Compute module size for symmetric & assymetric configuration
+    for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
+        uint32_t cur_rank = 0;
+        uint8_t sbyte =  get_spd(smb_idx, slot_idx, sbyte_adr * 4);
+
+        // SDRAM Density per die
+        switch (sbyte & 0x1F)
+        {
+          default:
+            break;
+          case 0b00001:
+            cur_rank = 512;
+            break;
+          case 0b00010:
+            cur_rank = 1024;
+            break;
+          case 0b00011:
+            cur_rank = 1536;
+            break;
+          case 0b00100:
+            cur_rank = 2048;
+            break;
+          case 0b00101:
+            cur_rank = 3072;
+            break;
+          case 0b00110:
+            cur_rank = 4096;
+            break;
+          case 0b00111:
+            cur_rank = 6144;
+            break;
+          case 0b01000:
+            cur_rank = 8192;
+            break;
+        }
+
+        // Die per package
+        if((sbyte >> 5) > 1 && (sbyte >> 5) <= 5) {
+            cur_rank *=  1 << (((sbyte >> 5) & 7) - 1);
+        }
+
+        sbyte = get_spd(smb_idx, slot_idx, 235);
+        spdi.hasECC = (((sbyte >> 3) & 3) > 0);
+
+        // Channels per DIMM
+        if(((sbyte >> 5) & 3) == 1) {
+            cur_rank *= 2;
+        }
+
+        // Primary Bus Width per Channel
+        cur_rank *= 1 << ((sbyte & 3) + 3);
+
+        // I/O Width
+        sbyte = get_spd(smb_idx, slot_idx, (sbyte_adr * 4) + 2);
+        cur_rank /= 1 << (((sbyte >> 5) & 3) + 2);
+
+        spdi.module_size += cur_rank;
+    }
+
+    // TODO
+    spdi.XMP = 0;
+
+    // Compute Frequency
+    uint16_t tCK = get_spd(smb_idx, slot_idx, 21) << 8;
+    tCK |= get_spd(smb_idx, slot_idx, 20);
+
+    spdi.freq = (float)(1.0f / tCK * 2.0f * 1000.0f * 1000.0f);
+    spdi.freq = (spdi.freq + 50) / 100 * 100;
+
+    // Module manufacturer
+    spdi.jedec_code = (get_spd(smb_idx, slot_idx, 512) & 0x1F) << 8;
+    spdi.jedec_code |= get_spd(smb_idx, slot_idx, 513) & 0x7F;
+
+    // Module SKU
+    uint8_t sku_byte;
+    for (int j = 0; j <= 29; j++) {
+        sku_byte = get_spd(smb_idx, slot_idx, 521+j);
+
+        if(sku_byte <= 0x20 && j > 1 && spdi.sku[j-1] <= 0x20) {
+            spdi.sku_len--;
+            break;
+        } else {
+            spdi.sku[j] = sku_byte;
+            spdi.sku_len++;
+        }
+    }
+
+    // Week & Date (BCD to Int)
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 515);
+    spdi.fab_year =  bcd - 6 * (bcd >> 4);
+
+    bcd = get_spd(smb_idx, slot_idx, 516);
+    spdi.fab_week =  bcd - 6 * (bcd >> 4);
+
+    spdi.isValid = true;
+
+    return spdi;
+}
+
+static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
+{
+    spd_info spdi;
 
     spdi.type = "DDR4";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
 
-    // Compute module size with shifts
+    // Compute module size in kB with shifts
     spdi.module_size = 1 << (
-                             ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 15)  +
+                             ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +
                              ((get_spd(smb_idx, slot_idx, 13) & 0x7) + 3)  -
                              ((get_spd(smb_idx, slot_idx, 12) & 0x7) + 2)  +
                              ((get_spd(smb_idx, slot_idx, 12) >> 3) & 0x7) +
@@ -209,7 +318,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
 
     spdi.hasECC = (((get_spd(smb_idx, slot_idx, 13) >> 3) & 1) == 1);
 
-    tck = get_spd(smb_idx, slot_idx, 18);
+    uint8_t tck = get_spd(smb_idx, slot_idx, 18);
 
     if(get_spd(smb_idx, slot_idx, 384) == 0x0C && get_spd(smb_idx, slot_idx, 385) == 0x4A) {
         // Max XMP
@@ -253,12 +362,12 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Module manufacturer
-    spdi.jedec_code= (get_spd(smb_idx, slot_idx, 320) & 0x1F) << 8;
+    spdi.jedec_code = (get_spd(smb_idx, slot_idx, 320) & 0x1F) << 8;
     spdi.jedec_code |= get_spd(smb_idx, slot_idx, 321) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
-    for (j = 0; j <= 20; j++) {
+    for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(smb_idx, slot_idx, 329+j);
 
         if(sku_byte <= 0x20 && j > 1 && spdi.sku[j-1] <= 0x20) {
@@ -271,7 +380,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Week & Date (BCD to Int)
-    bcd = get_spd(smb_idx, slot_idx, 323);
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 323);
     spdi.fab_year =  bcd - 6 * (bcd >> 4);
 
     bcd = get_spd(smb_idx, slot_idx, 324);
@@ -284,20 +393,16 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
 
 static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
 {
-
     spd_info spdi;
-
-    uint8_t tck, bcd;
-    int8_t j;
 
     spdi.type = "DDR3";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.XMP = 0;
 
-    // Compute module size with shifts
+    // Compute module size in KB with shifts
     spdi.module_size = 1 << (
-                             ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 15)  +
+                             ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +
                              ((get_spd(smb_idx, slot_idx, 8) & 0x7) + 3)  -
                              ((get_spd(smb_idx, slot_idx, 7) & 0x7) + 2)  +
                              ((get_spd(smb_idx, slot_idx, 7) >> 3) & 0x7)
@@ -305,7 +410,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
 
     spdi.hasECC = (((get_spd(smb_idx, slot_idx, 8) >> 3) & 1) == 1);
 
-    tck = get_spd(smb_idx, slot_idx, 12);
+    uint8_t tck = get_spd(smb_idx, slot_idx, 12);
 
     if(get_spd(smb_idx, slot_idx, 176) == 0x0C && get_spd(smb_idx, slot_idx, 177) == 0x4A) {
         tck = get_spd(smb_idx, slot_idx, 186);
@@ -349,7 +454,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
 
     // Module SKU
     uint8_t sku_byte;
-    for (j = 0; j <= 20; j++) {
+    for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(smb_idx, slot_idx, 128+j);
 
         if(sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
@@ -361,7 +466,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    bcd = get_spd(smb_idx, slot_idx, 120);
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 120);
     spdi.fab_year =  bcd - 6 * (bcd >> 4);
 
     bcd = get_spd(smb_idx, slot_idx, 121);
@@ -372,18 +477,16 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx) {
+static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx) 
+{
     spd_info spdi;
-
-    uint8_t bcd;
-    int8_t j;
 
     spdi.type = "DDR2";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.XMP = 0;
 
-    // Compute module size with shifts
+    // Compute module size in KB
     switch (get_spd(smb_idx, slot_idx, 31)) {
     case 1:
         spdi.module_size = 1024;
@@ -413,7 +516,6 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx) {
     }
 
     spdi.module_size *= (get_spd(smb_idx, slot_idx, 5) & 7) + 1;
-    spdi.module_size *= 1024;
 
     spdi.hasECC = ((get_spd(smb_idx, slot_idx, 11) >> 1) == 1);
 
@@ -434,7 +536,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx) {
 
     // Module SKU
     uint8_t sku_byte;
-    for (j = 0; j < 18; j++) {
+    for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
@@ -446,7 +548,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx) {
         }
     }
 
-    bcd = get_spd(smb_idx, slot_idx, 94);
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 94);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
     bcd = get_spd(smb_idx, slot_idx, 93);
@@ -489,7 +591,7 @@ static int find_smb_controller(void)
 // i801 / ICH5 Access
 // ------------------
 
-static void ich5_get_smb(uint8_t idx)
+static void ich5_get_smb(void)
 {
     unsigned long x;
 
@@ -505,46 +607,61 @@ static void ich5_get_smb(uint8_t idx)
     // Reset SMBUS Controller
     __outb(__inb(SMBHSTSTS) & 0x1F, SMBHSTSTS);
     usleep(1000);
-
-    // Reset DDR4 Page because BIOS might pass control with Page1 set
-    if(smbcontrollers[idx].cap & HAS_DDR4) {
-        __outb((0x36 << 1) | 0x00, SMBHSTADD);
-        __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
-
-        ich5_process();
-    }
 }
+
+/*************************************************************************************
+/ *****************************         WARNING          *****************************
+/ ************************************************************************************
+/   Be absolutely sure to know what you're doing before changing the function below!
+/       You can easily WRITE into the SPD (especially with DDR5) and corrupt it
+/                /!\  Your RAM modules will not work anymore  /!\
+/ *************************************************************************************/
 
 static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
 {
-
     smbus_adr += 0x50;
 
-    // Switch page if needed (DDR4)
-    if (spd_adr > 0xFF && !isPage1) {
+    if (dmi_memory_device->type == DMI_DDR4) {
+        // Switch page if needed (DDR4)
+        if (spd_adr > 0xFF && spd_page != 1) {
+            __outb((0x37 << 1) | I2C_WRITE, SMBHSTADD);
+            __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
 
-        __outb((0x37 << 1) | 0x00, SMBHSTADD);
-        __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+            ich5_process(); // return should 0x42 or 0x44
+            spd_page = 1;
 
-        ich5_process(); // return should 0x42 or 0x44
+        } else if (spd_adr <= 0xFF && spd_page != 0) {
+            __outb((0x36 << 1) | I2C_WRITE, SMBHSTADD);
+            __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
 
-        isPage1 = true;
+            ich5_process();
+            spd_page = 0;
+        }
 
-    } else if (spd_adr <= 0xFF && isPage1) {
+        if (spd_adr > 0xFF) {
+            spd_adr -= 0x100;
+        }
+    } else if (dmi_memory_device->type == DMI_DDR5) {
+        // Switch page if needed (DDR5)
+        uint8_t adr_page = spd_adr / 128;
 
-        __outb((0x36 << 1) | 0x00, SMBHSTADD);
-        __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+        if (adr_page != spd_page || last_adr != smbus_adr) {
+            __outb((smbus_adr << 1) | I2C_WRITE, SMBHSTADD);
+            __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
+            __outb(adr_page, SMBHSTDAT0);
+            __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
 
-        ich5_process();
+            ich5_process();
 
-        isPage1 = false;
+            spd_page = adr_page;
+            last_adr = smbus_adr;
+         }
+
+          spd_adr -= adr_page * 128;
+          spd_adr |= 0x80;
     }
 
-    if (spd_adr > 0xFF) {
-        spd_adr -= 0x100;
-    }
-
-    __outb((smbus_adr << 1) | 0x01, SMBHSTADD);
+    __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
     __outb(spd_adr, SMBHSTCMD);
     __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
 
