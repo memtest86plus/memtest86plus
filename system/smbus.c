@@ -199,7 +199,8 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     spdi.type = "DDR5";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
-
+    spdi.module_size = 0;
+    
     // Compute module size for symmetric & assymetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
         uint32_t cur_rank = 0;
