@@ -22,6 +22,7 @@
 
 #include "boot.h"
 #include "pmem.h"
+#include "vmem.h"
 #include "memsize.h"
 
 #include "cpuinfo.h"
@@ -67,6 +68,12 @@ static void determine_cache_size()
         l3_cache = cpuid_info.cache_info.l3_size;
         l3_cache *= 512;
         break;
+      case 'C':
+        // Zhaoxin CPU only
+        if (cpuid_info.version.family != 7) {
+            break;
+        }
+        /* fall through */
       case 'G':
         // Intel Processors
         l1_cache = 0;
@@ -1002,13 +1009,12 @@ static void measure_memory_bandwidth(void)
     } else if (l2_cache) {
         mem_test_len = 4*l2_cache*1024;
     } else {
-        mem_test_len = 1024*1024; // 1MB
+        return; // If we're not able to detect L2, don't start benchmark
     }
 
     // Locate enough free space for tests. We require the space to be mapped into
     // our virtual address space, which limits us to the first 3GB.
-    // FIXME: The 3GB limit should be defined by vmem.h
-    for (int i = 0; i < pm_map_size && pm_map[i].start < PAGE_C(3,GB); i++) {
+    for (int i = 0; i < pm_map_size && pm_map[i].start < VM_BENCH_WINDOW_SIZE; i++) {
         uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
         uintptr_t try_end   = try_start + mem_test_len;
 
@@ -1018,7 +1024,7 @@ static void measure_memory_bandwidth(void)
             try_end   = try_start + mem_test_len;
         }
 
-        uintptr_t end_limit = pm_map[i].end < PAGE_C(3,GB) ? pm_map[i].end << PAGE_SHIFT : SIZE_C(3,GB);
+        uintptr_t end_limit = pm_map[i].end < VM_BENCH_WINDOW_SIZE ? pm_map[i].end << PAGE_SHIFT : VM_BENCH_WINDOW_SIZE;
         if (try_end <= end_limit) {
             bench_start_adr = try_start;
             break;

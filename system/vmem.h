@@ -17,7 +17,8 @@
 
 #include "memsize.h"
 
-#define VM_WINDOW_SIZE     PAGE_C(1,GB)
+#define VM_WINDOW_SIZE           PAGE_C(1,GB)
+#define VM_BENCH_WINDOW_SIZE     PAGE_C(3,GB)
 
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 
