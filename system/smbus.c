@@ -30,8 +30,10 @@ static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
 
-static uint8_t ich5_process(void);
+static void fch_zen_get_smb(void);
+
 static void ich5_get_smb(void);
+static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 
 static const struct pci_smbus_controller smbcontrollers[] = {
@@ -91,6 +93,8 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     {0x8086, 0x54A3, "Alder Lake-M (PCH)",      ich5_get_smb, ich5_read_spd_byte},
 
      // AMD SMBUS
+     {0x1022, 0x780B, "AMD FCH", NULL, NULL},
+     {0x1022, 0x790B, "AMD FCH (Zen)",          fch_zen_get_smb, ich5_read_spd_byte},
      {0, 0, "", NULL, NULL}
 };
 
@@ -166,23 +170,23 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     for (i = 0; i < JEP106_CNT ; i++) {
 
         if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(LINE_SPD+lidx, curcol, " - %s ", jep106[i].name);
+            curcol = printf(LINE_SPD+lidx, curcol, " - %s", jep106[i].name);
             break;
         }
     }
 
     // If not present in JEDEC106, display raw JEDEC ID
-    if(i == JEP106_CNT) {
-        curcol = printf(LINE_SPD+lidx, curcol, " - Unknown (0x%x) ", spdi.jedec_code);
+    if(i == JEP106_CNT && spdi.jedec_code != 0) {
+        curcol = printf(LINE_SPD+lidx, curcol, " - Unknown (0x%x)", spdi.jedec_code);
     }
 
     // Print SKU
     for(i = 0; i < spdi.sku_len; i++) {
-        printc(LINE_SPD+lidx, curcol++, spdi.sku[i]);
+        printc(LINE_SPD+lidx, ++curcol, spdi.sku[i]);
     }
 
     // Print Manufacturing date (only if valid)
-    if(curcol <= 72 && spdi.fab_year > 1 && spdi.fab_year < 30 && spdi.fab_week < 55) {
+    if(curcol <= 72 && spdi.fab_year > 1 && spdi.fab_year < 32 && spdi.fab_week < 53) {
         curcol = printf(LINE_SPD+lidx, curcol, " (W%i'%i)", spdi.fab_week, spdi.fab_year);
     }
 
@@ -200,7 +204,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.module_size = 0;
-    
+
     // Compute module size for symmetric & assymetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
         uint32_t cur_rank = 0;
@@ -492,7 +496,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx) 
+static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -722,4 +726,29 @@ static uint8_t ich5_process(void)
     }
 
     return 0;
+}
+
+// --------------------
+// AMD SMBUS Controller
+// --------------------
+
+static void fch_zen_get_smb(void)
+{
+    uint16_t pm_reg;
+
+    smbusbase = 0;
+
+    __outb(AMD_PM_INDEX + 1, AMD_INDEX_IO_PORT);
+    pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
+    __outb(AMD_PM_INDEX, AMD_INDEX_IO_PORT);
+    pm_reg |= __inb(AMD_DATA_IO_PORT);
+
+    // Check if IO Smbus is enabled.
+    if((pm_reg & 0x10) == 0){
+        return;
+    }
+
+    if((pm_reg & 0xFF00) != 0) {
+        smbusbase = pm_reg & 0xFF00;
+    }
 }
