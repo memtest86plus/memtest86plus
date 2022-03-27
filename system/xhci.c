@@ -881,7 +881,6 @@ static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id)
     return -1;
 }
 
-
 static uint8_t get_keycode(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
