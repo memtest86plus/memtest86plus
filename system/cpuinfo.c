@@ -31,7 +31,8 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define PIT_TICKS_50mS  59659    // PIT clock is 1.193182MHz
+#define PIT_TICKS_50mS      59659       // PIT clock is 1.193182MHz
+#define BENCH_MIN_START_ADR 0x1000000   // 16MB
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -885,11 +886,12 @@ static void measure_cpu_speed(void)
     }
 }
 
-static uint32_t memspeed(uint64_t src, uint32_t len, uint16_t iter)
+static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
 {
-    uint64_t dst, wlen;
+    uintptr_t dst;
+    uintptr_t wlen;
     uint64_t start_time, end_time, run_time_clk, overhead;
-    uint16_t i;
+    int i;
 
     dst = src + len;
 
@@ -989,12 +991,13 @@ static uint32_t memspeed(uint64_t src, uint32_t len, uint16_t iter)
     end_time = get_tsc();
 #endif
 
-    if((end_time - start_time) > overhead)
+    if ((end_time - start_time) > overhead) {
         run_time_clk = (end_time - start_time) - overhead;
-    else
+    } else {
         return 0;
+    }
 
-    run_time_clk = ((len * iter) / run_time_clk) * clks_per_msec * 2;
+    run_time_clk = ((len * iter) / (double)run_time_clk) * clks_per_msec * 2;
 
     return run_time_clk;
 }
@@ -1016,12 +1019,22 @@ static void measure_memory_bandwidth(void)
     // our virtual address space, which limits us to the first 3GB.
     for (int i = 0; i < pm_map_size && pm_map[i].start < VM_BENCH_WINDOW_SIZE; i++) {
         uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
-        uintptr_t try_end   = try_start + mem_test_len;
+        uintptr_t try_end   = try_start + mem_test_len * 2;
+
+        // No start address below BENCH_MIN_START_ADR
+        if (try_start < BENCH_MIN_START_ADR) {
+            if ((pm_map[i].end << PAGE_SHIFT) >= (BENCH_MIN_START_ADR + mem_test_len * 2)) {
+                try_start = BENCH_MIN_START_ADR;
+                try_end   = BENCH_MIN_START_ADR + mem_test_len * 2;
+            } else {
+                continue;
+            }
+        }
 
         // Avoid the memory region where the program is currently located.
         if (try_start < (uintptr_t)_end && try_end > (uintptr_t)_start) {
             try_start = (uintptr_t)_end;
-            try_end   = try_start + mem_test_len;
+            try_end   = try_start + mem_test_len * 2;
         }
 
         uintptr_t end_limit = pm_map[i].end < VM_BENCH_WINDOW_SIZE ? pm_map[i].end << PAGE_SHIFT : VM_BENCH_WINDOW_SIZE;
@@ -1035,19 +1048,19 @@ static void measure_memory_bandwidth(void)
         return;
     }
 
-    // Measure L1 BW using 1/4th of the total L1 cache size
+    // Measure L1 BW using 1/3rd of the total L1 cache size
     if (l1_cache) {
-        l1_cache_speed = memspeed(bench_start_adr, (l1_cache/4)*1024, 300);
+        l1_cache_speed = memspeed(bench_start_adr, (l1_cache/3)*1024, 50);
     }
 
     // Measure L2 BW using half the L2 cache size
     if (l2_cache) {
-        l2_cache_speed = memspeed(bench_start_adr, l2_cache/2*1024, 300);
+        l2_cache_speed = memspeed(bench_start_adr, l2_cache/2*1024, 50);
     }
 
     // Measure L3 BW using half the L3 cache size
     if (l3_cache) {
-        l3_cache_speed = memspeed(bench_start_adr, l3_cache/2*1024, 300);
+        l3_cache_speed = memspeed(bench_start_adr, l3_cache/2*1024, 50);
     }
 
     // Measure RAM BW
