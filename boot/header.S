@@ -21,6 +21,7 @@
 #define __ASSEMBLY__
 
 #include "boot.h"
+#include "peimage.h"
 
 # The EFI loader loads the header at ImageBase, so we have to locate the main program
 # after that. This means we can't load the main program at HIGH_LOAD_ADDR. Pick a load
@@ -85,9 +86,9 @@ pe_header:
 
 coff_header:
 #ifdef __x86_64__
-	.word	0x8664				# Machine (x86-64)
+	.word	IMAGE_FILE_MACHINE_X64		# Machine (x86-64)
 #else
-	.word	0x14c				# Machine (i386)
+	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
 	.word	1				# NumberOfSections
 	.long	0 				# TimeDateStamp
@@ -95,27 +96,25 @@ coff_header:
 	.long	0				# NumberOfSymbols
 	.word	section_table - optional_header	# SizeOfOptionalHeader
 #ifdef __x86_64__
-	.word	0x20f				# Characteristics
-						# IMAGE_FILE_DEBUG_STRIPPED |
-						# IMAGE_FILE_LOCAL_SYMS_STRIPPED |
-						# IMAGE_FILE_LINE_NUMS_STRIPPED |
-						# IMAGE_FILE_EXECUTABLE_IMAGE |
-						# IMAGE_FILE_RELOCS_STRIPPED
+	.word	IMAGE_FILE_DEBUG_STRIPPED	\
+		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
+		| IMAGE_FILE_LINE_NUMS_STRIPPED	\
+		| IMAGE_FILE_EXECUTABLE_IMAGE	\
+		| IMAGE_FILE_RELOCS_STRIPPED	# Characteristics
 #else
-	.word	0x30f				# Characteristics.
-						# IMAGE_FILE_32BIT_MACHINE |
-						# IMAGE_FILE_DEBUG_STRIPPED |
-						# IMAGE_FILE_LOCAL_SYMS_STRIPPED |
-						# IMAGE_FILE_LINE_NUMS_STRIPPED |
-						# IMAGE_FILE_EXECUTABLE_IMAGE |
-						# IMAGE_FILE_RELOCS_STRIPPED
+	.word	IMAGE_FILE_32BIT_MACHINE	\
+		| IMAGE_FILE_DEBUG_STRIPPED	\
+		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
+		| IMAGE_FILE_LINE_NUMS_STRIPPED \
+		| IMAGE_FILE_EXECUTABLE_IMAGE	\
+		| IMAGE_FILE_RELOCS_STRIPPED	# Characteristics.
 #endif
 
 optional_header:
 #ifdef __x86_64__
-	.word	0x20b 				# PE32+ format
+	.word	IMAGE_NT_OPTIONAL_HDR64_MAGIC	# PE32+ format
 #else
-	.word	0x10b				# PE32 format
+	.word	IMAGE_NT_OPTIONAL_HDR32_MAGIC	# PE32 format
 #endif
 	.byte	0x02				# MajorLinkerVersion
 	.byte	0x14				# MinorLinkerVersion
@@ -128,7 +127,7 @@ optional_header:
 
 	.long	BASE_OF_CODE			# BaseOfCode
 #ifndef __x86_64__
-	.long	0				# data
+	.long	0				# BaseOfData
 #endif
 
 extra_header_fields:
@@ -180,7 +179,10 @@ section_table:
 	.long	0				# PointerToLineNumbers
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
-	.long	0x60500020			# Characteristics (section flags)
+	.long	IMAGE_SCN_MEM_READ		\
+		| IMAGE_SCN_MEM_EXECUTE		\
+		| IMAGE_SCN_ALIGN_16BYTES	\
+		| IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
 
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.
 
