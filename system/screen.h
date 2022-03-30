@@ -19,6 +19,26 @@
 #define SCREEN_WIDTH    80
 #define SCREEN_HEIGHT   25
 
+
+typedef struct {
+    uint8_t     r;
+    uint8_t     g;
+    uint8_t     b;
+} __attribute__((packed)) rgb_value_t;
+
+
+typedef union {
+    struct {
+        uint8_t     ch;
+        uint8_t     attr;
+    };
+    struct {
+        uint16_t    value;
+    };
+} vga_char_t;
+
+typedef vga_char_t vga_buffer_t[SCREEN_HEIGHT][SCREEN_WIDTH];
+
 /**
  * Colours that can be used for the foreground or background.
  */
@@ -53,6 +73,8 @@ void set_foreground_colour(screen_colour_t colour);
  * Set the background colour used for subsequent drawing operations.
  */
 void set_background_colour(screen_colour_t colour);
+
+void set_blinking_plus(int x, int y);
 
 /**
  * Clear the whole screen, using the current background colour.

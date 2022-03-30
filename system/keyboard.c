@@ -6,7 +6,10 @@
 #include "io.h"
 #include "usbhcd.h"
 
+#include "serial.h"
+
 #include "keyboard.h"
+#include "config.h"
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -252,6 +255,13 @@ char get_key(void)
             escaped = (c == 0xe0);
 
             // Ignore keys we don't recognise and key up codes
+        }
+    }
+
+    if (enable_tty) {
+        uint8_t c = tty_get_key();
+        if (c != 0xFF) {
+            return c;
         }
     }
 

@@ -23,6 +23,8 @@
 
 #include "tests.h"
 
+#include "serial.h"
+
 #include "error.h"
 
 //------------------------------------------------------------------------------
@@ -213,7 +215,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
                     bits++;
                 }
             }
-            display_pinned_message(0, 25, "%09x%03x (%kB)", 
+            display_pinned_message(0, 25, "%09x%03x (%kB)",
                                           error_info.min_addr.page,
                                           error_info.min_addr.offset,
                                           error_info.min_addr.page << 2);
@@ -255,7 +257,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
 #else
             //                  columns:  0---------1---------2---------3---------4---------5---------6---------7---------
             display_pinned_message(0, 0, "pCPU  Pass  Test  Failing Address        Expected  Found     Err Bits");
-            display_pinned_message(1, 0, "----  ----  ----  ---------------------  --------  --------  --------"); 
+            display_pinned_message(1, 0, "----  ----  ----  ---------------------  --------  --------  --------");
             //                  fields:    NN   NNNN   NN   PPPPPPPPPOOO (N.NN?B)  XXXXXXXX  XXXXXXXX  XXXXXXXX
 #endif
         }
@@ -297,6 +299,10 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     if (type != PARITY_ERROR) {
         error_info.last_addr = addr;
         error_info.last_xor  = xor;
+    }
+
+    if(enable_tty) {
+        tty_error_redraw();
     }
 
     spin_unlock(error_mutex);

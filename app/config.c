@@ -23,6 +23,7 @@
 #include "keyboard.h"
 #include "memsize.h"
 #include "pmem.h"
+#include "serial.h"
 #include "screen.h"
 #include "smp.h"
 #include "usbhcd.h"
@@ -97,11 +98,64 @@ bool            enable_sm          = true;
 
 bool            pause_at_start     = false;
 
-power_save_t    power_save =  POWER_SAVE_HIGH;
+power_save_t    power_save         = POWER_SAVE_HIGH;
+
+bool            enable_tty         = false;
+int             tty_params_port    = SERIAL_PORT_0x3F8;
+int             tty_params_baud    = SERIAL_DEFAULT_BAUDRATE;
+int             tty_update_period  = 2; // Update TTY every 2 seconds (default)
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+static void parse_serial_params(const char *params)
+{
+    if (strncmp(params, "ttyS", 5) == 0) {
+        return;
+    }
+
+    if (params[4] >= '0' && params[4] <= '3') {
+        tty_params_port = params[4] - '0';
+    } else {
+        return;
+    }
+
+    enable_tty = true;
+
+    if (params[5] != ',' && params[5] != ' ') {
+        return;
+    }
+
+    if (params[6] >= '0' && params[6] <= '9') {
+
+        switch (params[6])
+        {
+            default:
+                return;
+            case '0':
+                tty_params_baud   = 9600;
+                tty_update_period = 5;
+                break;
+            case '1':
+                tty_params_baud   = 19200;
+                tty_update_period = 4;
+                break;
+            case '2':
+                tty_params_baud   = 38400;
+                tty_update_period = 3;
+                break;
+            case '3':
+                tty_params_baud   = 57600;
+                tty_update_period = 3;
+                break;
+            case '4':
+                tty_params_baud   = 115200;
+                tty_update_period = 2;
+                break;
+        }
+    }
+}
 
 static void parse_option(const char *option, const char *params)
 {
@@ -116,8 +170,6 @@ static void parse_option(const char *option, const char *params)
             keyboard_types = KT_USB;
             usb_init_options = USB_EXTRA_RESET;
         }
-    } else if (strncmp(option, "nopause", 8) == 0) {
-        pause_at_start = false;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;
@@ -126,6 +178,12 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "high", 5) == 0) {
             power_save = POWER_SAVE_HIGH;
         }
+    } else if (strncmp(option, "console", 8) == 0) {
+        if (params != NULL) {
+            parse_serial_params(params);
+        }
+    } else if (strncmp(option, "nopause", 8) == 0) {
+        pause_at_start = false;
     } else if (strncmp(option, "smp", 4) == 0) {
         smp_enabled = true;
     } else if (strncmp(option, "trace", 6) == 0) {
@@ -267,7 +325,7 @@ static bool set_all_tests(bool enabled)
 
 static bool add_or_remove_test(bool add)
 {
-    
+
     display_input_message(POP_R+14, "Enter test #");
     int n = read_value(POP_R+14, POP_LM+12, 2, 0);
     if (n < 0 || n >= NUM_TEST_PATTERNS) {
@@ -534,7 +592,7 @@ static bool set_all_cpus(cpu_state_t state, int display_offset)
 
 static bool add_or_remove_cpu(bool add, int display_offset)
 {
-    
+
     display_input_message(POP_R+16, "Enter CPU #");
     int n = read_value(POP_R+16, POP_LM+11, 2, 0);
     if (n < 1 || n >= num_available_cpus) {
@@ -688,6 +746,7 @@ void config_menu(bool initial)
     cpu_mode_t   old_cpu_mode   = cpu_mode;
 
     bool exit_menu = false;
+    bool tty_update = true;
     while (!exit_menu) {
         prints(POP_R+1,  POP_LM, "Settings:");
         prints(POP_R+3,  POP_LI, "<F1>  Test selection");
@@ -750,10 +809,19 @@ void config_menu(bool initial)
             usleep(1000);
             break;
         }
+
+        if (enable_tty && tty_update) {
+            tty_popup_redraw();
+            tty_update = false;
+        }
     }
 
     restore_screen_region(POP_REGION, popup_save_buffer);
     set_background_colour(BLUE);
+
+    if (enable_tty) {
+        tty_popup_redraw();
+    }
 
     if (cpu_mode != old_cpu_mode) {
         display_cpu_mode(cpu_mode_str[cpu_mode]);

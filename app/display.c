@@ -9,6 +9,7 @@
 #include "hwctrl.h"
 #include "io.h"
 #include "keyboard.h"
+#include "serial.h"
 #include "pmem.h"
 #include "smbios.h"
 #include "smbus.h"
@@ -53,6 +54,9 @@ static int test_bar_length = 0; // currently displayed length
 static uint64_t run_start_time = 0; // TSC time stamp
 static uint64_t next_spin_time = 0; // TSC time stamp
 
+static int prev_sec = -1;               // previous second
+static bool timed_update_done = false;  // update cycle status
+
 //------------------------------------------------------------------------------
 // Variables
 //------------------------------------------------------------------------------
@@ -69,8 +73,8 @@ void display_init(void)
 
     clear_screen();
 
-    set_foreground_colour(RED);
-    set_background_colour(WHITE);
+    set_foreground_colour(BLACK);
+    set_background_colour(GREEN);
     clear_screen_region(0, 0, 0, 27);
 #if TESTWORD_WIDTH > 32
     prints(0, 0, "  Memtest86+ v6.00pre (64b)");
@@ -91,19 +95,23 @@ void display_init(void)
     prints(9, 0, "-------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
-    for (int i = 0;i < 80; i++) {
-        print_char(6, i, 0xc4);
-        print_char(9, i, 0xc4);
+    // Disable if TTY is enabled to avoid VT100 char replacements
+    if (!enable_tty) {
+        for (int i = 0;i < 80; i++) {
+            print_char(6, i, 0xc4);
+            print_char(9, i, 0xc4);
+        }
+        for (int i = 0; i < 6; i++) {
+            print_char(i, 28, 0xb3);
+        }
+        for (int i = 7; i < 10; i++) {
+            print_char(i, 39, 0xb3);
+        }
+        print_char(6, 28, 0xc1);
+        print_char(6, 39, 0xc2);
+        print_char(9, 39, 0xc1);
+        set_blinking_plus(0, 11);
     }
-    for (int i = 0; i < 6; i++) {
-        print_char(i, 28, 0xb3);
-    }
-    for (int i = 7; i < 10; i++) {
-        print_char(i, 39, 0xb3);
-    }
-    print_char(6, 28, 0xc1);
-    print_char(6, 39, 0xc2);
-    print_char(9, 39, 0xc1);
 
     set_foreground_colour(BLUE);
     set_background_colour(WHITE);
@@ -175,6 +183,10 @@ void display_start_run(void)
         next_spin_time = run_start_time + SPINNER_PERIOD * clks_per_msec;
     }
     display_spinner('-');
+
+    if(enable_tty){
+        tty_full_redraw();
+    }
 }
 
 void display_start_pass(void)
@@ -252,6 +264,7 @@ void scroll(void)
 
 void do_tick(int my_cpu)
 {
+    int act_sec = 0;
     bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
     if (use_spin_wait) {
         barrier_spin_wait(run_barrier);
@@ -303,7 +316,7 @@ void do_tick(int my_cpu)
         uint64_t current_time = get_tsc();
 
         int secs  = (current_time - run_start_time) / (1000 * clks_per_msec);
-        int mins  = secs / 60; secs %= 60;
+        int mins  = secs / 60; secs %= 60; act_sec = secs;
         int hours = mins / 60; mins %= 60;
         display_run_time(hours, mins, secs);
 
@@ -313,14 +326,38 @@ void do_tick(int my_cpu)
             update_spinner = false;
         }
     }
+
+    /* ---------------
+     * Timed functions
+     * --------------- */
+
+    // update spinner every SPINNER_PERIOD ms
     if (update_spinner) {
         spin_idx = (spin_idx + 1) % NUM_SPIN_STATES;
         display_spinner(spin_state[spin_idx]);
     }
 
+    // This only tick one time per second
+    if (!timed_update_done) {
 
-    if (enable_temperature) {
-        display_temperature(get_cpu_temperature());
+        // Update temperature one time per second
+        if (enable_temperature) {
+            display_temperature(get_cpu_temperature());
+        }
+
+        // Update TTY one time every TTY_UPDATE_PERIOD second(s)
+        if (enable_tty) {
+
+            if (act_sec % tty_update_period == 0) {
+                tty_partial_redraw();
+            }
+        }
+        timed_update_done = true;
+    }
+
+    if(act_sec != prev_sec) {
+        prev_sec = act_sec;
+        timed_update_done = false;
     }
 }
 

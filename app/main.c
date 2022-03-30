@@ -28,6 +28,7 @@
 #include "memsize.h"
 #include "pci.h"
 #include "screen.h"
+#include "serial.h"
 #include "smbios.h"
 #include "smp.h"
 #include "temperature.h"
@@ -213,6 +214,8 @@ static void global_init(void)
     if(enable_sm) {
         membw_init();
     }
+
+    tty_init();
 
     smbios_init();
 

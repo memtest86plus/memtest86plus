@@ -13,28 +13,6 @@
 #include "screen.h"
 
 //------------------------------------------------------------------------------
-// Types
-//------------------------------------------------------------------------------
-
-typedef struct {
-    uint8_t     r;
-    uint8_t     g;
-    uint8_t     b;
-} __attribute__((packed)) rgb_value_t;
-
-typedef union {
-    struct {
-        uint8_t     ch;
-        uint8_t     attr;
-    };
-    struct {
-        uint16_t    value;
-    };
-} vga_char_t;
-
-typedef vga_char_t vga_buffer_t[SCREEN_HEIGHT][SCREEN_WIDTH];
-
-//------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
 
@@ -58,7 +36,7 @@ static const rgb_value_t vga_pallete[16] = {
     { 255, 255, 255 }   // BOLD+WHITE
 };
 
-static vga_buffer_t *vga_buffer = (vga_buffer_t *)(0xb8000);
+vga_buffer_t *vga_buffer = (vga_buffer_t *)(0xb8000);
 
 static vga_buffer_t shadow_buffer;
 
@@ -261,6 +239,11 @@ void set_foreground_colour(screen_colour_t colour)
 void set_background_colour(screen_colour_t  colour)
 {
     current_attr = (current_attr & 0x8f) | ((colour << 4) & 0x70);
+}
+
+void set_blinking_plus(int x, int y)
+{
+    put_char(x, y, '+', 0xA4);
 }
 
 void clear_screen(void)

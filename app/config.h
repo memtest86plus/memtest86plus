@@ -49,10 +49,15 @@ extern bool         enable_temperature;
 extern bool         enable_trace;
 
 extern bool         enable_sm;
+extern bool         enable_tty;
 
 extern bool         pause_at_start;
 
 extern power_save_t power_save;
+
+extern int tty_params_port;
+extern int tty_params_baud;
+extern int tty_update_period;
 
 void config_init(void);
 
