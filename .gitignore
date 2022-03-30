@@ -10,6 +10,11 @@
 # Generated file
 githash.h
 
+# Editor/debugger state files
+.gdb_history
+*.sw?
+*~
+
 # Binaries
 memtest_shared
 memtest_shared.bin
