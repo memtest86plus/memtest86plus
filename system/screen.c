@@ -36,9 +36,9 @@ static const rgb_value_t vga_pallete[16] = {
     { 255, 255, 255 }   // BOLD+WHITE
 };
 
-vga_buffer_t *vga_buffer = (vga_buffer_t *)(0xb8000);
+static vga_buffer_t *vga_buffer = (vga_buffer_t *)(0xb8000);
 
-static vga_buffer_t shadow_buffer;
+vga_buffer_t shadow_buffer;
 
 static int lfb_bytes_per_pixel = 0;
 
@@ -239,11 +239,6 @@ void set_foreground_colour(screen_colour_t colour)
 void set_background_colour(screen_colour_t  colour)
 {
     current_attr = (current_attr & 0x8f) | ((colour << 4) & 0x70);
-}
-
-void set_blinking_plus(int x, int y)
-{
-    put_char(x, y, '+', 0xA4);
 }
 
 void clear_screen(void)

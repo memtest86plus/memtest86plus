@@ -145,7 +145,6 @@ void tty_init(void)
 
 void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 {
-    extern vga_buffer_t *vga_buffer;
     char p[SCREEN_WIDTH+1];
     int col_len = end_col - start_col;
 
@@ -164,7 +163,7 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
         }
 
         for (int col = start_col; col <= end_col; col++) {
-            p[col] = (char)((*vga_buffer)[row][col].value & 0xFF);
+            p[col] = shadow_buffer[row][col].value & 0xFF;
         }
 
         p[end_col+1] = '\0';

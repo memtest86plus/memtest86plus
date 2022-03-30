@@ -54,6 +54,12 @@ typedef enum {
 } screen_colour_t;
 
 /**
+ * BIOS/UEFI(GOP) agnostic framebuffer copy
+ */
+
+extern vga_buffer_t shadow_buffer;
+
+/**
  * Modifier that can be added to any foreground colour.
  * Has no effect on background colours.
  */
@@ -73,8 +79,6 @@ void set_foreground_colour(screen_colour_t colour);
  * Set the background colour used for subsequent drawing operations.
  */
 void set_background_colour(screen_colour_t colour);
-
-void set_blinking_plus(int x, int y);
 
 /**
  * Clear the whole screen, using the current background colour.

@@ -81,6 +81,8 @@ void display_init(void)
 #else
     prints(0, 0, "  Memtest86+ v6.00pre (32b)");
 #endif
+    set_foreground_colour(RED);
+    print_char(0, 11, '+');
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
     prints(0,28,                             "| ");
@@ -110,7 +112,6 @@ void display_init(void)
         print_char(6, 28, 0xc1);
         print_char(6, 39, 0xc2);
         print_char(9, 39, 0xc1);
-        set_blinking_plus(0, 11);
     }
 
     set_foreground_colour(BLUE);
