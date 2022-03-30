@@ -246,17 +246,17 @@ static int usb_to_ehci_speed(usb_speed_t usb_speed)
     }
 }
 
-int num_ehci_ports(uint32_t hcs_params)
+static int num_ehci_ports(uint32_t hcs_params)
 {
     return (hcs_params >> 0) & 0xf;
 }
 
-int num_ehci_companions(uint32_t hcs_params)
+static int num_ehci_companions(uint32_t hcs_params)
 {
     return (hcs_params >> 12) & 0xf;
 }
 
-int ehci_ext_cap_ptr(uint32_t hcc_params)
+static int ehci_ext_cap_ptr(uint32_t hcc_params)
 {
     return (hcc_params >> 8) & 0xff;
 }
@@ -407,7 +407,7 @@ static bool reset_root_hub_port(const usb_hcd_t *hcd, int port_num)
     return reset_ehci_port(ws->op_regs, port_num - 1);
 }
 
-bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num,
+static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num,
                     usb_speed_t device_speed, int device_id, usb_ep_t *ep0)
 {
     // Store the extra information needed by build_ehci_qhd().
