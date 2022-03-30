@@ -90,7 +90,7 @@ coff_header:
 #else
 	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
-	.word	2				# NumberOfSections
+	.word	3				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
@@ -118,14 +118,14 @@ optional_header:
 	.byte	0x14				# MinorLinkerVersion
 
 	.long	_text_size			# SizeOfCode
-	.long	0				# SizeOfInitializedData
+	.long	_sbat_size			# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
 	.long	BASE_OF_CODE + 0x1e0		# AddressOfEntryPoint
 
 	.long	BASE_OF_CODE			# BaseOfCode
 #ifndef __x86_64__
-	.long	0				# BaseOfData
+	.long	_sbat_start			# BaseOfData
 #endif
 
 extra_header_fields:
@@ -210,6 +210,22 @@ section_table:
 		| IMAGE_SCN_ALIGN_4BYTES	\
 		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
+	.ascii	".sbat"
+	.byte	0
+	.byte	0
+	.byte	0
+	.long	_sbat_size			# VirtualSize
+	.long	_sbat_start			# VirtualAddress
+	.long	_sbat_size			# SizeOfRawData
+	.long	_sbat_start			# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+		| IMAGE_SCN_ALIGN_4096BYTES	\
+		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.
 
 	.org	497
@@ -235,3 +251,6 @@ end_of_headers:
 	.long	0					// Page RVA
 	.long	10					// Block Size (2*4+2)
 	.word	(IMAGE_REL_AMD64_ABSOLUTE<<12) + 0	// reloc 0 -> 0
+
+.section ".sbat", "a", @progbits
+.incbin "../boot/sbat.csv"

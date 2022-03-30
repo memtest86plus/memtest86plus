@@ -23,6 +23,13 @@ SECTIONS {
 		*(.reloc)
 		_reloc_end = . ;
 	}
+	. = ALIGN(512);
+	.sbat : {
+		_sbat_start = . ;
+		*(.sbat)
+		. = ALIGN(512);
+		_sbat_end = . ;
+	}
 	. = ALIGN(4096);
 	_img_end = . ;
 	/DISCARD/ : { *(*) }
