@@ -148,7 +148,7 @@ extra_header_fields:
 	.long	end_of_headers			# SizeOfHeaders
 	.long	0				# CheckSum
 	.word	10				# Subsystem (EFI application)
-	.word	0				# DllCharacteristics
+	.word	IMAGE_DLLCHARACTERISTICS_NX_COMPAT	# DllCharacteristics
 #ifdef __x86_64__
 	.quad	0				# SizeOfStackReserve
 	.quad	0				# SizeOfStackCommit
