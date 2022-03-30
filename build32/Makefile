@@ -72,16 +72,16 @@ all: memtest.bin memtest.efi
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
 
-boot/%.o: boot/%.s
-	$(AS) $< -o $@
+boot/%.o: boot/%.S
+	$(CC) -m32 -x assembler-with-cpp -c -I../boot -o $@ $<
 
 boot/startup.s: ../boot/startup32.S ../boot/boot.h
 	@mkdir -p boot
-	$(CC) -m32 -E -traditional -I../boot -o $@ $<
+	$(CC) -m32 -x assembler-with-cpp -c -I../boot -o $@ $<
 
 boot/%.s: ../boot/%.S ../boot/boot.h
 	@mkdir -p boot
-	$(CC) -m32 -E -traditional -I../boot -o $@ $<
+	$(CC) -m32 -x assembler-with-cpp -c -I../boot -o $@ $<
 
 boot/efisetup.o: ../boot/efisetup.c
 	@mkdir -p boot
