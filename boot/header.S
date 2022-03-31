@@ -163,7 +163,20 @@ extra_header_fields:
 	.long	0				# SizeOfHeapCommit
 #endif
 	.long	0				# LoaderFlags
-	.long	0				# NumberOfRvaAndSizes
+	.long	IMAGE_DIRECTORY_ENTRY_DEBUG	# NumberOfRvaAndSizes
+
+	.long	0				# DataDirectory.Export.VirtualAddress
+	.long	0				# DataDirectory.Export.Size
+	.long	0				# DataDirectory.Import.VirtualAddress
+	.long	0				# DataDirectory.Import.Size
+	.long	0				# DataDirectory.Resource.VirtualAddress
+	.long	0				# DataDirectory.Resource.Size
+	.long	0				# DataDirectory.Exception.VirtualAddress
+	.long	0				# DataDirectory.Exception.Size
+	.long	0				# DataDirectory.Certs.VirtualAddress
+	.long	0				# DataDirectory.Certs.Size
+	.long	0				# DataDirectory.BaseReloc.VirtualAddress
+	.long	0				# DataDirectory.BaseReloc.Size
 
 	# Section table
 section_table:
