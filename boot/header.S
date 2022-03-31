@@ -90,7 +90,7 @@ coff_header:
 #else
 	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
-	.word	1				# NumberOfSections
+	.word	2				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
@@ -99,15 +99,13 @@ coff_header:
 	.word	IMAGE_FILE_DEBUG_STRIPPED	\
 		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
 		| IMAGE_FILE_LINE_NUMS_STRIPPED	\
-		| IMAGE_FILE_EXECUTABLE_IMAGE	\
-		| IMAGE_FILE_RELOCS_STRIPPED	# Characteristics
+		| IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics
 #else
 	.word	IMAGE_FILE_32BIT_MACHINE	\
 		| IMAGE_FILE_DEBUG_STRIPPED	\
 		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
 		| IMAGE_FILE_LINE_NUMS_STRIPPED \
-		| IMAGE_FILE_EXECUTABLE_IMAGE	\
-		| IMAGE_FILE_RELOCS_STRIPPED	# Characteristics.
+		| IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics.
 #endif
 
 optional_header:
@@ -175,8 +173,8 @@ extra_header_fields:
 	.long	0				# DataDirectory.Exception.Size
 	.long	0				# DataDirectory.Certs.VirtualAddress
 	.long	0				# DataDirectory.Certs.Size
-	.long	0				# DataDirectory.BaseReloc.VirtualAddress
-	.long	0				# DataDirectory.BaseReloc.Size
+	.long	_reloc_start			# DataDirectory.BaseReloc.VirtualAddress
+	.long	_reloc_size			# DataDirectory.BaseReloc.Size
 
 	# Section table
 section_table:
@@ -196,6 +194,21 @@ section_table:
 		| IMAGE_SCN_MEM_EXECUTE		\
 		| IMAGE_SCN_ALIGN_16BYTES	\
 		| IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
+
+	.ascii	".reloc"
+	.byte	0
+	.byte	0
+	.long	_reloc_size			# VirtualSize
+	.long	_reloc_start			# VirtualAddress
+	.long	_reloc_size			# SizeOfRawData
+	.long	_reloc_start			# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+		| IMAGE_SCN_ALIGN_4BYTES	\
+		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.
 
@@ -217,3 +230,8 @@ boot_flag:
 
 	.org	512
 end_of_headers:
+
+.section ".reloc", "a", @progbits
+	.long	0					// Page RVA
+	.long	10					// Block Size (2*4+2)
+	.word	(IMAGE_REL_AMD64_ABSOLUTE<<12) + 0	// reloc 0 -> 0
