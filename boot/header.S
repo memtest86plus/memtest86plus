@@ -146,8 +146,8 @@ extra_header_fields:
 	.word	0				# MinorSubsystemVersion
 	.long	0				# Win32VersionValue
 
-	.long	BASE_OF_CODE + _init_size	# SizeOfImage
-	.long	512				# SizeOfHeaders
+	.long	BASE_OF_CODE + _img_end		# SizeOfImage
+	.long	end_of_headers			# SizeOfHeaders
 	.long	0				# CheckSum
 	.word	10				# Subsystem (EFI application)
 	.word	0				# DllCharacteristics
@@ -214,3 +214,6 @@ root_dev:
 	.word	0
 boot_flag:
 	.word	0xAA55
+
+	.org	512
+end_of_headers:

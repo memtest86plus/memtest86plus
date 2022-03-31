@@ -17,6 +17,8 @@ SECTIONS {
 		. = ALIGN(512);
 		_text_end = . ;
 	}
+	. = ALIGN(4096);
+	_img_end = . ;
 	/DISCARD/ : { *(*) }
 
 	_text_size = (_text_end  - _text_start);
