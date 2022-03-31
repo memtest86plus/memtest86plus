@@ -261,6 +261,7 @@ char get_key(void)
     if (enable_tty) {
         uint8_t c = tty_get_key();
         if (c != 0xFF) {
+            if(c == 0x0D) c = '\n'; // Enter
             return c;
         }
     }

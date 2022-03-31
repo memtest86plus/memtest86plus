@@ -45,27 +45,6 @@
 // Constants
 //------------------------------------------------------------------------------
 
-// Origin and size of the pop-up window.
-
-#define POP_R       3
-#define POP_C       21
-
-#define POP_W       38
-#define POP_H       18
-
-#define POP_LAST_R  (POP_R + POP_H - 1)
-#define POP_LAST_C  (POP_C + POP_W - 1)
-
-#define POP_REGION  POP_R, POP_C, POP_LAST_R, POP_LAST_C
-
-#define POP_LM      (POP_C + 3)     // Left margin
-#define POP_LI      (POP_C + 5)     // List indent
-
-#define SEL_W       32
-#define SEL_H       2
-
-#define SEL_AREA    (SEL_W * SEL_H)
-
 static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
 
 //------------------------------------------------------------------------------
@@ -264,6 +243,7 @@ static void display_input_message(int row, const char *message)
 {
     clear_popup_row(row);
     prints(row, POP_LM, message);
+    if (enable_tty) tty_popup_redraw();
 }
 
 static void display_error_message(int row, const char *message)
@@ -272,6 +252,7 @@ static void display_error_message(int row, const char *message)
     set_foreground_colour(YELLOW);
     prints(row, POP_LM, message);
     set_foreground_colour(WHITE);
+    if (enable_tty) tty_popup_redraw();
 }
 
 static void display_selection_header(int row, int max_num, int offset)
@@ -376,9 +357,17 @@ static void test_selection_menu(void)
         display_enabled(POP_R+12, i, test_list[i].enabled);
     }
 
+    bool tty_update = true;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
+
+        if (enable_tty && tty_update) {
+            tty_popup_redraw();
+            tty_update = false;
+        }
+        tty_update = true;
+
         switch (get_key()) {
           case '1':
             changed = set_all_tests(false);
@@ -411,6 +400,7 @@ static void test_selection_menu(void)
           } break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
         if (changed) {
@@ -418,6 +408,7 @@ static void test_selection_menu(void)
             changed = false;
         }
     }
+
     clear_screen_region(POP_REGION);
 }
 
@@ -431,9 +422,17 @@ static void address_range_menu(void)
     prints(POP_R+6, POP_LI, "<F10> Exit menu");
     printf(POP_R+8, POP_LM, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
 
+    bool tty_update = true;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
+
+        if (enable_tty && tty_update) {
+            tty_popup_redraw();
+            tty_update = false;
+        }
+        tty_update = true;
+
         switch (get_key()) {
           case '1': {
             display_input_message(POP_R+10, "Enter lower limit: ");
@@ -468,6 +467,7 @@ static void address_range_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
         if (changed) {
@@ -499,9 +499,17 @@ static void cpu_mode_menu(void)
     prints(POP_R+6, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+cpu_mode, POP_LM, '*');
 
+    bool tty_update = true;
     bool exit_menu = false;
     while (!exit_menu) {
         int ch = get_key();
+
+        if (enable_tty && tty_update) {
+            tty_popup_redraw();
+            tty_update = false;
+        }
+        tty_update = true;
+
         switch (ch) {
           case '1':
           case '2':
@@ -523,6 +531,7 @@ static void cpu_mode_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
     }
@@ -548,9 +557,18 @@ static void error_mode_menu(void)
     prints(POP_R+7, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+error_mode, POP_LM, '*');
 
+    bool tty_update = true;
     bool exit_menu = false;
     while (!exit_menu) {
         int ch = get_key();
+
+        if (enable_tty && tty_update) {
+            tty_popup_redraw();
+            tty_update = false;
+        }
+
+        tty_update = true;
+
         switch (ch) {
           case '1':
           case '2':
@@ -573,6 +591,7 @@ static void error_mode_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
     }
@@ -745,8 +764,8 @@ void config_menu(bool initial)
 
     cpu_mode_t   old_cpu_mode   = cpu_mode;
 
-    bool exit_menu = false;
     bool tty_update = true;
+    bool exit_menu = false;
     while (!exit_menu) {
         prints(POP_R+1,  POP_LM, "Settings:");
         prints(POP_R+3,  POP_LI, "<F1>  Test selection");
@@ -766,6 +785,13 @@ void config_menu(bool initial)
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
             prints(POP_R+8 , POP_LI, "<F10> Exit menu");
         }
+
+        if (enable_tty && tty_update) {
+            tty_popup_redraw();
+            tty_update = false;
+        }
+
+        tty_update = true;
 
         switch (get_key()) {
           case '1':
@@ -807,12 +833,8 @@ void config_menu(bool initial)
             break;
           default:
             usleep(1000);
-            break;
-        }
-
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
             tty_update = false;
+            break;
         }
     }
 
