@@ -17,6 +17,12 @@ SECTIONS {
 		. = ALIGN(512);
 		_text_end = . ;
 	}
+	. = ALIGN(512);
+	.reloc : {
+		_reloc_start = . ;
+		*(.reloc)
+		_reloc_end = . ;
+	}
 	. = ALIGN(4096);
 	_img_end = . ;
 	/DISCARD/ : { *(*) }
