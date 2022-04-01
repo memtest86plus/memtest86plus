@@ -579,10 +579,11 @@ static bool find_cpus_in_rsdp(void)
         uint64_t *tab_end = (uint64_t *)((uint8_t *)rt + rt->length);
 
         while (tab_ptr < tab_end) {
-            uint32_t *ptr = (uint32_t *)map_region(*tab_ptr++, sizeof(uint32_t), true);  // read the next table entry
+            uintptr_t addr = *tab_ptr++;  // read the next table entry
+            uint32_t *ptr = (uint32_t *)map_region(addr, sizeof(uint32_t), true);
 
             if (ptr && *ptr == MADTSignature) {
-                if (parse_madt((uintptr_t)ptr)) {
+                if (parse_madt(addr)) {
                     return true;
                 }
             }
@@ -605,10 +606,11 @@ static bool find_cpus_in_rsdp(void)
         uint32_t *tab_end = (uint32_t *)((uint8_t *)rt + rt->length);
 
         while (tab_ptr < tab_end) {
-            uint32_t *ptr = (uint32_t *)map_region(*tab_ptr++, sizeof(uint32_t), true);  // read the next table entry
+            uintptr_t addr = *tab_ptr++;  // read the next table entry
+            uint32_t *ptr = (uint32_t *)map_region(addr, sizeof(uint32_t), true);
 
             if (ptr && *ptr == MADTSignature) {
-                if (parse_madt((uintptr_t)ptr)) {
+                if (parse_madt(addr)) {
                     return true;
                 }
             }
