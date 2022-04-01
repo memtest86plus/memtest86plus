@@ -158,28 +158,40 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 
     for (int row = start_row; row <= end_row; row++) {
 
+        // Last line is inverted (Black on white)
         if (row == SCREEN_HEIGHT-1) {
             tty_inverse();
         }
 
+        // Copy Shadow buffer to TTY buffer
         for (int col = start_col; col <= end_col; col++) {
-            p[col] = shadow_buffer[row][col].value & 0xFF;
+            p[col] = shadow_buffer[row][col].value & 0x7F;
         }
 
+        // Add string terminator
         p[end_col+1] = '\0';
 
+        // For first line, title on top-left must be inverted
+        // Do the switch, send to TTY then continue to next line.
         if (row == 0 && start_col == 0 && col_len > 28) {
             tty_inverse();
             p[28] = '\0';
             tty_print(row,0,p);
             tty_normal();
             p[28] = '|';
-            tty_print(row,28,p+28);
+            tty_print(row, 28, p + 28);
             continue;
         }
 
-        tty_print(row,start_col,p+start_col);
+        // Replace degree symbol with '*' for tty to avoid a C437/VT100 translation table.
+        if(row == 7 && col_len > 77 && (shadow_buffer[7][73].value & 0xFF) == 0xF8) {
+            p[73] = 0x2A;
+        }
 
+        // Send row to TTY
+        tty_print(row, start_col, p + start_col);
+
+        // Revert to normal if last line.
         if (row == SCREEN_HEIGHT-1) {
             tty_normal();
         }
