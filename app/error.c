@@ -301,10 +301,6 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         error_info.last_xor  = xor;
     }
 
-    if(enable_tty) {
-        tty_error_redraw();
-    }
-
     spin_unlock(error_mutex);
 }
 
@@ -371,5 +367,9 @@ void error_update(void)
                                    test_list[test_num].errors);
         }
         display_error_count(error_count);
+
+        if(enable_tty) {
+            tty_error_redraw();
+        }
     }
 }
