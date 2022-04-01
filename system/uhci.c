@@ -54,7 +54,7 @@
 #define UHCI_USBSTS_HCPE        0x0010              // Host Controller Processor Error
 #define UHCI_USBSTS_HCH         0x0020              // Host Controller Halted
 
-// Port Status and Control register 
+// Port Status and Control register
 
 #define UHCI_PORT_SC_CCS        0x0001              // Current Connect Status
 #define UHCI_PORT_SC_CCSC       0x0002              // Current Connect Status Change
@@ -66,7 +66,7 @@
 #define UHCI_PORT_SC_PR         0x0200              // Port Reset
 #define UHCI_PORT_SC_SUSPEND    0x1000              // Suspend
 
-// Link Pointer 
+// Link Pointer
 
 #define UHCI_LP_TERMINATE       0x00000001          // Terminate (T) bit
 
@@ -261,7 +261,7 @@ static void build_uhci_td(uhci_td_t *td, const usb_ep_t *ep, uint32_t pid, uint3
 static uint16_t get_uhci_done(workspace_t *ws)
 {
     uint16_t io_base = ws->io_base;
-    
+
     uint16_t status = inw(UHCI_USBSTS) & (UHCI_USBSTS_INT | UHCI_USBSTS_ERR);
     if (status != 0) {
         outw(UHCI_USBSTS_INT | UHCI_USBSTS_ERR, UHCI_USBSTS);

@@ -214,6 +214,20 @@ typedef struct {
 } rsdt_header_t;
 
 typedef struct {
+    char        signature[4];   // "APIC"
+    uint32_t    length;
+    uint8_t     revision;
+    uint8_t     checksum;
+    char        oem_id[6];
+    char        oem_table_id[8];
+    char        oem_revision[4];
+    char        creator_id[4];
+    char        creator_revision[4];
+    uint32_t    lapic_addr;
+    uint32_t    flags;
+} madt_table_header_t;
+
+typedef struct {
     uint8_t     type;
     uint8_t     length;
 } madt_entry_header_t;
@@ -431,10 +445,10 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
 
 static bool parse_madt(uintptr_t addr)
 {
-    mp_config_table_header_t *mpc = (mp_config_table_header_t *)map_region(addr, sizeof(mp_config_table_header_t), true);
+    madt_table_header_t *mpc = (madt_table_header_t *)map_region(addr, sizeof(madt_table_header_t), true);
     if (mpc == NULL) return false;
 
-    mpc = (mp_config_table_header_t *)map_region(addr, mpc->length, true);
+    mpc = (madt_table_header_t *)map_region(addr, mpc->length, true);
     if (mpc == NULL) return false;
 
     if (checksum(mpc, mpc->length) != 0) {
@@ -445,7 +459,7 @@ static bool parse_madt(uintptr_t addr)
 
     int found_cpus = 0;
 
-    uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(mp_config_table_header_t);
+    uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(madt_table_header_t);
     uint8_t *mpc_table_end = (uint8_t *)mpc + mpc->length;
     while (tab_entry_ptr < mpc_table_end) {
         madt_entry_header_t *entry_header = (madt_entry_header_t *)tab_entry_ptr;
@@ -579,10 +593,11 @@ static bool find_cpus_in_rsdp(void)
         uint64_t *tab_end = (uint64_t *)((uint8_t *)rt + rt->length);
 
         while (tab_ptr < tab_end) {
-            uint32_t *ptr = (uint32_t *)map_region(*tab_ptr++, sizeof(uint32_t), true);  // read the next table entry
+            uintptr_t addr = *tab_ptr++;  // read the next table entry
+            uint32_t *ptr = (uint32_t *)map_region(addr, sizeof(uint32_t), true);
 
             if (ptr && *ptr == MADTSignature) {
-                if (parse_madt((uintptr_t)ptr)) {
+                if (parse_madt(addr)) {
                     return true;
                 }
             }
@@ -605,10 +620,11 @@ static bool find_cpus_in_rsdp(void)
         uint32_t *tab_end = (uint32_t *)((uint8_t *)rt + rt->length);
 
         while (tab_ptr < tab_end) {
-            uint32_t *ptr = (uint32_t *)map_region(*tab_ptr++, sizeof(uint32_t), true);  // read the next table entry
+            uintptr_t addr = *tab_ptr++;  // read the next table entry
+            uint32_t *ptr = (uint32_t *)map_region(addr, sizeof(uint32_t), true);
 
             if (ptr && *ptr == MADTSignature) {
-                if (parse_madt((uintptr_t)ptr)) {
+                if (parse_madt(addr)) {
                     return true;
                 }
             }
