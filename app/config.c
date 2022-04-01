@@ -94,6 +94,7 @@ bool            enable_temperature = false;
 bool            enable_trace       = false;
 
 bool            enable_sm          = true;
+bool            enable_bench       = true;
 
 bool            pause_at_start     = false;
 
@@ -118,6 +119,8 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
+    } else if (strncmp(option, "nobench", 8) == 0) {
+        enable_bench = false;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;
@@ -267,7 +270,7 @@ static bool set_all_tests(bool enabled)
 
 static bool add_or_remove_test(bool add)
 {
-    
+
     display_input_message(POP_R+14, "Enter test #");
     int n = read_value(POP_R+14, POP_LM+12, 2, 0);
     if (n < 0 || n >= NUM_TEST_PATTERNS) {
@@ -534,7 +537,7 @@ static bool set_all_cpus(cpu_state_t state, int display_offset)
 
 static bool add_or_remove_cpu(bool add, int display_offset)
 {
-    
+
     display_input_message(POP_R+16, "Enter CPU #");
     int n = read_value(POP_R+16, POP_LM+11, 2, 0);
     if (n < 1 || n >= num_available_cpus) {

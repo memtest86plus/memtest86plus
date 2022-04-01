@@ -49,6 +49,7 @@ extern bool         enable_temperature;
 extern bool         enable_trace;
 
 extern bool         enable_sm;
+extern bool         enable_bench;
 
 extern bool         pause_at_start;
 

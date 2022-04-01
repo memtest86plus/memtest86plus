@@ -21,6 +21,7 @@
 #include "tsc.h"
 
 #include "boot.h"
+#include "config.h"
 #include "pmem.h"
 #include "vmem.h"
 #include "memsize.h"
@@ -1088,5 +1089,7 @@ void cpuinfo_init(void)
 
 void membw_init(void)
 {
-    measure_memory_bandwidth();
+    if(enable_bench) {
+        measure_memory_bandwidth();
+    }
 }
