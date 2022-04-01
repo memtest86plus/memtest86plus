@@ -9,6 +9,7 @@
 #include "pci.h"
 #include "unistd.h"
 
+#include "cpuinfo.h"
 #include "smbus.h"
 #include "smbios.h"
 #include "jedec_id.h"
@@ -97,7 +98,6 @@ static const struct pci_smbus_controller smbcontrollers[] = {
      {0x1022, 0x790B, "AMD FCH (Zen)",          fch_zen_get_smb, ich5_read_spd_byte},
      {0, 0, "", NULL, NULL}
 };
-
 
 void print_smbus_startup_info(void) {
 
@@ -742,6 +742,12 @@ static void fch_zen_get_smb(void)
     pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
     __outb(AMD_PM_INDEX, AMD_INDEX_IO_PORT);
     pm_reg |= __inb(AMD_DATA_IO_PORT);
+
+    // Special case for AMD Cezanne (get smb address in memory)
+    if (imc_type == IMC_K19_CZN && pm_reg == 0xFFFF) {
+        smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
+        return;
+    }
 
     // Check if IO Smbus is enabled.
     if((pm_reg & 0x10) == 0){

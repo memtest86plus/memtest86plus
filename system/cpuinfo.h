@@ -60,6 +60,7 @@
 #define IMC_K17         0x8060  // Zen & Zen2 (Family 17h)
 #define IMC_K18         0x8070  // Hygon (Family 18h)
 #define IMC_K19         0x8080  // Zen3 & Zen4(Family 19h)
+#define IMC_K19_CZN     0x8081  // Cezanne APU
 
 /**
  * A string identifying the CPU make and model.
