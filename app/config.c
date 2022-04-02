@@ -74,6 +74,7 @@ bool            enable_temperature = false;
 bool            enable_trace       = false;
 
 bool            enable_sm          = true;
+bool            enable_bench       = true;
 
 bool            pause_at_start     = false;
 
@@ -161,6 +162,8 @@ static void parse_option(const char *option, const char *params)
         if (params != NULL) {
             parse_serial_params(params);
         }
+    } else if (strncmp(option, "nobench", 8) == 0) {
+        enable_bench = false;
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
     } else if (strncmp(option, "smp", 4) == 0) {
