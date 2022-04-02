@@ -2,10 +2,13 @@
 // Copyright (C) 2022 Samuel Demeulemeester
 //
 
-#include "display.h"
 #include "stdint.h"
 #include "string.h"
+#include "display.h"
+static const uint8_t * table_start = NULL;
+static uint32_t table_length = 0; // 16-bit in SMBIOS v2, 32-bit in SMBIOS v3.
 
+#include "boot.h"
 #include "bootparams.h"
 #include "efi.h"
 #include "vmem.h"
@@ -21,10 +24,10 @@ static const efi_guid_t SMBIOS2_GUID = { 0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16
 struct system_map *dmi_system_info;
 struct mem_dev *dmi_memory_device;
 
-char * get_tstruct_string(struct tstruct_header * header, int n) {
+static char * get_tstruct_string(struct tstruct_header * header, uint16_t maxlen, int n) {
     if (n < 1)
-        return 0;
-    char * a = (char * ) header + header -> length;
+        return NULL;
+    char * a = (char *) header + header->length;
     n--;
     do {
         if (! * a)
@@ -32,51 +35,51 @@ char * get_tstruct_string(struct tstruct_header * header, int n) {
         if (!n && * a)
             return a;
         a++;
-    } while (!( * a == 0 && * (a - 1) == 0));
-    return 0;
+    } while (a < ((char *) header + maxlen) && !( * a == 0 && * (a - 1) == 0));
+    return NULL;
 }
 
 #ifdef __x86_64__
-static smbios_t * find_smbios_in_efi64_system_table(efi64_system_table_t * system_table) {
-    efi64_config_table_t * config_tables = (efi64_config_table_t * ) map_region(system_table -> config_tables, system_table -> num_config_tables * sizeof(efi64_config_table_t), true);
+static smbiosv2_t * find_smbiosv2_in_efi64_system_table(efi64_system_table_t * system_table) {
+    efi64_config_table_t * config_tables = (efi64_config_table_t *) map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi64_config_table_t), true);
     if (config_tables == NULL) return NULL;
 
     uintptr_t table_addr = 0;
-    for (uint32_t i = 0; i < system_table -> num_config_tables; i++) {
+    for (uint32_t i = 0; i < system_table->num_config_tables; i++) {
         if (memcmp( & config_tables[i].guid, & SMBIOS2_GUID, sizeof(efi_guid_t)) == 0) {
             table_addr = config_tables[i].table;
         }
     }
-    return (smbios_t * ) table_addr;
+    return (smbiosv2_t *) table_addr;
 }
 #endif
 
-static smbios_t * find_smbios_in_efi32_system_table(efi32_system_table_t * system_table) {
-    efi32_config_table_t * config_tables = (efi32_config_table_t * ) map_region(system_table -> config_tables, system_table -> num_config_tables * sizeof(efi32_config_table_t), true);
+static smbiosv2_t * find_smbiosv2_in_efi32_system_table(efi32_system_table_t * system_table) {
+    efi32_config_table_t * config_tables = (efi32_config_table_t *) map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi32_config_table_t), true);
     if (config_tables == NULL) return NULL;
 
     uintptr_t table_addr = 0;
-    for (uint32_t i = 0; i < system_table -> num_config_tables; i++) {
+    for (uint32_t i = 0; i < system_table->num_config_tables; i++) {
         if (memcmp( & config_tables[i].guid, & SMBIOS2_GUID, sizeof(efi_guid_t)) == 0) {
             table_addr = config_tables[i].table;
         }
     }
-    return (smbios_t * ) table_addr;
+    return (smbiosv2_t *) table_addr;
 }
 
-static uintptr_t find_smbios_adr(void) {
-    const boot_params_t * boot_params = (boot_params_t * ) boot_params_addr;
-    const efi_info_t * efi_info = & boot_params -> efi_info;
+static uintptr_t find_smbiosv2_adr(void) {
+    const boot_params_t * boot_params = (boot_params_t *) boot_params_addr;
+    const efi_info_t * efi_info = & boot_params->efi_info;
 
-    smbios_t * rp = NULL;
+    smbiosv2_t * rp = NULL;
 
-    if (efi_info -> loader_signature == EFI32_LOADER_SIGNATURE) {
+    if (efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
         // EFI32
-        if (rp == NULL && efi_info -> loader_signature == EFI32_LOADER_SIGNATURE) {
-            uintptr_t system_table_addr = map_region(efi_info -> sys_tab, sizeof(efi32_system_table_t), true);
+        if (rp == NULL && efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
+            uintptr_t system_table_addr = map_region(efi_info->sys_tab, sizeof(efi32_system_table_t), true);
             system_table_addr = map_region(system_table_addr, sizeof(efi32_system_table_t), true);
             if (system_table_addr != 0) {
-                rp = find_smbios_in_efi32_system_table((efi32_system_table_t * ) system_table_addr);
+                rp = find_smbiosv2_in_efi32_system_table((efi32_system_table_t *) system_table_addr);
                 return (uintptr_t) rp;
             }
         }
@@ -84,11 +87,11 @@ static uintptr_t find_smbios_adr(void) {
 #ifdef __x86_64__
     if (rp == NULL && efi_info -> loader_signature == EFI64_LOADER_SIGNATURE) {
         // EFI64
-        if (rp == NULL && efi_info -> loader_signature == EFI64_LOADER_SIGNATURE) {
-            uintptr_t system_table_addr = (uintptr_t) efi_info -> sys_tab_hi << 32 | (uintptr_t) efi_info -> sys_tab;
+        if (rp == NULL && efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
+            uintptr_t system_table_addr = (uintptr_t) efi_info->sys_tab_hi << 32 | (uintptr_t) efi_info->sys_tab;
             system_table_addr = map_region(system_table_addr, sizeof(efi64_system_table_t), true);
             if (system_table_addr != 0) {
-                rp = find_smbios_in_efi64_system_table((efi64_system_table_t * ) system_table_addr);
+                rp = find_smbiosv2_in_efi64_system_table((efi64_system_table_t *) system_table_addr);
                 return (uintptr_t) rp;
             }
         }
@@ -96,8 +99,8 @@ static uintptr_t find_smbios_adr(void) {
 #endif
     if (rp == NULL) {
         // BIOS
-        char * dmi, * dmi_search_start;
-        dmi_search_start = (char * ) 0x000F0000;
+        uint8_t * dmi, * dmi_search_start;
+        dmi_search_start = (uint8_t *) 0x000F0000;
 
         for (dmi = dmi_search_start; dmi < dmi_search_start + 0xffff0; dmi += 16) {
             if ( * dmi == '_' && * (dmi + 1) == 'S' && * (dmi + 2) == 'M' && * (dmi + 3) == '_')
@@ -108,25 +111,68 @@ static uintptr_t find_smbios_adr(void) {
     return 0;
 }
 
-int smbios_init(void) {
-
-    char * dmi, * dmi_start, *table_start;
+static int parse_dmi(uint16_t numstructs) {
+    const uint8_t * dmi = table_start;
     int tstruct_count = 0;
+
+    if (table_length < sizeof(struct system_map) + 2) {
+        return -1;
+    }
+
+    // Parse all structs (currently restricted to Type 2 only)
+    while (dmi < table_start + table_length - 2) { // -2 for header type and length.
+        const struct tstruct_header * header = (struct tstruct_header *) dmi;
+
+        // Type 2 - Baseboard Information
+        if (header->type == 2 && header->length > offsetof(struct system_map, serialnumber)) {
+            // Multiple type 2 structs are allowed by the standard. Effectively pick up the last one.
+            dmi_system_info = (struct system_map *) dmi;
+        }
+        // Type 17 - Memory Device
+        else if (header->type == 17 && header->length > offsetof(struct mem_dev, partnum)) {
+            dmi_memory_device = (struct mem_dev *) dmi;
+        }
+
+        dmi += header->length;
+
+        if (dmi >= table_start + table_length) {
+            dmi_system_info = NULL;
+            return -1;
+        }
+
+        while ((dmi < table_start + table_length - 1) && !(*dmi == 0 && *(dmi + 1) == 0)) {
+            dmi++;
+        }
+
+        dmi += 2;
+
+        if ((dmi > table_start + table_length) || (++tstruct_count > numstructs)) {
+            dmi_system_info = NULL;
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int smbios_init(void) {
     uintptr_t smb_adr;
-    smbios_t * eps;
+    const uint8_t * dmi_start;
+    const smbiosv2_t * eps;
 
     // Get SMBIOS Address
-    smb_adr = find_smbios_adr();
+    smb_adr = find_smbiosv2_adr();
 
     if (smb_adr == 0) {
         return -1;
     }
 
-    dmi_start = (char * ) smb_adr;
-    eps = (smbios_t * ) smb_adr;
+    dmi_start = (const uint8_t *) smb_adr;
+    eps = (const smbiosv2_t *) smb_adr;
 
     // Verify checksum
     int8_t checksum = 0;
+    const uint8_t * dmi = dmi_start;
 
     for (; dmi < (dmi_start + eps->length); dmi++) {
         checksum += * dmi;
@@ -137,56 +183,36 @@ int smbios_init(void) {
     }
 
     // SMBIOS 2.3 required
-    if (eps -> majorversion < 2 && eps -> minorversion < 3) {
+    if (eps->majorversion < 2 && eps->minorversion < 3) {
         return -1;
     }
 
-    table_start = (char * )(uintptr_t) eps -> tableaddress;
-    dmi = (char * ) table_start;
+    table_start = (const uint8_t *)(uintptr_t)eps->tableaddress;
+    table_length = (uint32_t)eps->tablelength;
 
-    // Parse all structs
-    while (dmi < (table_start + eps -> tablelength)) {
-        struct tstruct_header * header = (struct tstruct_header *) dmi;
-
-        // Type 2 - Baseboard Information
-        if (header -> type == 2) {
-            dmi_system_info = (struct system_map *) dmi;
-        }
-
-        // Type 17 - Memory Device
-        if (header->type == 17) {
-            dmi_memory_device = (struct mem_dev *) dmi;
-        }
-
-        dmi += header -> length;
-
-        while (!(*dmi == 0 && *(dmi + 1) == 0)) {
-            dmi++;
-        }
-
-        dmi += 2;
-
-        if (++tstruct_count > eps->numstructs) {
-            return -1;
-        }
-    }
-
-    return 0;
+    return parse_dmi(eps->numstructs);
 }
 
 void print_smbios_startup_info(void) {
-    char *sys_man, *sys_sku;
+    if (dmi_system_info != NULL) {
+        char * sys_man, * sys_sku;
 
-    int sl1, sl2, dmicol;
+        int sl1, sl2, dmicol;
 
-    sys_man = get_tstruct_string(&dmi_system_info->header, dmi_system_info->manufacturer);
-    sl1 = strlen(sys_man);
+        sys_man = get_tstruct_string(&dmi_system_info->header, table_length - ((uint8_t *)&dmi_system_info->header - (uint8_t *)table_start), dmi_system_info->manufacturer);
+        if (sys_man != NULL) {
+            sl1 = strlen(sys_man);
 
-    sys_sku = get_tstruct_string(&dmi_system_info->header, dmi_system_info->productname);
-    sl2 = strlen(sys_sku);
+            sys_sku = get_tstruct_string(&dmi_system_info->header, table_length - ((uint8_t *)&dmi_system_info->header - (uint8_t *)table_start), dmi_system_info->productname);
+            if (sys_sku != NULL) {
+                sl2 = strlen(sys_sku);
 
-    if (sl1 && sl2) {
-        dmicol = 40 - ((sl1 + sl2) / 2);
-        display_dmi_mb(sys_man, sys_sku)
+                if (sl1 && sl2) {
+                    dmicol = 40 - ((sl1 + sl2) / 2);
+                    dmicol = prints(LINE_DMI, dmicol, sys_man);
+                    prints(LINE_DMI, dmicol + 1, sys_sku);
+                }
+            }
+        }
     }
 }
