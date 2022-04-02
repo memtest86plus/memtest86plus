@@ -1159,7 +1159,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         // Reset the port.
         if (!reset_xhci_port(op_regs, port_idx)) continue;
 
-        usleep(100*MILLISEC);  // USB reset recovery time
+        usleep(10*MILLISEC);  // USB reset recovery time
 
         port_status = read32(&op_regs->port_regs[port_idx].sc);
 
