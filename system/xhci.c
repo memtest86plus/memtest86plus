@@ -60,7 +60,7 @@
 #define XHCI_PORT_SC_PLS                0x000001e0      // Port Link State
 #define XHCI_PORT_SC_PP                 0x00000200      // Port Power
 #define XHCI_PORT_SC_PS                 0x00003c00      // Port Speed
-#define XHCI_PORT_SC_PRSC               0x00200000      // Port Reset
+#define XHCI_PORT_SC_PRC                0x00200000      // Port Reset Change
 
 #define XHCI_PORT_SC_PS_OFFSET          10              // first bit of Port Speed
 
@@ -472,8 +472,8 @@ static int get_xhci_device_speed(xhci_op_regs_t *op_regs, int port_idx)
 
 static bool reset_xhci_port(xhci_op_regs_t *op_regs, int port_idx)
 {
-    write32(&op_regs->port_regs[port_idx].sc, XHCI_PORT_SC_PP | XHCI_PORT_SC_PR);
-    return wait_until_clr(&op_regs->port_regs[port_idx].sc, XHCI_PORT_SC_PR, 1000*MILLISEC);
+    write32(&op_regs->port_regs[port_idx].sc, XHCI_PORT_SC_PP | XHCI_PORT_SC_PR | XHCI_PORT_SC_PRC);
+    return wait_until_set(&op_regs->port_regs[port_idx].sc, XHCI_PORT_SC_PRC, 1000*MILLISEC);
 }
 
 static void disable_xhci_port(xhci_op_regs_t *op_regs, int port_idx)
