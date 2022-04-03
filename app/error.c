@@ -368,7 +368,7 @@ void error_update(void)
         }
         display_error_count(error_count);
 
-        if(enable_tty) {
+        if (enable_tty) {
             tty_error_redraw();
         }
     }

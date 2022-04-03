@@ -185,7 +185,7 @@ void display_start_run(void)
     }
     display_spinner('-');
 
-    if(enable_tty){
+    if (enable_tty){
         tty_full_redraw();
     }
 }
@@ -356,7 +356,7 @@ void do_tick(int my_cpu)
         timed_update_done = true;
     }
 
-    if(act_sec != prev_sec) {
+    if (act_sec != prev_sec) {
         prev_sec = act_sec;
         timed_update_done = false;
     }

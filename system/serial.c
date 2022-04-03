@@ -21,79 +21,79 @@ static struct serial_port console_serial;
 
 static void serial_write_reg(struct serial_port *port, uint16_t reg, uint8_t val)
 {
-	union {
-		uintptr_t addr;
-		uint8_t *ptr;
-	} reg_walker;
+    union {
+        uintptr_t addr;
+        uint8_t *ptr;
+    } reg_walker;
 
-	reg_walker.addr = port->base_addr + reg * port->reg_width;
+    reg_walker.addr = port->base_addr + reg * port->reg_width;
 
-	if (port->is_mmio) {
-		*reg_walker.ptr = val;
-	} else {
-		__outb(val, reg_walker.addr);
-	}
+    if (port->is_mmio) {
+        *reg_walker.ptr = val;
+    } else {
+        __outb(val, reg_walker.addr);
+    }
 }
 
 static uint8_t serial_read_reg(struct serial_port *port, uint16_t reg)
 {
-	union {
-		uintptr_t addr;
-		uint8_t *ptr;
-	} reg_walker;
+    union {
+        uintptr_t addr;
+        uint8_t *ptr;
+    } reg_walker;
 
-	reg_walker.addr = port->base_addr + reg * port->reg_width;
+    reg_walker.addr = port->base_addr + reg * port->reg_width;
 
-	if (port->is_mmio) {
-		return *reg_walker.ptr;
-	} else {
-		return __inb(reg_walker.addr);
-	}
+    if (port->is_mmio) {
+        return *reg_walker.ptr;
+    } else {
+        return __inb(reg_walker.addr);
+    }
 }
 
 static void serial_wait_for_xmit(struct serial_port *port)
 {
-	uint8_t lsr;
+    uint8_t lsr;
 
-	do {
-		lsr = serial_read_reg(port, UART_LSR);
-	} while ((lsr & BOTH_EMPTY) != BOTH_EMPTY);
+    do {
+        lsr = serial_read_reg(port, UART_LSR);
+    } while ((lsr & BOTH_EMPTY) != BOTH_EMPTY);
 }
 
 void serial_echo_print(const char *p)
 {
-	struct serial_port *port = &console_serial;
+    struct serial_port *port = &console_serial;
 
-	if (!port->enable) {
-		return;
-	}
-	/* Now, do each character */
-	while (*p) {
-		serial_wait_for_xmit(port);
+    if (!port->enable) {
+        return;
+    }
+    /* Now, do each character */
+    while (*p) {
+        serial_wait_for_xmit(port);
 
-		/* Send the character out. */
-		serial_write_reg(port, UART_TX, *p);
-		if(*p==10) {
-			serial_wait_for_xmit(port);
-			serial_write_reg(port, UART_TX, 13);
-		}
-		p++;
-	}
+        /* Send the character out. */
+        serial_write_reg(port, UART_TX, *p);
+        if (*p==10) {
+            serial_wait_for_xmit(port);
+            serial_write_reg(port, UART_TX, 13);
+        }
+        p++;
+    }
 }
 
 void tty_print(int y, int x, const char *p)
 {
-	static char sx[3], sy[3];
+    static char sx[3], sy[3];
 
-	itoa(++x,sx);
-	itoa(++y,sy);
+    itoa(++x,sx);
+    itoa(++y,sy);
 
-	serial_echo_print("\x1b[");
-	serial_echo_print(sy);
-	serial_echo_print(";");
-	serial_echo_print(sx);
-	serial_echo_print("H");
-	serial_echo_print(p);
+    serial_echo_print("\x1b[");
+    serial_echo_print(sy);
+    serial_echo_print(";");
+    serial_echo_print(sx);
+    serial_echo_print("H");
+    serial_echo_print(p);
 }
 
 //------------------------------------------------------------------------------
@@ -102,42 +102,42 @@ void tty_print(int y, int x, const char *p)
 
 void tty_init(void)
 {
-	if (!enable_tty) {
-	    return;
-	}
+    if (!enable_tty) {
+        return;
+    }
 
-	int uart_status, serial_div;
-	unsigned char lcr;
+    int uart_status, serial_div;
+    unsigned char lcr;
 
     console_serial.enable       = true;
     console_serial.is_mmio      = false;
-    console_serial.baudrate     = tty_params_baud;
     console_serial.parity       = SERIAL_DEFAULT_PARITY;
     console_serial.bits         = SERIAL_DEFAULT_BITS;
+    console_serial.baudrate     = tty_params_baud;
     console_serial.reg_width    = 1;
-    console_serial.base_addr    = serial_base_ports[tty_params_port];
     console_serial.refclk       = UART_REF_CLK;
+    console_serial.base_addr    = serial_base_ports[tty_params_port];
 
-	/* read the Divisor Latch */
-	uart_status = serial_read_reg(&console_serial, UART_LCR);
-	serial_write_reg(&console_serial, UART_LCR, uart_status | UART_LCR_DLAB);
-	serial_read_reg(&console_serial, UART_DLM);
-	serial_read_reg(&console_serial, UART_DLL);
-	serial_write_reg(&console_serial, UART_LCR, uart_status);
+    /* read the Divisor Latch */
+    uart_status = serial_read_reg(&console_serial, UART_LCR);
+    serial_write_reg(&console_serial, UART_LCR, uart_status | UART_LCR_DLAB);
+    serial_read_reg(&console_serial, UART_DLM);
+    serial_read_reg(&console_serial, UART_DLL);
+    serial_write_reg(&console_serial, UART_LCR, uart_status);
 
-	/* now do hardwired init */
-	lcr = console_serial.parity | (console_serial.bits - 5);
-	serial_write_reg(&console_serial, UART_LCR, lcr);               /* No parity, 8 data bits, 1 stop */
-	serial_div = (console_serial.refclk / console_serial.baudrate) / 16;
-	serial_write_reg(&console_serial, UART_LCR, 0x80|lcr);          /* Access divisor latch */
-	serial_write_reg(&console_serial, UART_DLL, serial_div & 0xff); /* baud rate divisor */
-	serial_write_reg(&console_serial, UART_DLM, (serial_div >> 8) & 0xff);
-	serial_write_reg(&console_serial, UART_LCR, lcr);               /* Done with divisor */
+    /* now do hardwired init */
+    lcr = console_serial.parity | (console_serial.bits - 5);
+    serial_write_reg(&console_serial, UART_LCR, lcr);               /* No parity, 8 data bits, 1 stop */
+    serial_div = (console_serial.refclk / console_serial.baudrate) / 16;
+    serial_write_reg(&console_serial, UART_LCR, 0x80|lcr);          /* Access divisor latch */
+    serial_write_reg(&console_serial, UART_DLL, serial_div & 0xff); /* baud rate divisor */
+    serial_write_reg(&console_serial, UART_DLM, (serial_div >> 8) & 0xff);
+    serial_write_reg(&console_serial, UART_LCR, lcr);               /* Done with divisor */
 
-	/* Prior to disabling interrupts, read the LSR and RBR registers */
-	uart_status = serial_read_reg(&console_serial, UART_LSR);           /* COM? LSR */
-	uart_status = serial_read_reg(&console_serial, UART_RX);	        /* COM? RBR */
-	serial_write_reg(&console_serial, UART_IER, 0x00);              /* Disable all interrupts */
+    /* Prior to disabling interrupts, read the LSR and RBR registers */
+    uart_status = serial_read_reg(&console_serial, UART_LSR);           /* COM? LSR */
+    uart_status = serial_read_reg(&console_serial, UART_RX);	        /* COM? RBR */
+    serial_write_reg(&console_serial, UART_IER, 0x00);              /* Disable all interrupts */
 
     tty_clear_screen();
     tty_disable_cursor();
@@ -184,7 +184,7 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
         }
 
         // Replace degree symbol with '*' for tty to avoid a C437/VT100 translation table.
-        if(row == 7 && col_len > 77 && (shadow_buffer[7][73].value & 0xFF) == 0xF8) {
+        if (row == 7 && col_len > 77 && (shadow_buffer[7][73].value & 0xFF) == 0xF8) {
             p[73] = 0x2A;
         }
 
@@ -202,7 +202,7 @@ char tty_get_key(void)
 {
     int uart_status = serial_read_reg(&console_serial, UART_LSR);
 
-	if (uart_status & UART_LSR_DR) {
+    if (uart_status & UART_LSR_DR) {
         return serial_read_reg(&console_serial, UART_RX);
     } else {
         return 0xFF;
