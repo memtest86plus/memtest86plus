@@ -154,9 +154,6 @@ struct serial_port {
 #define tty_error_redraw() \
     tty_send_region(10, 0, 23, 79);
 
-#define tty_popup_redraw() \
-    tty_send_region(POP_REGION);
-
 #define tty_normal() \
     serial_echo_print(TTY_NORMAL);
 

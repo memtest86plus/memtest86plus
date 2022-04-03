@@ -19,14 +19,6 @@
 #define SCREEN_WIDTH    80
 #define SCREEN_HEIGHT   25
 
-
-typedef struct {
-    uint8_t     r;
-    uint8_t     g;
-    uint8_t     b;
-} __attribute__((packed)) rgb_value_t;
-
-
 typedef union {
     struct {
         uint8_t     ch;

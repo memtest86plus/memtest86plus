@@ -16,6 +16,12 @@
 // Private Variables
 //------------------------------------------------------------------------------
 
+typedef struct {
+    uint8_t     r;
+    uint8_t     g;
+    uint8_t     b;
+} __attribute__((packed)) rgb_value_t;
+
 static const rgb_value_t vga_pallete[16] = {
     //  R    G    B
     {   0,   0,   0 },  // BLACK

@@ -15,29 +15,6 @@
 
 #include "smp.h"
 
-// Origin and size of the pop-up window.
-
-#define POP_R       3
-#define POP_C       21
-
-#define POP_W       38
-#define POP_H       18
-
-#define POP_LAST_R  (POP_R + POP_H - 1)
-#define POP_LAST_C  (POP_C + POP_W - 1)
-
-#define POP_REGION  POP_R, POP_C, POP_LAST_R, POP_LAST_C
-
-#define POP_LM      (POP_C + 3)     // Left margin
-#define POP_LI      (POP_C + 5)     // List indent
-
-#define SEL_W       32
-#define SEL_H       2
-
-#define SEL_AREA    (SEL_W * SEL_H)
-
-// -------------
-
 typedef enum {
     PAR,
     SEQ,

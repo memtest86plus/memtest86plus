@@ -36,17 +36,16 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
     int n = 0;
     int base = 10;
     bool done = false;
-    bool tty_update = true;
+    bool tty_update = enable_tty;
     bool got_suffix = false;
     while (!done) {
         char c = get_key();
 
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
-            tty_update = false;
+        if (tty_update) {
+            tty_send_region(row, col, row, col+10);
         }
 
-        tty_update = true;
+        tty_update = enable_tty;
 
         switch (c) {
           case '\n':

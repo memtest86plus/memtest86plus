@@ -45,6 +45,27 @@
 // Constants
 //------------------------------------------------------------------------------
 
+// Origin and size of the pop-up window.
+
+#define POP_R       3
+#define POP_C       21
+
+#define POP_W       38
+#define POP_H       18
+
+#define POP_LAST_R  (POP_R + POP_H - 1)
+#define POP_LAST_C  (POP_C + POP_W - 1)
+
+#define POP_REGION  POP_R, POP_C, POP_LAST_R, POP_LAST_C
+
+#define POP_LM      (POP_C + 3)     // Left margin
+#define POP_LI      (POP_C + 5)     // List indent
+
+#define SEL_W       32
+#define SEL_H       2
+
+#define SEL_AREA    (SEL_W * SEL_H)
+
 static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
 
 //------------------------------------------------------------------------------
@@ -246,7 +267,7 @@ static void display_input_message(int row, const char *message)
 {
     clear_popup_row(row);
     prints(row, POP_LM, message);
-    if (enable_tty) tty_popup_redraw();
+    if (enable_tty) tty_send_region(POP_REGION);
 }
 
 static void display_error_message(int row, const char *message)
@@ -255,7 +276,7 @@ static void display_error_message(int row, const char *message)
     set_foreground_colour(YELLOW);
     prints(row, POP_LM, message);
     set_foreground_colour(WHITE);
-    if (enable_tty) tty_popup_redraw();
+    if (enable_tty) tty_send_region(POP_REGION);
 }
 
 static void display_selection_header(int row, int max_num, int offset)
@@ -360,16 +381,15 @@ static void test_selection_menu(void)
         display_enabled(POP_R+12, i, test_list[i].enabled);
     }
 
-    bool tty_update = true;
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
 
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
-            tty_update = false;
+        if (tty_update) {
+            tty_send_region(POP_REGION);
         }
-        tty_update = true;
+        tty_update = enable_tty;
 
         switch (get_key()) {
           case '1':
@@ -425,16 +445,15 @@ static void address_range_menu(void)
     prints(POP_R+6, POP_LI, "<F10> Exit menu");
     printf(POP_R+8, POP_LM, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
 
-    bool tty_update = true;
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
 
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
-            tty_update = false;
+        if (tty_update) {
+            tty_send_region(POP_REGION);
         }
-        tty_update = true;
+        tty_update = enable_tty;
 
         switch (get_key()) {
           case '1': {
@@ -502,16 +521,15 @@ static void cpu_mode_menu(void)
     prints(POP_R+6, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+cpu_mode, POP_LM, '*');
 
-    bool tty_update = true;
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         int ch = get_key();
 
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
-            tty_update = false;
+        if (tty_update) {
+            tty_send_region(POP_REGION);
         }
-        tty_update = true;
+        tty_update = enable_tty;
 
         switch (ch) {
           case '1':
@@ -560,17 +578,16 @@ static void error_mode_menu(void)
     prints(POP_R+7, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+error_mode, POP_LM, '*');
 
-    bool tty_update = true;
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         int ch = get_key();
 
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
-            tty_update = false;
+        if (tty_update) {
+            tty_send_region(POP_REGION);
         }
 
-        tty_update = true;
+        tty_update = enable_tty;
 
         switch (ch) {
           case '1':
@@ -767,7 +784,7 @@ void config_menu(bool initial)
 
     cpu_mode_t   old_cpu_mode   = cpu_mode;
 
-    bool tty_update = true;
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         prints(POP_R+1,  POP_LM, "Settings:");
@@ -789,12 +806,11 @@ void config_menu(bool initial)
             prints(POP_R+8 , POP_LI, "<F10> Exit menu");
         }
 
-        if (enable_tty && tty_update) {
-            tty_popup_redraw();
-            tty_update = false;
+        if (tty_update) {
+            tty_send_region(POP_REGION);
         }
 
-        tty_update = true;
+        tty_update = enable_tty;
 
         switch (get_key()) {
           case '1':
@@ -845,7 +861,7 @@ void config_menu(bool initial)
     set_background_colour(BLUE);
 
     if (enable_tty) {
-        tty_popup_redraw();
+        tty_send_region(POP_REGION);
     }
 
     if (cpu_mode != old_cpu_mode) {
