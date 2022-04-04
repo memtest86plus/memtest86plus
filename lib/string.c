@@ -13,6 +13,21 @@
 #include "string.h"
 
 //------------------------------------------------------------------------------
+// Private Functions
+//------------------------------------------------------------------------------
+
+void reverse(char s[])
+{
+    int i, j;
+    char c;
+
+    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
+        c = s[i];
+        s[i] = s[j];
+        s[j] = c;
+    }
+}
+//------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
@@ -104,4 +119,30 @@ char *strstr(const char *haystack, const char *needle)
         }
     }
     return NULL;
+}
+
+char *itoa(int num, char *str)
+{
+    int i = 0;
+
+    /* Special case for 0 */
+    if (num == 0) {
+        str[i++] = '0';
+        str[i] = '\0';
+        return str;
+    }
+
+    // Parse digits
+    while (num != 0) {
+        int rem = num % 10;
+        str[i++] = (rem > 9) ? (rem-10) + 'a' : rem + '0';
+        num /= 10;
+    }
+
+    // Last is string terminator
+    str[i] = '\0';
+
+    reverse(str);
+
+    return str;
 }

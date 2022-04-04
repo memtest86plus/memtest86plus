@@ -28,6 +28,7 @@
 #include "memsize.h"
 #include "pci.h"
 #include "screen.h"
+#include "serial.h"
 #include "smbios.h"
 #include "smp.h"
 #include "temperature.h"
@@ -145,7 +146,6 @@ static void run_at(uintptr_t addr, int my_cpu)
 {
     uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
 
-
     if (my_cpu == 0) {
         // Copy the program code and all data except the stacks.
         memcpy((void *)addr, (void *)_start, _stacks - _start);
@@ -211,6 +211,8 @@ static void global_init(void)
     pci_init();
 
     membw_init();
+
+    tty_init();
 
     smbios_init();
 

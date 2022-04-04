@@ -60,4 +60,10 @@ int strncmp(const char *s1, const char *s2, size_t n);
  */
 char *strstr(const char *haystack, const char *needle);
 
+/**
+ * Convert n to characters in s
+ */
+
+char *itoa(int num, char *str);
+
 #endif // STRING_H

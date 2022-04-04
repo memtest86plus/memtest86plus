@@ -23,6 +23,7 @@
 #include "keyboard.h"
 #include "memsize.h"
 #include "pmem.h"
+#include "serial.h"
 #include "screen.h"
 #include "smp.h"
 #include "usbhcd.h"
@@ -98,11 +99,64 @@ bool            enable_bench       = true;
 
 bool            pause_at_start     = false;
 
-power_save_t    power_save =  POWER_SAVE_HIGH;
+power_save_t    power_save         = POWER_SAVE_HIGH;
+
+bool            enable_tty         = false;
+int             tty_params_port    = SERIAL_PORT_0x3F8;
+int             tty_params_baud    = SERIAL_DEFAULT_BAUDRATE;
+int             tty_update_period  = 2; // Update TTY every 2 seconds (default)
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+static void parse_serial_params(const char *params)
+{
+    if (strncmp(params, "ttyS", 5) == 0) {
+        return;
+    }
+
+    if (params[4] >= '0' && params[4] <= '3') {
+        tty_params_port = params[4] - '0';
+    } else {
+        return;
+    }
+
+    enable_tty = true;
+
+    if (params[5] != ',' && params[5] != ' ') {
+        return;
+    }
+
+    if (params[6] >= '0' && params[6] <= '9') {
+
+        switch (params[6])
+        {
+            default:
+                return;
+            case '0':
+                tty_params_baud   = 9600;
+                tty_update_period = 5;
+                break;
+            case '1':
+                tty_params_baud   = 19200;
+                tty_update_period = 4;
+                break;
+            case '2':
+                tty_params_baud   = 38400;
+                tty_update_period = 3;
+                break;
+            case '3':
+                tty_params_baud   = 57600;
+                tty_update_period = 3;
+                break;
+            case '4':
+                tty_params_baud   = 115200;
+                tty_update_period = 2;
+                break;
+        }
+    }
+}
 
 static void parse_option(const char *option, const char *params)
 {
@@ -117,10 +171,6 @@ static void parse_option(const char *option, const char *params)
             keyboard_types = KT_USB;
             usb_init_options = USB_EXTRA_RESET;
         }
-    } else if (strncmp(option, "nopause", 8) == 0) {
-        pause_at_start = false;
-    } else if (strncmp(option, "nobench", 8) == 0) {
-        enable_bench = false;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;
@@ -129,6 +179,14 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "high", 5) == 0) {
             power_save = POWER_SAVE_HIGH;
         }
+    } else if (strncmp(option, "console", 8) == 0) {
+        if (params != NULL) {
+            parse_serial_params(params);
+        }
+    } else if (strncmp(option, "nobench", 8) == 0) {
+        enable_bench = false;
+    } else if (strncmp(option, "nopause", 8) == 0) {
+        pause_at_start = false;
     } else if (strncmp(option, "smp", 4) == 0) {
         smp_enabled = true;
     } else if (strncmp(option, "trace", 6) == 0) {
@@ -209,6 +267,7 @@ static void display_input_message(int row, const char *message)
 {
     clear_popup_row(row);
     prints(row, POP_LM, message);
+    if (enable_tty) tty_send_region(POP_REGION);
 }
 
 static void display_error_message(int row, const char *message)
@@ -217,6 +276,7 @@ static void display_error_message(int row, const char *message)
     set_foreground_colour(YELLOW);
     prints(row, POP_LM, message);
     set_foreground_colour(WHITE);
+    if (enable_tty) tty_send_region(POP_REGION);
 }
 
 static void display_selection_header(int row, int max_num, int offset)
@@ -321,9 +381,16 @@ static void test_selection_menu(void)
         display_enabled(POP_R+12, i, test_list[i].enabled);
     }
 
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+        tty_update = enable_tty;
+
         switch (get_key()) {
           case '1':
             changed = set_all_tests(false);
@@ -356,6 +423,7 @@ static void test_selection_menu(void)
           } break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
         if (changed) {
@@ -363,6 +431,7 @@ static void test_selection_menu(void)
             changed = false;
         }
     }
+
     clear_screen_region(POP_REGION);
 }
 
@@ -376,9 +445,16 @@ static void address_range_menu(void)
     prints(POP_R+6, POP_LI, "<F10> Exit menu");
     printf(POP_R+8, POP_LM, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
 
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+        tty_update = enable_tty;
+
         switch (get_key()) {
           case '1': {
             display_input_message(POP_R+10, "Enter lower limit: ");
@@ -413,6 +489,7 @@ static void address_range_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
         if (changed) {
@@ -444,9 +521,16 @@ static void cpu_mode_menu(void)
     prints(POP_R+6, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+cpu_mode, POP_LM, '*');
 
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         int ch = get_key();
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+        tty_update = enable_tty;
+
         switch (ch) {
           case '1':
           case '2':
@@ -468,6 +552,7 @@ static void cpu_mode_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
     }
@@ -493,9 +578,17 @@ static void error_mode_menu(void)
     prints(POP_R+7, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+error_mode, POP_LM, '*');
 
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         int ch = get_key();
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+
+        tty_update = enable_tty;
+
         switch (ch) {
           case '1':
           case '2':
@@ -518,6 +611,7 @@ static void error_mode_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
     }
@@ -690,6 +784,7 @@ void config_menu(bool initial)
 
     cpu_mode_t   old_cpu_mode   = cpu_mode;
 
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         prints(POP_R+1,  POP_LM, "Settings:");
@@ -710,6 +805,12 @@ void config_menu(bool initial)
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
             prints(POP_R+8 , POP_LI, "<F10> Exit menu");
         }
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+
+        tty_update = enable_tty;
 
         switch (get_key()) {
           case '1':
@@ -751,12 +852,17 @@ void config_menu(bool initial)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
     }
 
     restore_screen_region(POP_REGION, popup_save_buffer);
     set_background_colour(BLUE);
+
+    if (enable_tty) {
+        tty_send_region(POP_REGION);
+    }
 
     if (cpu_mode != old_cpu_mode) {
         display_cpu_mode(cpu_mode_str[cpu_mode]);

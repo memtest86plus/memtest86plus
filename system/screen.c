@@ -13,7 +13,7 @@
 #include "screen.h"
 
 //------------------------------------------------------------------------------
-// Types
+// Private Variables
 //------------------------------------------------------------------------------
 
 typedef struct {
@@ -21,22 +21,6 @@ typedef struct {
     uint8_t     g;
     uint8_t     b;
 } __attribute__((packed)) rgb_value_t;
-
-typedef union {
-    struct {
-        uint8_t     ch;
-        uint8_t     attr;
-    };
-    struct {
-        uint16_t    value;
-    };
-} vga_char_t;
-
-typedef vga_char_t vga_buffer_t[SCREEN_HEIGHT][SCREEN_WIDTH];
-
-//------------------------------------------------------------------------------
-// Private Variables
-//------------------------------------------------------------------------------
 
 static const rgb_value_t vga_pallete[16] = {
     //  R    G    B
@@ -60,7 +44,7 @@ static const rgb_value_t vga_pallete[16] = {
 
 static vga_buffer_t *vga_buffer = (vga_buffer_t *)(0xb8000);
 
-static vga_buffer_t shadow_buffer;
+vga_buffer_t shadow_buffer;
 
 static int lfb_bytes_per_pixel = 0;
 

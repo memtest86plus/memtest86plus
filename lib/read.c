@@ -11,9 +11,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "config.h"
 #include "ctype.h"
 #include "keyboard.h"
 #include "print.h"
+#include "serial.h"
 #include "unistd.h"
 
 #include "read.h"
@@ -34,9 +36,17 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
     int n = 0;
     int base = 10;
     bool done = false;
+    bool tty_update = enable_tty;
     bool got_suffix = false;
     while (!done) {
         char c = get_key();
+
+        if (tty_update) {
+            tty_send_region(row, col, row, col+10);
+        }
+
+        tty_update = enable_tty;
+
         switch (c) {
           case '\n':
             if (n > 0) {
@@ -91,6 +101,7 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
             break;
         default:
             usleep(1000);
+            tty_update = false;
             break;
         }
         if (n < field_width && buffer[n] != ' ') {

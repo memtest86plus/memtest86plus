@@ -19,6 +19,18 @@
 #define SCREEN_WIDTH    80
 #define SCREEN_HEIGHT   25
 
+typedef union {
+    struct {
+        uint8_t     ch;
+        uint8_t     attr;
+    };
+    struct {
+        uint16_t    value;
+    };
+} vga_char_t;
+
+typedef vga_char_t vga_buffer_t[SCREEN_HEIGHT][SCREEN_WIDTH];
+
 /**
  * Colours that can be used for the foreground or background.
  */
@@ -32,6 +44,12 @@ typedef enum {
     YELLOW      = 6,
     WHITE       = 7
 } screen_colour_t;
+
+/**
+ * BIOS/UEFI(GOP) agnostic framebuffer copy
+ */
+
+extern vga_buffer_t shadow_buffer;
 
 /**
  * Modifier that can be added to any foreground colour.
