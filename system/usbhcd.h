@@ -112,7 +112,8 @@ typedef struct usb_hcd_s {
  */
 typedef enum {
     USB_DEFAULT_INIT    = 0,
-    USB_EXTRA_RESET     = 1
+    USB_EXTRA_RESET     = 1 << 0,
+    USB_IGNORE_EHCI     = 1 << 1
 } usb_init_options_t;
 
 /**

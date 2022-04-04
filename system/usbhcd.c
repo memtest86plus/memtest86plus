@@ -692,7 +692,9 @@ void find_usb_keyboards(bool pause_at_end)
                         // We need to initialise EHCI controllers before initialising any of their companion
                         // controllers, so do it now.
                         if (controller_type[func] == EHCI) {
-                            probe_usb_controller(bus, dev, func, controller_type[func]);
+                            if (~usb_init_options & USB_IGNORE_EHCI) {
+                                probe_usb_controller(bus, dev, func, controller_type[func]);
+                            }
                             // If we've filled the controller table, abort now.
                             if (num_usb_controllers == MAX_USB_CONTROLLERS) {
                                 return;
