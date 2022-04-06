@@ -21,6 +21,7 @@
 
 #include "config.h"
 #include "error.h"
+#include "githash.h"
 
 #include "tests.h"
 
@@ -76,13 +77,9 @@ void display_init(void)
     set_foreground_colour(BLACK);
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
-#if TESTWORD_WIDTH > 32
-    prints(0, 0, "  Memtest86+ v6.00pre (64b)");
-#else
-    prints(0, 0, "  Memtest86+ v6.00pre (32b)");
-#endif
+    prints(0, 0, "     Memtest86+ v6.00b1");
     set_foreground_colour(RED);
-    printc(0, 11, '+');
+    printc(0, 14, '+');
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
     prints(0,28,                             "| ");
@@ -118,6 +115,13 @@ void display_init(void)
     set_background_colour(WHITE);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, " <ESC> exit  <F1> configuration  <Space> scroll lock");
+    prints(ROW_FOOTER, 64, "6.00.");
+    prints(ROW_FOOTER, 69, GIT_HASH);
+#if TESTWORD_WIDTH > 32
+    prints(ROW_FOOTER, 76, ".x64");
+#else
+    prints(ROW_FOOTER, 76, ".x32");
+#endif
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
 

@@ -93,9 +93,14 @@ tests/%.o: ../tests/%.c
 	@mkdir -p tests
 	$(CC) -c $(CFLAGS) -O3 $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-app/%.o: ../app/%.c
+app/%.o: ../app/%.c githash.h
 	@mkdir -p app
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+githash.h:
+	echo  -n '#ifndef GIT_HASH\n#define GIT_HASH "' > ../app/$@ && \
+	git rev-parse HEAD | cut -c1-7 | tr -d "\n" >> ../app/$@ && \
+	echo  '"\n#endif' >> ../app/$@
 
 # Link it statically once so I know I don't have undefined symbols and
 # then link it dynamically so I have full relocation information.
