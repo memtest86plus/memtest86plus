@@ -599,8 +599,9 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     pci_config_write32(bus, dev, func, bar, 0xffffffff);
     uintptr_t mmio_size = pci_config_read32(bus, dev, func, bar);
     pci_config_write32(bus, dev, func, bar, base_addr);
+    bool in_io_space = base_addr & 0x1;
 #ifdef __x86_64__
-    if (base_addr & 0x4) {
+    if (!in_io_space && (base_addr & 0x4)) {
         base_addr += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
         pci_config_write32(bus, dev, func, bar + 4, 0xffffffff);
         mmio_size += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
@@ -613,13 +614,24 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     mmio_size &= ~(uintptr_t)0xf;
     mmio_size = ~mmio_size + 1;
 
-    print_usb_info("Found %s controller %04x:%04x at %08x size %08x", hci_name[controller_type],
-                   (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size);
+    print_usb_info("Found %s controller %04x:%04x at %08x size %08x in %s space", hci_name[controller_type],
+                   (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size, in_io_space ? "I/O" : "Mem");
 
-    base_addr = map_region(base_addr, mmio_size, false);
-    if (base_addr == 0) {
-        print_usb_info(" Failed to map device into virtual memory");
-        return;
+    if (in_io_space) {
+        if (controller_type != UHCI) {
+            print_usb_info(" Unsupported address mapping for this controller type");
+            return;
+        }
+    } else {
+        if (controller_type == UHCI) {
+            print_usb_info(" Unsupported address mapping for this controller type");
+            return;
+        }
+        base_addr = map_region(base_addr, mmio_size, false);
+        if (base_addr == 0) {
+            print_usb_info(" Failed to map device into virtual memory");
+            return;
+        }
     }
 
     // Search for power management capability.
