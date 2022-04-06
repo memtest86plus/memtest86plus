@@ -20,3 +20,6 @@ memtest_shared.bin
 grub-iso
 html
 latex
+
+# hash file
+githash.h
