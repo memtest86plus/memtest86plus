@@ -212,13 +212,13 @@ static bool reset_host_controller(uint16_t io_base)
 
 static bool start_host_controller(uint16_t io_base)
 {
-    outw(UHCI_USBCMD, UHCI_USBCMD_R_S | UHCI_USBCMD_MAXP);
+    outw(UHCI_USBCMD_R_S | UHCI_USBCMD_MAXP, UHCI_USBCMD);
     return io_wait_until_clr(UHCI_USBSTS, UHCI_USBSTS_HCH, 1000*MILLISEC);
 }
 
 static bool halt_host_controller(uint16_t io_base)
 {
-    outw(UHCI_USBCMD, inw(UHCI_USBCMD) & ~UHCI_USBCMD_R_S);
+    outw(inw(UHCI_USBCMD) & ~UHCI_USBCMD_R_S, UHCI_USBCMD);
     return io_wait_until_set(UHCI_USBSTS, UHCI_USBSTS_HCH, 1000*MILLISEC);
 }
 
@@ -231,6 +231,13 @@ static bool reset_uhci_port(uint16_t io_base, int port_idx)
 
     outw(port_status & ~UHCI_PORT_SC_PR, UHCI_PORT_SC(port_idx));
     return io_wait_until_clr(UHCI_PORT_SC(port_idx), UHCI_PORT_SC_PR, 5*MILLISEC);
+}
+
+static bool enable_uhci_port(uint16_t io_base, int port_idx)
+{
+    uint16_t port_status = inw(UHCI_PORT_SC(port_idx));
+    outw(port_status | UHCI_PORT_SC_PED, UHCI_PORT_SC(port_idx));
+    return io_wait_until_set(UHCI_PORT_SC(port_idx), UHCI_PORT_SC_PED, 1000*MILLISEC);
 }
 
 static void disable_uhci_port(uint16_t io_base, int port_idx)
@@ -457,6 +464,9 @@ bool uhci_init(uint16_t io_base, usb_hcd_t *hcd)
         if (!reset_uhci_port(io_base, port_idx)) continue;
 
         usleep(10*MILLISEC);  // USB reset recovery time
+
+        // Enable the port.
+        if (!enable_uhci_port(io_base, port_idx)) continue;
 
         port_status = inw(UHCI_PORT_SC(port_idx));
 
