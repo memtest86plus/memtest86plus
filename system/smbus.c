@@ -23,6 +23,7 @@ unsigned short smbusbase;
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
 
+static spd_info parse_spd_ddr (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx);
@@ -134,6 +135,9 @@ void print_smbus_startup_info(void) {
                 case 0x08: // DDR2
                     curspd = parse_spd_ddr2(index, spdidx);
                     break;
+                case 0x07: // DDR
+                    curspd = parse_spd_ddr(index, spdidx);
+                    break;
             }
 
             if(curspd.isValid) {
@@ -187,7 +191,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
 
     // Print Manufacturing date (only if valid)
     if(curcol <= 72 && spdi.fab_year > 1 && spdi.fab_year < 32 && spdi.fab_week < 53) {
-        curcol = printf(LINE_SPD+lidx, curcol, " (W%i'%i)", spdi.fab_week, spdi.fab_year);
+        curcol = printf(LINE_SPD+lidx, curcol, " (W%02i'%02i)", spdi.fab_week, spdi.fab_year);
     }
 
     // Print XMP Status
@@ -326,7 +330,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
 
-    // Compute module size in kB with shifts
+    // Compute module size in MB with shifts
     spdi.module_size = 1 << (
                              ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +
                              ((get_spd(smb_idx, slot_idx, 13) & 0x7) + 3)  -
@@ -419,7 +423,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     spdi.sku_len = 0;
     spdi.XMP = 0;
 
-    // Compute module size in KB with shifts
+    // Compute module size in MB with shifts
     spdi.module_size = 1 << (
                              ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +
                              ((get_spd(smb_idx, slot_idx, 8) & 0x7) + 3)  -
@@ -505,33 +509,33 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     spdi.sku_len = 0;
     spdi.XMP = 0;
 
-    // Compute module size in KB
+    // Compute module size in MB
     switch (get_spd(smb_idx, slot_idx, 31)) {
-    case 1:
-        spdi.module_size = 1024;
-        break;
-    case 2:
-        spdi.module_size = 2048;
-        break;
-    case 4:
-        spdi.module_size = 4096;
-        break;
-    case 8:
-        spdi.module_size = 8192;
-        break;
-    case 16:
-        spdi.module_size = 16384;
-        break;
-    case 32:
-        spdi.module_size = 128;
-        break;
-    case 64:
-        spdi.module_size = 256;
-        break;
-    default:
-    case 128:
-        spdi.module_size = 512;
-        break;
+        case 1:
+            spdi.module_size = 1024;
+            break;
+        case 2:
+            spdi.module_size = 2048;
+            break;
+        case 4:
+            spdi.module_size = 4096;
+            break;
+        case 8:
+            spdi.module_size = 8192;
+            break;
+        case 16:
+            spdi.module_size = 16384;
+            break;
+        case 32:
+            spdi.module_size = 128;
+            break;
+        case 64:
+            spdi.module_size = 256;
+            break;
+        default:
+        case 128:
+            spdi.module_size = 512;
+            break;
     }
 
     spdi.module_size *= (get_spd(smb_idx, slot_idx, 5) & 7) + 1;
@@ -571,6 +575,90 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
     bcd = get_spd(smb_idx, slot_idx, 93);
+    spdi.fab_week = bcd - 6 * (bcd >> 4);
+
+    spdi.isValid = true;
+
+    return spdi;
+}
+
+static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
+{
+    spd_info spdi;
+
+    spdi.type = "DDR";
+    spdi.slot_num = slot_idx;
+    spdi.sku_len = 0;
+    spdi.XMP = 0;
+
+    // Compute module size in MB
+    switch (get_spd(smb_idx, slot_idx, 31)) {
+        case 1:
+            spdi.module_size = 1024;
+            break;
+        case 2:
+            spdi.module_size = 2048;
+            break;
+        case 4:
+            spdi.module_size = 4096;
+            break;
+        case 8:
+            spdi.module_size = 32;
+            break;
+        case 16:
+            spdi.module_size = 64;
+            break;
+        case 32:
+            spdi.module_size = 128;
+            break;
+        case 64:
+            spdi.module_size = 256;
+            break;
+        case 128:
+            spdi.module_size = 512;
+            break;
+        default: // we don't support asymetric banking
+            spdi.module_size = 0;
+            break;
+    }
+
+    spdi.module_size *= get_spd(smb_idx, slot_idx, 5);
+
+    spdi.hasECC = ((get_spd(smb_idx, slot_idx, 11) >> 1) == 1);
+
+    // Module speed
+    uint8_t spd_byte9 = get_spd(smb_idx, slot_idx, 9);
+    spdi.freq = (float)(1.0f / (((spd_byte9 >> 4) * 10.0f) + (spd_byte9 & 0xF)) * 10000.0f * 2.0f);
+
+    // Module manufacturer
+    uint8_t contcode;
+    for (contcode = 64; contcode < 72; contcode++) {
+        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+            break;
+        }
+    }
+
+    spdi.jedec_code = (contcode - 64) << 8;
+    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+
+    // Module SKU
+    uint8_t sku_byte;
+    for (int j = 0; j < 18; j++) {
+        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+
+        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+            spdi.sku_len--;
+            break;
+        } else {
+            spdi.sku[j] = sku_byte;
+            spdi.sku_len++;
+        }
+    }
+
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
+    spdi.fab_year = bcd - 6 * (bcd >> 4);
+
+    bcd = get_spd(smb_idx, slot_idx, 94);
     spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
