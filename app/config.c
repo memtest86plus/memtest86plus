@@ -169,7 +169,7 @@ static void parse_option(const char *option, const char *params)
             keyboard_types = KT_USB;
         } else if (strncmp(params, "buggy-usb", 10) == 0) {
             keyboard_types = KT_USB;
-            usb_init_options = USB_EXTRA_RESET;
+            usb_init_options |= USB_EXTRA_RESET;
         }
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
@@ -185,6 +185,8 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "nobench", 8) == 0) {
         enable_bench = false;
+    } else if (strncmp(option, "noehci", 7) == 0) {
+        usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
     } else if (strncmp(option, "smp", 4) == 0) {
