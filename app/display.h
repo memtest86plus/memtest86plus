@@ -146,7 +146,7 @@
     printf(7, 47, "%i:%02i:%02i", hours, mins, secs)
 
 #define display_temperature(temp) \
-    printf(7, 71, "%2i%cC   ", temp, 0xf8)
+    printf(1, 20, "%2i/%2i%cC", temp, temp, 0xf8)
 
 #define display_pass_count(count) \
     printi(8, 47, count, 0, false, true)

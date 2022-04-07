@@ -83,7 +83,7 @@ void display_init(void)
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
     prints(0,28,                             "| ");
-    prints(1, 0, "CPU     : N/A               | Pass   % ");
+    prints(1, 0, "CLK/Temp: N/A               | Pass   % ");
     prints(2, 0, "L1 Cache: N/A               | Test   % ");
     prints(3, 0, "L2 Cache: N/A               | Test #   ");
     prints(4, 0, "L3 Cache: N/A               | Testing: ");
