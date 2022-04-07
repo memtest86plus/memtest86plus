@@ -339,6 +339,7 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
         outw(UHCI_USBSTS_INT | UHCI_USBSTS_ERR, UHCI_USBSTS);
 
         for (int kbd_idx = 0; kbd_idx < ws->num_keyboards; kbd_idx++) {
+            uhci_qh_t *kbd_qh = &ws->qh[1 + kbd_idx];
             uhci_td_t *kbd_td = &ws->td[3 + kbd_idx];
 
             status = kbd_td->control_status;
@@ -361,6 +362,7 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
 
             // Reenable the TD.
             write32(&kbd_td->control_status, kbd_td->driver_data[0]);
+            write32(&kbd_qh->qe_link_ptr, (uintptr_t)kbd_td | UHCI_LP_TYPE_TD);
         }
     }
 
