@@ -23,6 +23,7 @@ SYS_OBJS = system/cpuid.o \
            system/smbus.o \
            system/smp.o \
            system/temperature.o \
+           system/uhci.o \
            system/usbhcd.o \
            system/vmem.o \
            system/xhci.o

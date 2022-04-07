@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2021-2022 Martin Whitaker.
 
-// NOTE: This is currently untested and very unlikely to work out of the box.
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
