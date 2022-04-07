@@ -145,8 +145,8 @@
 #define display_run_time(hours, mins, secs) \
     printf(7, 47, "%i:%02i:%02i", hours, mins, secs)
 
-#define display_temperature(temp) \
-    printf(1, 20, "%2i/%2i%cC", temp, temp, 0xf8)
+#define display_temperature(temp, maxtemp) \
+    printf(1, 20, "%2i/%2i%cC", temp, maxtemp, 0xf8)
 
 #define display_pass_count(count) \
     printi(8, 47, count, 0, false, true)
