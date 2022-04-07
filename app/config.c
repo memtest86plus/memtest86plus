@@ -91,7 +91,7 @@ error_mode_t    error_mode = ERROR_MODE_NONE;
 
 cpu_state_t     cpu_state[MAX_CPUS];
 
-bool            enable_temperature = false;
+bool            enable_temperature = true;
 bool            enable_trace       = false;
 
 bool            enable_sm          = true;
@@ -761,7 +761,7 @@ void config_init(void)
         cpu_state[i] = CPU_STATE_ENABLED;
     }
 
-    enable_temperature = !no_temperature;
+    enable_temperature &= !no_temperature;
 
     power_save = POWER_SAVE_HIGH;
 

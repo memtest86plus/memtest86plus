@@ -246,7 +246,7 @@ static void global_init(void)
     if (enable_temperature) {
         int temp = get_cpu_temperature();
         if (temp > 0) {
-            display_temperature(temp);
+            display_temperature(temp, temp);
         } else {
             enable_temperature = false;
             no_temperature = true;

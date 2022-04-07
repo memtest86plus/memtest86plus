@@ -64,6 +64,8 @@ static bool timed_update_done = false;  // update cycle status
 
 int scroll_message_row;
 
+int max_cpu_temp = 0;
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -347,7 +349,15 @@ void do_tick(int my_cpu)
 
         // Update temperature one time per second
         if (enable_temperature) {
-            display_temperature(get_cpu_temperature());
+            int actual_cpu_temp = get_cpu_temperature();
+
+            if(max_cpu_temp < actual_cpu_temp ) {
+                max_cpu_temp = actual_cpu_temp;
+            }
+
+            if(actual_cpu_temp != 0) {
+                display_temperature(actual_cpu_temp, max_cpu_temp);
+            }
         }
 
         // Update TTY one time every TTY_UPDATE_PERIOD second(s)
