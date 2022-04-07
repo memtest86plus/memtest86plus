@@ -252,7 +252,11 @@ static void build_uhci_td(uhci_td_t *td, const usb_ep_t *ep, uint32_t pid, uint3
 {
     uint8_t device_speed = (ep->device_speed == USB_SPEED_LOW) ? UHCI_TD_LOW_SPEED : UHCI_TD_FULL_SPEED;
 
-    td->link_ptr = (uintptr_t)(td + 1) | UHCI_LP_TYPE_TD | UHCI_LP_DEPTH_FIRST;
+    if (ioc) {
+        td->link_ptr = UHCI_LP_TERMINATE;
+    } else {
+        td->link_ptr = (uintptr_t)(td + 1) | UHCI_LP_TYPE_TD | UHCI_LP_DEPTH_FIRST;
+    }
     td->control_status = UHCI_TD_CERR(3)
                        | device_speed
                        | ioc
