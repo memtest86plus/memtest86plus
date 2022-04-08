@@ -42,28 +42,28 @@
     prints(1, 20, str)
 
 #define display_l1_cache_size(size) \
-    printf(2, 10, "%kB", (uintptr_t)(size))
+    printf(2, 9, "%6kB", (uintptr_t)(size));
 
 #define display_l2_cache_size(size) \
-    printf(3, 10, "%kB", (uintptr_t)(size))
+    printf(3, 9, "%6kB", (uintptr_t)(size));
 
 #define display_l3_cache_size(size) \
-    printf(4, 10, "%kB", (uintptr_t)(size))
-
-#define display_l1_cache_speed(size) \
-    printf(2, 19, "%kB/s", (uintptr_t)(size))
-
-#define display_l2_cache_speed(size) \
-    printf(3, 19, "%kB/s", (uintptr_t)(size))
-
-#define display_l3_cache_speed(size) \
-    printf(4, 19, "%kB/s", (uintptr_t)(size))
-
-#define display_ram_speed(size) \
-    printf(5, 19, "%kB/s", (uintptr_t)(size))
+    printf(4, 9, "%6kB", (uintptr_t)(size));
 
 #define display_memory_size(size) \
-    printf(5, 10, "%kB", (uintptr_t)(size))
+    printf(5, 9, "%6kB", (uintptr_t)(size));
+
+#define display_l1_cache_speed(size) \
+    printf(2, 18, "%S6kB/s", (uintptr_t)(size))
+
+#define display_l2_cache_speed(size) \
+    printf(3, 18, "%S6kB/s", (uintptr_t)(size))
+
+#define display_l3_cache_speed(size) \
+    printf(4, 18, "%S6kB/s", (uintptr_t)(size))
+
+#define display_ram_speed(size) \
+    printf(5, 18, "%S6kB/s", (uintptr_t)(size))
 
 #define display_dmi_mb(sys_ma, sys_sku) \
     dmicol = prints(23, dmicol, sys_man); \

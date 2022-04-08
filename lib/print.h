@@ -52,11 +52,13 @@ int printx(int row, int col, uintptr_t value, int length, bool pad, bool left);
 /**
  * Prints a K<unit> value on screen starting at location (row,col) in a field of
  * at least length characters, optionally padding the number with leading zeros,
- * and optionally left-justifying instead of right-justifying in the field. The
- * value is shown to 3 significant figures in the nearest K/M/G/T units. Returns
- * the next column after the formatted value.
+ * optionally left-justifying instead of right-justifying in the field, and
+ * optionnaly adding a space between number and unit. The value is shown to
+ * 3 significant figures in the nearest K/M/G/T units. Returns the next column
+ * after the formatted value.
  */
-int printk(int row, int col, uintptr_t value, int length, bool pad, bool left);
+int printk(int row, int col, uintptr_t value, int length,
+           bool pad, bool left, bool add_space);
 
 /**
  * Emulates the standard printf function. Printing starts at location (row,col).
@@ -64,6 +66,7 @@ int printk(int row, int col, uintptr_t value, int length, bool pad, bool left);
  * The conversion flags supported are:
  *   -  left justify
  *   0  pad with leading zeros
+ *   S  add space between number and unit (k specifier only)
  *
  * The conversion specifiers supported are:
  *   c  character (int type)

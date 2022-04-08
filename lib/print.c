@@ -148,7 +148,7 @@ int printx(int row, int col, uintptr_t value, int field_length, bool pad, bool l
     return print_in_field(row, col, buffer, -length, field_length, left);
 }
 
-int printk(int row, int col, uintptr_t value, int field_length, bool pad, bool left)
+int printk(int row, int col, uintptr_t value, int field_length, bool pad, bool left, bool add_space)
 {
     static const char suffix[4] = { 'K', 'M', 'G', 'T' };
 
@@ -186,6 +186,11 @@ int printk(int row, int col, uintptr_t value, int field_length, bool pad, bool l
 
     int length = 0;
     buffer[length++] = suffix[scale];
+
+    if(add_space) {
+        buffer[length++] = ' ';
+    }
+
     if (fract_length > 0) {
         length += int_to_dec_str(&buffer[length], fract, fract_length, fract_length);
         buffer[length++] = '.';
@@ -219,11 +224,16 @@ int vprintf(int row, int col, const char *fmt, va_list args)
             continue;
         }
 
-        bool pad   = false;
-        bool left  = false;
+        bool pad        = false;
+        bool left       = false;
+        bool add_space  = false;
         int length = 0;
         if (*fmt == '-') {
             left = true;
+            fmt++;
+        }
+        if (*fmt == 'S') {
+            add_space = true;
             fmt++;
         }
         if (*fmt == '0') {
@@ -263,7 +273,7 @@ int vprintf(int row, int col, const char *fmt, va_list args)
             col = printx(row, col, va_arg(args, uintptr_t), length, pad, left);
             break;
           case 'k':
-            col = printk(row, col, va_arg(args, uintptr_t), length, pad, left);
+            col = printk(row, col, va_arg(args, uintptr_t), length, pad, left, add_space);
             break;
         }
         fmt++;
