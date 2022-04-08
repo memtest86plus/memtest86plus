@@ -1,10 +1,18 @@
 AS = as -32
 CC = gcc
 
+GIT = git
+
+ifeq ($(GIT),none)
+  GIT_AVAILABLE = false
+else
+  GIT_AVAILABLE = true
+endif
+
 CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m32 -march=i586 -fpic -fno-builtin \
          -ffreestanding -fomit-frame-pointer -fno-stack-protector
 
-INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app
+INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app -Iapp
 
 SYS_OBJS = system/cpuid.o \
            system/cpuinfo.o \
@@ -94,14 +102,23 @@ tests/%.o: ../tests/%.c
 	@mkdir -p tests
 	$(CC) -c $(CFLAGS) -O3 $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-app/%.o: ../app/%.c githash.h
+app/%.o: ../app/%.c app/githash.h
 	@mkdir -p app
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-githash.h:
-	echo  -n '#ifndef GIT_HASH\n#define GIT_HASH "' > ../app/$@ && \
-	git rev-parse HEAD | cut -c1-7 | tr -d "\n" >> ../app/$@ && \
-	echo  '"\n#endif' >> ../app/$@
+app/githash.h: FORCE
+	@mkdir -p app
+	@( \
+	  if $(GIT_AVAILABLE) && test -d ../.git ; then \
+	    hash=`git rev-parse HEAD | cut -c1-7`; \
+	  else \
+	    hash="unknown"; \
+	  fi; \
+	  define=`echo "#define GIT_HASH \"$$hash\""`; \
+	  echo $$define | diff - $@ > /dev/null 2>&1 || echo $$define > $@; \
+	)
+
+FORCE:
 
 # Link it statically once so I know I don't have undefined symbols and
 # then link it dynamically so I have full relocation information.
