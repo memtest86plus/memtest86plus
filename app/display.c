@@ -91,8 +91,8 @@ void display_init(void)
     prints(4, 0, "L3 Cache: N/A               | Testing: ");
     prints(5, 0, "Memory  : N/A               | Pattern: ");
     prints(6, 0, "-------------------------------------------------------------------------------");
-    prints(7, 0, "CPU cores:     available,     enabled  | Time:            Temperature: N/A ");
-    prints(8, 0, "Run mode : PAR    Using:               | Pass:            Errors: ");
+    prints(7, 0, "CPU cores:     available,     enabled    | Time:           Status: Init. ");
+    prints(8, 0, "Run mode : PAR    Using:                 | Pass:           Errors: ");
     prints(9, 0, "-------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
@@ -106,17 +106,17 @@ void display_init(void)
             print_char(i, 28, 0xb3);
         }
         for (int i = 7; i < 10; i++) {
-            print_char(i, 39, 0xb3);
+            print_char(i, 41, 0xb3);
         }
         print_char(6, 28, 0xc1);
-        print_char(6, 39, 0xc2);
-        print_char(9, 39, 0xc1);
+        print_char(6, 41, 0xc2);
+        print_char(9, 41, 0xc1);
     }
 
     set_foreground_colour(BLUE);
     set_background_colour(WHITE);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
-    prints(ROW_FOOTER, 0, " <ESC> exit  <F1> configuration  <Space> scroll lock");
+    prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
     prints(ROW_FOOTER, 64, "6.00.");
     prints(ROW_FOOTER, 69, GIT_HASH);
 #if TESTWORD_WIDTH > 32
@@ -179,9 +179,9 @@ void display_start_run(void)
         clear_message_area();
     }
 
-    clear_screen_region(7, 47, 7, 57);                  // run time
-    clear_screen_region(8, 47, 8, 57);                  // pass number
-    clear_screen_region(8, 66, 8, SCREEN_WIDTH - 1);    // error count
+    clear_screen_region(7, 49, 7, 57);                  // run time
+    clear_screen_region(8, 49, 8, 57);                  // pass number
+    clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
     display_pass_count(0);
     display_error_count(0);
     if (clks_per_msec > 0) {
@@ -190,6 +190,7 @@ void display_start_run(void)
         next_spin_time = run_start_time + SPINNER_PERIOD * clks_per_msec;
     }
     display_spinner('-');
+    display_status("Testing");
 
     if (enable_tty){
         tty_full_redraw();
