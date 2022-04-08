@@ -65,6 +65,9 @@
 #define display_ram_speed(size) \
     printf(5, 18, "%S6kB/s", (uintptr_t)(size))
 
+#define display_status(status) \
+    prints(7, 67, status)
+
 #define display_dmi_mb(sys_ma, sys_sku) \
     dmicol = prints(23, dmicol, sys_man); \
     prints(23, dmicol + 1, sys_sku);
@@ -86,7 +89,7 @@
     prints(8, 25, "all cores")
 
 #define display_spinner(spin_state) \
-    printc(8, 36, spin_state)
+    printc(7, 76, spin_state)
 
 #define display_pass_percentage(pct) \
     printi(1, 34, pct, 3, false, false)
@@ -143,16 +146,16 @@
     }
 
 #define display_run_time(hours, mins, secs) \
-    printf(7, 47, "%i:%02i:%02i", hours, mins, secs)
+    printf(7, 50, "%i:%02i:%02i", hours, mins, secs)
 
 #define display_temperature(temp, maxtemp) \
     printf(1, 20, "%2i/%2i%cC", temp, maxtemp, 0xf8)
 
 #define display_pass_count(count) \
-    printi(8, 47, count, 0, false, true)
+    printi(8, 50, count, 0, false, true)
 
 #define display_error_count(count) \
-    printi(8, 66, count, 0, false, true)
+    printi(8, 67, count, 0, false, true);
 
 #define clear_message_area() \
     { \

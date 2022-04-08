@@ -367,6 +367,7 @@ void error_update(void)
                                    test_list[test_num].errors);
         }
         display_error_count(error_count);
+        display_status("Failed!");
 
         if (enable_tty) {
             tty_error_redraw();

@@ -622,6 +622,7 @@ void main(void)
         if (!dummy_run) {
             display_pass_count(pass_num);
             if (error_count == 0) {
+                display_status("Pass   ");
                 display_notice("** Pass completed, no errors **");
             }
         }
