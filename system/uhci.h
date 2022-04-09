@@ -15,12 +15,13 @@
 #include "usbhcd.h"
 
 /**
- * Initialises the UHCI device found at I/O address io_base, scans all the
- * attached USB devices, and configures any HID USB keyboard devices it
- * finds to generate periodic interrupt transfers that report key presses.
- * Initialises hcd and returns true if the device was successfully
- * initialised and one or more keyboards were found.
+ * Initialises the UHCI device found at bus, dev, func on the PCI bus and
+ * io_base in the I/O address space, scans all the attached USB devices, and
+ * configures any HID USB keyboard devices it finds to generate periodic
+ * interrupt transfers that report key presses. Initialises hcd and returns
+ * true if the device was successfully initialised and one or more keyboards
+ * were found.
  */
-bool uhci_init(uint16_t io_base, usb_hcd_t *hcd);
+bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd);
 
 #endif // UHCI_H

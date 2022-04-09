@@ -661,7 +661,7 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     // Initialise the device according to its type.
     bool keyboards_found = false;
     if (controller_type == UHCI) {
-        keyboards_found = uhci_init(base_addr, &usb_controllers[num_usb_controllers]);
+        keyboards_found = uhci_init(bus, dev, func, base_addr, &usb_controllers[num_usb_controllers]);
     }
     if (controller_type == OHCI) {
         keyboards_found = ohci_init(base_addr, &usb_controllers[num_usb_controllers]);

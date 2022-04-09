@@ -8,6 +8,7 @@
 #include "io.h"
 #include "memrw32.h"
 #include "memsize.h"
+#include "pci.h"
 #include "pmem.h"
 #include "usb.h"
 
@@ -26,6 +27,21 @@
 
 #define UHCI_FL_LENGTH          1024                // Maximum number of entries in periodic frame list
 
+// Register addresses in PCI Config space
+
+#define UHCI_LEGSUP             0xc0                // Legacy Support register
+
+// Legacy Support register
+
+#define UHCI_LEGSUP_TBY60R      0x0100              // Trap By 0x60 Read  Status/Clear
+#define UHCI_LEGSUP_TBY60W      0x0200              // Trap By 0x60 Write Status/Clear
+#define UHCI_LEGSUP_TBY64R      0x0400              // Trap By 0x64 Read  Status/Clear
+#define UHCI_LEGSUP_TBY64W      0x0800              // Trap By 0x64 Write Status/Clear
+
+#define UHCI_LEGSUP_A20PTS      0x8000              // End of A20GATE Pass Through Status/Clear
+
+#define UHCI_LEGSUP_CLEAR       (UHCI_LEGSUP_TBY60R | UHCI_LEGSUP_TBY60W | UHCI_LEGSUP_TBY64R | UHCI_LEGSUP_TBY64W | UHCI_LEGSUP_A20PTS)
+
 // Register addresses in I/O space
 
 #define UHCI_USBCMD             (io_base+0x00)      // USB Command register
@@ -33,7 +49,7 @@
 #define UHCI_USBINTR            (io_base+0x04)      // USB Interrupt Enable register
 #define UHCI_FRNUM              (io_base+0x06)      // Frame Number register
 #define UHCI_FLBASE             (io_base+0x08)      // Frame List Base Address register
-#define UHCI_SOF                (io_base+0x0c)      // Start of Frame Modify register
+#define UHCI_SOF                (io_base+0x0c)      // Start of Frame modify register
 #define UHCI_PORT_SC(n)         (io_base+0x10+2*n)  // Port n Status and Control register (n = 0..MaxPortIdx)
 
 // USB Command register
@@ -51,6 +67,14 @@
 #define UHCI_USBSTS_HSE         0x0008              // Host System Error
 #define UHCI_USBSTS_HCPE        0x0010              // Host Controller Processor Error
 #define UHCI_USBSTS_HCH         0x0020              // Host Controller Halted
+
+// USB Interrupt Enable register
+
+#define UHCI_USBINTR_NONE       0x0000              // No interrupts enabled
+
+// USB SOF register
+
+#define UHCI_SOF_DEFAULT        0x40                // Default timing (1ms with 12MHz clock)
 
 // Port Status and Control register
 
@@ -393,8 +417,11 @@ static const hcd_methods_t methods = {
 // Public Functions
 //------------------------------------------------------------------------------
 
-bool uhci_init(uint16_t io_base, usb_hcd_t *hcd)
+bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
 {
+    // Disable PCI and SMM interrupts.
+    pci_config_write16(bus, dev, func, UHCI_LEGSUP, UHCI_LEGSUP_CLEAR);
+
     // Ensure the controller is halted and then reset it.
     if (!halt_host_controller(io_base)) return false;
     if (!reset_host_controller(io_base)) return false;
@@ -429,7 +456,10 @@ bool uhci_init(uint16_t io_base, usb_hcd_t *hcd)
     hcd->ws      = &ws->base_ws;
 
     // Initialise the host controller.
-    outl(fl_addr, UHCI_FLBASE);
+    outw(UHCI_USBINTR_NONE, UHCI_USBINTR);
+    outw(0,                 UHCI_FRNUM);
+    outl(fl_addr,           UHCI_FLBASE);
+    outb(UHCI_SOF_DEFAULT,  UHCI_SOF);
     if (!start_host_controller(io_base)) {
         pm_map[0].end += num_pages(sizeof(workspace_t));
         pm_map[0].end += num_pages(UHCI_FL_LENGTH * sizeof(uint32_t));
