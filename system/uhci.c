@@ -272,7 +272,7 @@ static void disable_uhci_port(uint16_t io_base, int port_idx)
 static void build_uhci_td(uhci_td_t *td, const usb_ep_t *ep, uint32_t pid, uint32_t dt, uint32_t ioc,
                           const void *buffer, size_t length)
 {
-    uint8_t device_speed = (ep->device_speed == USB_SPEED_LOW) ? UHCI_TD_LOW_SPEED : UHCI_TD_FULL_SPEED;
+    uint32_t device_speed = (ep->device_speed == USB_SPEED_LOW) ? UHCI_TD_LOW_SPEED : UHCI_TD_FULL_SPEED;
 
     if (ioc) {
         td->link_ptr = UHCI_LP_TERMINATE;
