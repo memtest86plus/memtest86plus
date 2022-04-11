@@ -8,9 +8,9 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2004-2022 Sam Demeulemeester.
  *
  * Derived from memtest86+ cpuid.h
- * (original contained no copyright statement)
  */
 
 #include <stdint.h>
@@ -134,6 +134,14 @@ typedef union {
 } cpuid_custom_features;
 
 typedef struct {
+    int     core_count;
+    int     thread_count;
+    int     is_hybrid;
+    int     ecore_count;
+    int     pcore_count;
+} topology_t;
+
+typedef struct {
     uint32_t                max_cpuid;
     uint32_t                max_xcpuid;
     uint32_t                dts_pmp;
@@ -144,6 +152,7 @@ typedef struct {
     cpuid_brand_string_t    brand_id;
     cpuid_cache_info_t      cache_info;
     cpuid_custom_features   custom;
+    topology_t              topology;
 } cpuid_info_t;
 
 typedef union {

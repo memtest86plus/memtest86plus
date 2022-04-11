@@ -66,15 +66,11 @@
 
 #define SEL_AREA    (SEL_W * SEL_H)
 
-static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
-
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
 
 static uint16_t popup_save_buffer[POP_W * POP_H];
-
-static bool smp_enabled = true;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -90,6 +86,8 @@ cpu_mode_t      cpu_mode = PAR;
 error_mode_t    error_mode = ERROR_MODE_NONE;
 
 cpu_state_t     cpu_state[MAX_CPUS];
+
+bool            smp_enabled        = true;
 
 bool            enable_temperature = true;
 bool            enable_trace       = false;
@@ -867,7 +865,7 @@ void config_menu(bool initial)
     }
 
     if (cpu_mode != old_cpu_mode) {
-        display_cpu_mode(cpu_mode_str[cpu_mode]);
+        display_cpu_topology();
         restart = true;
     }
 
