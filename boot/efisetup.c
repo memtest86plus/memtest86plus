@@ -366,7 +366,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
 #if DEBUG
     print_string("FB base   : ");
-    print_hex(si->lfb_base);
+    print_hex((uintptr_t)lfb_base);
     print_string("\n");
     print_string("FB size   : ");
     print_dec(si->lfb_width);
