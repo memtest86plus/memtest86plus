@@ -142,8 +142,10 @@
 
 #define MAX_KEYBOARDS           8                   // per host controller
 
+#define MAX_PACKETS             32                  // per data transfer (must be >= MAX_KEYBOARDS)
+
 #define WS_QH_SIZE              (1 + MAX_KEYBOARDS) // Queue Head Descriptors
-#define WS_TD_SIZE              (3 + MAX_KEYBOARDS) // Queue Transfer Descriptors
+#define WS_TD_SIZE              (2 + MAX_PACKETS)   // Queue Transfer Descriptors
 #define WS_KC_BUFFER_SIZE       8                   // keycodes
 
 #define MILLISEC                1000                // in microseconds
@@ -269,19 +271,19 @@ static void disable_uhci_port(uint16_t io_base, int port_idx)
     (void)io_wait_until_clr(UHCI_PORT_SC(port_idx), UHCI_PORT_SC_PED, 1000*MILLISEC);
 }
 
-static void build_uhci_td(uhci_td_t *td, const usb_ep_t *ep, uint32_t pid, uint32_t dt, uint32_t ioc,
+static void build_uhci_td(uhci_td_t *td, const usb_ep_t *ep, uint32_t pid, uint32_t dt, uint32_t options,
                           const void *buffer, size_t length)
 {
     uint32_t device_speed = (ep->device_speed == USB_SPEED_LOW) ? UHCI_TD_LOW_SPEED : UHCI_TD_FULL_SPEED;
 
-    if (ioc) {
+    if (options & UHCI_TD_IOC_Y) {
         td->link_ptr = UHCI_LP_TERMINATE;
     } else {
         td->link_ptr = (uintptr_t)(td + 1) | UHCI_LP_TYPE_TD | UHCI_LP_DEPTH_FIRST;
     }
     td->control_status = UHCI_TD_CERR(3)
                        | device_speed
-                       | ioc
+                       | options
                        | UHCI_TD_ACTIVE;
     td->token          = UHCI_TD_LENGTH(length)
                        | dt
@@ -297,8 +299,17 @@ static uint16_t get_uhci_done(workspace_t *ws)
 
     uint16_t status = inw(UHCI_USBSTS) & (UHCI_USBSTS_INT | UHCI_USBSTS_ERR);
     if (status != 0) {
+        if (status & UHCI_USBSTS_ERR || ws->qh[0].qe_link_ptr != UHCI_LP_TERMINATE) {
+#if 1
+            uintptr_t td_addr = ws->qh[0].qe_link_ptr & 0xfffffff0;
+            uhci_td_t *td = (uhci_td_t *)td_addr;
+            print_usb_info(" transfer failed TD %08x status %08x token %08x",
+                           td_addr, (uintptr_t)td->control_status, (uintptr_t)td->token);
+#endif
+            write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
+            status |= UHCI_USBSTS_ERR;
+        }
         outw(UHCI_USBSTS_INT | UHCI_USBSTS_ERR, UHCI_USBSTS);
-        write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
     }
     return status;
 }
@@ -343,10 +354,21 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
+    size_t packet_size = ep->max_packet_size;
+    if (length > (MAX_PACKETS * packet_size)) {
+        return false;
+    }
+
     write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
-    build_uhci_td(&ws->td[0], ep, UHCI_TD_PID_SETUP, UHCI_TD_DT(0), UHCI_TD_IOC_N, setup_pkt, sizeof(usb_setup_pkt_t));
-    build_uhci_td(&ws->td[1], ep, UHCI_TD_PID_IN,    UHCI_TD_DT(1), UHCI_TD_IOC_N, buffer, length);
-    build_uhci_td(&ws->td[2], ep, UHCI_TD_PID_OUT,   UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
+    int pkt_num = 0;
+    build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_SETUP, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, setup_pkt, sizeof(usb_setup_pkt_t)); pkt_num++;
+    while (length > packet_size) {
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_IN, UHCI_TD_DT(pkt_num & 1), UHCI_TD_SPD, buffer, packet_size); pkt_num++;
+        buffer = (uint8_t *)buffer + packet_size;
+        length -= packet_size;
+    }
+    build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_IN, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, buffer, length); pkt_num++;
+    build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
     write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
     return wait_for_uhci_done(ws);
 }
@@ -362,7 +384,7 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
 
         for (int kbd_idx = 0; kbd_idx < ws->num_keyboards; kbd_idx++) {
             uhci_qh_t *kbd_qh = &ws->qh[1 + kbd_idx];
-            uhci_td_t *kbd_td = &ws->td[3 + kbd_idx];
+            uhci_td_t *kbd_td = &ws->td[2 + kbd_idx];
 
             status = kbd_td->control_status;
             if (status & UHCI_TD_ACTIVE) continue;
@@ -548,7 +570,7 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
         uhci_qh_t *kbd_qh = &ws->qh[1 + kbd_idx];
-        uhci_td_t *kbd_td = &ws->td[3 + kbd_idx];
+        uhci_td_t *kbd_td = &ws->td[2 + kbd_idx];
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
