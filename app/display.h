@@ -38,9 +38,6 @@
 #define display_cpu_clk(freq) \
     printf(1, 10, "%i MHz", freq)
 
-#define display_cpu_addr_mode(str) \
-    prints(1, 20, str)
-
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size));
 
@@ -72,21 +69,12 @@
     dmicol = prints(23, dmicol, sys_man); \
     prints(23, dmicol + 1, sys_sku);
 
-#define display_available_cpus(count) \
-    printi(7, 10, count, 4, false, false)
-
-#define display_enabled_cpus(count) \
-    printi(7, 25, count, 4, false, false)
-
-#define display_cpu_mode(str) \
-    prints(8, 11, str)
-
 #define display_active_cpu(cpu_num) \
-    prints(8, 25, "core #"); \
-    printi(8, 31, cpu_num, 3, false, true)
+    prints(8, 7, "Core #"); \
+    printi(8, 13, cpu_num, 3, false, true)
 
 #define display_all_active \
-    prints(8, 25, "all cores")
+    prints(8, 7, "All Cores")
 
 #define display_spinner(spin_state) \
     printc(7, 76, spin_state)
@@ -195,6 +183,8 @@
 extern int scroll_message_row;
 
 void display_init(void);
+
+void display_cpu_topology(void);
 
 void post_display_init(void);
 

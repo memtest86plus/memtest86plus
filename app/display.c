@@ -37,6 +37,8 @@
 
 static const char spin_state[NUM_SPIN_STATES] = { '|', '/', '-', '\\' };
 
+static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -91,8 +93,8 @@ void display_init(void)
     prints(4, 0, "L3 Cache: N/A               | Testing: ");
     prints(5, 0, "Memory  : N/A               | Pattern: ");
     prints(6, 0, "-------------------------------------------------------------------------------");
-    prints(7, 0, "CPU cores:     available,     enabled    | Time:           Status: Init. ");
-    prints(8, 0, "Run mode : PAR    Using:                 | Pass:           Errors: ");
+    prints(7, 0, "CPU:                     SMP: N/A        | Time:           Status: Init. ");
+    prints(8, 0, "Using:                                   | Pass:           Errors: ");
     prints(9, 0, "-------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
@@ -133,11 +135,6 @@ void display_init(void)
     if (clks_per_msec) {
         display_cpu_clk((int)(clks_per_msec / 1000));
     }
-    if (cpuid_info.flags.lm) {
-        display_cpu_addr_mode("(x64)");
-    } else if (cpuid_info.flags.pae) {
-        display_cpu_addr_mode("(PAE)");
-    }
     if (l1_cache) {
         display_l1_cache_size(l1_cache);
     }
@@ -165,6 +162,55 @@ void display_init(void)
     }
 
     scroll_message_row = ROW_SCROLL_T;
+}
+
+void display_cpu_topology(void)
+{
+    extern int num_enabled_cpus;
+    int num_cpu_sockets = 1;
+
+    if(smp_enabled) {
+        printf(7,30, "%uT (%s)", num_enabled_cpus, cpu_mode_str[cpu_mode]);
+    } else {
+        prints(7,30, "Disabled");
+    }
+
+    // If topology failed, assume topology according to APIC
+    if(cpuid_info.topology.core_count <= 0) {
+
+        cpuid_info.topology.core_count = num_enabled_cpus;
+        cpuid_info.topology.thread_count = num_enabled_cpus;
+
+        if(cpuid_info.flags.htt && num_enabled_cpus >= 2 && num_enabled_cpus % 2 == 0) {
+            cpuid_info.topology.core_count /= 2;
+        }
+    }
+
+    // Compute number of sockets according to individual CPU core count
+    if(num_enabled_cpus > cpuid_info.topology.thread_count &&
+       num_enabled_cpus % cpuid_info.topology.thread_count == 0) {
+
+        num_cpu_sockets  = num_enabled_cpus / cpuid_info.topology.thread_count;
+    }
+
+    // Temporary workaround for Hybrid CPUs.
+    // TODO: run cpuid on each core to get correct P+E topology
+    if(cpuid_info.topology.is_hybrid) {
+        printf(7, 5, "%u Threads (%s)", cpuid_info.topology.thread_count,
+                                        cpuid_info.flags.lm ? "X64" : "PAE");
+        return;
+    }
+
+    if(num_cpu_sockets < 2) {
+        printf(7, 5, "%uC/%uT (%s)", cpuid_info.topology.core_count,
+                                     cpuid_info.topology.thread_count,
+                                     cpuid_info.flags.lm ? "X64" : "PAE");
+    } else {
+        printf(7, 5, "%uS/%uC/%uT (%s)", num_cpu_sockets,
+                                         num_cpu_sockets * cpuid_info.topology.core_count,
+                                         num_cpu_sockets * cpuid_info.topology.thread_count,
+                                         cpuid_info.flags.lm ? "X64" : "PAE");
+    }
 }
 
 void post_display_init(void)
