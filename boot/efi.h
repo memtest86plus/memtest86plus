@@ -123,12 +123,12 @@ typedef struct {
     uintn_t             frame_buffer_size;
 } efi_gop_mode_t;
 
-typedef struct {
-    void                *query_mode;
-    void                *set_mode;
+typedef struct efi_graphics_output_s {
+    efi_status_t        (efiapi *query_mode)(struct efi_graphics_output_s *, uint32_t, uintn_t *, efi_gop_mode_info_t **);
+    efi_status_t        (efiapi *set_mode)(struct efi_graphics_output_s *, uint32_t);
     void                *blt;
     efi_gop_mode_t      *mode;
-} efi_graphics_output_protocol_t;
+} efi_graphics_output_t;
 
 typedef struct {
     uint64_t            signature;
