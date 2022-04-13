@@ -346,9 +346,13 @@ static void test_all_windows(int my_cpu)
         if (!dummy_run) {
             if (parallel_test) {
                 num_active_cpus = num_enabled_cpus;
-                display_all_active;
+                if(display_mode == 0) {
+                    display_all_active();
+                }
             } else {
-                display_active_cpu(my_cpu);
+                if(display_mode == 0) {
+                    display_active_cpu(my_cpu);
+                }
             }
         }
         barrier_reset(run_barrier, num_active_cpus);

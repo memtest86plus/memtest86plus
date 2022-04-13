@@ -66,6 +66,8 @@ static bool timed_update_done = false;  // update cycle status
 
 int scroll_message_row;
 
+int display_mode = 0; // RAM Info from: 0 = N/A - 1 = SPD - 2 = IMC
+
 int max_cpu_temp = 0;
 
 //------------------------------------------------------------------------------
@@ -217,6 +219,31 @@ void post_display_init(void)
 {
     print_smbios_startup_info();
     print_smbus_startup_info();
+
+    if(false) {
+        // Try to get RAM information from IMC (TODO)
+        printf(8,0, "IMC: %uMHz (%s-%u) CAS %u-%u-%u-%u", ram.freq / 2
+                                                        , ram.type
+                                                        , ram.freq
+                                                        , ram.tCL
+                                                        , ram.tRCD
+                                                        , ram.tRP
+                                                        , ram.tRAS);
+        display_mode = 2;
+    } else if (ram.freq > 0 && ram.tCL > 1) {
+        // If not available, grab max memory specs from SPD
+        printf(8,0, "RAM: %uMHz (%s-%u) CAS %u-%u-%u-%u", ram.freq / 2
+                                                        , ram.type
+                                                        , ram.freq
+                                                        , ram.tCL
+                                                        , ram.tRCD
+                                                        , ram.tRP
+                                                        , ram.tRAS);
+        display_mode = 1;
+    } else {
+        // If nothing avilable, fallback to "Using Core" Display
+        display_mode = 0;
+    }
 }
 
 void display_start_run(void)
