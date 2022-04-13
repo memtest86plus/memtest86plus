@@ -53,9 +53,9 @@
 /**
  * EFI_RESET_TYPE values.
  */
-#define EFI_RESET_COLD 0
-#define EFI_RESET_WARM 1
-#define EFI_RESET_SHUTDOWN 2
+#define EFI_RESET_COLD          0
+#define EFI_RESET_WARM          1
+#define EFI_RESET_SHUTDOWN      2
 
 /**
  * EFI_GRAPHICS_PIXEL_FORMAT values.
@@ -65,8 +65,8 @@
 #define PIXEL_BIT_MASK                      2
 #define PIXEL_BLT_ONLY                      3
 
-#define EFI_SYSTEM_TABLE_SIGNATURE UINT64_C(0x5453595320494249)
-#define EFI_RUNTIME_SERVICES_SIGNATURE UINT64_C(0x5652453544e5552)
+#define EFI_SYSTEM_TABLE_SIGNATURE      UINT64_C(0x5453595320494249)
+#define EFI_RUNTIME_SERVICES_SIGNATURE  UINT64_C(0x5652453544e5552)
 
 #define efiapi __attribute__((ms_abi))
 
@@ -124,14 +124,14 @@ typedef struct {
 } efi_gop_mode_t;
 
 typedef struct {
-    void                *query_mode; 
-    void                *set_mode; 
+    void                *query_mode;
+    void                *set_mode;
     void                *blt;
     efi_gop_mode_t      *mode;
 } efi_graphics_output_protocol_t;
 
 typedef struct {
-    uint64_t            signature; 
+    uint64_t            signature;
     uint32_t            revision;
     uint32_t            header_size;
     uint32_t            crc32;
@@ -144,129 +144,129 @@ typedef struct {
 } efi_input_key_t;
 
 typedef struct efi_simple_text_in_s {
-    void *reset;
-    efi_status_t (efiapi *read_key_stroke)(struct efi_simple_text_in_s *, efi_input_key_t *);
-    void *test_string;
+    void                *reset;
+    efi_status_t        (efiapi *read_key_stroke)(struct efi_simple_text_in_s *, efi_input_key_t *);
+    void                *test_string;
 } efi_simple_text_in_t;
 
 typedef struct efi_simple_text_out_s {
-    void *reset;
-    efi_status_t (efiapi *output_string)(struct efi_simple_text_out_s *, efi_char16_t *);
-    void *test_string;
+    void                *reset;
+    efi_status_t        (efiapi *output_string)(struct efi_simple_text_out_s *, efi_char16_t *);
+    void                *test_string;
 } efi_simple_text_out_t;
 
 typedef struct {
-    efi_table_header_t header;
-    void *raise_tpl;
-    void *restore_tpl;
-    efi_status_t (efiapi *allocate_pages)(int, int, uintn_t, efi_phys_addr_t *);
-    efi_status_t (efiapi *free_pages)(efi_phys_addr_t, uintn_t);
-    efi_status_t (efiapi *get_memory_map)(uintn_t *, void *, uintn_t *, uintn_t *, uint32_t *);
-    efi_status_t (efiapi *allocate_pool)(int, uintn_t, void **);
-    efi_status_t (efiapi *free_pool)(void *);
-    void *create_event;
-    void *set_timer;
-    void *wait_for_event;
-    void *signal_event;
-    void *close_event;
-    void *check_event;
-    void *install_protocol_interface;
-    void *reinstall_protocol_interface;
-    void *uninstall_protocol_interface;
-    efi_status_t (efiapi *handle_protocol)(efi_handle_t, efi_guid_t *, void **);
-    void *reserved;
-    void *register_protocol_notify;
-    efi_status_t (efiapi *locate_handle)(int, efi_guid_t *, void *, uintn_t *, efi_handle_t *);
-    void *locate_device_path;
-    efi_status_t (efiapi *install_configuration_table)(efi_guid_t *, void *);
-    void *load_image;
-    void *start_image;
-    void *exit;
-    void *unload_image;
-    efi_status_t (efiapi *exit_boot_services)(efi_handle_t, uintn_t);
-    void *get_next_monotonic_count;
-    void *stall;
-    void *set_watchdog_timer;
-    void *connect_controller;
-    efi_status_t (efiapi *disconnect_controller)(efi_handle_t, efi_handle_t, efi_handle_t);
-    void *open_protocol;
-    void *close_protocol;
-    void *open_protocol_information;
-    void *protocols_per_handle;
-    void *locate_handle_buffer;
-    efi_status_t (efiapi *locate_protocol)(efi_guid_t *, void *, void **);
-    void *install_multiple_protocol_interfaces;
-    void *uninstall_multiple_protocol_interfaces;
-    void *calculate_crc32;
-    void *copy_mem;
-    void *set_mem;
-    void *create_event_ex;
+    efi_table_header_t  header;
+    void                *raise_tpl;
+    void                *restore_tpl;
+    efi_status_t        (efiapi *allocate_pages)(int, int, uintn_t, efi_phys_addr_t *);
+    efi_status_t        (efiapi *free_pages)(efi_phys_addr_t, uintn_t);
+    efi_status_t        (efiapi *get_memory_map)(uintn_t *, void *, uintn_t *, uintn_t *, uint32_t *);
+    efi_status_t        (efiapi *allocate_pool)(int, uintn_t, void **);
+    efi_status_t        (efiapi *free_pool)(void *);
+    void                *create_event;
+    void                *set_timer;
+    void                *wait_for_event;
+    void                *signal_event;
+    void                *close_event;
+    void                *check_event;
+    void                *install_protocol_interface;
+    void                *reinstall_protocol_interface;
+    void                *uninstall_protocol_interface;
+    efi_status_t        (efiapi *handle_protocol)(efi_handle_t, efi_guid_t *, void **);
+    void                *reserved;
+    void                *register_protocol_notify;
+    efi_status_t        (efiapi *locate_handle)(int, efi_guid_t *, void *, uintn_t *, efi_handle_t *);
+    void                *locate_device_path;
+    efi_status_t        (efiapi *install_configuration_table)(efi_guid_t *, void *);
+    void                *load_image;
+    void                *start_image;
+    void                *exit;
+    void                *unload_image;
+    efi_status_t        (efiapi *exit_boot_services)(efi_handle_t, uintn_t);
+    void                *get_next_monotonic_count;
+    void                *stall;
+    void                *set_watchdog_timer;
+    void                *connect_controller;
+    efi_status_t        (efiapi *disconnect_controller)(efi_handle_t, efi_handle_t, efi_handle_t);
+    void                *open_protocol;
+    void                *close_protocol;
+    void                *open_protocol_information;
+    void                *protocols_per_handle;
+    void                *locate_handle_buffer;
+    efi_status_t        (efiapi *locate_protocol)(efi_guid_t *, void *, void **);
+    void                *install_multiple_protocol_interfaces;
+    void                *uninstall_multiple_protocol_interfaces;
+    void                *calculate_crc32;
+    void                *copy_mem;
+    void                *set_mem;
+    void                *create_event_ex;
 } efi_boot_services_t;
 
 typedef struct {
-    efi_table_header_t header;
-    unsigned long get_time;
-    unsigned long set_time;
-    unsigned long get_wakeup_time;
-    unsigned long set_wakeup_time;
-    unsigned long set_virtual_address_map;
-    unsigned long convert_pointer;
-    unsigned long get_variable;
-    unsigned long get_next_variable;
-    unsigned long set_variable;
-    unsigned long get_next_high_mono_count;
-    efi_status_t (efiapi *reset_system)(int, int, int);
-    unsigned long update_capsule;
-    unsigned long query_capsule_caps;
-    unsigned long query_variable_info;
+    efi_table_header_t  header;
+    unsigned long       get_time;
+    unsigned long       set_time;
+    unsigned long       get_wakeup_time;
+    unsigned long       set_wakeup_time;
+    unsigned long       set_virtual_address_map;
+    unsigned long       convert_pointer;
+    unsigned long       get_variable;
+    unsigned long       get_next_variable;
+    unsigned long       set_variable;
+    unsigned long       get_next_high_mono_count;
+    efi_status_t        (efiapi *reset_system)(int, int, int);
+    unsigned long       update_capsule;
+    unsigned long       query_capsule_caps;
+    unsigned long       query_variable_info;
 } efi_runtime_services_t;
 
 typedef struct {
-    efi_guid_t  guid;
-    uint32_t    table;  
+    efi_guid_t          guid;
+    uint32_t            table;
 } efi32_config_table_t;
 
 typedef struct {
-    efi_guid_t  guid;  
-    uint64_t    table; 
-} efi64_config_table_t;   
+    efi_guid_t          guid;
+    uint64_t            table;
+} efi64_config_table_t;
 
 typedef struct {
-    efi_guid_t  guid;  
-    void       *table; 
-} efi_config_table_t;   
+    efi_guid_t          guid;
+    void                *table;
+} efi_config_table_t;
 
 typedef struct {
     efi_table_header_t  header;
-    uint32_t    fw_vendor;
-    uint32_t    fw_revision;
-    uint32_t    con_in_handle;
-    uint32_t    con_in;
-    uint32_t    con_out_handle;
-    uint32_t    con_out;
-    uint32_t    std_err_handle;
-    uint32_t    std_err;
-    uint32_t    runtime_services;
-    uint32_t    boot_services;
-    uint32_t    num_config_tables;
-    uint32_t    config_tables;
+    uint32_t            fw_vendor;
+    uint32_t            fw_revision;
+    uint32_t            con_in_handle;
+    uint32_t            con_in;
+    uint32_t            con_out_handle;
+    uint32_t            con_out;
+    uint32_t            std_err_handle;
+    uint32_t            std_err;
+    uint32_t            runtime_services;
+    uint32_t            boot_services;
+    uint32_t            num_config_tables;
+    uint32_t            config_tables;
 } efi32_system_table_t;
 
 typedef struct {
     efi_table_header_t  header;
-    uint64_t    fw_vendor;
-    uint32_t    fw_revision;
-    uint32_t    pad;
-    uint64_t    con_in_handle;
-    uint64_t    con_in;
-    uint64_t    con_out_handle;
-    uint64_t    con_out;
-    uint64_t    std_err_handle;
-    uint64_t    std_err;
-    uint64_t    runtime_services;
-    uint64_t    boot_services;
-    uint64_t    num_config_tables;
-    uint64_t    config_tables;
+    uint64_t            fw_vendor;
+    uint32_t            fw_revision;
+    uint32_t            pad;
+    uint64_t            con_in_handle;
+    uint64_t            con_in;
+    uint64_t            con_out_handle;
+    uint64_t            con_out;
+    uint64_t            std_err_handle;
+    uint64_t            std_err;
+    uint64_t            runtime_services;
+    uint64_t            boot_services;
+    uint64_t            num_config_tables;
+    uint64_t            config_tables;
 } efi64_system_table_t;
 
 typedef struct {
