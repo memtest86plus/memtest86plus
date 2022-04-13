@@ -124,6 +124,48 @@ static void wait_for_key(void)
 
     while (efi_call_proto(efi_table_attr(sys_table, con_in), read_key_stroke, &input_key) == EFI_NOT_READY) {}
 }
+
+static void test_frame_buffer(screen_info_t *si)
+{
+    uint32_t r_value = 0xffffffff >> (32 - si->red_size);
+    uint32_t g_value = 0;
+    uint32_t b_value = 0;
+
+    int pixel_size = (si->lfb_depth / 8);
+
+    union {
+        uint8_t     byte[4];
+        uint32_t    word;
+    } pixel_value;
+
+    pixel_value.word = (r_value << si->red_pos) | (g_value << si->green_pos) | (b_value << si->blue_pos);
+
+    uintptr_t lfb_base = si->lfb_base;
+#ifdef __x86_64__
+    if (LFB_CAPABILITY_64BIT_BASE & si->capabilities) {
+        lfb_base |= (uintptr_t)si->ext_lfb_base << 32;
+    }
+#endif
+
+    uint8_t *lfb_row = (uint8_t *)lfb_base;
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < si->lfb_width; x++) {
+            for (int b = 0; b < pixel_size; b++) {
+                lfb_row[x * pixel_size + b] = pixel_value.byte[b];
+            }
+        }
+        lfb_row += si->lfb_linelength;
+    }
+    lfb_row += (si->lfb_height - 16) * si->lfb_linelength;
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < si->lfb_width; x++) {
+            for (int b = 0; b < pixel_size; b++) {
+                lfb_row[x * pixel_size + b] = pixel_value.byte[b];
+            }
+        }
+        lfb_row += si->lfb_linelength;
+    }
+}
 #endif
 
 static efi_memory_desc_t *get_memory_desc(uintptr_t map_addr, size_t desc_size, size_t n)
@@ -448,6 +490,12 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 #endif
         return status;
     }
+
+#if DEBUG
+    test_frame_buffer(si);
+    print_string("Press any key to continue...\n");
+    wait_for_key();
+#endif
 
     return EFI_SUCCESS;
 }
