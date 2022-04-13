@@ -197,8 +197,8 @@ void screen_init(void)
         // This will produce a garbled display, but that's better than nothing.
         if (lfb_stride > 32768) {
             lfb_stride = 32768;
-            if (lfb_width > (lfb_stride / lfb_bytes_per_pixel)) {
-                lfb_width = (lfb_stride / lfb_bytes_per_pixel);
+            if (lfb_width > (int)(lfb_stride / lfb_bytes_per_pixel)) {
+                lfb_width = (int)(lfb_stride / lfb_bytes_per_pixel);
             }
         }
         if (lfb_height > 8192) lfb_height = 8192;
