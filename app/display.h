@@ -73,7 +73,7 @@
     prints(8, 7, "Core #"); \
     printi(8, 13, cpu_num, 3, false, true)
 
-#define display_all_active \
+#define display_all_active() \
     prints(8, 7, "All Cores")
 
 #define display_spinner(spin_state) \
@@ -181,6 +181,8 @@
     if (enable_trace) do_trace(my_cpu, __VA_ARGS__)
 
 extern int scroll_message_row;
+
+extern int display_mode;
 
 void display_init(void);
 
