@@ -95,7 +95,7 @@ void display_init(void)
     prints(4, 0, "L3 Cache:   N/A             | Testing: ");
     prints(5, 0, "Memory  :   N/A             | Pattern: ");
     prints(6, 0, "--------------------------------------------------------------------------------");
-    prints(7, 0, "CPU:                     SMP: N/A         | Time:           Status: Init. ");
+    prints(7, 0, "CPU:                      SMP: N/A        | Time:           Status: Init. ");
     prints(8, 0, "Using:                                    | Pass:           Errors: ");
     prints(9, 0, "--------------------------------------------------------------------------------");
 
@@ -137,6 +137,11 @@ void display_init(void)
     if (clks_per_msec) {
         display_cpu_clk((int)(clks_per_msec / 1000));
     }
+    if (cpuid_info.flags.lm) {
+        display_cpu_addr_mode("X64");
+    } else if (cpuid_info.flags.pae) {
+        display_cpu_addr_mode("PAE");
+    }
     if (l1_cache) {
         display_l1_cache_size(l1_cache);
     }
@@ -172,9 +177,9 @@ void display_cpu_topology(void)
     int num_cpu_sockets = 1;
 
     if(smp_enabled) {
-        printf(7,30, "%uT (%s)", num_enabled_cpus, cpu_mode_str[cpu_mode]);
+        display_threading(num_enabled_cpus, cpu_mode_str[cpu_mode]);
     } else {
-        prints(7,30, "Disabled");
+        display_threading_disabled();
     }
 
     // If topology failed, assume topology according to APIC
@@ -195,24 +200,30 @@ void display_cpu_topology(void)
         num_cpu_sockets  = num_enabled_cpus / cpuid_info.topology.thread_count;
     }
 
+
     // Temporary workaround for Hybrid CPUs.
     // TODO: run cpuid on each core to get correct P+E topology
     if(cpuid_info.topology.is_hybrid) {
-        printf(7, 5, "%u Threads (%s)", cpuid_info.topology.thread_count,
-                                        cpuid_info.flags.lm ? "X64" : "PAE");
+        display_cpu_topo_hybrid(cpuid_info.topology.thread_count);
         return;
     }
 
-    if(num_cpu_sockets < 2) {
-        printf(7, 5, "%uC/%uT (%s)", cpuid_info.topology.core_count,
-                                     cpuid_info.topology.thread_count,
-                                     cpuid_info.flags.lm ? "X64" : "PAE");
-    } else {
-        printf(7, 5, "%uS/%uC/%uT (%s)", num_cpu_sockets,
-                                         num_cpu_sockets * cpuid_info.topology.core_count,
-                                         num_cpu_sockets * cpuid_info.topology.thread_count,
-                                         cpuid_info.flags.lm ? "X64" : "PAE");
+    // Condensed display for multi-socket motherboard
+    if(num_cpu_sockets > 1) {
+        display_cpu_topo_multi_socket(num_cpu_sockets,
+                                      num_cpu_sockets * cpuid_info.topology.core_count,
+                                      num_cpu_sockets * cpuid_info.topology.thread_count);
+        return;
     }
+
+    if(cpuid_info.topology.thread_count < 100) {
+        display_cpu_topo(cpuid_info.topology.core_count,
+                         cpuid_info.topology.thread_count);
+    } else {
+        display_cpu_topo_short(cpuid_info.topology.core_count,
+                               cpuid_info.topology.thread_count);
+    }
+
 }
 
 void post_display_init(void)
@@ -222,23 +233,13 @@ void post_display_init(void)
 
     if(false) {
         // Try to get RAM information from IMC (TODO)
-        printf(8,0, "IMC: %uMHz (%s-%u) CAS %u-%u-%u-%u", ram.freq / 2
-                                                        , ram.type
-                                                        , ram.freq
-                                                        , ram.tCL
-                                                        , ram.tRCD
-                                                        , ram.tRP
-                                                        , ram.tRAS);
+        display_spec_mode("IMC: ");
+        display_spec(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
         display_mode = 2;
     } else if (ram.freq > 0 && ram.tCL > 1) {
         // If not available, grab max memory specs from SPD
-        printf(8,0, "RAM: %uMHz (%s-%u) CAS %u-%u-%u-%u", ram.freq / 2
-                                                        , ram.type
-                                                        , ram.freq
-                                                        , ram.tCL
-                                                        , ram.tRCD
-                                                        , ram.tRP
-                                                        , ram.tRAS);
+        display_spec_mode("RAM: ");
+        display_spec(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
         display_mode = 1;
     } else {
         // If nothing avilable, fallback to "Using Core" Display
