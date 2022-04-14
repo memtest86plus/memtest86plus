@@ -9,6 +9,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2004-2022 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -38,6 +39,9 @@
 #define display_cpu_clk(freq) \
     printf(1, 10, "%iMHz", freq)
 
+#define display_cpu_addr_mode(str) \
+    prints(5, 76, str)
+
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size));
 
@@ -64,6 +68,31 @@
 
 #define display_status(status) \
     prints(7, 68, status)
+
+#define display_threading(nb, mode) \
+    printf(7,31, "%uT (%s)", nb, mode);
+
+#define display_threading_disabled() \
+    prints(7,31, "Disabled");
+
+#define display_cpu_topo_hybrid(nb) \
+    printf(7, 5, "%u Threads (Hybrid)", nb);
+
+#define display_cpu_topo_multi_socket(nbs, nbc, nbt) \
+    printf(7, 5, "%uS / %uC / %uT", nbs, nbc, nbt);
+
+#define display_cpu_topo(nbc, nbt) \
+    printf(7, 5, "%u Cores %u Threads", nbc, nbt);
+
+#define display_cpu_topo_short(nbc, nbt) \
+    printf(7, 5, "%u Cores (%uT)", nbc, nbt);
+
+#define display_spec_mode(mode) \
+    prints(8,0, mode);
+
+#define display_spec(freq, type, cl, rcd, rp, ras) \
+    printf(8,5, "%uMHz (%s-%u) CAS %u-%u-%u-%u", \
+                freq / 2, type, freq, cl, rcd, rp, ras);
 
 #define display_dmi_mb(sys_ma, sys_sku) \
     dmicol = prints(23, dmicol, sys_man); \
@@ -106,7 +135,7 @@
 #define display_test_addresses(pb, pe, total) \
     { \
         clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
-        printf(4, 39, "%kB - %kB    %kB of %kB", pb, pe, (pe) - (pb), total); \
+        printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
     }
 
 #define display_test_stage_description(...) \
