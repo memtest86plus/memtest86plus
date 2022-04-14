@@ -36,7 +36,7 @@
     prints(0, 30, str)
 
 #define display_cpu_clk(freq) \
-    printf(1, 10, "%i MHz", freq)
+    printf(1, 10, "%iMHz", freq)
 
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size));
@@ -63,7 +63,7 @@
     printf(5, 18, "%S6kB/s", (uintptr_t)(size))
 
 #define display_status(status) \
-    prints(7, 67, status)
+    prints(7, 68, status)
 
 #define display_dmi_mb(sys_ma, sys_sku) \
     dmicol = prints(23, dmicol, sys_man); \
@@ -77,7 +77,7 @@
     prints(8, 7, "All Cores")
 
 #define display_spinner(spin_state) \
-    printc(7, 76, spin_state)
+    printc(7, 77, spin_state)
 
 #define display_pass_percentage(pct) \
     printi(1, 34, pct, 3, false, false)
@@ -134,16 +134,16 @@
     }
 
 #define display_run_time(hours, mins, secs) \
-    printf(7, 50, "%i:%02i:%02i", hours, mins, secs)
+    printf(7, 51, "%i:%02i:%02i", hours, mins, secs)
 
 #define display_temperature(temp, maxtemp) \
     printf(1, 20, "%2i/%2i%cC", temp, maxtemp, 0xf8)
 
 #define display_pass_count(count) \
-    printi(8, 50, count, 0, false, true)
+    printi(8, 51, count, 0, false, true)
 
 #define display_error_count(count) \
-    printi(8, 67, count, 0, false, true);
+    printi(8, 68, count, 0, false, true);
 
 #define clear_message_area() \
     { \

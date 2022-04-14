@@ -89,15 +89,15 @@ void display_init(void)
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
     prints(0,28,                             "| ");
-    prints(1, 0, "CLK/Temp: N/A               | Pass   % ");
-    prints(2, 0, "L1 Cache: N/A               | Test   % ");
-    prints(3, 0, "L2 Cache: N/A               | Test #   ");
-    prints(4, 0, "L3 Cache: N/A               | Testing: ");
-    prints(5, 0, "Memory  : N/A               | Pattern: ");
-    prints(6, 0, "-------------------------------------------------------------------------------");
-    prints(7, 0, "CPU:                     SMP: N/A        | Time:           Status: Init. ");
-    prints(8, 0, "Using:                                   | Pass:           Errors: ");
-    prints(9, 0, "-------------------------------------------------------------------------------");
+    prints(1, 0, "CLK/Temp:   N/A             | Pass   % ");
+    prints(2, 0, "L1 Cache:   N/A             | Test   % ");
+    prints(3, 0, "L2 Cache:   N/A             | Test #   ");
+    prints(4, 0, "L3 Cache:   N/A             | Testing: ");
+    prints(5, 0, "Memory  :   N/A             | Pattern: ");
+    prints(6, 0, "--------------------------------------------------------------------------------");
+    prints(7, 0, "CPU:                     SMP: N/A         | Time:           Status: Init. ");
+    prints(8, 0, "Using:                                    | Pass:           Errors: ");
+    prints(9, 0, "--------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
     // Disable if TTY is enabled to avoid VT100 char replacements
@@ -110,11 +110,11 @@ void display_init(void)
             print_char(i, 28, 0xb3);
         }
         for (int i = 7; i < 10; i++) {
-            print_char(i, 41, 0xb3);
+            print_char(i, 42, 0xb3);
         }
         print_char(6, 28, 0xc1);
-        print_char(6, 41, 0xc2);
-        print_char(9, 41, 0xc1);
+        print_char(6, 42, 0xc2);
+        print_char(9, 42, 0xc1);
     }
 
     set_foreground_colour(BLUE);
