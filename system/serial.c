@@ -184,8 +184,8 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
         }
 
         // Replace degree symbol with '*' for tty to avoid a C437/VT100 translation table.
-        if (row == 7 && col_len > 77 && (shadow_buffer[7][73].value & 0xFF) == 0xF8) {
-            p[73] = 0x2A;
+        if (row == 1 && (shadow_buffer[1][25].value & 0xFF) == 0xF8) {
+            p[25] = 0x2A;
         }
 
         // Send row to TTY

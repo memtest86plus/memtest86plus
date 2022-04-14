@@ -149,7 +149,8 @@ struct serial_port {
 
 #define tty_partial_redraw() \
     tty_send_region(1, 34, 5, 79); \
-    tty_send_region(7, 0, 8, 79);
+    tty_send_region(7, 0, 8, 79); \
+    if(enable_temperature) tty_send_region(1, 16, 1, 26);
 
 #define tty_error_redraw() \
     tty_send_region(10, 0, 23, 79);
