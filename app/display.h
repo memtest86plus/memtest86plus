@@ -46,7 +46,7 @@ typedef enum {
     printf(1, 10, "%iMHz", freq)
 
 #define display_cpu_addr_mode(str) \
-    prints(5, 76, str)
+    prints(4, 75, str)
 
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))
@@ -140,13 +140,13 @@ typedef enum {
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
         printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
         printf(4, 39, __VA_ARGS__); \
     }
 
