@@ -33,6 +33,12 @@
 
 #define ERROR_LIMIT     UINT64_C(999999999999)
 
+typedef enum {
+    DISPLAY_MODE_NA,
+    DISPLAY_MODE_SPD,
+    DISPLAY_MODE_IMC
+} display_mode_t;
+
 #define display_cpu_model(str) \
     prints(0, 30, str)
 
@@ -43,49 +49,49 @@
     prints(5, 76, str)
 
 #define display_l1_cache_size(size) \
-    printf(2, 9, "%6kB", (uintptr_t)(size));
+    printf(2, 9, "%6kB", (uintptr_t)(size))
 
 #define display_l2_cache_size(size) \
-    printf(3, 9, "%6kB", (uintptr_t)(size));
+    printf(3, 9, "%6kB", (uintptr_t)(size))
 
 #define display_l3_cache_size(size) \
-    printf(4, 9, "%6kB", (uintptr_t)(size));
+    printf(4, 9, "%6kB", (uintptr_t)(size))
 
 #define display_memory_size(size) \
-    printf(5, 9, "%6kB", (uintptr_t)(size));
+    printf(5, 9, "%6kB", (uintptr_t)(size))
 
-#define display_l1_cache_speed(size) \
-    printf(2, 18, "%S6kB/s", (uintptr_t)(size))
+#define display_l1_cache_speed(speed) \
+    printf(2, 18, "%S6kB/s", (uintptr_t)(speed))
 
-#define display_l2_cache_speed(size) \
-    printf(3, 18, "%S6kB/s", (uintptr_t)(size))
+#define display_l2_cache_speed(speed) \
+    printf(3, 18, "%S6kB/s", (uintptr_t)(speed))
 
-#define display_l3_cache_speed(size) \
-    printf(4, 18, "%S6kB/s", (uintptr_t)(size))
+#define display_l3_cache_speed(speed) \
+    printf(4, 18, "%S6kB/s", (uintptr_t)(speed))
 
-#define display_ram_speed(size) \
-    printf(5, 18, "%S6kB/s", (uintptr_t)(size))
+#define display_ram_speed(speed) \
+    printf(5, 18, "%S6kB/s", (uintptr_t)(speed))
 
 #define display_status(status) \
     prints(7, 68, status)
 
 #define display_threading(nb, mode) \
-    printf(7,31, "%uT (%s)", nb, mode);
+    printf(7,31, "%uT (%s)", nb, mode)
 
 #define display_threading_disabled() \
-    prints(7,31, "Disabled");
+    prints(7,31, "Disabled")
 
-#define display_cpu_topo_hybrid(nb) \
-    printf(7, 5, "%u Threads (Hybrid)", nb);
+#define display_cpu_topo_hybrid(num_threads) \
+    printf(7, 5, "%u Threads (Hybrid)", num_threads)
 
-#define display_cpu_topo_multi_socket(nbs, nbc, nbt) \
-    printf(7, 5, "%uS / %uC / %uT", nbs, nbc, nbt);
+#define display_cpu_topo_multi_socket(num_sockets, num_cores, num_threads) \
+    printf(7, 5, "%uS / %uC / %uT", num_sockets, num_cores, num_threads)
 
-#define display_cpu_topo(nbc, nbt) \
-    printf(7, 5, "%u Cores %u Threads", nbc, nbt);
+#define display_cpu_topo( num_cores, num_threads) \
+    printf(7, 5, "%u Cores %u Threads", num_cores, num_threads)
 
-#define display_cpu_topo_short(nbc, nbt) \
-    printf(7, 5, "%u Cores (%uT)", nbc, nbt);
+#define display_cpu_topo_short( num_cores, num_threads) \
+    printf(7, 5, "%u Cores (%uT)",  num_cores, num_threads)
 
 #define display_spec_mode(mode) \
     prints(8,0, mode);
@@ -172,7 +178,7 @@
     printi(8, 51, count, 0, false, true)
 
 #define display_error_count(count) \
-    printi(8, 68, count, 0, false, true);
+    printi(8, 68, count, 0, false, true)
 
 #define clear_message_area() \
     { \
@@ -211,7 +217,7 @@
 
 extern int scroll_message_row;
 
-extern int display_mode;
+extern display_mode_t display_mode;
 
 void display_init(void);
 

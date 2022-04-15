@@ -346,11 +346,11 @@ static void test_all_windows(int my_cpu)
         if (!dummy_run) {
             if (parallel_test) {
                 num_active_cpus = num_enabled_cpus;
-                if(display_mode == 0) {
+                if(display_mode == DISPLAY_MODE_NA) {
                     display_all_active();
                 }
             } else {
-                if(display_mode == 0) {
+                if (display_mode == 0) {
                     display_active_cpu(my_cpu);
                 }
             }
