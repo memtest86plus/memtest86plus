@@ -137,11 +137,13 @@ void display_init(void)
     if (clks_per_msec) {
         display_cpu_clk((int)(clks_per_msec / 1000));
     }
+#if TESTWORD_WIDTH < 64
     if (cpuid_info.flags.lm) {
-        display_cpu_addr_mode("X64");
+        display_cpu_addr_mode(" [LM]");
     } else if (cpuid_info.flags.pae) {
-        display_cpu_addr_mode("PAE");
+        display_cpu_addr_mode("[PAE]");
     }
+#endif
     if (l1_cache) {
         display_l1_cache_size(l1_cache);
     }
@@ -281,7 +283,9 @@ void display_start_pass(void)
 
 void display_start_test(void)
 {
-    clear_screen_region(2, 39, 5, SCREEN_WIDTH - 1);    // progress bar, test details
+    clear_screen_region(2, 39, 3, SCREEN_WIDTH - 1);    // progress bar, test details
+    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6);    // Avoid erasing paging mode
+    clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1);
     clear_screen_region(3, 36, 3, 37);                  // test number
     display_test_percentage(0);
     display_test_number(test_num);
