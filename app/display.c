@@ -66,9 +66,9 @@ static bool timed_update_done = false;  // update cycle status
 
 int scroll_message_row;
 
-int display_mode = 0; // RAM Info from: 0 = N/A - 1 = SPD - 2 = IMC
-
 int max_cpu_temp = 0;
+
+display_mode_t display_mode = DISPLAY_MODE_NA;
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -176,14 +176,14 @@ void display_cpu_topology(void)
     extern int num_enabled_cpus;
     int num_cpu_sockets = 1;
 
-    if(smp_enabled) {
+    if (smp_enabled) {
         display_threading(num_enabled_cpus, cpu_mode_str[cpu_mode]);
     } else {
         display_threading_disabled();
     }
 
     // If topology failed, assume topology according to APIC
-    if(cpuid_info.topology.core_count <= 0) {
+    if (cpuid_info.topology.core_count <= 0) {
 
         cpuid_info.topology.core_count = num_enabled_cpus;
         cpuid_info.topology.thread_count = num_enabled_cpus;
@@ -194,7 +194,7 @@ void display_cpu_topology(void)
     }
 
     // Compute number of sockets according to individual CPU core count
-    if(num_enabled_cpus > cpuid_info.topology.thread_count &&
+    if (num_enabled_cpus > cpuid_info.topology.thread_count &&
        num_enabled_cpus % cpuid_info.topology.thread_count == 0) {
 
         num_cpu_sockets  = num_enabled_cpus / cpuid_info.topology.thread_count;
@@ -203,20 +203,20 @@ void display_cpu_topology(void)
 
     // Temporary workaround for Hybrid CPUs.
     // TODO: run cpuid on each core to get correct P+E topology
-    if(cpuid_info.topology.is_hybrid) {
+    if (cpuid_info.topology.is_hybrid) {
         display_cpu_topo_hybrid(cpuid_info.topology.thread_count);
         return;
     }
 
     // Condensed display for multi-socket motherboard
-    if(num_cpu_sockets > 1) {
+    if (num_cpu_sockets > 1) {
         display_cpu_topo_multi_socket(num_cpu_sockets,
                                       num_cpu_sockets * cpuid_info.topology.core_count,
                                       num_cpu_sockets * cpuid_info.topology.thread_count);
         return;
     }
 
-    if(cpuid_info.topology.thread_count < 100) {
+    if (cpuid_info.topology.thread_count < 100) {
         display_cpu_topo(cpuid_info.topology.core_count,
                          cpuid_info.topology.thread_count);
     } else {
@@ -231,19 +231,19 @@ void post_display_init(void)
     print_smbios_startup_info();
     print_smbus_startup_info();
 
-    if(false) {
+    if (false) {
         // Try to get RAM information from IMC (TODO)
         display_spec_mode("IMC: ");
         display_spec(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
-        display_mode = 2;
+        display_mode = DISPLAY_MODE_IMC;
     } else if (ram.freq > 0 && ram.tCL > 1) {
         // If not available, grab max memory specs from SPD
         display_spec_mode("RAM: ");
         display_spec(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
-        display_mode = 1;
+        display_mode = DISPLAY_MODE_SPD;
     } else {
-        // If nothing avilable, fallback to "Using Core" Display
-        display_mode = 0;
+        // If nothing available, fallback to "Using Core" Display
+        display_mode = DISPLAY_MODE_NA;
     }
 }
 
@@ -331,7 +331,7 @@ void scroll(void)
         scroll_message_row++;
     } else {
         if (scroll_lock) {
-            display_footer_message("<Enter> Single step");
+            display_footer_message("<Enter> Single step     ");
         }
         scroll_wait = true;
         do {

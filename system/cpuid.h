@@ -139,7 +139,7 @@ typedef struct {
     int     is_hybrid;
     int     ecore_count;
     int     pcore_count;
-} topology_t;
+} cpuid_topology_t;
 
 typedef struct {
     uint32_t                max_cpuid;
@@ -152,7 +152,7 @@ typedef struct {
     cpuid_brand_string_t    brand_id;
     cpuid_cache_info_t      cache_info;
     cpuid_custom_features   custom;
-    topology_t              topology;
+    cpuid_topology_t        topology;
 } cpuid_info_t;
 
 typedef union {

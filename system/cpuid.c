@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 #include "cpuid.h"
-#include "display.h"
 
 //------------------------------------------------------------------------------
 // Public Variables
