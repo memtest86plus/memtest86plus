@@ -25,6 +25,7 @@ unsigned short smbusbase;
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
 
+static spd_info parse_spd_rdram (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx);
@@ -41,6 +42,10 @@ static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 
 static const struct pci_smbus_controller smbcontrollers[] = {
+    {0x8086, 0x2413, "82801AA (ICH)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2423, "82801AB (ICH)",           ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2443, "82801BA (ICH2)",          ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2483, "82801CA (ICH3)",          ich5_get_smb, ich5_read_spd_byte},
     {0x8086, 0x24C3, "82801DB (ICH4)",          ich5_get_smb, ich5_read_spd_byte},
     {0x8086, 0x24D3, "82801E (ICH5)",           ich5_get_smb, ich5_read_spd_byte},
     {0x8086, 0x25A4, "6300ESB",                 ich5_get_smb, ich5_read_spd_byte},
@@ -109,6 +114,7 @@ void print_smbus_startup_info(void) {
 
     spd_info curspd;
     ram.freq = 0;
+    curspd.isValid = false;
 
     index = find_smb_controller();
 
@@ -121,7 +127,6 @@ void print_smbus_startup_info(void) {
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
 
         if (get_spd(index, spdidx, 0) != 0xFF) {
-
             switch(get_spd(index, spdidx, 2))
             {
                 default:
@@ -140,6 +145,11 @@ void print_smbus_startup_info(void) {
                     break;
                 case 0x07: // DDR
                     curspd = parse_spd_ddr(index, spdidx);
+                    break;
+                case 0x01: // RAMBUS - RDRAM
+                    if (get_spd(index, spdidx, 1) == 8) {
+                        curspd = parse_spd_rdram(index, spdidx);
+                    }
                     break;
             }
 
@@ -922,6 +932,103 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
     spdi.tRP= (uint16_t)(tns/tckns);
 
     spdi.tRAS = (uint16_t)(get_spd(smb_idx, slot_idx, 30)/tckns);
+    spdi.tRC = 0;
+
+    // Module manufacturer
+    uint8_t contcode;
+    for (contcode = 64; contcode < 72; contcode++) {
+        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+            break;
+        }
+    }
+
+    spdi.jedec_code = (contcode - 64) << 8;
+    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+
+    // Module SKU
+    uint8_t sku_byte;
+    for (int j = 0; j < 18; j++) {
+        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+
+        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+            spdi.sku_len--;
+            break;
+        } else {
+            spdi.sku[j] = sku_byte;
+            spdi.sku_len++;
+        }
+    }
+
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
+    spdi.fab_year = bcd - 6 * (bcd >> 4);
+
+    bcd = get_spd(smb_idx, slot_idx, 94);
+    spdi.fab_week = bcd - 6 * (bcd >> 4);
+
+    spdi.isValid = true;
+
+    return spdi;
+}
+
+static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
+{
+    spd_info spdi;
+
+    spdi.isValid = false;
+    spdi.type = "RDRAM";
+    spdi.slot_num = slot_idx;
+    spdi.sku_len = 0;
+    spdi.XMP = 0;
+
+    // Compute module size in MB
+    uint8_t tbyte = get_spd(smb_idx, slot_idx, 5);
+    switch(tbyte) {
+        case 0x84:
+            spdi.module_size = 8;
+            break;
+        case 0xC5:
+            spdi.module_size = 16;
+            break;
+        default:
+            return spdi;
+    }
+
+    spdi.module_size *= get_spd(smb_idx, slot_idx, 99);
+
+    tbyte = get_spd(smb_idx, slot_idx, 4);
+    if(tbyte > 0x96) {
+        spdi.module_size *= 1 + (((tbyte & 0xF0) >> 4) - 9) + ((tbyte & 0xF) - 6);
+    }
+
+    spdi.hasECC = (get_spd(smb_idx, slot_idx, 100) == 0x12) ? true : false;
+
+    // Module speed
+    tbyte = get_spd(smb_idx, slot_idx, 15);
+    switch(tbyte) {
+        case 0x1A:
+            spdi.freq = 600;
+            break;
+        case 0x15:
+            spdi.freq = 711;
+            break;
+        case 0x13:
+            spdi.freq = 800;
+            break;
+        case 0xe:
+            spdi.freq = 1066;
+            break;
+        case 0xc:
+            spdi.freq = 1200;
+            break;
+        default:
+            return spdi;
+    }
+
+    // Module Timings
+    spdi.tCL = get_spd(smb_idx, slot_idx, 14);
+    spdi.tRCD = get_spd(smb_idx, slot_idx, 12);
+    spdi.tRP= get_spd(smb_idx, slot_idx, 10);
+    spdi.tRAS = get_spd(smb_idx, slot_idx, 11);
     spdi.tRC = 0;
 
     // Module manufacturer
