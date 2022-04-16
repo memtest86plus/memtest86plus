@@ -21,7 +21,8 @@ static const efi_guid_t SMBIOS2_GUID = { 0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16
 // SMBIOS v3 compliant FW must include an SMBIOS v2 table, but maybe parse SM3 table later...
 // static const efi_guid_t SMBIOS3_GUID = { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} };
 
-struct system_map *dmi_system_info;
+struct system_info *dmi_system_info;
+struct baseboard_info *dmi_baseboard_info;
 struct mem_dev *dmi_memory_device;
 
 static char * get_tstruct_string(struct tstruct_header * header, uint16_t maxlen, int n) {
@@ -115,7 +116,8 @@ static int parse_dmi(uint16_t numstructs) {
     const uint8_t * dmi = table_start;
     int tstruct_count = 0;
 
-    if (table_length < sizeof(struct system_map) + 2) {
+    // Struct type 1 is one of the mandatory types, so we're dealing with invalid data if its size is lower than that of a minimal type 1 struct (plus a couple bytes).
+    if (table_length < sizeof(struct system_info)) {
         return -1;
     }
 
@@ -123,10 +125,15 @@ static int parse_dmi(uint16_t numstructs) {
     while (dmi < table_start + table_length - 2) { // -2 for header type and length.
         const struct tstruct_header * header = (struct tstruct_header *) dmi;
 
+        // Type 1 - System Information
+        if (header->type == 1 && header->length > offsetof(struct system_info, wut)) {
+            // Multiple type 1 structs are not allowed by the standard. Still, effectively pick up the last one.
+            dmi_system_info = (struct system_info *) dmi;
+        }
         // Type 2 - Baseboard Information
-        if (header->type == 2 && header->length > offsetof(struct system_map, serialnumber)) {
+        else if (header->type == 2 && header->length > offsetof(struct baseboard_info, serialnumber)) {
             // Multiple type 2 structs are allowed by the standard. Effectively pick up the last one.
-            dmi_system_info = (struct system_map *) dmi;
+            dmi_baseboard_info = (struct baseboard_info *) dmi;
         }
         // Type 17 - Memory Device
         else if (header->type == 17 && header->length > offsetof(struct mem_dev, partnum)) {
@@ -137,6 +144,7 @@ static int parse_dmi(uint16_t numstructs) {
 
         if (dmi >= table_start + table_length) {
             dmi_system_info = NULL;
+            dmi_baseboard_info = NULL;
             return -1;
         }
 
@@ -148,6 +156,7 @@ static int parse_dmi(uint16_t numstructs) {
 
         if ((dmi > table_start + table_length) || (++tstruct_count > numstructs)) {
             dmi_system_info = NULL;
+            dmi_baseboard_info = NULL;
             return -1;
         }
     }
@@ -194,16 +203,20 @@ int smbios_init(void) {
 }
 
 void print_smbios_startup_info(void) {
-    if (dmi_system_info != NULL) {
+    // Use baseboard info (struct type 2) as primary source of information, and fall back to system info (struct type 1).
+    // Indeed, while the latter may contain less useful information than the former, its presence is mandated by the successive revisions of the SMBIOS standard.
+    // NOTE: we can get away with this ugly cast because the offsets of .manufacturer and .productname are the same in system_info and baseboard_info.
+    struct system_info * ptr = dmi_baseboard_info != NULL ? (struct system_info *)dmi_baseboard_info : dmi_system_info;
+    if (ptr != NULL) {
         char * sys_man, * sys_sku;
 
         int sl1, sl2, dmicol;
 
-        sys_man = get_tstruct_string(&dmi_system_info->header, table_length - ((uint8_t *)&dmi_system_info->header - (uint8_t *)table_start), dmi_system_info->manufacturer);
+        sys_man = get_tstruct_string(&ptr->header, table_length - ((uint8_t *)&ptr->header - (uint8_t *)table_start), ptr->manufacturer);
         if (sys_man != NULL) {
             sl1 = strlen(sys_man);
 
-            sys_sku = get_tstruct_string(&dmi_system_info->header, table_length - ((uint8_t *)&dmi_system_info->header - (uint8_t *)table_start), dmi_system_info->productname);
+            sys_sku = get_tstruct_string(&ptr->header, table_length - ((uint8_t *)&ptr->header - (uint8_t *)table_start), ptr->productname);
             if (sys_sku != NULL) {
                 sl2 = strlen(sys_sku);
 
