@@ -67,8 +67,6 @@
 
 static volatile int     init_state = 0;
 
-static int              num_enabled_cpus = 1;
-
 static uintptr_t        low_load_addr;
 static uintptr_t        high_load_addr;
 
@@ -100,6 +98,7 @@ efi_info_t  saved_efi_info;
 uint8_t     chunk_index[MAX_CPUS];
 
 int         num_active_cpus = 0;
+int         num_enabled_cpus = 1;
 
 int         master_cpu = 0;
 
@@ -230,8 +229,6 @@ static void global_init(void)
 
     clear_message_area();
 
-    display_available_cpus(num_available_cpus);
-
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
@@ -239,14 +236,14 @@ static void global_init(void)
             num_enabled_cpus++;
         }
     }
-    display_enabled_cpus(num_enabled_cpus);
+    display_cpu_topology();
 
     master_cpu = 0;
 
     if (enable_temperature) {
         int temp = get_cpu_temperature();
         if (temp > 0) {
-            display_temperature(temp);
+            display_temperature(temp, temp);
         } else {
             enable_temperature = false;
             no_temperature = true;
@@ -349,9 +346,13 @@ static void test_all_windows(int my_cpu)
         if (!dummy_run) {
             if (parallel_test) {
                 num_active_cpus = num_enabled_cpus;
-                display_all_active;
+                if(display_mode == DISPLAY_MODE_NA) {
+                    display_all_active();
+                }
             } else {
-                display_active_cpu(my_cpu);
+                if (display_mode == 0) {
+                    display_active_cpu(my_cpu);
+                }
             }
         }
         barrier_reset(run_barrier, num_active_cpus);
@@ -627,6 +628,7 @@ void main(void)
         if (!dummy_run) {
             display_pass_count(pass_num);
             if (error_count == 0) {
+                display_status("Pass   ");
                 display_notice("** Pass completed, no errors **");
             }
         }

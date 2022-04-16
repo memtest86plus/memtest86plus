@@ -105,18 +105,21 @@ startup:
 
 	# ...and check if the processor supports long mode.
 
-	pushl	%ebx			# ebx is overwritten by cpuid
 	movl	$0x80000000, %eax	# check if function 0x80000001 is available
+	pushl	%ebx			# ebx is overwritten by cpuid
 	cpuid
+	popl	%ebx			# restore ebx
 	cmpl	$0x80000001, %eax
 	jb	1f
 	movl	$0x80000001, %eax	# test the LM flag
+	pushl	%ebx			# ebx is overwritten by cpuid
 	cpuid
-	andl	$0x20000000, %edx
 	popl	%ebx			# restore ebx
+	andl	$0x20000000, %edx
 	jz	1f
 	movl	$1, use_long_mode@GOTOFF(%ebx)
 1:
+
 	# Pick the correct stack.
 
 	call	smp_my_cpu_num

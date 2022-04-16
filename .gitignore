@@ -7,6 +7,9 @@
 # Object files
 *.o
 
+# Generated file
+githash.h
+
 # Binaries
 memtest_shared
 memtest_shared.bin
@@ -20,3 +23,5 @@ memtest_shared.bin
 grub-iso
 html
 latex
+
+

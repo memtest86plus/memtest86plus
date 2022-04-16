@@ -63,7 +63,6 @@ typedef struct spd_infos {
     bool        isValid;
     uint32_t    module_size;
     uint8_t     slot_num;
-    char        *type;
     uint16_t    jedec_code;
     char        sku[32];
     uint8_t     sku_len;
@@ -72,7 +71,24 @@ typedef struct spd_infos {
     bool        hasECC;
     uint8_t     fab_year;
     uint8_t     fab_week;
+    uint16_t    tCL;
+    uint16_t    tRCD;
+    uint16_t    tRP;
+    uint16_t    tRAS;
+    uint16_t    tRC;
+    char        *type;
 } spd_info;
+
+typedef struct ram_infos {
+    uint16_t    freq;
+    uint16_t    tCL;
+    uint16_t    tRCD;
+    uint16_t    tRP;
+    uint16_t    tRAS;
+    char        *type;
+} ram_info;
+
+extern ram_info ram;
 
 #define get_spd(smb_idx, slot_idx, spd_adr) \
     smbcontrollers[smb_idx].read_spd_byte(slot_idx, spd_adr)

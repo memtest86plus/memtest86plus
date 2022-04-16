@@ -24,6 +24,9 @@
 
 #define MAP_BUFFER_HEADROOM     8       // number of descriptors
 
+#define MIN_H_RESOLUTION        640     // as required by our main display
+#define MIN_V_RESOLUTION        400
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -120,6 +123,48 @@ static void wait_for_key(void)
     efi_input_key_t input_key;
 
     while (efi_call_proto(efi_table_attr(sys_table, con_in), read_key_stroke, &input_key) == EFI_NOT_READY) {}
+}
+
+static void test_frame_buffer(screen_info_t *si)
+{
+    uint32_t r_value = 0xffffffff >> (32 - si->red_size);
+    uint32_t g_value = 0;
+    uint32_t b_value = 0;
+
+    int pixel_size = (si->lfb_depth / 8);
+
+    union {
+        uint8_t     byte[4];
+        uint32_t    word;
+    } pixel_value;
+
+    pixel_value.word = (r_value << si->red_pos) | (g_value << si->green_pos) | (b_value << si->blue_pos);
+
+    uintptr_t lfb_base = si->lfb_base;
+#ifdef __x86_64__
+    if (LFB_CAPABILITY_64BIT_BASE & si->capabilities) {
+        lfb_base |= (uintptr_t)si->ext_lfb_base << 32;
+    }
+#endif
+
+    uint8_t *lfb_row = (uint8_t *)lfb_base;
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < si->lfb_width; x++) {
+            for (int b = 0; b < pixel_size; b++) {
+                lfb_row[x * pixel_size + b] = pixel_value.byte[b];
+            }
+        }
+        lfb_row += si->lfb_linelength;
+    }
+    lfb_row += (si->lfb_height - 16) * si->lfb_linelength;
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < si->lfb_width; x++) {
+            for (int b = 0; b < pixel_size; b++) {
+                lfb_row[x * pixel_size + b] = pixel_value.byte[b];
+            }
+        }
+        lfb_row += si->lfb_linelength;
+    }
 }
 #endif
 
@@ -249,37 +294,61 @@ static void get_bit_range(uint32_t mask, uint8_t *pos, uint8_t *size)
     *size = length;
 }
 
-static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size)
+static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_size)
 {
     efi_status_t status;
 
-    efi_graphics_output_protocol_t *gop = NULL;
+    efi_graphics_output_t *first_gop = NULL;
     for (int i = 0; i < efi_get_num_handles(handles_size); i++) {
         efi_handle_t handle = efi_get_handle_at(handles, i);
 
-        efi_graphics_output_protocol_t *current_gop = NULL;
-        status = efi_call_bs(handle_protocol, handle, &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, (void **)&current_gop);
+        efi_graphics_output_t *gop = NULL;
+        status = efi_call_bs(handle_protocol, handle, &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, (void **)&gop);
         if (status != EFI_SUCCESS) {
             continue;
         }
 
-        void *con_out = NULL;
-        status = efi_call_bs(handle_protocol, handle, &EFI_CONSOLE_OUT_DEVICE_GUID, &con_out);
+        efi_gop_mode_t      *mode = efi_table_attr(gop,  mode);
+        efi_gop_mode_info_t *info = efi_table_attr(mode, info);
 
-        efi_gop_mode_t      *current_mode = efi_table_attr(current_gop,  mode);
-        efi_gop_mode_info_t *current_info = efi_table_attr(current_mode, info);
+        // BLT is not available after we call ExitBootServices().
+        if (info->pixel_format == PIXEL_BLT_ONLY) {
+            continue;
+        }
+
+#if DEBUG
+        print_string("Found GOP with ");
+        print_dec(mode->max_mode);
+        print_string(" modes\n");
+#endif
 
         // Systems that use the UEFI Console Splitter may provide multiple GOP
         // devices, not all of which are backed by real hardware. The workaround
         // is to search for a GOP implementing the ConOut protocol, and if one
         // isn't found, to just fall back to the first GOP.
-        if ((!gop || con_out) && current_info->pixel_format != PIXEL_BLT_ONLY) {
-            gop = current_gop;
-            if (con_out) {
-                break;
-            }
+
+        void *con_out = NULL;
+        status = efi_call_bs(handle_protocol, handle, &EFI_CONSOLE_OUT_DEVICE_GUID, &con_out);
+        if (status == EFI_SUCCESS) {
+#if DEBUG
+            print_string("This GOP implements the ConOut protocol\n");
+#endif
+            return gop;
+        }
+
+        if (first_gop == NULL) {
+            first_gop = gop;
         }
     }
+
+    return first_gop;
+}
+
+static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size)
+{
+    efi_status_t status;
+
+    efi_graphics_output_t *gop = find_gop(handles, handles_size);
     if (!gop) {
 #if DEBUG
         print_string("GOP not found\n");
@@ -287,15 +356,43 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         return EFI_NOT_FOUND;
     }
 
-    efi_gop_mode_t      *mode = efi_table_attr(gop,  mode);
-    efi_gop_mode_info_t *info = efi_table_attr(mode, info);
+    efi_gop_mode_t *mode = efi_table_attr(gop, mode);
+
+    efi_gop_mode_info_t best_info;
+    best_info.h_resolution = UINT32_MAX;
+    best_info.v_resolution = UINT32_MAX;
+
+    uint32_t best_mode = UINT32_MAX;
+    for (uint32_t mode_num = 0; mode_num < mode->max_mode; mode_num++) {
+        efi_gop_mode_info_t *info;
+        uintn_t              info_size;
+        status = efi_call_proto(gop, query_mode, mode_num, &info_size, &info);
+        if (status != EFI_SUCCESS) {
+            continue;
+        }
+
+        if (info->h_resolution >= MIN_H_RESOLUTION
+         && info->v_resolution >= MIN_V_RESOLUTION
+         && info->h_resolution < best_info.h_resolution) {
+            best_mode = mode_num;
+            best_info = *info;
+        }
+
+        efi_call_bs(free_pool, info);
+    }
+    if (best_mode == UINT32_MAX) {
+#if DEBUG
+        print_string("No suitable GOP screen resolution\n");
+#endif
+        return EFI_NOT_FOUND;
+    }
 
     efi_phys_addr_t  lfb_base = efi_table_attr(mode, frame_buffer_base);
 
     si->orig_video_isVGA = VIDEO_TYPE_EFI;
 
-    si->lfb_width  = info->h_resolution;
-    si->lfb_height = info->v_resolution;
+    si->lfb_width  = best_info.h_resolution;
+    si->lfb_height = best_info.v_resolution;
     si->lfb_base   = lfb_base;
 #ifdef __x86_64__
     if (lfb_base >> 32) {
@@ -304,13 +401,13 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     }
 #endif
 
-    switch (info->pixel_format) {
+    switch (best_info.pixel_format) {
       case PIXEL_RGB_RESERVED_8BIT_PER_COLOR:
 #if DEBUG
         print_string("RGB32 mode\n");
 #endif
         si->lfb_depth       = 32;
-        si->lfb_linelength  = info->pixels_per_scan_line * 4;
+        si->lfb_linelength  = best_info.pixels_per_scan_line * 4;
         si->red_size        = 8;
         si->red_pos         = 0;
         si->green_size      = 8;
@@ -325,7 +422,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         print_string("BGR32 mode\n");
 #endif
         si->lfb_depth       = 32;
-        si->lfb_linelength  = info->pixels_per_scan_line * 4;
+        si->lfb_linelength  = best_info.pixels_per_scan_line * 4;
         si->red_size        = 8;
         si->red_pos         = 16;
         si->green_size      = 8;
@@ -339,12 +436,12 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 #if DEBUG
         print_string("Bit mask mode\n");
 #endif
-        get_bit_range(info->pixel_info.red_mask,   &si->red_pos,   &si->red_size);
-        get_bit_range(info->pixel_info.green_mask, &si->green_pos, &si->green_size);
-        get_bit_range(info->pixel_info.blue_mask,  &si->blue_pos,  &si->blue_size);
-        get_bit_range(info->pixel_info.rsvd_mask,  &si->rsvd_pos,  &si->rsvd_size);
+        get_bit_range(best_info.pixel_info.red_mask,   &si->red_pos,   &si->red_size);
+        get_bit_range(best_info.pixel_info.green_mask, &si->green_pos, &si->green_size);
+        get_bit_range(best_info.pixel_info.blue_mask,  &si->blue_pos,  &si->blue_size);
+        get_bit_range(best_info.pixel_info.rsvd_mask,  &si->rsvd_pos,  &si->rsvd_size);
         si->lfb_depth       = si->red_size + si->green_size + si->blue_size + si->rsvd_size;
-        si->lfb_linelength  = (info->pixels_per_scan_line * si->lfb_depth) / 8;
+        si->lfb_linelength  = (best_info.pixels_per_scan_line * si->lfb_depth) / 8;
         break;
       default:
 #if DEBUG
@@ -382,6 +479,20 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     print_string("FB stride : ");
     print_dec(si->lfb_linelength);
     print_string("\n");
+    print_string("Press any key to continue...\n");
+    wait_for_key();
+#endif
+
+    status = efi_call_proto(gop, set_mode, best_mode);
+    if (status != EFI_SUCCESS) {
+#if DEBUG
+        print_string("Set GOP mode failed\n");
+#endif
+        return status;
+    }
+
+#if DEBUG
+    test_frame_buffer(si);
     print_string("Press any key to continue...\n");
     wait_for_key();
 #endif

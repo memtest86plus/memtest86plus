@@ -9,6 +9,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2004-2022 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -32,14 +33,20 @@
 
 #define ERROR_LIMIT     UINT64_C(999999999999)
 
+typedef enum {
+    DISPLAY_MODE_NA,
+    DISPLAY_MODE_SPD,
+    DISPLAY_MODE_IMC
+} display_mode_t;
+
 #define display_cpu_model(str) \
     prints(0, 30, str)
 
 #define display_cpu_clk(freq) \
-    printf(1, 10, "%i MHz", freq)
+    printf(1, 10, "%iMHz", freq)
 
 #define display_cpu_addr_mode(str) \
-    prints(1, 20, str)
+    prints(4, 75, str)
 
 #define display_cpu_cache_mode() \
     if (!enable_cpucache) { \
@@ -47,51 +54,70 @@
     }
 
 #define display_l1_cache_size(size) \
-    printf(2, 10, "%kB", (uintptr_t)(size))
+    printf(2, 9, "%6kB", (uintptr_t)(size))
 
 #define display_l2_cache_size(size) \
-    printf(3, 10, "%kB", (uintptr_t)(size))
+    printf(3, 9, "%6kB", (uintptr_t)(size))
 
 #define display_l3_cache_size(size) \
-    printf(4, 10, "%kB", (uintptr_t)(size))
-
-#define display_l1_cache_speed(size) \
-    printf(2, 19, "%kB/s", (uintptr_t)(size))
-
-#define display_l2_cache_speed(size) \
-    printf(3, 19, "%kB/s", (uintptr_t)(size))
-
-#define display_l3_cache_speed(size) \
-    printf(4, 19, "%kB/s", (uintptr_t)(size))
-
-#define display_ram_speed(size) \
-    printf(5, 19, "%kB/s", (uintptr_t)(size))
+    printf(4, 9, "%6kB", (uintptr_t)(size))
 
 #define display_memory_size(size) \
-    printf(5, 10, "%kB", (uintptr_t)(size))
+    printf(5, 9, "%6kB", (uintptr_t)(size))
+
+#define display_l1_cache_speed(speed) \
+    printf(2, 18, "%S6kB/s", (uintptr_t)(speed))
+
+#define display_l2_cache_speed(speed) \
+    printf(3, 18, "%S6kB/s", (uintptr_t)(speed))
+
+#define display_l3_cache_speed(speed) \
+    printf(4, 18, "%S6kB/s", (uintptr_t)(speed))
+
+#define display_ram_speed(speed) \
+    printf(5, 18, "%S6kB/s", (uintptr_t)(speed))
+
+#define display_status(status) \
+    prints(7, 68, status)
+
+#define display_threading(nb, mode) \
+    printf(7,31, "%uT (%s)", nb, mode)
+
+#define display_threading_disabled() \
+    prints(7,31, "Disabled")
+
+#define display_cpu_topo_hybrid(num_threads) \
+    printf(7, 5, "%u Threads (Hybrid)", num_threads)
+
+#define display_cpu_topo_multi_socket(num_sockets, num_cores, num_threads) \
+    printf(7, 5, "%uS / %uC / %uT", num_sockets, num_cores, num_threads)
+
+#define display_cpu_topo( num_cores, num_threads) \
+    printf(7, 5, "%u Cores %u Threads", num_cores, num_threads)
+
+#define display_cpu_topo_short( num_cores, num_threads) \
+    printf(7, 5, "%u Cores (%uT)",  num_cores, num_threads)
+
+#define display_spec_mode(mode) \
+    prints(8,0, mode);
+
+#define display_spec(freq, type, cl, rcd, rp, ras) \
+    printf(8,5, "%uMHz (%s-%u) CAS %u-%u-%u-%u", \
+                freq / 2, type, freq, cl, rcd, rp, ras);
 
 #define display_dmi_mb(sys_ma, sys_sku) \
     dmicol = prints(23, dmicol, sys_man); \
     prints(23, dmicol + 1, sys_sku);
 
-#define display_available_cpus(count) \
-    printi(7, 10, count, 4, false, false)
-
-#define display_enabled_cpus(count) \
-    printi(7, 25, count, 4, false, false)
-
-#define display_cpu_mode(str) \
-    prints(8, 11, str)
-
 #define display_active_cpu(cpu_num) \
-    prints(8, 25, "core #"); \
-    printi(8, 31, cpu_num, 3, false, true)
+    prints(8, 7, "Core #"); \
+    printi(8, 13, cpu_num, 3, false, true)
 
-#define display_all_active \
-    prints(8, 25, "all cores")
+#define display_all_active() \
+    prints(8, 7, "All Cores")
 
 #define display_spinner(spin_state) \
-    printc(8, 36, spin_state)
+    printc(7, 77, spin_state)
 
 #define display_pass_percentage(pct) \
     printi(1, 34, pct, 3, false, false)
@@ -119,13 +145,13 @@
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
-        printf(4, 39, "%kB - %kB    %kB of %kB", pb, pe, (pe) - (pb), total); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
         printf(4, 39, __VA_ARGS__); \
     }
 
@@ -148,16 +174,16 @@
     }
 
 #define display_run_time(hours, mins, secs) \
-    printf(7, 47, "%i:%02i:%02i", hours, mins, secs)
+    printf(7, 51, "%i:%02i:%02i", hours, mins, secs)
 
-#define display_temperature(temp) \
-    printf(7, 71, "%2i%cC   ", temp, 0xf8)
+#define display_temperature(temp, maxtemp) \
+    printf(1, 20, "%2i/%2i%cC", temp, maxtemp, 0xf8)
 
 #define display_pass_count(count) \
-    printi(8, 47, count, 0, false, true)
+    printi(8, 51, count, 0, false, true)
 
 #define display_error_count(count) \
-    printi(8, 66, count, 0, false, true)
+    printi(8, 68, count, 0, false, true)
 
 #define clear_message_area() \
     { \
@@ -196,7 +222,11 @@
 
 extern int scroll_message_row;
 
+extern display_mode_t display_mode;
+
 void display_init(void);
+
+void display_cpu_topology(void);
 
 void post_display_init(void);
 

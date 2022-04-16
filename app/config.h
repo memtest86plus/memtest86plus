@@ -45,6 +45,8 @@ extern error_mode_t error_mode;
 
 extern cpu_state_t  cpu_state[MAX_CPUS];
 
+extern bool         smp_enabled;
+
 extern bool         enable_temperature;
 extern bool         enable_trace;
 extern bool         enable_cpucache;

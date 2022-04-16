@@ -21,6 +21,7 @@
 
 #include "config.h"
 #include "error.h"
+#include "githash.h"
 
 #include "tests.h"
 
@@ -35,6 +36,8 @@
 #define NUM_SPIN_STATES 4
 
 static const char spin_state[NUM_SPIN_STATES] = { '|', '/', '-', '\\' };
+
+static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -63,6 +66,10 @@ static bool timed_update_done = false;  // update cycle status
 
 int scroll_message_row;
 
+int max_cpu_temp = 0;
+
+display_mode_t display_mode = DISPLAY_MODE_NA;
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -73,26 +80,24 @@ void display_init(void)
 
     clear_screen();
 
-    set_foreground_colour(RED);
+    set_foreground_colour(BLACK);
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
-#if TESTWORD_WIDTH > 32
-    prints(0, 0, "  Memtest86+ v6.00pre (64b)");
-#else
-    prints(0, 0, "  Memtest86+ v6.00pre (32b)");
-#endif
+    prints(0, 0, "     Memtest86+ v6.00b1");
+    set_foreground_colour(RED);
+    printc(0, 14, '+');
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
     prints(0,28,                             "| ");
-    prints(1, 0, "CPU     : N/A               | Pass   % ");
-    prints(2, 0, "L1 Cache: N/A               | Test   % ");
-    prints(3, 0, "L2 Cache: N/A               | Test #   ");
-    prints(4, 0, "L3 Cache: N/A               | Testing: ");
-    prints(5, 0, "Memory  : N/A               | Pattern: ");
-    prints(6, 0, "-------------------------------------------------------------------------------");
-    prints(7, 0, "CPU cores:     available,     enabled  | Time:            Temperature: N/A ");
-    prints(8, 0, "Run mode : PAR    Using:               | Pass:            Errors: ");
-    prints(9, 0, "-------------------------------------------------------------------------------");
+    prints(1, 0, "CLK/Temp:   N/A             | Pass   % ");
+    prints(2, 0, "L1 Cache:   N/A             | Test   % ");
+    prints(3, 0, "L2 Cache:   N/A             | Test #   ");
+    prints(4, 0, "L3 Cache:   N/A             | Testing: ");
+    prints(5, 0, "Memory  :   N/A             | Pattern: ");
+    prints(6, 0, "--------------------------------------------------------------------------------");
+    prints(7, 0, "CPU:                      SMP: N/A        | Time:           Status: Init. ");
+    prints(8, 0, "Using:                                    | Pass:           Errors: ");
+    prints(9, 0, "--------------------------------------------------------------------------------");
 
     // Redraw lines using box drawing characters.
     // Disable if TTY is enabled to avoid VT100 char replacements
@@ -105,17 +110,24 @@ void display_init(void)
             print_char(i, 28, 0xb3);
         }
         for (int i = 7; i < 10; i++) {
-            print_char(i, 39, 0xb3);
+            print_char(i, 42, 0xb3);
         }
         print_char(6, 28, 0xc1);
-        print_char(6, 39, 0xc2);
-        print_char(9, 39, 0xc1);
+        print_char(6, 42, 0xc2);
+        print_char(9, 42, 0xc1);
     }
 
     set_foreground_colour(BLUE);
     set_background_colour(WHITE);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
-    prints(ROW_FOOTER, 0, " <ESC> exit  <F1> configuration  <Space> scroll lock");
+    prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
+    prints(ROW_FOOTER, 64, "6.00.");
+    prints(ROW_FOOTER, 69, GIT_HASH);
+#if TESTWORD_WIDTH > 32
+    prints(ROW_FOOTER, 76, ".x64");
+#else
+    prints(ROW_FOOTER, 76, ".x32");
+#endif
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
 
@@ -125,11 +137,13 @@ void display_init(void)
     if (clks_per_msec) {
         display_cpu_clk((int)(clks_per_msec / 1000));
     }
+#if TESTWORD_WIDTH < 64
     if (cpuid_info.flags.lm) {
-        display_cpu_addr_mode("(x64)");
+        display_cpu_addr_mode(" [LM]");
     } else if (cpuid_info.flags.pae) {
-        display_cpu_addr_mode("(PAE)");
+        display_cpu_addr_mode("[PAE]");
     }
+#endif
     display_cpu_cache_mode();
     if (l1_cache) {
         display_l1_cache_size(l1_cache);
@@ -160,10 +174,80 @@ void display_init(void)
     scroll_message_row = ROW_SCROLL_T;
 }
 
+void display_cpu_topology(void)
+{
+    extern int num_enabled_cpus;
+    int num_cpu_sockets = 1;
+
+    if (smp_enabled) {
+        display_threading(num_enabled_cpus, cpu_mode_str[cpu_mode]);
+    } else {
+        display_threading_disabled();
+    }
+
+    // If topology failed, assume topology according to APIC
+    if (cpuid_info.topology.core_count <= 0) {
+
+        cpuid_info.topology.core_count = num_enabled_cpus;
+        cpuid_info.topology.thread_count = num_enabled_cpus;
+
+        if(cpuid_info.flags.htt && num_enabled_cpus >= 2 && num_enabled_cpus % 2 == 0) {
+            cpuid_info.topology.core_count /= 2;
+        }
+    }
+
+    // Compute number of sockets according to individual CPU core count
+    if (num_enabled_cpus > cpuid_info.topology.thread_count &&
+       num_enabled_cpus % cpuid_info.topology.thread_count == 0) {
+
+        num_cpu_sockets  = num_enabled_cpus / cpuid_info.topology.thread_count;
+    }
+
+
+    // Temporary workaround for Hybrid CPUs.
+    // TODO: run cpuid on each core to get correct P+E topology
+    if (cpuid_info.topology.is_hybrid) {
+        display_cpu_topo_hybrid(cpuid_info.topology.thread_count);
+        return;
+    }
+
+    // Condensed display for multi-socket motherboard
+    if (num_cpu_sockets > 1) {
+        display_cpu_topo_multi_socket(num_cpu_sockets,
+                                      num_cpu_sockets * cpuid_info.topology.core_count,
+                                      num_cpu_sockets * cpuid_info.topology.thread_count);
+        return;
+    }
+
+    if (cpuid_info.topology.thread_count < 100) {
+        display_cpu_topo(cpuid_info.topology.core_count,
+                         cpuid_info.topology.thread_count);
+    } else {
+        display_cpu_topo_short(cpuid_info.topology.core_count,
+                               cpuid_info.topology.thread_count);
+    }
+
+}
+
 void post_display_init(void)
 {
     print_smbios_startup_info();
     print_smbus_startup_info();
+
+    if (false) {
+        // Try to get RAM information from IMC (TODO)
+        display_spec_mode("IMC: ");
+        display_spec(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
+        display_mode = DISPLAY_MODE_IMC;
+    } else if (ram.freq > 0 && ram.tCL > 1) {
+        // If not available, grab max memory specs from SPD
+        display_spec_mode("RAM: ");
+        display_spec(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
+        display_mode = DISPLAY_MODE_SPD;
+    } else {
+        // If nothing available, fallback to "Using Core" Display
+        display_mode = DISPLAY_MODE_NA;
+    }
 }
 
 void display_start_run(void)
@@ -172,9 +256,9 @@ void display_start_run(void)
         clear_message_area();
     }
 
-    clear_screen_region(7, 47, 7, 57);                  // run time
-    clear_screen_region(8, 47, 8, 57);                  // pass number
-    clear_screen_region(8, 66, 8, SCREEN_WIDTH - 1);    // error count
+    clear_screen_region(7, 49, 7, 57);                  // run time
+    clear_screen_region(8, 49, 8, 57);                  // pass number
+    clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
     display_pass_count(0);
     display_error_count(0);
     if (clks_per_msec > 0) {
@@ -183,6 +267,7 @@ void display_start_run(void)
         next_spin_time = run_start_time + SPINNER_PERIOD * clks_per_msec;
     }
     display_spinner('-');
+    display_status("Testing");
 
     if (enable_tty){
         tty_full_redraw();
@@ -199,7 +284,9 @@ void display_start_pass(void)
 
 void display_start_test(void)
 {
-    clear_screen_region(2, 39, 5, SCREEN_WIDTH - 1);    // progress bar, test details
+    clear_screen_region(2, 39, 3, SCREEN_WIDTH - 1);    // progress bar, test details
+    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6);    // Avoid erasing paging mode
+    clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1);
     clear_screen_region(3, 36, 3, 37);                  // test number
     display_test_percentage(0);
     display_test_number(test_num);
@@ -249,7 +336,7 @@ void scroll(void)
         scroll_message_row++;
     } else {
         if (scroll_lock) {
-            display_footer_message("<Enter> Single step");
+            display_footer_message("<Enter> Single step     ");
         }
         scroll_wait = true;
         do {
@@ -342,7 +429,15 @@ void do_tick(int my_cpu)
 
         // Update temperature one time per second
         if (enable_temperature) {
-            display_temperature(get_cpu_temperature());
+            int actual_cpu_temp = get_cpu_temperature();
+
+            if(max_cpu_temp < actual_cpu_temp ) {
+                max_cpu_temp = actual_cpu_temp;
+            }
+
+            if(actual_cpu_temp != 0) {
+                display_temperature(actual_cpu_temp, max_cpu_temp);
+            }
         }
 
         // Update TTY one time every TTY_UPDATE_PERIOD second(s)
