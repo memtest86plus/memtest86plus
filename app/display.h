@@ -49,8 +49,10 @@ typedef enum {
     prints(4, 75, str)
 
 #define display_cpu_cache_mode() \
-    if (!enable_cpucache) { \
-        prints(1, 25, " UC"); \
+    { \
+        if (!enable_cpu_cache) {   \
+            prints(1, 25, " UC");  \
+        } \
     }
 
 #define display_l1_cache_size(size) \

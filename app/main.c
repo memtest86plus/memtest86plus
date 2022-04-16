@@ -467,7 +467,7 @@ void main(void)
         my_cpu = smp_my_cpu_num();
     }
     if (init_state < 2) {
-        if (enable_cpucache) {
+        if (enable_cpu_cache) {
             cache_on();
         }
         else {

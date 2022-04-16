@@ -91,7 +91,7 @@ bool            smp_enabled        = true;
 
 bool            enable_temperature = true;
 bool            enable_trace       = false;
-bool            enable_cpucache    = true;
+bool            enable_cpu_cache   = true;
 
 bool            enable_sm          = true;
 bool            enable_bench       = true;
@@ -185,7 +185,7 @@ static void parse_option(const char *option, const char *params)
     } else if (strncmp(option, "nobench", 8) == 0) {
         enable_bench = false;
     } else if (strncmp(option, "nocpucache", 11) == 0) {
-        enable_cpucache = false;
+        enable_cpu_cache = false;
     } else if (strncmp(option, "noehci", 7) == 0) {
         usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nopause", 8) == 0) {
