@@ -143,6 +143,14 @@ void cpuid_init(void)
 
     int thread_per_core = 1;
 
+    // Set correct HTT flag according to AP-485
+    if (cpuid_info.max_cpuid >= 1 && cpuid_info.flags.htt) {
+        cpuid(1, 0,&reg[0], &reg[1], &reg[2], &reg[3]);
+        if(((reg[1] >> 16) & 0xFF) <= 1) {
+            cpuid_info.flags.htt = !cpuid_info.flags.htt;
+        }
+    }
+
     switch (cpuid_info.vendor_id.str[0]) {
       case 'A':
         // AMD Processors
