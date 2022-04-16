@@ -49,11 +49,7 @@ typedef enum {
     prints(4, 75, str)
 
 #define display_cpu_cache_mode() \
-    { \
-        if (!enable_cpu_cache) {   \
-            prints(1, 25, " UC");  \
-        } \
-    }
+    prints(2, 10, "Disabled")
 
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))

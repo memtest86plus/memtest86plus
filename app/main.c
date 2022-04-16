@@ -469,8 +469,7 @@ void main(void)
     if (init_state < 2) {
         if (enable_cpu_cache) {
             cache_on();
-        }
-        else {
+        } else {
             cache_off();
         }
         if (my_cpu == 0) {

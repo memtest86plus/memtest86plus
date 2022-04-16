@@ -144,8 +144,9 @@ void display_init(void)
         display_cpu_addr_mode("[PAE]");
     }
 #endif
-    display_cpu_cache_mode();
-    if (l1_cache) {
+    if (!enable_cpu_cache) {
+        display_cpu_cache_mode();
+    } else if (l1_cache) {
         display_l1_cache_size(l1_cache);
     }
     if (l2_cache) {
