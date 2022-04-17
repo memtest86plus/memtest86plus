@@ -156,7 +156,7 @@ esp.img: memtest.efi
 memtest.iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
 	cp floppy.img iso/boot/floppy.img
-	xorrisofs -pad -R -J -volid Memtest86+32 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
+	xorrisofs -pad -R -J -volid MT86PLUS_32 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /boot=./iso/boot /EFI=./iso/EFI
@@ -181,7 +181,7 @@ GRUB_FONT_DIR ?= /usr/share/grub
 
 GRUB_LIB_DIR ?= /usr/lib/grub
 
-GRUB_MKIMAGE ?= grub2-mkimage
+GRUB_MKIMAGE := $(shell command -v grub-mkimage2 || command -v grub-mkimage)
 
 GRUB_MODULES = iso9660 fat part_msdos all_video font gfxterm gfxmenu \
                boot chain configfile echo ls
@@ -200,7 +200,7 @@ grub-esp.img: memtest.efi grub-bootia32.efi ../grub/grub-efi.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
 	cp $(GRUB_LIB_DIR)/i386-efi/*.mod grub-iso/EFI/BOOT/grub/i386-efi/
 	@rm -f grub-esp.img
-	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C grub-esp.img 8192
+	/sbin/mkdosfs -n MT86P_ESP -F12 -C grub-esp.img 8192
 	mcopy -s -i grub-esp.img grub-iso/EFI ::
 
 grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/grub-legacy.cfg grub-esp.img
@@ -210,7 +210,7 @@ grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/grub-legacy.cfg grub-esp
 	cp ../grub/grub-legacy.cfg grub-iso/boot/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
 	cp $(GRUB_LIB_DIR)/i386-pc/*.mod grub-iso/boot/grub/i386-pc/
-	xorrisofs -pad -R -J -volid Memtest86+32 -graft-points -hide-rr-moved \
+	xorrisofs -pad -R -J -volid MT86PLUS_32 -graft-points -hide-rr-moved \
 		  --grub2-mbr $(GRUB_LIB_DIR)/i386-pc/boot_hybrid.img \
 		  -b /boot/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
 		  --efi-boot --interval:appended_partition_2:all:: \
