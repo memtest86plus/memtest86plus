@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 
 #include <stdint.h>
 
@@ -218,10 +218,10 @@ keyboard_types_t keyboard_types = KT_LEGACY | KT_USB;
 // Public Functions
 //------------------------------------------------------------------------------
 
-void keyboard_init(bool pause_at_end)
+void keyboard_init(void)
 {
     if (keyboard_types & KT_USB) {
-        find_usb_keyboards(pause_at_end);
+        find_usb_keyboards(keyboard_types == KT_USB);
     }
 }
 

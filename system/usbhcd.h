@@ -113,7 +113,8 @@ typedef struct usb_hcd_s {
 typedef enum {
     USB_DEFAULT_INIT    = 0,
     USB_EXTRA_RESET     = 1 << 0,
-    USB_IGNORE_EHCI     = 1 << 1
+    USB_IGNORE_EHCI     = 1 << 1,
+    USB_DEBUG           = 1 << 2
 } usb_init_options_t;
 
 /**
@@ -266,7 +267,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
  *
  * Used internally by keyboard.c.
  */
-void find_usb_keyboards(bool pause_at_end);
+void find_usb_keyboards(bool pause_if_none);
 
 /**
  * Polls the keyboards discovered by find_usb_keyboards. Consumes and returns

@@ -24,6 +24,8 @@
 
 #define MAX_USB_CONTROLLERS     8       // an arbitrary limit - must match the initialisation of usb_controllers
 
+#define PAUSE_IF_NONE_TIME      10      // seconds
+
 #define MILLISEC                1000    // in microseconds
 
 //------------------------------------------------------------------------------
@@ -681,7 +683,7 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
 // Public Functions
 //------------------------------------------------------------------------------
 
-void find_usb_keyboards(bool pause_at_end)
+void find_usb_keyboards(bool pause_if_none)
 {
     clear_screen();
     print_usb_info("Scanning for USB keyboards...");
@@ -738,9 +740,15 @@ void find_usb_keyboards(bool pause_at_end)
         }
     }
 
-    if (pause_at_end) {
+    if (usb_init_options & USB_DEBUG) {
         print_usb_info("Press any key to continue...");
         while (get_key() == 0) {}
+    } else if (pause_if_none && num_usb_controllers == 0) {
+        for (int i = PAUSE_IF_NONE_TIME; i > 0; i--) {
+            print_usb_info("No USB keyboards found. Continuing in %i second%c ", i, i == 1 ? ' ' : 's');
+            sleep(1);
+            print_row--; // overwrite message
+        }
     }
 }
 

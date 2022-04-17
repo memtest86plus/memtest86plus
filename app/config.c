@@ -191,6 +191,8 @@ static void parse_option(const char *option, const char *params)
         smp_enabled = true;
     } else if (strncmp(option, "trace", 6) == 0) {
         enable_trace = true;
+    } else if (strncmp(option, "usbdebug", 9) == 0) {
+        usb_init_options |= USB_DEBUG;
     } else if (strncmp(option, "nosm", 5) == 0) {
         enable_sm = false;
     }

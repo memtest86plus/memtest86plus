@@ -35,7 +35,7 @@ extern keyboard_types_t keyboard_types;
 /**
  * Initialises the keyboard interface.
  */
-void keyboard_init(bool pause_at_end);
+void keyboard_init(void);
 
 /**
  * Checks if a key has been pressed and returns the primary ASCII character
