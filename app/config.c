@@ -883,7 +883,7 @@ void initial_config(void)
     bool smp_init_done = false;
     if (pause_at_start) {
         bool got_key = false;
-        for (int i = 0; i < 5000 && !got_key; i++) {
+        for (int i = 0; i < 3000 && !got_key; i++) {
             usleep(1000);
             switch (get_key()) {
               case ESC:
