@@ -26,6 +26,8 @@
 
 #define MILLISEC                1000    // in microseconds
 
+#define MAX_WAIT_NO_USB_FOUND   10      // in seconds
+
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
@@ -506,7 +508,7 @@ bool assign_usb_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num
     return true;
 }
 
-bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num, 
+bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num,
                                  usb_speed_t device_speed, int device_id, int *num_devices,
                                  usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {
@@ -681,7 +683,7 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
 // Public Functions
 //------------------------------------------------------------------------------
 
-void find_usb_keyboards(bool pause_at_end)
+void find_usb_keyboards(bool usb_debug)
 {
     clear_screen();
     print_usb_info("Scanning for USB keyboards...");
@@ -738,9 +740,17 @@ void find_usb_keyboards(bool pause_at_end)
         }
     }
 
-    if (pause_at_end) {
+    if (usb_debug) {
         print_usb_info("Press any key to continue...");
         while (get_key() == 0) {}
+    } else if (num_usb_controllers == 0) {
+        for (int i = MAX_WAIT_NO_USB_FOUND * 1000; i > 0; i--) {
+            usleep(1000);
+            if (i % 1000 == 0) {
+                printf(print_row,0, "No USB Keyboard Found! Continue in %u second%s...", i/1000, (i>1000)?"s":" ");
+            }
+        }
+        print_row++;
     }
 }
 

@@ -55,6 +55,7 @@ extern bool         enable_tty;
 extern bool         enable_bench;
 
 extern bool         pause_at_start;
+extern bool         pause_usb_debug;
 
 extern power_save_t power_save;
 

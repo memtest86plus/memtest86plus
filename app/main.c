@@ -219,7 +219,7 @@ static void global_init(void)
 
     config_init();
 
-    keyboard_init(pause_at_start);
+    keyboard_init(pause_usb_debug);
 
     display_init();
 

@@ -96,6 +96,7 @@ bool            enable_sm          = true;
 bool            enable_bench       = true;
 
 bool            pause_at_start     = true;
+bool            pause_usb_debug    = false;
 
 power_save_t    power_save         = POWER_SAVE_HIGH;
 
@@ -881,7 +882,7 @@ void initial_config(void)
     bool smp_init_done = false;
     if (pause_at_start) {
         bool got_key = false;
-        for (int i = 0; i < 5000 && !got_key; i++) {
+        for (int i = 0; i < 3000 && !got_key; i++) {
             usleep(1000);
             switch (get_key()) {
               case ESC:
