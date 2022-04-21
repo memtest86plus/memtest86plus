@@ -1541,7 +1541,7 @@ static const struct spd_jedec_manufacturer jep106[] = {
 //  { 0x0C14, "NeuMem Co Ltd" },
 //  { 0x0C15, "Lifelong" },
 //  { 0x0C16, "Beijing Oitech Technology Co Ltd" },
-    { 0x0C17, "Groupe LDLC" },
+    { 0x0C17, "LDLC" },
 //  { 0x0C18, "Semidynamics Technology Services SLU" },
 //  { 0x0C19, "swordbill" },
 //  { 0x0C1A, "YIREN" },

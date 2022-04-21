@@ -231,6 +231,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
 {
     spd_info spdi;
 
+    spdi.isValid = false;
     spdi.type = "DDR5";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
@@ -302,53 +303,66 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Compute Frequency (including XMP)
-    uint16_t tCK, tns;
+    uint16_t tCK, tCKtmp, tns;
+    int xmp_offset = 0;
 
     spdi.XMP = ((get_spd(smb_idx, slot_idx, 640) == 0x0C && get_spd(smb_idx, slot_idx, 641) == 0x4A)) ? 3 : 0;
 
     if (spdi.XMP == 3) {
-        // XMP 3.0
-        tCK = get_spd(smb_idx, slot_idx, 710) << 8;
-        tCK |= get_spd(smb_idx, slot_idx, 709);
+        // XMP 3.0 (enumerate all profiles to find the fastest)
+        tCK = 0;
+        for (int offset = 0; offset < 3*64; offset += 64) {
+            tCKtmp = get_spd(smb_idx, slot_idx, 710 + offset) << 8 |
+                     get_spd(smb_idx, slot_idx, 709 + offset);
+
+            if (tCKtmp != 0 && (tCK == 0 || tCKtmp < tCK)) {
+                xmp_offset = offset;
+                tCK = tCKtmp;
+            }
+        }
     } else {
         // JEDEC
-        tCK = get_spd(smb_idx, slot_idx, 21) << 8;
-        tCK |= get_spd(smb_idx, slot_idx, 20);
+        tCK = get_spd(smb_idx, slot_idx, 21) << 8 |
+              get_spd(smb_idx, slot_idx, 20);
+    }
+
+    if (tCK == 0) {
+        return spdi;
     }
 
     spdi.freq = (float)(1.0f / tCK * 2.0f * 1000.0f * 1000.0f);
     spdi.freq = (spdi.freq + 50) / 100 * 100;
 
     // Module Timings
-    if(spdi.XMP == 3) {
+    if (spdi.XMP == 3) {
         // ------------------
         // XMP Specifications
         // ------------------
 
         // CAS# Latency
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 718) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 717);
-        spdi.tCL = tns / tCK;
+        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 718 + xmp_offset) << 8 |
+               (uint16_t)get_spd(smb_idx, slot_idx, 717 + xmp_offset);
+        spdi.tCL = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# to CAS# Latency
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 720) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 719);
-        spdi.tRCD = (uint16_t)(tns/tCK);
+        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 720 + xmp_offset) << 8 |
+               (uint16_t)get_spd(smb_idx, slot_idx, 719 + xmp_offset);
+        spdi.tRCD = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# Precharge
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 722) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 721);
-        spdi.tRP= (uint16_t)(tns/tCK);
+        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 722 + xmp_offset) << 8 |
+               (uint16_t)get_spd(smb_idx, slot_idx, 721 + xmp_offset);
+        spdi.tRP= (uint16_t)(tns/tCK + 0.5f);
 
         // Row Active Time
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 724) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 723);
-        spdi.tRAS = (uint16_t)(tns/tCK);
+        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 724 + xmp_offset) << 8 |
+               (uint16_t)get_spd(smb_idx, slot_idx, 723 + xmp_offset);
+        spdi.tRAS = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Cycle Time
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 726) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 725);
-        spdi.tRC = (uint16_t)(tns/tCK);
+        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 726 + xmp_offset) << 8 |
+               (uint16_t)get_spd(smb_idx, slot_idx, 725 + xmp_offset);
+        spdi.tRC = (uint16_t)(tns/tCK + 0.5f);
     } else {
         // --------------------
         // JEDEC Specifications
@@ -357,40 +371,39 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 31) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 30);
-        spdi.tCL = tns / tCK;
+        spdi.tCL = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 33) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 32);
-        spdi.tRCD = (uint16_t)(tns/tCK);
+        spdi.tRCD = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# Precharge
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 35) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 34);
-        spdi.tRP= (uint16_t)(tns/tCK);
+        spdi.tRP= (uint16_t)(tns/tCK + 0.5f);
 
         // Row Active Time
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 37) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 36);
-        spdi.tRAS = (uint16_t)(tns/tCK);
+        spdi.tRAS = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Cycle Time
         tns  = (uint16_t)get_spd(smb_idx, slot_idx, 39) << 8 |
                (uint16_t)get_spd(smb_idx, slot_idx, 38);
-        spdi.tRC = (uint16_t)(tns/tCK);
+        spdi.tRC = (uint16_t)(tns/tCK + 0.5f);
     }
 
     // Module manufacturer
     spdi.jedec_code = (get_spd(smb_idx, slot_idx, 512) & 0x1F) << 8;
     spdi.jedec_code |= get_spd(smb_idx, slot_idx, 513) & 0x7F;
 
-    // Module Timings
+    // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j <= 29; j++) {
         sku_byte = get_spd(smb_idx, slot_idx, 521+j);
 
         if (sku_byte <= 0x20 && j > 1 && spdi.sku[j-1] <= 0x20) {
-            spdi.sku_len--;
             break;
         } else {
             spdi.sku[j] = sku_byte;
