@@ -635,7 +635,7 @@ static bool add_or_remove_cpu(bool add, int display_offset)
 {
 
     display_input_message(POP_R+16, "Enter CPU #");
-    int n = read_value(POP_R+16, POP_LM+11, 2, 0);
+    int n = read_value(POP_R+16, POP_LM+11, 4, 0);
     if (n < 1 || n >= num_available_cpus) {
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
@@ -649,13 +649,13 @@ static bool add_or_remove_cpu(bool add, int display_offset)
 static bool add_cpu_range(int display_offset)
 {
     display_input_message(POP_R+16, "Enter first CPU #");
-    int n1 = read_value(POP_R+16, POP_LM+17, 2, 0);
+    int n1 = read_value(POP_R+16, POP_LM+17, 4, 0);
     if (n1 < 1 || n1 >= num_available_cpus) {
         display_error_message(POP_R+16, "Invalid CPU number");
         return false;
     }
     display_input_message(POP_R+16, "Enter last CPU #");
-    int n2 = read_value(POP_R+16, POP_LM+16, 2, 0);
+    int n2 = read_value(POP_R+16, POP_LM+16, 4, 0);
     if (n2 < n1 || n2 >= num_available_cpus) {
         display_error_message(POP_R+16, "Invalid CPU range");
         return false;
