@@ -445,11 +445,11 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         }
     }
 
-    // Preserve the FM interval set by the SMM or BIOS.
+    // Preserve the frame interval set by the SMM or BIOS.
     // If not set, use the default value.
-    uint32_t fm_interval = read32(&op_regs->fm_interval) & 0x3fff;
-    if (fm_interval == 0) {
-        fm_interval = 0x2edf;
+    uint32_t frame_interval = read32(&op_regs->fm_interval) & 0x3fff;
+    if (frame_interval == 0) {
+        frame_interval = 0x2edf;
     }
 
     // Prepare for host controller setup (see section 5.1.1.3 of the OHCI spec.).
@@ -506,10 +506,10 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     flush32(&op_regs->interrupt_status, ~0);
 
     // Some controllers ignore writes to these registers when in suspend state, so write them now.
-    uint32_t max_packet_size = ((fm_interval - 210) * 6) / 7;
+    uint32_t max_packet_size = ((frame_interval - 210) * 6) / 7;
     uint32_t frame_interval_toggle = (read32(&op_regs->fm_interval) & OHCI_FIT) ^ OHCI_FIT;
-    write32(&op_regs->fm_interval, frame_interval_toggle | max_packet_size << 16 | fm_interval);
-    write32(&op_regs->periodic_start, (fm_interval * 9) / 10);
+    write32(&op_regs->fm_interval, frame_interval_toggle | max_packet_size << 16 | frame_interval);
+    write32(&op_regs->periodic_start, (frame_interval * 9) / 10);
 
     uint32_t rh_descriptor_a = read32(&op_regs->rh_descriptor_a);
     uint32_t rh_descriptor_b = read32(&op_regs->rh_descriptor_b);
