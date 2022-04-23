@@ -60,6 +60,10 @@
 #define OHCI_INTR_OC            0x40000000      // Ownership Change
 #define OHCI_INTR_MIE           0x80000000      // Master Interrupt Enable
 
+// HcFmIntervalRegister
+
+#define OHCI_FIT                0x80000000      // Frame Interval Toggle
+
 // HcRhDescriptorA register
 
 #define OHCI_RHDA_PSM           0x00000100      // Power Switching Mode
@@ -493,9 +497,6 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     ws->ed[0].next_ed = 0;
 
     // Initialise the host controller.
-    uint32_t max_packet_size = ((fm_interval - 210) * 6) / 7;
-    write32(&op_regs->fm_interval, 1 << 31 | max_packet_size << 16 | fm_interval);
-    write32(&op_regs->periodic_start, (fm_interval * 9) / 10);
     write32(&op_regs->hcca, (uintptr_t)(&ws->hcca));
     write32(&op_regs->ctrl_head_ed, (uintptr_t)(&ws->ed[0]));
     write32(&op_regs->bulk_head_ed, 0);
@@ -503,6 +504,12 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     write32(&op_regs->bulk_current_ed, 0);
     write32(&op_regs->control, OHCI_CTRL_HCFS_RUN | OHCI_CTRL_CLE | OHCI_CTRL_CBSR0);
     flush32(&op_regs->interrupt_status, ~0);
+
+    // Some controllers ignore writes to these registers when in suspend state, so write them now.
+    uint32_t max_packet_size = ((fm_interval - 210) * 6) / 7;
+    uint32_t frame_interval_toggle = (read32(&op_regs->fm_interval) & OHCI_FIT) ^ OHCI_FIT;
+    write32(&op_regs->fm_interval, frame_interval_toggle | max_packet_size << 16 | fm_interval);
+    write32(&op_regs->periodic_start, (fm_interval * 9) / 10);
 
     uint32_t rh_descriptor_a = read32(&op_regs->rh_descriptor_a);
     uint32_t rh_descriptor_b = read32(&op_regs->rh_descriptor_b);
