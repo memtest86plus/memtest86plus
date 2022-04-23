@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2022 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ lib.c:
 //
@@ -14,39 +14,42 @@
 #include "bootparams.h"
 #include "efi.h"
 
-#include "hwctrl.h"
 #include "io.h"
 
 #include "unistd.h"
+
+#include "hwctrl.h"
+
+//------------------------------------------------------------------------------
+// Private Variables
+//------------------------------------------------------------------------------
+
+static efi_runtime_services_t   *efi_rs_table = NULL;
 
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
-extern efi_info_t saved_efi_info;
-
-static void efi_reset(uint8_t reset_type)
+void hwctrl_init(void)
 {
-    static efi_runtime_services_t *rs_table = NULL;
-
+    boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 #ifdef __x86_64__
-    if (saved_efi_info.loader_signature == EFI64_LOADER_SIGNATURE) {
-        uintptr_t system_table_addr = ((uintptr_t)saved_efi_info.sys_tab_hi << 32) | saved_efi_info.sys_tab;
+    if (boot_params->efi_info.loader_signature == EFI64_LOADER_SIGNATURE) {
+        uintptr_t system_table_addr = (uintptr_t)boot_params->efi_info.sys_tab_hi << 32 | boot_params->efi_info.sys_tab;
         if (system_table_addr != 0) {
             efi64_system_table_t *sys_table = (efi64_system_table_t *)system_table_addr;
-            rs_table = (efi_runtime_services_t *)sys_table->runtime_services;
-            rs_table->reset_system(reset_type, 0, 0);
+            efi_rs_table = (efi_runtime_services_t *)sys_table->runtime_services;
+        }
+    }
+#else
+    if (boot_params->efi_info.loader_signature == EFI32_LOADER_SIGNATURE) {
+        uintptr_t system_table_addr = boot_params->efi_info.sys_tab;
+        if (system_table_addr != 0) {
+            efi32_system_table_t *sys_table = (efi32_system_table_t *)system_table_addr;
+            efi_rs_table = (efi_runtime_services_t *)(uintptr_t)sys_table->runtime_services;
         }
     }
 #endif
-    if (saved_efi_info.loader_signature == EFI32_LOADER_SIGNATURE) {
-        uintptr_t system_table_addr = saved_efi_info.sys_tab;
-        if (system_table_addr != 0) {
-            efi32_system_table_t *sys_table = (efi32_system_table_t *)system_table_addr;
-            rs_table = (efi_runtime_services_t *)(uintptr_t)sys_table->runtime_services;
-            rs_table->reset_system(reset_type, 0, 0);
-        }
-    }
 }
 
 void reboot(void)
@@ -59,8 +62,8 @@ void reboot(void)
     usleep(50);
 
     // If we have UEFI, try EFI reset service
-    if(saved_efi_info.loader_signature) {
-        efi_reset(EFI_RESET_COLD);
+    if (efi_rs_table != NULL) {
+        efi_rs_table->reset_system(EFI_RESET_COLD, 0, 0);
         usleep(1000000);
     }
 
@@ -68,7 +71,7 @@ void reboot(void)
     outb(0xfe, 0x64);
     usleep(150000);
 
-    if(!saved_efi_info.loader_signature) {
+    if (efi_rs_table == NULL) {
         // In last resort, (very) obsolete reboot method using BIOS
         *((uint16_t *)0x472) = 0x1234;
     }

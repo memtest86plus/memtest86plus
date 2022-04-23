@@ -11,6 +11,11 @@
  */
 
 /**
+ * Initialises the hardware control interface.
+ */
+void hwctrl_init(void);
+
+/**
  * Reboots the machine.
  */
 void reboot(void);
