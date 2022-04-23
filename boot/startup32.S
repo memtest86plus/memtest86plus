@@ -74,7 +74,7 @@ efi_handover:
 
 	movl	%eax, %esi
 	movl	0x214(%esi), %ebx	# bootparams.code32_start
-	leal	(startup - startup32), %edi
+	leal	(startup - startup32)(%ebx), %edi
 
 # The 32-bit entry point for AP boot and for restart after relocation.
 
