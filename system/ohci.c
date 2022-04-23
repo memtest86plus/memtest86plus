@@ -459,7 +459,7 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         break;
       case OHCI_CTRL_HCFS_SUS:
       case OHCI_CTRL_HCFS_RES:
-        flush32(&op_regs->control, OHCI_CTRL_HCFS_SUS);
+        flush32(&op_regs->control, OHCI_CTRL_HCFS_RES);
         usleep(10*MILLISEC);
         break;
       default: // operational
