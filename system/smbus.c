@@ -25,12 +25,13 @@ unsigned short smbusbase;
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
 
-static spd_info parse_spd_rdram (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_rdram      (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_sdram      (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr        (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr2       (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr3       (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr4       (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr5       (uint8_t smb_idx, uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
@@ -200,6 +201,9 @@ void print_smbus_startup_info(void) {
                     break;
                 case 0x07: // DDR
                     curspd = parse_spd_ddr(index, spdidx);
+                    break;
+                case 0x04: // SDRAM
+                    curspd = parse_spd_sdram(index, spdidx);
                     break;
                 case 0x01: // RAMBUS - RDRAM
                     if (get_spd(index, spdidx, 1) == 8) {
@@ -1028,6 +1032,98 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
+    spdi.fab_year = bcd - 6 * (bcd >> 4);
+
+    bcd = get_spd(smb_idx, slot_idx, 94);
+    spdi.fab_week = bcd - 6 * (bcd >> 4);
+
+    spdi.isValid = true;
+
+    return spdi;
+}
+
+static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
+{
+    spd_info spdi;
+
+    uint8_t bcd;
+
+    spdi.type = "SDRAM";
+    spdi.slot_num = slot_idx;
+    spdi.sku_len = 0;
+    spdi.XMP = 0;
+
+    uint8_t spd_byte3  = get_spd(smb_idx, slot_idx, 3) & 0x0F; // Number of Row Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
+    uint8_t spd_byte4  = get_spd(smb_idx, slot_idx, 4) & 0x0F; // Number of Column Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
+    uint8_t spd_byte5  = get_spd(smb_idx, slot_idx, 5);        // Number of Banks on module (8 bits)
+    uint8_t spd_byte17 = get_spd(smb_idx, slot_idx, 17);       // SDRAM Device Attributes, Number of Banks on the discrete SDRAM Device (8 bits)
+
+    // Size in MB
+    if (   (spd_byte3 != 0)
+        && (spd_byte4 != 0)
+        && (spd_byte3 + spd_byte4 > 17)
+        && (spd_byte3 + spd_byte4 <= 29)
+        && (spd_byte5 <= 8)
+        && (spd_byte17 <= 8)
+       ) {
+        spdi.module_size = (1U << (spd_byte3 + spd_byte4 - 17)) * ((uint16_t)spd_byte5 * spd_byte17);
+    } else {
+        spdi.module_size = 0;
+    }
+
+    spdi.hasECC = ((get_spd(smb_idx, slot_idx, 11) >> 1) == 1);
+
+    // Module speed
+    float tns, tckns;
+    uint8_t spd_byte9 = get_spd(smb_idx, slot_idx, 9);
+    tckns = (spd_byte9 >> 4) + (spd_byte9 & 0xF) * 0.1f;
+
+    spdi.freq = (uint16_t)(1000.0f / tckns);
+
+    // Module Timings
+    uint8_t spd_byte18 = get_spd(smb_idx, slot_idx, 18);
+    for (int shft = 0; shft < 7; shft++) {
+        if ((spd_byte18 >> shft) & 1) {
+            spdi.tCL = shft;
+            break;
+        }
+    }
+
+    tns = get_spd(smb_idx, slot_idx, 29);
+    spdi.tRCD = (uint16_t)(tns/tckns);
+
+    tns = get_spd(smb_idx, slot_idx, 27);
+    spdi.tRP = (uint16_t)(tns/tckns);
+
+    spdi.tRAS = (uint16_t)(get_spd(smb_idx, slot_idx, 30)/tckns);
+    spdi.tRC = 0;
+
+    // Module manufacturer
+    uint8_t contcode;
+    for (contcode = 64; contcode < 72; contcode++) {
+        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+            break;
+        }
+    }
+
+    spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
+    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+
+    // Module SKU
+    uint8_t sku_byte;
+    for (int j = 0; j < 18; j++) {
+        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+
+        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+            spdi.sku_len--;
+            break;
+        } else {
+            spdi.sku[j] = sku_byte;
+            spdi.sku_len++;
+        }
+    }
+
+    bcd = get_spd(smb_idx, slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
     bcd = get_spd(smb_idx, slot_idx, 94);
