@@ -58,6 +58,10 @@
 #define TEST_INTERRUPT      0
 #endif
 
+#define LOW_LOAD_LIMIT      SIZE_C(4,MB)  // must be a multiple of the page size
+
+#define HIGH_LOAD_LIMIT     (VM_PINNED_SIZE << PAGE_SHIFT)
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -146,7 +150,7 @@ static void run_at(uintptr_t addr, int my_cpu)
 
     if (my_cpu == 0) {
         // Copy the program code and all data except the stacks.
-        memcpy((void *)addr, (void *)_start, _stacks - _start);
+        memmove((void *)addr, (void *)_start, _stacks - _start);
         // Copy the thread-local storage.
         size_t locals_offset = _stacks - _start + BSP_STACK_SIZE - LOCALS_SIZE;
         for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
@@ -167,7 +171,7 @@ static void run_at(uintptr_t addr, int my_cpu)
 static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t lower_limit, uintptr_t upper_limit)
 {
     uintptr_t current_start = (uintptr_t)_start;
-    if (current_start >= lower_limit && current_start < upper_limit) {
+    if (current_start >= lower_limit && (current_start + program_size) <= upper_limit) {
         *load_addr = current_start;
         return true;
     }
@@ -175,7 +179,7 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
     for (int i = 0; i < pm_map_size; i++) {
         uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
         uintptr_t try_limit = pm_map[i].end   << PAGE_SHIFT;
-        if (try_start == 0) try_start = 0x1000;
+        if (try_start < lower_limit) try_start = lower_limit;
         uintptr_t try_end   = try_start + program_size;
         if (try_end > try_limit) continue;
 
@@ -260,8 +264,8 @@ static void global_init(void)
 
     size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
 
-    bool load_addr_ok = set_load_addr(& low_load_addr, program_size,            0, SIZE_C(1,MB))
-                     && set_load_addr(&high_load_addr, program_size, SIZE_C(1,MB), SIZE_C(2,GB));
+    bool load_addr_ok = set_load_addr(& low_load_addr, program_size,         0x1000,  LOW_LOAD_LIMIT)
+                     && set_load_addr(&high_load_addr, program_size, LOW_LOAD_LIMIT, HIGH_LOAD_LIMIT);
 
     trace(0, "program size %ikB", (int)(program_size / 1024));
     trace(0, " low_load_addr %0*x", 2*sizeof(uintptr_t),  low_load_addr);
@@ -373,7 +377,7 @@ static void test_all_windows(int my_cpu)
                 // Relocation may disrupt the test.
                 window_num = 1;
             }
-            if (window_num == 0 && pm_limit_lower >= high_load_addr) {
+            if (window_num == 0 && pm_limit_lower >= LOW_LOAD_LIMIT) {
                 // Avoid unnecessary relocation.
                 window_num = 1;
             }
@@ -396,10 +400,10 @@ static void test_all_windows(int my_cpu)
             switch (window_num) {
               case 0:
                 window_start = 0;
-                window_end   = (high_load_addr >> PAGE_SHIFT);
+                window_end   = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
                 break;
               case 1:
-                window_start = (high_load_addr >> PAGE_SHIFT);
+                window_start = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
                 window_end   = VM_WINDOW_SIZE;
                 break;
               default:
