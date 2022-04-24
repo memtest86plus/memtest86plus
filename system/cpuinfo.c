@@ -1042,7 +1042,7 @@ static void measure_memory_bandwidth(void)
             try_end   = try_start + mem_test_len * 2;
         }
 
-        uintptr_t end_limit = pm_map[i].end < VM_PINNED_SIZE ? pm_map[i].end << PAGE_SHIFT : VM_PINNED_SIZE;
+        uintptr_t end_limit = (pm_map[i].end < VM_PINNED_SIZE ? pm_map[i].end : VM_PINNED_SIZE) << PAGE_SHIFT;
         if (try_end <= end_limit) {
             bench_start_adr = try_start;
             break;
