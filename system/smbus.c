@@ -31,13 +31,14 @@ static int8_t last_adr = -1;
 // Functions Prototypes
 static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len);
 
-static void parse_spd_rdram (spd_info *spdi, uint8_t slot_idx);
-static void parse_spd_sdram (spd_info *spdi, uint8_t slot_idx);
-static void parse_spd_ddr   (spd_info *spdi, uint8_t slot_idx);
-static void parse_spd_ddr2  (spd_info *spdi, uint8_t slot_idx);
-static void parse_spd_ddr3  (spd_info *spdi, uint8_t slot_idx);
-static void parse_spd_ddr4  (spd_info *spdi, uint8_t slot_idx);
-static void parse_spd_ddr5  (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_rdram        (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_sdram        (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_ddr          (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_ddr2         (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_ddr2_fbdimm  (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_ddr3         (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_ddr4         (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd_ddr5         (spd_info *spdi, uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static bool setup_smb_controller(void);
@@ -93,6 +94,9 @@ void print_smbus_startup_info(void)
                     break;
                 case 0x0B: // DDR3
                     parse_spd_ddr3(&curspd, spdidx);
+                    break;
+                case 0x09: // DDR2 FB-DIMM
+                    parse_spd_ddr2_fbdimm(&curspd, spdidx);
                     break;
                 case 0x08: // DDR2
                     parse_spd_ddr2(&curspd, spdidx);
@@ -385,7 +389,7 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     }
 
     // Module manufacturer
-    spdi->jedec_code = (get_spd(slot_idx, 512) & 0x1F) << 8;
+    spdi->jedec_code  = ((uint16_t)get_spd(slot_idx, 512) & 0x1F) << 8;
     spdi->jedec_code |= get_spd(slot_idx, 513) & 0x7F;
 
     read_sku(spdi->sku, slot_idx, 521, 30);
@@ -672,6 +676,59 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
+static void parse_spd_ddr2_fbdimm(spd_info *spdi, uint8_t slot_idx)
+{
+    spdi->type = "DDR2 FB-DIMM";
+
+    // Compute module size with shifts
+    uint8_t spd_byte4 = get_spd(slot_idx, 4); // Bits 7-5 (Row Address Bits) + 12, bits 4-2 (Column Address Bits) + 9, bits 1-0 (Number of Banks) >> 2.
+    uint8_t spd_byte7 = get_spd(slot_idx, 7); // Bits 5-3 (Number of Ranks), bits 2-0 (SDRAM Device Width) >> 2.
+
+    //                                Number of Ranks             Row Address Bits   Column Address Bits     Mask     Number of banks
+    spdi->module_size  = ((uint32_t)(((spd_byte7 >> 3) & 7)) << (((spd_byte4 >> 5) + ((spd_byte4 >> 2) & 7)) & 31)) * ((spd_byte4 & 3) << 2);
+
+    spdi->hasECC = ((get_spd(slot_idx, 81) >> 1) == 1);
+
+    // Module speed
+    float tckns, tns;
+    uint8_t tbyte;
+
+    uint8_t spd_byte9 = get_spd(slot_idx, 9);   // MTB dividend
+    uint8_t spd_byte10 = get_spd(slot_idx, 10); // MTB divisor
+    if ((spd_byte9 == 1) && ((spd_byte10 == 4) || (spd_byte10 == 8))) {
+        float mtb = (float)spd_byte9 / spd_byte10;
+
+        spdi->freq = 0; // TODO
+
+        // Module Timings (JEDEC)
+        spdi->tCL = get_spd(slot_idx, 14); // TODO
+        spdi->tRCD = get_spd(slot_idx, 19); // TODO
+        spdi->tRP = get_spd(slot_idx, 21); // TODO
+        spdi->tRAS = get_spd(slot_idx, 23); // TODO
+        spdi->tRC = get_spd(slot_idx, 24); // TODO
+    }
+    else {
+        // TODO
+        spdi->freq = 0;
+        spdi->tCL = 0;
+        spdi->tRCD = 0;
+        spdi->tRP = 0;
+        spdi->tRAS = 0;
+        spdi->tRC = 0;
+    }
+
+    // Module manufacturer
+    spdi->jedec_code  = ((uint16_t)(get_spd(slot_idx, 117) & 0x1F)) << 8;
+    spdi->jedec_code |= get_spd(slot_idx, 118) & 0x7F;
+
+    read_sku(spdi->sku, slot_idx, 128, 18);
+
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 120));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 121));
+
+    spdi->isValid = true;
+}
+
 static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR2";
@@ -887,7 +944,7 @@ static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
         }
     }
 
-    spdi->jedec_code = (contcode - 64) << 8;
+    spdi->jedec_code  = ((uint16_t)(contcode - 64)) << 8;
     spdi->jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
     read_sku(spdi->sku, slot_idx, 73, 18);
