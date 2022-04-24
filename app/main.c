@@ -79,7 +79,6 @@ static bool             rerun_test = false;
 
 static bool             dummy_run  = false;
 
-static int              window_num   = 0;
 static uintptr_t        window_start = 0;
 static uintptr_t        window_end   = 0;
 
@@ -109,6 +108,8 @@ int         vm_map_size = 0;
 
 int         pass_num = 0;
 int         test_num = 0;
+
+int         window_num = 0;
 
 bool        restart = false;
 bool        bail    = false;
