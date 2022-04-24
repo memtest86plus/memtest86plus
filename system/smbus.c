@@ -29,6 +29,7 @@ static spd_info parse_spd_rdram      (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_sdram      (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr        (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr2       (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_ddr2_fbdimm(uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr3       (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr4       (uint8_t smb_idx, uint8_t slot_idx);
 static spd_info parse_spd_ddr5       (uint8_t smb_idx, uint8_t slot_idx);
@@ -195,6 +196,9 @@ void print_smbus_startup_info(void) {
                     break;
                 case 0x0B: // DDR3
                     curspd = parse_spd_ddr3(index, spdidx);
+                    break;
+                case 0x09: // DDR2 FB-DIMM
+                    curspd = parse_spd_ddr2_fbdimm(index, spdidx);
                     break;
                 case 0x08: // DDR2
                     curspd = parse_spd_ddr2(index, spdidx);
@@ -762,6 +766,83 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
 
     bcd = get_spd(smb_idx, slot_idx, 121);
     spdi.fab_week =  bcd - 6 * (bcd >> 4);
+
+    spdi.isValid = true;
+
+    return spdi;
+}
+
+static spd_info parse_spd_ddr2_fbdimm(uint8_t smb_idx, uint8_t slot_idx)
+{
+    spd_info spdi;
+
+    uint8_t bcd;
+    int8_t j;
+
+    spdi.type = "DDR2 FB-DIMM";
+    spdi.slot_num = slot_idx;
+    spdi.sku_len = 0;
+    spdi.XMP = 0;
+
+    // Compute module size with shifts
+    uint8_t spd_byte4 = get_spd(smb_idx, slot_idx, 4); // Bits 7-5 (Row Address Bits) + 12, bits 4-2 (Column Address Bits) + 9, bits 1-0 (Number of Banks) >> 2.
+    uint8_t spd_byte7 = get_spd(smb_idx, slot_idx, 7); // Bits 5-3 (Number of Ranks), bits 2-0 (SDRAM Device Width) >> 2.
+
+    //                               Number of Ranks             Row Address Bits   Column Address Bits     Mask     Number of banks
+    spdi.module_size  = ((uint32_t)(((spd_byte7 >> 3) & 7)) << (((spd_byte4 >> 5) + ((spd_byte4 >> 2) & 7)) & 31)) * ((spd_byte4 & 3) << 2);
+
+    spdi.hasECC = ((get_spd(smb_idx, slot_idx, 81) >> 1) == 1);
+
+    // Module speed
+    float tckns, tns;
+    uint8_t tbyte;
+
+    uint8_t spd_byte9 = get_spd(smb_idx, slot_idx, 9);   // MTB dividend
+    uint8_t spd_byte10 = get_spd(smb_idx, slot_idx, 10); // MTB divisor
+    if ((spd_byte9 == 1) && ((spd_byte10 == 4) || (spd_byte10 == 8))) {
+        float mtb = (float)spd_byte9 / spd_byte10;
+
+        spdi.freq = 0; // TODO
+
+        // Module Timings (JEDEC)
+        spdi.tCL = get_spd(smb_idx, slot_idx, 14); // TODO
+        spdi.tRCD = get_spd(smb_idx, slot_idx, 19); // TODO
+        spdi.tRP = get_spd(smb_idx, slot_idx, 21); // TODO
+        spdi.tRAS = get_spd(smb_idx, slot_idx, 23); // TODO
+        spdi.tRC = get_spd(smb_idx, slot_idx, 24); // TODO
+    }
+    else {
+        spdi.freq = 0;
+        spdi.tCL = 0;
+        spdi.tRCD = 0;
+        spdi.tRP = 0;
+        spdi.tRAS = 0;
+        spdi.tRC = 0;
+    }
+
+    // Module manufacturer
+    spdi.jedec_code  = ((uint16_t)(get_spd(smb_idx, slot_idx, 117) & 0x1F)) << 8;
+    spdi.jedec_code |= get_spd(smb_idx, slot_idx, 118) & 0x7F;
+
+    // Module SKU
+    uint8_t sku_byte;
+    for (j = 0; j < 18; j++) {
+        sku_byte = get_spd(smb_idx, slot_idx, 128 + j);
+
+        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+            spdi.sku_len--;
+            break;
+        } else {
+            spdi.sku[j] = sku_byte;
+            spdi.sku_len++;
+        }
+    }
+
+    bcd = get_spd(smb_idx, slot_idx, 120);
+    spdi.fab_year = bcd - 6 * (bcd >> 4);
+
+    bcd = get_spd(smb_idx, slot_idx, 121);
+    spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
 
