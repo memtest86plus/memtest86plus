@@ -920,10 +920,10 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 94);
+    uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 93);
+    bcd = get_spd(smb_idx, slot_idx, 94);
     spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
