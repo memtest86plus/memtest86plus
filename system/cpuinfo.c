@@ -1021,8 +1021,8 @@ static void measure_memory_bandwidth(void)
     }
 
     // Locate enough free space for tests. We require the space to be mapped into
-    // our virtual address space, which limits us to the first 3GB.
-    for (int i = 0; i < pm_map_size && pm_map[i].start < VM_BENCH_WINDOW_SIZE; i++) {
+    // our virtual address space, which limits us to the first 2GB.
+    for (int i = 0; i < pm_map_size && pm_map[i].start < VM_PINNED_SIZE; i++) {
         uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
         uintptr_t try_end   = try_start + mem_test_len * 2;
 
@@ -1042,7 +1042,7 @@ static void measure_memory_bandwidth(void)
             try_end   = try_start + mem_test_len * 2;
         }
 
-        uintptr_t end_limit = pm_map[i].end < VM_BENCH_WINDOW_SIZE ? pm_map[i].end << PAGE_SHIFT : VM_BENCH_WINDOW_SIZE;
+        uintptr_t end_limit = (pm_map[i].end < VM_PINNED_SIZE ? pm_map[i].end : VM_PINNED_SIZE) << PAGE_SHIFT;
         if (try_end <= end_limit) {
             bench_start_adr = try_start;
             break;

@@ -92,6 +92,10 @@ extern int pass_num;
  * The current test number.
  */
 extern int test_num;
+/**
+ * The current window number.
+ */
+extern int window_num;
 
 /**
  * A flag indicating that testing should be restarted due to a configuration
