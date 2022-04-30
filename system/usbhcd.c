@@ -593,9 +593,9 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     uint16_t device_id  = pci_config_read16(bus, dev, func, 0x02);
     uint16_t pci_status = pci_config_read16(bus, dev, func, 0x06);
 
-    // Disable the device while we probe it.
-    uint16_t control = pci_config_read16(bus, dev, func, 0x04);
-    pci_config_write16(bus, dev, func, 0x04, control & ~0x0007);
+    // Disable access to the device while we probe it.
+    uint16_t pci_command = pci_config_read16(bus, dev, func, 0x04);
+    pci_config_write16(bus, dev, func, 0x04, pci_command & ~0x0003);
 
     int bar = (controller_type == UHCI) ? 0x20 : 0x10;
     uintptr_t base_addr = pci_config_read32(bus, dev, func, bar);
@@ -616,6 +616,9 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     base_addr &= ~(uintptr_t)0xf;
     mmio_size &= ~(uintptr_t)0xf;
     mmio_size = ~mmio_size + 1;
+
+    // Restore access to the device and set the bus master flag in case the BIOS hasn't.
+    pci_config_write16(bus, dev, func, 0x04, pci_command | (in_io_space ? 0x0005 : 0x0006));
 
     print_usb_info("Found %s controller %04x:%04x at %08x size %08x in %s space", hci_name[controller_type],
                    (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size, in_io_space ? "I/O" : "Mem");
@@ -656,9 +659,6 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
             cap_ptr = pci_config_read8(bus, dev, func, cap_ptr+1) & 0xfe;
         }
     }
-
-    // Enable the device.
-    pci_config_write16(bus, dev, func, 0x04, control | 0x0007);
 
     // Initialise the device according to its type.
     bool keyboards_found = false;
