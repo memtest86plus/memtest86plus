@@ -458,8 +458,9 @@ static void poll_keyboards(const usb_hcd_t *hcd)
         uint8_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS;
         if (~status & error_mask) {
             hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
-            process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt);
-            *prev_kbd_rpt = *kbd_rpt;
+            if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+                *prev_kbd_rpt = *kbd_rpt;
+            }
         }
 
         ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];

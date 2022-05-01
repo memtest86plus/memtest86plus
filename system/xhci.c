@@ -893,8 +893,9 @@ static void poll_keyboards(const usb_hcd_t *hcd)
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
         hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
-        process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt);
-        *prev_kbd_rpt = *kbd_rpt;
+        if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+            *prev_kbd_rpt = *kbd_rpt;
+        }
 
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
         issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));

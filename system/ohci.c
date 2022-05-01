@@ -376,8 +376,9 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 
         if ((td->control & OHCI_TD_CC) == OHCI_TD_CC_NO_ERR) {
             hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
-            process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt);
-            *prev_kbd_rpt = *kbd_rpt;
+            if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+                *prev_kbd_rpt = *kbd_rpt;
+            }
         }
 
         ohci_td_t *next_td = (ohci_td_t *)((uintptr_t)td->next_td);

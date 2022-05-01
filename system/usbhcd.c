@@ -679,13 +679,14 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     return keyboard_found;
 }
 
-void process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report)
+bool process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report)
 {
     hcd_workspace_t *ws = hcd->ws;
 
+    int error_count = 0;
     for (int i = 0; i < 6; i++) {
         uint8_t key_code = report->key_code[i];
-        if (key_code != 0) {
+        if (key_code > 0x03) {
             // Check if we've already seen this key press.
             for (int j = 0; j < 6; j++) {
                 if (prev_report->key_code[j] == key_code) {
@@ -702,8 +703,11 @@ void process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hi
                     ws->kc_index_i = kc_index_n;
                 }
             }
+        } else if (key_code != 0x00) {
+            error_count++;
         }
     }
+    return error_count < 6;
 }
 
 //------------------------------------------------------------------------------

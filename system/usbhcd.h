@@ -269,11 +269,12 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
 /**
  * Scans the latest keyboard report from a HID keyboard for key presses that
  * weren't present in the previous report from that keyboard. Appends the HID
- * key code for each new key press to the driver's key code buffer.
+ * key code for each new key press to the driver's key code buffer. Returns
+ * false if the report signals the phantom condition, otherwise returns true.
  *
  * Used internally by the various HCI drivers.
  */
-void process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report);
+bool process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report);
 
 /**
  * Scans the attached USB devices and initialises all HID keyboard devices
