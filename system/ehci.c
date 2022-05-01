@@ -115,6 +115,8 @@
 
 // - data_length member (16 bits)
 
+#define EHCI_QTD_DT_MASK        0x8000
+
 #define EHCI_QTD_DT(n)          ((n) << 15)     // Data Toggle = n (n = 0,1)
 
 // Queue head data structure
@@ -460,9 +462,11 @@ static void poll_keyboards(const usb_hcd_t *hcd)
             *prev_kbd_rpt = *kbd_rpt;
         }
 
-        build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, EHCI_QTD_DT(1), kbd_rpt, sizeof(hid_kbd_rpt_t));
-
         ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
+
+        uint16_t dt = kbd_qhd->data_length & EHCI_QTD_DT_MASK;
+        build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, dt, kbd_rpt, sizeof(hid_kbd_rpt_t));
+
         kbd_qhd->next_qtd_ptr = (uintptr_t)kbd_qtd;
     }
 }
