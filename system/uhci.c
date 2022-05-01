@@ -146,7 +146,6 @@
 
 #define WS_QH_SIZE              (1 + MAX_KEYBOARDS) // Queue Head Descriptors
 #define WS_TD_SIZE              (2 + MAX_PACKETS)   // Queue Transfer Descriptors
-#define WS_KC_BUFFER_SIZE       8                   // keycodes
 
 #define MILLISEC                1000                // in microseconds
 
@@ -176,22 +175,20 @@ typedef struct {
     hcd_workspace_t     base_ws;
 
     // System memory data structures used by the host controller.
-    uhci_qh_t           qh[WS_QH_SIZE];
-    uhci_td_t           td[WS_TD_SIZE];
+    uhci_qh_t           qh[WS_QH_SIZE]  __attribute__ ((aligned (16)));
+    uhci_td_t           td[WS_TD_SIZE]  __attribute__ ((aligned (16)));
 
     // Keyboard data transfer buffers.
     hid_kbd_rpt_t       kbd_rpt[MAX_KEYBOARDS];
+
+    // Saved keyboard reports.
+    hid_kbd_rpt_t       prev_kbd_rpt[MAX_KEYBOARDS];
 
     // I/O base address of the host controller registers.
     uint16_t            io_base;
 
     // Number of keyboards detected.
     int                 num_keyboards;
-
-    // Circular buffer for received keycodes.
-    uint8_t             kc_buffer[WS_KC_BUFFER_SIZE];
-    int                 kc_index_i;
-    int                 kc_index_o;
 } workspace_t  __attribute__ ((aligned (256)));
 
 //------------------------------------------------------------------------------
@@ -373,7 +370,7 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return wait_for_uhci_done(ws);
 }
 
-static uint8_t get_keycode(const usb_hcd_t *hcd)
+static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
     uint16_t io_base = ws->io_base;
@@ -393,15 +390,9 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
 
             uint32_t error_mask = UHCI_TD_STALLED | UHCI_TD_DB_ERR | UHCI_TD_BABBLE | UHCI_TD_NAK_RX | UHCI_TD_CRC_TO | UHCI_TD_BS_ERR;
             if (~status & error_mask) {
-                uint8_t keycode = kbd_rpt->key_code[0];
-                if (keycode != 0) {
-                    int kc_index_i = ws->kc_index_i;
-                    int kc_index_n = (kc_index_i + 1) % WS_KC_BUFFER_SIZE;
-                    if (kc_index_n != ws->kc_index_o) {
-                        ws->kc_buffer[kc_index_i] = keycode;
-                        ws->kc_index_i = kc_index_n;
-                    }
-                }
+                hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
+                process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt);
+                *prev_kbd_rpt = *kbd_rpt;
             }
 
             // Reenable the TD.
@@ -409,14 +400,6 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
             write32(&kbd_qh->qe_link_ptr, (uintptr_t)kbd_td | UHCI_LP_TYPE_TD);
         }
     }
-
-    int kc_index_o = ws->kc_index_o;
-    if (kc_index_o != ws->kc_index_i) {
-        ws->kc_index_o = (kc_index_o + 1) % WS_KC_BUFFER_SIZE;
-        return ws->kc_buffer[kc_index_o];
-    }
-
-    return 0;
 }
 
 //------------------------------------------------------------------------------
@@ -432,7 +415,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
-    .get_keycode         = get_keycode
+    .poll_keyboards      = poll_keyboards
 };
 
 //------------------------------------------------------------------------------

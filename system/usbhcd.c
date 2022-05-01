@@ -56,7 +56,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = NULL,
     .get_data_request    = NULL,
-    .get_keycode         = NULL
+    .poll_keyboards      = NULL
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.
@@ -587,6 +587,33 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     return keyboard_found;
 }
 
+void process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report)
+{
+    hcd_workspace_t *ws = hcd->ws;
+
+    for (int i = 0; i < 6; i++) {
+        uint8_t key_code = report->key_code[i];
+        if (key_code != 0) {
+            // Check if we've already seen this key press.
+            for (int j = 0; j < 6; j++) {
+                if (prev_report->key_code[j] == key_code) {
+                    key_code = 0;
+                    break;
+                }
+            }
+            // If not, put it in the key code buffer.
+            if (key_code != 0) {
+                int kc_index_i = ws->kc_index_i;
+                int kc_index_n = (kc_index_i + 1) % HCD_KC_BUFFER_SIZE;
+                if (kc_index_n != ws->kc_index_o) {
+                    ws->kc_buffer[kc_index_i] = key_code;
+                    ws->kc_index_i = kc_index_n;
+                }
+            }
+        }
+    }
+}
+
 static void probe_usb_controller(int bus, int dev, int func, hci_type_t controller_type)
 {
     uint16_t vendor_id  = pci_config_read16(bus, dev, func, 0x00);
@@ -755,8 +782,15 @@ void find_usb_keyboards(bool pause_if_none)
 uint8_t get_usb_keycode(void)
 {
     for (int i = 0; i < num_usb_controllers; i++) {
-        uint8_t keycode = usb_controllers[i].methods->get_keycode(&usb_controllers[i]);
-        if (keycode != 0) return keycode;
+        const usb_hcd_t *hcd = &usb_controllers[i];
+
+        usb_controllers[i].methods->poll_keyboards(hcd);
+
+        int kc_index_o = hcd->ws->kc_index_o;
+        if (kc_index_o != hcd->ws->kc_index_i) {
+            hcd->ws->kc_index_o = (kc_index_o + 1) % HCD_KC_BUFFER_SIZE;
+            return hcd->ws->kc_buffer[kc_index_o];
+        }
     }
     return 0;
 }

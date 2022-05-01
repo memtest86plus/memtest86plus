@@ -30,9 +30,13 @@
 
 /**
  * The size of the data transfer buffer in a host controller driver workspace.
- * This aligns the start of the driver private data to a 1024 byte boundary.
  */
-#define HCD_DATA_BUFFER_SIZE    (1024 - sizeof(size_t))
+#define HCD_DATA_BUFFER_SIZE    512  // bytes
+
+/**
+ * The size of the key code buffer in a host controller driver workspace.
+ */
+#define HCD_KC_BUFFER_SIZE      8  // keycodes
 
 /**
  * A USB device speed (used internally by the various HCI drivers).
@@ -87,7 +91,7 @@ typedef struct {
     bool    (*configure_kbd_ep)     (usb_hcd_r, const usb_ep_t *, int);
     bool    (*setup_request)        (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *);
     bool    (*get_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
-    uint8_t (*get_keycode)          (usb_hcd_r);
+    void    (*poll_keyboards)       (usb_hcd_r);
 } hcd_methods_t;
 
 /**
@@ -97,6 +101,9 @@ typedef struct {
 typedef struct __attribute__((packed)) {
     uint8_t         data_buffer[HCD_DATA_BUFFER_SIZE];
     size_t          data_length;
+    uint8_t         kc_buffer[HCD_KC_BUFFER_SIZE];
+    int8_t          kc_index_i;
+    int8_t          kc_index_o;
 } hcd_workspace_t;
 
 /**
@@ -258,6 +265,15 @@ bool assign_usb_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num
 bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num,
                                  usb_speed_t device_speed, int device_id, int *num_devices,
                                  usb_ep_t keyboards[], int max_keyboards, int *num_keyboards);
+
+/**
+ * Scans the latest keyboard report from a HID keyboard for key presses that
+ * weren't present in the previous report from that keyboard. Appends the HID
+ * key code for each new key press to the driver's key code buffer.
+ *
+ * Used internally by the various HCI drivers.
+ */
+void process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report);
 
 /**
  * Scans the attached USB devices and initialises all HID keyboard devices

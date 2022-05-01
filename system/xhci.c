@@ -138,7 +138,6 @@
 #define WS_CR_SIZE                      8       // TRBs    (multiple of 4 to maintain 64 byte alignment)
 #define WS_ER_SIZE                      16      // TRBs    (multiple of 4 to maintain 64 byte alignment)
 #define WS_ERST_SIZE                    4       // entries (multiple of 4 to maintain 64 byte alignment)
-#define WS_KC_BUFFER_SIZE               8       // keycodes
 
 #define EP_TR_SIZE                      8       // TRBs    (multiple of 4 to maintain 64 byte alignment)
 
@@ -304,15 +303,18 @@ typedef struct {
     hcd_workspace_t     base_ws;
 
     // System memory data structures used by the host controller.
-    xhci_trb_t          cr   [WS_CR_SIZE];      // command ring
-    xhci_trb_t          er   [WS_ER_SIZE];      // event ring
-    xhci_erst_entry_t   erst [WS_ERST_SIZE];    // event ring segment table
+    xhci_trb_t          cr   [WS_CR_SIZE]    __attribute__ ((aligned (64)));    // command ring
+    xhci_trb_t          er   [WS_ER_SIZE]    __attribute__ ((aligned (64)));    // event ring
+    xhci_erst_entry_t   erst [WS_ERST_SIZE]  __attribute__ ((aligned (64)));    // event ring segment table
 
     // Keyboard data transfer rings
     ep_tr_t             kbd_tr  [MAX_KEYBOARDS];
 
     // Keyboard data transfer buffers.
     hid_kbd_rpt_t       kbd_rpt [MAX_KEYBOARDS];
+
+    // Saved keyboard reports.
+    hid_kbd_rpt_t       prev_kbd_rpt[MAX_KEYBOARDS];
 
     // Pointers to the host controller registers.
     xhci_op_regs_t      *op_regs;
@@ -338,11 +340,6 @@ typedef struct {
 
     // Keyboard endpoint ID lookup table
     uint8_t             kbd_ep_id   [MAX_KEYBOARDS];
-
-    // Circular buffer for received keycodes.
-    uint8_t             kc_buffer[WS_KC_BUFFER_SIZE];
-    int32_t             kc_index_i;
-    int32_t             kc_index_o;
 } workspace_t  __attribute__ ((aligned (64)));
 
 //------------------------------------------------------------------------------
@@ -881,7 +878,7 @@ static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id)
     return -1;
 }
 
-static uint8_t get_keycode(const usb_hcd_t *hcd)
+static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
@@ -894,28 +891,15 @@ static uint8_t get_keycode(const usb_hcd_t *hcd)
         if (kbd_idx < 0) continue;
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
-        uint8_t keycode = kbd_rpt->key_code[0];
-        if (keycode != 0) {
-            int kc_index_i = ws->kc_index_i;
-            int kc_index_n = (kc_index_i + 1) % WS_KC_BUFFER_SIZE;
-            if (kc_index_n != ws->kc_index_o) {
-                ws->kc_buffer[kc_index_i] = keycode;
-                ws->kc_index_i = kc_index_n;
-            }
-        }
+
+        hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
+        process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt);
+        *prev_kbd_rpt = *kbd_rpt;
 
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
         issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));
         ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
     }
-
-    int kc_index_o = ws->kc_index_o;
-    if (kc_index_o != ws->kc_index_i) {
-        ws->kc_index_o = (kc_index_o + 1) % WS_KC_BUFFER_SIZE;
-        return ws->kc_buffer[kc_index_o];
-    }
-
-    return 0;
 }
 
 static bool set_heap_segment(void)
@@ -945,7 +929,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = configure_kbd_ep,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
-    .get_keycode         = get_keycode
+    .poll_keyboards      = poll_keyboards
 };
 
 //------------------------------------------------------------------------------
