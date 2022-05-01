@@ -393,6 +393,8 @@ static void poll_keyboards(const usb_hcd_t *hcd)
                 hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
                 process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt);
                 *prev_kbd_rpt = *kbd_rpt;
+
+                write32(&kbd_td->token, read32(&kbd_td->token) ^ UHCI_TD_DT(1));
             }
 
             // Reenable the TD.
