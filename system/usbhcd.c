@@ -679,7 +679,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     return keyboard_found;
 }
 
-bool process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report)
+bool process_usb_keyboard_report(const usb_hcd_t *hcd, const hid_kbd_rpt_t *report, const hid_kbd_rpt_t *prev_report)
 {
     hcd_workspace_t *ws = hcd->ws;
 

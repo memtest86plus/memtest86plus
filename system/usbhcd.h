@@ -274,7 +274,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
  *
  * Used internally by the various HCI drivers.
  */
-bool process_usb_keyboard_report(const usb_hcd_t *hcd, hid_kbd_rpt_t *report, hid_kbd_rpt_t *prev_report);
+bool process_usb_keyboard_report(const usb_hcd_t *hcd, const hid_kbd_rpt_t *report, const hid_kbd_rpt_t *prev_report);
 
 /**
  * Scans the attached USB devices and initialises all HID keyboard devices
