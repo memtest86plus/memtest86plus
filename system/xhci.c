@@ -211,7 +211,7 @@ typedef struct {
     uint8_t             id_specific[2];
 } xhci_ext_cap_t;
 
-typedef struct {
+typedef volatile struct {
     uint8_t             id;
     uint8_t             next_offset;
     uint8_t             bios_owns;
@@ -987,7 +987,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
             xhci_legacy_support_t *legacy_support = (xhci_legacy_support_t *)ext_cap_base;
             // Take ownership from the SMM if necessary.
             int timer = 1000;
-            legacy_support->host_owns = 0x1;
+            legacy_support->host_owns |= 0x1;
             while (legacy_support->bios_owns & 0x1) {
                 if (timer == 0) return false;
                 usleep(1*MILLISEC);
