@@ -187,8 +187,8 @@ static void parse_option(const char *option, const char *params)
         usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
-    } else if (strncmp(option, "smp", 4) == 0) {
-        smp_enabled = true;
+    } else if (strncmp(option, "nosmp", 6) == 0) {
+        smp_enabled = false;
     } else if (strncmp(option, "trace", 6) == 0) {
         enable_trace = true;
     } else if (strncmp(option, "usbdebug", 9) == 0) {

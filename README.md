@@ -120,8 +120,8 @@ option consists of an option name, optionally followed by an `=` sign and
 one or more parameters, separated by commas. The following options are
 recognised:
 
-  * smp
-    * enables the use of multiple CPU cores at startup
+  * nosmp
+    * disables ACPI table parsing and the use of multiple CPU cores
   * nosm
     * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
   * nopause
