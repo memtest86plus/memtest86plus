@@ -795,9 +795,9 @@ void config_menu(bool initial)
         prints(POP_R+5,  POP_LI, "<F3>  CPU sequencing mode");
         prints(POP_R+6,  POP_LI, "<F4>  Error reporting mode");
         if (initial) {
-            if (num_available_cpus < 2)  set_foreground_colour(BOLD+BLACK);
+            if (!smp_enabled)  set_foreground_colour(BOLD+BLACK);
             prints(POP_R+7,  POP_LI, "<F5>  CPU selection");
-            if (num_available_cpus < 2)  set_foreground_colour(WHITE);
+            if (!smp_enabled)  set_foreground_colour(WHITE);
             if (no_temperature) set_foreground_colour(BOLD+BLACK);
             printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
             if (no_temperature) set_foreground_colour(WHITE);
@@ -829,7 +829,7 @@ void config_menu(bool initial)
             break;
           case '5':
             if (initial) {
-                if (num_available_cpus > 1) {
+                if (smp_enabled) {
                     cpu_selection_menu();
                 }
             } else {
@@ -880,7 +880,9 @@ void initial_config(void)
 {
     display_initial_notice();
 
-    bool smp_init_done = false;
+    if (num_available_cpus < 2) {
+        smp_enabled = false;
+    }
     if (pause_at_start) {
         bool got_key = false;
         for (int i = 0; i < 3000 && !got_key; i++) {
@@ -892,8 +894,6 @@ void initial_config(void)
                 reboot();
                 break;
               case '1':
-                smp_init(smp_enabled);
-                smp_init_done = true;
                 config_menu(true);
                 got_key = true;
                 break;
@@ -912,8 +912,5 @@ void initial_config(void)
                 break;
             }
         }
-    }
-    if (!smp_init_done) {
-        smp_init(smp_enabled);
     }
 }

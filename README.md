@@ -170,7 +170,7 @@ At startup, and when running tests, Memtest86+ responds to the following keys:
   * F1
     * enters the configuration menu
   * F2
-    * toggles detection and use of multiple CPU cores (SMP)
+    * toggles use of multiple CPU cores (SMP)
   * Space
     * toggles scroll lock (stops/starts error message scrolling)
   * Enter

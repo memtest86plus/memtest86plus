@@ -224,6 +224,14 @@ static void global_init(void)
 
     config_init();
 
+    smp_init(smp_enabled);
+
+    // At this point we have started reserving physical pages in the memory
+    // map for data structures that need to be permanently pinned in place.
+    // This may overwrite any data structures passed to us by the BIOS and/or
+    // boot loader, e.g. the boot parameters, boot command line, and ACPI
+    // tables. So do not access those data structures after this point.
+
     keyboard_init();
 
     display_init();
