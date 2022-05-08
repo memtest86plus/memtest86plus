@@ -33,6 +33,7 @@
 
 static efi_guid_t EFI_CONSOLE_OUT_DEVICE_GUID         = { 0xd3b36f2c, 0xd551, 0x11d4, {0x9a, 0x46, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d} };
 static efi_guid_t EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID   = { 0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a} };
+static efi_guid_t EFI_LOADED_IMAGE_PROTOCOL_GUID      = { 0x5b1b31a1, 0x9562, 0x11d2, {0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b} };
 
 static efi_system_table_t *sys_table = NULL;
 
@@ -167,6 +168,28 @@ static void test_frame_buffer(screen_info_t *si)
     }
 }
 #endif
+
+static int get_cmd_line_length(efi_loaded_image_t *image)
+{
+    // We only use ASCII characters in our command line options, so for simplicity
+    // just truncate the command line if we find a non-ASCII character.
+    efi_char16_t *cmd_line = (efi_char16_t *)image->load_options;
+    int max_length = image->load_options_size / sizeof(efi_char16_t);
+    int length = 0;
+    while (length < max_length && cmd_line[length] > 0x00 && cmd_line[length] < 0x80) {
+        length++;
+    }
+    return length;
+}
+
+static void get_cmd_line(efi_loaded_image_t *image, int num_chars, char *buffer)
+{
+    efi_char16_t *cmd_line = (efi_char16_t *)image->load_options;
+    for (int i = 0; i < num_chars; i++) {
+        buffer[i] = cmd_line[i];
+    }
+    buffer[num_chars] = '\0';
+}
 
 static efi_memory_desc_t *get_memory_desc(uintptr_t map_addr, size_t desc_size, size_t n)
 {
@@ -647,12 +670,26 @@ boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg,
     }
 
     if (boot_params == NULL) {
-        status = alloc_low_memory((void **)&boot_params, sizeof(boot_params_t), 0);
+        efi_loaded_image_t *image;
+        status = efi_call_bs(handle_protocol, handle, &EFI_LOADED_IMAGE_PROTOCOL_GUID, (void **)&image);
+        if (status != EFI_SUCCESS) {
+            print_string("failed to get handle for loaded image protocol\n");
+            goto fail;
+        }
+
+        int cmd_line_length = get_cmd_line_length(image);
+
+        status = alloc_low_memory((void **)&boot_params, sizeof(boot_params_t) + cmd_line_length + 1, 0);
         if (status != EFI_SUCCESS) {
             print_string("failed to allocate low memory for boot params\n");
             goto fail;
         }
         memset(boot_params, 0, sizeof(boot_params_t));
+
+        uintptr_t cmd_line_addr = (uintptr_t)boot_params + sizeof(boot_params_t);
+        get_cmd_line(image, cmd_line_length, (char *)cmd_line_addr);
+        boot_params->cmd_line_ptr  = cmd_line_addr;
+        boot_params->cmd_line_size = cmd_line_length + 1;
     }
 
     boot_params->code32_start = (uintptr_t)startup32;
