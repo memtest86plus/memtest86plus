@@ -191,6 +191,21 @@ static void get_cmd_line(efi_loaded_image_t *image, int num_chars, char *buffer)
     buffer[num_chars] = '\0';
 }
 
+static efi_status_t alloc_memory(void **ptr, size_t size, efi_phys_addr_t max_addr)
+{
+    efi_status_t status;
+
+    size_t num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    efi_phys_addr_t addr = max_addr;
+    status = efi_call_bs(allocate_pages, EFI_ALLOCATE_MAX_ADDRESS, EFI_LOADER_DATA, num_pages, &addr);
+    if (status == EFI_SUCCESS) {
+        *ptr = (void *)(uintptr_t)addr;
+    }
+
+    return status;
+}
+
 static efi_memory_desc_t *get_memory_desc(uintptr_t map_addr, size_t desc_size, size_t n)
 {
     return (efi_memory_desc_t *)(map_addr + n * desc_size);
@@ -239,60 +254,6 @@ again:
         efi_call_bs(free_pool, *mem_map);
         goto fail;
     }
-
-fail:
-    return status;
-}
-
-static efi_status_t alloc_low_memory(void **ptr, size_t size, efi_phys_addr_t min_addr)
-{
-    efi_status_t status;
-
-    efi_memory_desc_t  *mem_map             = NULL;
-    uintn_t             mem_map_size        = 0;
-    uintn_t             mem_desc_size       = 0;
-    uint32_t            mem_desc_version    = 0;
-    uintn_t             mem_map_key         = 0;
-    uintn_t             map_buffer_size     = 0;
-
-    status = get_memory_map(&mem_map, &mem_map_size, &mem_desc_size, &mem_desc_version, &mem_map_key, &map_buffer_size);
-    if (status != EFI_SUCCESS) {
-        goto fail;
-    }
-
-    size_t num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-    size_t num_descs = mem_map_size / mem_desc_size;
-
-    for (size_t i = 0; i < num_descs; i++) {
-        efi_memory_desc_t *desc = get_memory_desc((uintptr_t)mem_map, mem_desc_size, i);
-
-        if (desc->type != EFI_CONVENTIONAL_MEMORY) {
-            continue;
-        }
-        if (desc->num_pages < num_pages) {
-            continue;
-        }
-
-        efi_phys_addr_t start = desc->phys_addr;
-        efi_phys_addr_t end   = start + desc->num_pages * PAGE_SIZE;
-
-        if (start < min_addr) {
-            start = min_addr;
-        }
-        start = round_up(start, PAGE_SIZE);
-        if ((start + size) > end) {
-            continue;
-        }
-
-        status = efi_call_bs(allocate_pages, EFI_ALLOCATE_ADDRESS, EFI_LOADER_DATA, num_pages, &start);
-        if (status == EFI_SUCCESS) {
-            *ptr = (void *)(uintptr_t)start;
-            efi_call_bs(free_pool, mem_map);
-            return EFI_SUCCESS;
-        }
-    }
-    efi_call_bs(free_pool, mem_map);
-    status = EFI_NOT_FOUND;
 
 fail:
     return status;
@@ -679,7 +640,8 @@ boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg,
 
         int cmd_line_length = get_cmd_line_length(image);
 
-        status = alloc_low_memory((void **)&boot_params, sizeof(boot_params_t) + cmd_line_length + 1, 0);
+        // Allocate below 3GB to avoid having to remap.
+        status = alloc_memory((void **)&boot_params, sizeof(boot_params_t) + cmd_line_length + 1, 0xbfffffff);
         if (status != EFI_SUCCESS) {
             print_string("failed to allocate low memory for boot params\n");
             goto fail;

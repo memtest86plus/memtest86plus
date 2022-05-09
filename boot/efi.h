@@ -38,7 +38,8 @@
 /**
  * EFI_ALLOCATE_TYPE values.
  */
-#define EFI_ALLOCATE_ADDRESS    2
+#define EFI_ALLOCATE_MAX_ADDRESS    1
+#define EFI_ALLOCATE_ADDRESS        2
 
 /**
  * EFI_MEMORY_TYPE values.
