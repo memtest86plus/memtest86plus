@@ -81,7 +81,13 @@ typedef enum {
 #define display_threading_disabled() \
     prints(7,31, "Disabled")
 
-#define display_cpu_topo_hybrid(num_threads) \
+#define display_cpu_topo_hybrid(num_pcores, num_ecores, num_threads) \
+    { \
+        clear_screen_region(7, 5, 7, 25); \
+        printf(7, 5, "%uP+%uE-Cores (%uT)", num_pcores, num_ecores, num_threads); \
+    }
+
+#define display_cpu_topo_hybrid_short(num_threads) \
     printf(7, 5, "%u Threads (Hybrid)", num_threads)
 
 #define display_cpu_topo_multi_socket(num_sockets, num_cores, num_threads) \

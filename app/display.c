@@ -178,6 +178,7 @@ void display_cpu_topology(void)
     extern int num_enabled_cpus;
     int num_cpu_sockets = 1;
 
+    // Display Thread Count and Thread Dispatch Mode
     if (smp_enabled) {
         display_threading(num_enabled_cpus, cpu_mode_str[cpu_mode]);
     } else {
@@ -197,16 +198,25 @@ void display_cpu_topology(void)
 
     // Compute number of sockets according to individual CPU core count
     if (num_enabled_cpus > cpuid_info.topology.thread_count &&
-       num_enabled_cpus % cpuid_info.topology.thread_count == 0) {
-
+        num_enabled_cpus % cpuid_info.topology.thread_count == 0) {
         num_cpu_sockets  = num_enabled_cpus / cpuid_info.topology.thread_count;
     }
 
-
-    // Temporary workaround for Hybrid CPUs.
-    // TODO: run cpuid on each core to get correct P+E topology
+    // Display P/E-Core count for Hybrid CPUs.
     if (cpuid_info.topology.is_hybrid) {
-        display_cpu_topo_hybrid(cpuid_info.topology.thread_count);
+        if (cpuid_info.topology.pcore_count > 1) {
+
+            if (cpuid_info.flags.htt &&
+                (cpuid_info.topology.thread_count - cpuid_info.topology.ecore_count) == cpuid_info.topology.pcore_count) {
+                    cpuid_info.topology.pcore_count /= 2;
+            }
+
+            display_cpu_topo_hybrid(cpuid_info.topology.pcore_count,
+                                    cpuid_info.topology.ecore_count,
+                                    cpuid_info.topology.thread_count);
+        } else {
+            display_cpu_topo_hybrid_short(cpuid_info.topology.thread_count);
+        }
         return;
     }
 

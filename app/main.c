@@ -300,6 +300,25 @@ static void global_init(void)
     restart = false;
 }
 
+static void ap_enumerate(int my_cpu)
+{
+    if (!cpuid_info.topology.is_hybrid) {
+        return;
+    }
+
+    hybrid_core_type[my_cpu] = get_ap_hybrid_type();
+
+    if (hybrid_core_type[my_cpu] == CORE_PCORE) {
+        cpuid_info.topology.pcore_count++;
+    } else if (hybrid_core_type[my_cpu] == CORE_ECORE) {
+        cpuid_info.topology.ecore_count++;
+    }
+
+    if (my_cpu == num_enabled_cpus - 1) {
+        display_cpu_topology();
+    }
+}
+
 static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 {
     vm_map_size = 0;
@@ -499,6 +518,7 @@ void main(void)
         } else {
             trace(my_cpu, "AP started");
             cpu_state[my_cpu] = CPU_STATE_RUNNING;
+            ap_enumerate(my_cpu);
             while (init_state < 2) {
                 usleep(100);
             }

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2004-2022 Sam Demeulemeester.
 //
 // Derived from memtest86+ config.c:
 //
-// MemTest86+ V5.00 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.x86-secret.com - http://www.memtest.org
 // ----------------------------------------------------
 // config.c - MemTest-86  Version 3.4
 //
@@ -19,6 +17,7 @@
 #include "bootparams.h"
 
 #include "cpuinfo.h"
+#include "cpuid.h"
 #include "hwctrl.h"
 #include "keyboard.h"
 #include "memsize.h"
@@ -86,6 +85,9 @@ cpu_mode_t      cpu_mode = PAR;
 error_mode_t    error_mode = ERROR_MODE_NONE;
 
 cpu_state_t     cpu_state[MAX_CPUS];
+
+core_type_t     hybrid_core_type[MAX_CPUS];
+bool            exclude_ecores     = true;
 
 bool            smp_enabled        = true;
 
@@ -691,7 +693,14 @@ static void cpu_selection_menu(void)
     prints(POP_R+5, POP_LI, "<F3>  Add one CPU");
     prints(POP_R+6, POP_LI, "<F4>  Add CPU range");
     prints(POP_R+7, POP_LI, "<F5>  Add all CPUs");
-    prints(POP_R+8, POP_LI, "<F10> Exit menu");
+    if (cpuid_info.topology.is_hybrid) {
+        if (exclude_ecores) {
+            prints(POP_R+8, POP_LI, "<F6>  Include E-Cores");
+        } else {
+            prints(POP_R+8, POP_LI, "<F6>  Exclude E-Cores");
+        }
+    }
+    prints(POP_R+9, POP_LI, "<F10> Exit menu");
 
     display_cpu_selection(display_offset);
 
@@ -713,6 +722,10 @@ static void cpu_selection_menu(void)
             break;
           case '5':
             changed = set_all_cpus(true, display_offset);
+            break;
+          case '6':
+            exclude_ecores = !exclude_ecores;
+            prints(POP_R+8, POP_LI+6, exclude_ecores ? "Exclude" : "Include");
             break;
           case 'u':
             if (display_offset >= SEL_W) {
