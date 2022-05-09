@@ -197,14 +197,15 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
 
 static void global_init(void)
 {
-    // This is the first region we map, so is guaranteed not to fail.
-    boot_params_addr = map_region(boot_params_addr, sizeof(boot_params_t), true);
-
     floppy_off();
 
-    hwctrl_init();
-
     cpuid_init();
+
+    // Nothing before this should access the boot parameters, in case they are located above 4GB.
+    // This is the first region we map, so it is guaranteed not to fail.
+    boot_params_addr = map_region(boot_params_addr, sizeof(boot_params_t), true);
+
+    hwctrl_init();
 
     screen_init();
 
