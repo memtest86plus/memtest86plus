@@ -127,30 +127,33 @@ static void parse_serial_params(const char *params)
     }
 
     if (params[6] >= '0' && params[6] <= '9') {
-
         switch (params[6])
         {
             default:
                 return;
-            case '0':
-                tty_params_baud   = 9600;
-                tty_update_period = 5;
-                break;
             case '1':
-                tty_params_baud   = 19200;
-                tty_update_period = 4;
+                tty_params_baud   = (params[7] == '9') ? 19200 : 115200;
+                tty_update_period = (params[7] == '9') ? 4 : 2;
                 break;
             case '2':
-                tty_params_baud   = 38400;
-                tty_update_period = 3;
+                tty_params_baud   = 230400;
+                tty_update_period = 2;
                 break;
             case '3':
+                tty_params_baud   = 38400;
+                tty_update_period = 4;
+                break;
+            case '5':
                 tty_params_baud   = 57600;
                 tty_update_period = 3;
                 break;
-            case '4':
-                tty_params_baud   = 115200;
-                tty_update_period = 2;
+            case '7':
+                tty_params_baud   = 76800;
+                tty_update_period = 3;
+                break;
+            case '9':
+                tty_params_baud   = 9600;
+                tty_update_period = 5;
                 break;
         }
     }
