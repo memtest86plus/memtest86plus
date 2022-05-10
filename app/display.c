@@ -180,7 +180,11 @@ void display_cpu_topology(void)
 
     // Display Thread Count and Thread Dispatch Mode
     if (smp_enabled) {
-        display_threading(num_enabled_cpus, cpu_mode_str[cpu_mode]);
+        if (cpuid_info.topology.is_hybrid && cpuid_info.topology.ecore_count > 0 && exclude_ecores) {
+            display_threading(num_enabled_cpus - cpuid_info.topology.ecore_count, cpu_mode_str[cpu_mode]);
+        } else {
+            display_threading(num_enabled_cpus, cpu_mode_str[cpu_mode]);
+        }
     } else {
         display_threading_disabled();
     }

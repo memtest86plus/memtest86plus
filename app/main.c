@@ -314,6 +314,11 @@ static void ap_enumerate(int my_cpu)
         cpuid_info.topology.ecore_count++;
     }
 
+    if (hybrid_core_type[my_cpu] == CORE_ECORE && exclude_ecores) {
+        cpu_state[my_cpu] = CPU_STATE_DISABLED;
+        //TODO : hlt AP?
+    }
+
     if (my_cpu == num_enabled_cpus - 1) {
         display_cpu_topology();
     }
