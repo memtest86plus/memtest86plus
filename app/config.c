@@ -110,53 +110,60 @@ int             tty_update_period  = 2; // Update TTY every 2 seconds (default)
 
 static void parse_serial_params(const char *params)
 {
+    enable_tty = true;
+
+    // No parameters passed (only "console"), use default
+     if (params == NULL) {
+        return;
+    }
+
+    // No TTY port passed, use default ttyS0
     if (strncmp(params, "ttyS", 5) == 0) {
         return;
     }
 
+    // Configure TTY port or use default
     if (params[4] >= '0' && params[4] <= '3') {
         tty_params_port = params[4] - '0';
     } else {
         return;
     }
 
-    enable_tty = true;
-
-    if (params[5] != ',' && params[5] != ' ') {
+    // No Baud Rate specified, use default
+    if (params[5] != ',' || params[6] == '\0') {
         return;
     }
 
-    if (params[6] >= '0' && params[6] <= '9') {
-        switch (params[6])
-        {
-            default:
-                return;
-            case '1':
-                tty_params_baud   = (params[7] == '9') ? 19200 : 115200;
-                tty_update_period = (params[7] == '9') ? 4 : 2;
-                break;
-            case '2':
-                tty_params_baud   = 230400;
-                tty_update_period = 2;
-                break;
-            case '3':
-                tty_params_baud   = 38400;
-                tty_update_period = 4;
-                break;
-            case '5':
-                tty_params_baud   = 57600;
-                tty_update_period = 3;
-                break;
-            case '7':
-                tty_params_baud   = 76800;
-                tty_update_period = 3;
-                break;
-            case '9':
-                tty_params_baud   = 9600;
-                tty_update_period = 5;
-                break;
-        }
+    switch (params[6])
+    {
+        default:
+            return;
+        case '1':
+            tty_params_baud   = (params[7] == '9') ? 19200 : 115200;
+            tty_update_period = (params[7] == '9') ? 4 : 2;
+            break;
+        case '2':
+            tty_params_baud   = 230400;
+            tty_update_period = 2;
+            break;
+        case '3':
+            tty_params_baud   = 38400;
+            tty_update_period = 4;
+            break;
+        case '5':
+            tty_params_baud   = 57600;
+            tty_update_period = 3;
+            break;
+        case '7':
+            tty_params_baud   = 76800;
+            tty_update_period = 3;
+            break;
+        case '9':
+            tty_params_baud   = 9600;
+            tty_update_period = 5;
+            break;
     }
+
 }
 
 static void parse_option(const char *option, const char *params)
@@ -181,9 +188,7 @@ static void parse_option(const char *option, const char *params)
             power_save = POWER_SAVE_HIGH;
         }
     } else if (strncmp(option, "console", 8) == 0) {
-        if (params != NULL) {
-            parse_serial_params(params);
-        }
+        parse_serial_params(params);
     } else if (strncmp(option, "nobench", 8) == 0) {
         enable_bench = false;
     } else if (strncmp(option, "noehci", 7) == 0) {

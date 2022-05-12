@@ -217,13 +217,13 @@ static void global_init(void)
 
     membw_init();
 
-    tty_init();
-
     smbios_init();
 
     badram_init();
 
     config_init();
+
+    tty_init();
 
     smp_init(smp_enabled);
 
