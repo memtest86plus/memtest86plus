@@ -744,7 +744,7 @@ ap_trampoline:
 	movl	%edi, %eax
 	addl	$(gdt - startup), %eax
 	movl	%eax, (ap_gdt_descr - ap_trampoline + 2)
-	lgdt	ap_gdt_descr - ap_trampoline
+data32	lgdt	ap_gdt_descr - ap_trampoline
 
 	# Switch to protected mode and reload the segment registers.
 

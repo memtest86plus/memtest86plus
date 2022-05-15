@@ -556,7 +556,7 @@ ap_trampoline:
 	movl	%ebx, %eax
 	addl	$(gdt - startup), %eax
 	movl	%eax, (ap_gdt_descr - ap_trampoline + 2)
-	lgdt	ap_gdt_descr - ap_trampoline
+data32	lgdt	ap_gdt_descr - ap_trampoline
 
 	# Set the page directory base address.
 
