@@ -68,11 +68,11 @@ cmd_line_ptr:
 initrd_addr_max:
 	.long	0xffffffff
 kernel_alignment:
-	.long	0
+	.long	4096
 relocatable_kernel:
 	.byte	0
 min_alignment:
-	.byte	0
+	.byte	12
 xload_flags:
 #ifdef __x86_64__
 	.word	0x9		# XLF_KERNEL_64,XLF_EFI_HANDOVER_64
