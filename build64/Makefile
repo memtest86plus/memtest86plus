@@ -38,7 +38,6 @@ SYS_OBJS = system/cpuid.o \
            system/xhci.o
 
 LIB_OBJS = lib/barrier.o \
-           lib/ctype.o \
            lib/print.o \
            lib/read.o \
            lib/string.o \
