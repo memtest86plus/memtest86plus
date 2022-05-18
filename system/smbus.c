@@ -155,7 +155,7 @@ void print_smbus_startup_info(void) {
 
             if (curspd.isValid) {
                 if(spd_line_idx == 0) {
-                    prints(LINE_SPD-2, 0, "Memory SPD Informations");
+                    prints(LINE_SPD-2, 0, "Memory SPD Information");
                     prints(LINE_SPD-1, 0, "-----------------------");
                 }
 
@@ -172,7 +172,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     uint16_t i;
 
     // Print Slot Index, Module Size, type & Max frequency (Jedec or XMP)
-    curcol = printf(LINE_SPD+lidx, 0, " - Slot %i : %kB %s-%i",
+    curcol = printf(LINE_SPD+lidx, 0, " Slot %i: %kB %s-%i",
                     spdi.slot_num,
                     spdi.module_size * 1024,
                     spdi.type,
@@ -191,7 +191,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 
     // Print Manufacturer from JEDEC106
-    for (i = 0; i < JEP106_CNT ; i++) {
+    for (i = 0; i < JEP106_CNT; i++) {
 
         if (spdi.jedec_code == jep106[i].jedec_code) {
             curcol = printf(LINE_SPD+lidx, curcol, " - %s", jep106[i].name);
@@ -205,13 +205,23 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 
     // Print SKU
+    if (spdi.sku_len)
+        curcol++;
+
     for(i = 0; i < spdi.sku_len; i++) {
-        printc(LINE_SPD+lidx, ++curcol, spdi.sku[i]);
+        printc(LINE_SPD+lidx, curcol++, spdi.sku[i]);
     }
 
-    // Print Manufacturing date (only if valid)
-    if (curcol <= 72 && spdi.fab_year > 1 && spdi.fab_year < 32 && spdi.fab_week < 53) {
-        curcol = printf(LINE_SPD+lidx, curcol, " (W%02i'%02i)", spdi.fab_week, spdi.fab_year);
+    // Check manufacturing date and print if valid.
+    // fab_year is uint8_t and carries only the last two digits.
+    //  - for 0..31 we assume 20xx, and 0 means 2000.
+    //  - for 96..99 we assume 19xx.
+    //  - values 32..95 and > 99 are considered invalid.
+    if (curcol <= 72 && spdi.fab_week < 53 &&
+        (spdi.fab_year < 32 || (spdi.fab_year >= 96 && spdi.fab_year <= 99))) {
+        curcol = printf(LINE_SPD+lidx, curcol, " %02i%02i-W%02i",
+                        spdi.fab_year >= 96 ? 19 : 20,
+                        spdi.fab_year, spdi.fab_week);
     }
 
     // Populate global ram var
