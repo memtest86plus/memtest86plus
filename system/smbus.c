@@ -1135,7 +1135,7 @@ static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
     uint8_t spd_byte18 = get_spd(smb_idx, slot_idx, 18);
     for (int shft = 0; shft < 7; shft++) {
         if ((spd_byte18 >> shft) & 1) {
-            spdi.tCL = shft;
+            spdi.tCL = shft + 1;
             break;
         }
     }
