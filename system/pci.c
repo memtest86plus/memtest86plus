@@ -244,6 +244,30 @@ void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value)
     }
 }
 
+
+// -------------
+// LPC Functions
+// -------------
+
+void lpc_outb(uint8_t cmd, uint8_t data)
+{
+    outb(cmd, 0x2E);
+    usleep(100);
+    outb(data, 0x2F);
+    usleep(100);
+}
+
+uint8_t lpc_inb(uint8_t reg)
+{
+    outb(reg, 0x2E);
+    usleep(100);
+    return inb(0x2F);
+}
+
+// ---------------------------------------
+// AMD System Management Network Functions
+// ---------------------------------------
+
 uint32_t amd_smn_read(uint32_t adr)
 {
   pci_config_write32(0, 0, 0, 0x60, adr);

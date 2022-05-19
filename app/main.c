@@ -22,6 +22,7 @@
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwctrl.h"
+#include "hwquirks.h"
 #include "io.h"
 #include "keyboard.h"
 #include "pmem.h"
@@ -218,6 +219,8 @@ static void global_init(void)
     membw_init();
 
     smbios_init();
+
+    quirks_init();
 
     badram_init();
 
