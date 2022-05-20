@@ -47,6 +47,7 @@
 /* AMD-Specific constants */
 #define AMD_INDEX_IO_PORT   0xCD6
 #define AMD_DATA_IO_PORT    0xCD7
+#define AMD_SMBUS_BASE_REG  0x2C
 #define AMD_PM_INDEX        0x00
 
 #define SPD5_MR11 11

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2004-2022 Samuel Demeulemeester
-//
 
 #include "display.h"
 
@@ -20,7 +19,7 @@
 ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
 
 int smbdev, smbfun;
-unsigned short smbusbase;
+unsigned short smbusbase = 0;
 
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
@@ -36,11 +35,22 @@ static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
 
+static void amd_sb_get_smb(void);
 static void fch_zen_get_smb(void);
-
+static void piix4_get_smb(void);
 static void ich5_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
+
+// ----------------------------------------------------------
+// WARNING: Be careful when adding a controller ID!
+// Incorrect SMB accesses (ie: on bank switch) can brick your
+// motherboard or your memory module.
+//                           ----
+// No Pull Request including a new SMBUS Controller will be
+// accepted without a proof (screenshot) that it has been
+// tested successfully on a real motherboard.
+// ----------------------------------------------------------
 
 static const struct pci_smbus_controller smbcontrollers[] = {
     {0x8086, 0x2413, "82801AA (ICH)",           ich5_get_smb, ich5_read_spd_byte},
@@ -103,7 +113,7 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     {0x8086, 0x54A3, "Alder Lake-M (PCH)",      ich5_get_smb, ich5_read_spd_byte},
 
      // AMD SMBUS
-     {0x1022, 0x780B, "AMD FCH", NULL, NULL},
+     {0x1022, 0x780B, "AMD SB800/900",          amd_sb_get_smb, ich5_read_spd_byte},
      {0x1022, 0x790B, "AMD FCH (Zen)",          fch_zen_get_smb, ich5_read_spd_byte},
      {0, 0, "", NULL, NULL}
 };
@@ -124,6 +134,10 @@ void print_smbus_startup_info(void) {
     }
 
     smbcontrollers[index].get_adr();
+
+    if (smbusbase == 0) {
+        return;
+    }
 
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
 
@@ -1213,16 +1227,29 @@ static int find_smb_controller(void)
     return -1;
 }
 
-// ------------------
-// i801 / ICH5 Access
-// ------------------
+// ----------------------
+// PIIX4 SMBUS Controller
+// ----------------------
+
+static void piix4_get_smb(void)
+{
+    uint16_t x = pci_config_read16(0, smbdev, smbfun, 0x90) & 0xFFF0;
+
+    if (x != 0) {
+        smbusbase = x;
+    }
+}
+
+// ----------------------------
+// i801 / ICH5 SMBUS Controller
+// ----------------------------
 
 static void ich5_get_smb(void)
 {
-    unsigned long x;
+    uint16_t x;
 
     x = pci_config_read16(0, smbdev, smbfun, 0x20);
-    smbusbase = (unsigned short) x & 0xFFF0;
+    smbusbase = x & 0xFFF0;
 
     // Enable I2C Bus
     uint8_t temp = pci_config_read8(0, smbdev, smbfun, 0x40);
@@ -1234,6 +1261,63 @@ static void ich5_get_smb(void)
     __outb(__inb(SMBHSTSTS) & 0x1F, SMBHSTSTS);
     usleep(1000);
 }
+
+// --------------------
+// AMD SMBUS Controller
+// --------------------
+
+static void amd_sb_get_smb(void)
+{
+    uint8_t rev_id;
+    uint16_t pm_reg;
+
+    rev_id = pci_config_read8(0, smbdev, smbfun, 0x08);
+
+    // AMD did the switch between PIIX4 and proprietary SMBase Access somewhere
+    // between rev 0x30 and 0x3A. Assume 0x3A (Tested OK on AM1 SoC)
+    if (rev_id < 0x3A) {
+         // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
+         piix4_get_smb();
+    } else {
+         // Newer AMD SouthBridge (SB800 up to Zen) uses specific registers
+        __outb(AMD_SMBUS_BASE_REG + 1, AMD_INDEX_IO_PORT);
+        pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
+        __outb(AMD_SMBUS_BASE_REG, AMD_INDEX_IO_PORT);
+        pm_reg |= __inb(AMD_DATA_IO_PORT) & 0xE0;
+
+        if (pm_reg != 0xFFE0 && pm_reg != 0) {
+            smbusbase = pm_reg;
+        }
+    }
+}
+
+static void fch_zen_get_smb(void)
+{
+    uint16_t pm_reg;
+
+    __outb(AMD_PM_INDEX + 1, AMD_INDEX_IO_PORT);
+    pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
+    __outb(AMD_PM_INDEX, AMD_INDEX_IO_PORT);
+    pm_reg |= __inb(AMD_DATA_IO_PORT);
+
+    printf(22,0,"pmreg: 0x%x",pm_reg);
+
+    // Special case for AMD Cezanne (get smb address in memory)
+    if (imc_type == IMC_K19_CZN && pm_reg == 0xFFFF) {
+        smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
+        return;
+    }
+
+    // Check if IO Smbus is enabled.
+    if ((pm_reg & 0x10) == 0) {
+        return;
+    }
+
+    if ((pm_reg & 0xFF00) != 0) {
+        smbusbase = pm_reg & 0xFF00;
+    }
+}
+
 
 /*************************************************************************************
 / *****************************         WARNING          *****************************
@@ -1333,35 +1417,4 @@ static uint8_t ich5_process(void)
     }
 
     return 0;
-}
-
-// --------------------
-// AMD SMBUS Controller
-// --------------------
-
-static void fch_zen_get_smb(void)
-{
-    uint16_t pm_reg;
-
-    smbusbase = 0;
-
-    __outb(AMD_PM_INDEX + 1, AMD_INDEX_IO_PORT);
-    pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
-    __outb(AMD_PM_INDEX, AMD_INDEX_IO_PORT);
-    pm_reg |= __inb(AMD_DATA_IO_PORT);
-
-    // Special case for AMD Cezanne (get smb address in memory)
-    if (imc_type == IMC_K19_CZN && pm_reg == 0xFFFF) {
-        smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
-        return;
-    }
-
-    // Check if IO Smbus is enabled.
-    if ((pm_reg & 0x10) == 0) {
-        return;
-    }
-
-    if ((pm_reg & 0xFF00) != 0) {
-        smbusbase = pm_reg & 0xFF00;
-    }
 }
