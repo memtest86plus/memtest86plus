@@ -60,6 +60,13 @@ void pci_config_write16(int bus, int dev, int func, int reg, uint16_t value);
 void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value);
 
 
+/**
+ * Basic LPC Functions
+ */
+
+void lpc_outb(uint8_t cmd, uint8_t data);
+uint8_t lpc_inb(uint8_t reg);
+
 /*
  * Add some SNM related function (S.DEMEULEMEESTER)
  */
