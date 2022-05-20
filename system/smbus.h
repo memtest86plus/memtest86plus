@@ -55,9 +55,7 @@
 struct pci_smbus_controller{
     unsigned vendor;
     unsigned device;
-    char *name;
     void (*get_adr)(void);
-    uint8_t (*read_spd_byte)(uint8_t dimmadr, uint16_t bytenum);
 };
 
 typedef struct spd_infos {
@@ -91,8 +89,8 @@ typedef struct ram_infos {
 
 extern ram_info ram;
 
-#define get_spd(smb_idx, slot_idx, spd_adr) \
-    smbcontrollers[smb_idx].read_spd_byte(slot_idx, spd_adr)
+#define get_spd(slot_idx, spd_adr) \
+    ich5_read_spd_byte(slot_idx, spd_adr)
 
 /**
  * Print SMBUS Info

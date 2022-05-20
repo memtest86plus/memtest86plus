@@ -24,13 +24,13 @@ unsigned short smbusbase = 0;
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
 
-static spd_info parse_spd_rdram (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_sdram (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr   (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr2  (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr3  (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr4  (uint8_t smb_idx, uint8_t slot_idx);
-static spd_info parse_spd_ddr5  (uint8_t smb_idx, uint8_t slot_idx);
+static spd_info parse_spd_rdram (uint8_t slot_idx);
+static spd_info parse_spd_sdram (uint8_t slot_idx);
+static spd_info parse_spd_ddr   (uint8_t slot_idx);
+static spd_info parse_spd_ddr2  (uint8_t slot_idx);
+static spd_info parse_spd_ddr3  (uint8_t slot_idx);
+static spd_info parse_spd_ddr4  (uint8_t slot_idx);
+static spd_info parse_spd_ddr5  (uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
@@ -53,69 +53,69 @@ static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 // ----------------------------------------------------------
 
 static const struct pci_smbus_controller smbcontrollers[] = {
-    {0x8086, 0x2413, "82801AA (ICH)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x2423, "82801AB (ICH)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x2443, "82801BA (ICH2)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x2483, "82801CA (ICH3)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x24C3, "82801DB (ICH4)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x24D3, "82801E (ICH5)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x25A4, "6300ESB",                 ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x266A, "82801F (ICH6)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x269B, "6310ESB/6320ESB",         ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x27DA, "82801G (ICH7)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x283E, "82801H (ICH8)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x2930, "82801I (ICH9)",           ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x5032, "EP80579 (Tolapai)",       ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x3A30, "ICH10",                   ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x3A60, "ICH10",                   ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x3B30, "5/3400 Series (PCH)",     ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1C22, "6 Series (PCH)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1D22, "Patsburg (PCH)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1D70, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1D71, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1D72, "Patsburg (PCH) IDF",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x2330, "DH89xxCC (PCH)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1E22, "Panther Point (PCH)",     ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x8C22, "Lynx Point (PCH)",        ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x9C22, "Lynx Point-LP (PCH)",     ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1F3C, "Avoton (SOC)",            ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x8D22, "Wellsburg (PCH)",         ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x8D7D, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x8D7E, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x8D7F, "Wellsburg (PCH) MS",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x23B0, "Coleto Creek (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x8CA2, "Wildcat Point (PCH)",     ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x9CA2, "Wildcat Point-LP (PCH)",  ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x0F12, "BayTrail (SOC)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x2292, "Braswell (SOC)",          ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA123, "Sunrise Point-H (PCH) ",  ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x9D23, "Sunrise Point-LP (PCH)",  ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x19DF, "Denverton  (SOC)",        ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x1BC9, "Emmitsburg (PCH)",        ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA1A3, "Lewisburg (PCH)",         ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA223, "Lewisburg Super (PCH)",   ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA2A3, "Kaby Lake (PCH-H)",       ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x31D4, "Gemini Lake (SOC)",       ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA323, "Cannon Lake-H (PCH)",     ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x9DA3, "Cannon Lake-LP (PCH)",    ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x18DF, "Cedar Fork (PCH)",        ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x34A3, "Ice Lake-LP (PCH)",       ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x38A3, "Ice Lake-N (PCH)",        ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x02A3, "Comet Lake (PCH)",        ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x06A3, "Comet Lake-H (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x4B23, "Elkhart Lake (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA0A3, "Tiger Lake-LP (PCH)",     ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x43A3, "Tiger Lake-H (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x4DA3, "Jasper Lake (SOC)",       ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0xA3A3, "Comet Lake-V (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x7AA3, "Alder Lake-S (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x51A3, "Alder Lake-P (PCH)",      ich5_get_smb, ich5_read_spd_byte},
-    {0x8086, 0x54A3, "Alder Lake-M (PCH)",      ich5_get_smb, ich5_read_spd_byte},
+    {0x8086, 0x2413, ich5_get_smb},    // 82801AA (ICH)
+    {0x8086, 0x2423, ich5_get_smb},    // 82801AB (ICH)
+    {0x8086, 0x2443, ich5_get_smb},    // 82801BA (ICH2)
+    {0x8086, 0x2483, ich5_get_smb},    // 82801CA (ICH3)
+    {0x8086, 0x24C3, ich5_get_smb},    // 82801DB (ICH4)
+    {0x8086, 0x24D3, ich5_get_smb},    // 82801E (ICH5)
+    {0x8086, 0x25A4, ich5_get_smb},    // 6300ESB
+    {0x8086, 0x266A, ich5_get_smb},    // 82801F (ICH6)
+    {0x8086, 0x269B, ich5_get_smb},    // 6310ESB/6320ESB
+    {0x8086, 0x27DA, ich5_get_smb},    // 82801G (ICH7)
+    {0x8086, 0x283E, ich5_get_smb},    // 82801H (ICH8)
+    {0x8086, 0x2930, ich5_get_smb},    // 82801I (ICH9)
+    {0x8086, 0x5032, ich5_get_smb},    // EP80579 (Tolapai)
+    {0x8086, 0x3A30, ich5_get_smb},    // ICH10
+    {0x8086, 0x3A60, ich5_get_smb},    // ICH10
+    {0x8086, 0x3B30, ich5_get_smb},    // 5/3400 Series (PCH)
+    {0x8086, 0x1C22, ich5_get_smb},    // 6 Series (PCH)
+    {0x8086, 0x1D22, ich5_get_smb},    // Patsburg (PCH)
+    {0x8086, 0x1D70, ich5_get_smb},    // Patsburg (PCH) IDF
+    {0x8086, 0x1D71, ich5_get_smb},    // Patsburg (PCH) IDF
+    {0x8086, 0x1D72, ich5_get_smb},    // Patsburg (PCH) IDF
+    {0x8086, 0x2330, ich5_get_smb},    // DH89xxCC (PCH)
+    {0x8086, 0x1E22, ich5_get_smb},    // Panther Point (PCH)
+    {0x8086, 0x8C22, ich5_get_smb},    // Lynx Point (PCH)
+    {0x8086, 0x9C22, ich5_get_smb},    // Lynx Point-LP (PCH)
+    {0x8086, 0x1F3C, ich5_get_smb},    // Avoton (SOC)
+    {0x8086, 0x8D22, ich5_get_smb},    // Wellsburg (PCH)
+    {0x8086, 0x8D7D, ich5_get_smb},    // Wellsburg (PCH) MS
+    {0x8086, 0x8D7E, ich5_get_smb},    // Wellsburg (PCH) MS
+    {0x8086, 0x8D7F, ich5_get_smb},    // Wellsburg (PCH) MS
+    {0x8086, 0x23B0, ich5_get_smb},    // Coleto Creek (PCH)
+    {0x8086, 0x8CA2, ich5_get_smb},    // Wildcat Point (PCH)
+    {0x8086, 0x9CA2, ich5_get_smb},    // Wildcat Point-LP (PCH)
+    {0x8086, 0x0F12, ich5_get_smb},    // BayTrail (SOC)
+    {0x8086, 0x2292, ich5_get_smb},    // Braswell (SOC)
+    {0x8086, 0xA123, ich5_get_smb},    // Sunrise Point-H (PCH)
+    {0x8086, 0x9D23, ich5_get_smb},    // Sunrise Point-LP (PCH)
+    {0x8086, 0x19DF, ich5_get_smb},    // Denverton  (SOC)
+    {0x8086, 0x1BC9, ich5_get_smb},    // Emmitsburg (PCH)
+    {0x8086, 0xA1A3, ich5_get_smb},    // Lewisburg (PCH)
+    {0x8086, 0xA223, ich5_get_smb},    // Lewisburg Super (PCH)
+    {0x8086, 0xA2A3, ich5_get_smb},    // Kaby Lake (PCH-H)
+    {0x8086, 0x31D4, ich5_get_smb},    // Gemini Lake (SOC)
+    {0x8086, 0xA323, ich5_get_smb},    // Cannon Lake-H (PCH)
+    {0x8086, 0x9DA3, ich5_get_smb},    // Cannon Lake-LP (PCH)
+    {0x8086, 0x18DF, ich5_get_smb},    // Cedar Fork (PCH)
+    {0x8086, 0x34A3, ich5_get_smb},    // Ice Lake-LP (PCH)
+    {0x8086, 0x38A3, ich5_get_smb},    // Ice Lake-N (PCH)
+    {0x8086, 0x02A3, ich5_get_smb},    // Comet Lake (PCH)
+    {0x8086, 0x06A3, ich5_get_smb},    // Comet Lake-H (PCH)
+    {0x8086, 0x4B23, ich5_get_smb},    // Elkhart Lake (PCH)
+    {0x8086, 0xA0A3, ich5_get_smb},    // Tiger Lake-LP (PCH)
+    {0x8086, 0x43A3, ich5_get_smb},    // Tiger Lake-H (PCH)
+    {0x8086, 0x4DA3, ich5_get_smb},    // Jasper Lake (SOC)
+    {0x8086, 0xA3A3, ich5_get_smb},    // Comet Lake-V (PCH)
+    {0x8086, 0x7AA3, ich5_get_smb},    // Alder Lake-S (PCH)
+    {0x8086, 0x51A3, ich5_get_smb},    // Alder Lake-P (PCH)
+    {0x8086, 0x54A3, ich5_get_smb},    // Alder Lake-M (PCH)
 
-     // AMD SMBUS
-     {0x1022, 0x780B, "AMD SB800/900",          amd_sb_get_smb, ich5_read_spd_byte},
-     {0x1022, 0x790B, "AMD FCH (Zen)",          fch_zen_get_smb, ich5_read_spd_byte},
-     {0, 0, "", NULL, NULL}
+    //  AMD SMBUS
+    {0x1022, 0x780B, amd_sb_get_smb},  // AMD FCH (Pre-Zen)
+    {0x1022, 0x790B, fch_zen_get_smb}, // AMD FCH (Zen)
+    {0, 0, NULL}
 };
 
 void print_smbus_startup_info(void) {
@@ -141,32 +141,32 @@ void print_smbus_startup_info(void) {
 
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
 
-        if (get_spd(index, spdidx, 0) != 0xFF) {
-            switch(get_spd(index, spdidx, 2))
+        if (get_spd(spdidx, 0) != 0xFF) {
+            switch(get_spd(spdidx, 2))
             {
                 default:
                     continue;
                 case 0x12: // DDR5
-                    curspd = parse_spd_ddr5(index, spdidx);
+                    curspd = parse_spd_ddr5(spdidx);
                     break;
                 case 0x0C: // DDR4
-                    curspd = parse_spd_ddr4(index, spdidx);
+                    curspd = parse_spd_ddr4(spdidx);
                     break;
                 case 0x0B: // DDR3
-                    curspd = parse_spd_ddr3(index, spdidx);
+                    curspd = parse_spd_ddr3(spdidx);
                     break;
                 case 0x08: // DDR2
-                    curspd = parse_spd_ddr2(index, spdidx);
+                    curspd = parse_spd_ddr2(spdidx);
                     break;
                 case 0x07: // DDR
-                    curspd = parse_spd_ddr(index, spdidx);
+                    curspd = parse_spd_ddr(spdidx);
                     break;
                 case 0x04: // SDRAM
-                    curspd = parse_spd_sdram(index, spdidx);
+                    curspd = parse_spd_sdram(spdidx);
                     break;
                 case 0x01: // RAMBUS - RDRAM
-                    if (get_spd(index, spdidx, 1) == 8) {
-                        curspd = parse_spd_rdram(index, spdidx);
+                    if (get_spd(spdidx, 1) == 8) {
+                        curspd = parse_spd_rdram(spdidx);
                     }
                     break;
             }
@@ -253,7 +253,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 }
 
-static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_ddr5(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -266,7 +266,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     // Compute module size for symmetric & assymetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
         uint32_t cur_rank = 0;
-        uint8_t sbyte = get_spd(smb_idx, slot_idx, sbyte_adr * 4);
+        uint8_t sbyte = get_spd(slot_idx, sbyte_adr * 4);
 
         // SDRAM Density per die
         switch (sbyte & 0x1F)
@@ -304,7 +304,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
             cur_rank *= 1U << (((sbyte >> 5) & 7) - 1);
         }
 
-        sbyte = get_spd(smb_idx, slot_idx, 235);
+        sbyte = get_spd(slot_idx, 235);
         spdi.hasECC = (((sbyte >> 3) & 3) > 0);
 
         // Channels per DIMM
@@ -316,14 +316,14 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         cur_rank *= 1U << ((sbyte & 3) + 3);
 
         // I/O Width
-        sbyte = get_spd(smb_idx, slot_idx, (sbyte_adr * 4) + 2);
+        sbyte = get_spd(slot_idx, (sbyte_adr * 4) + 2);
         cur_rank /= 1U << (((sbyte >> 5) & 3) + 2);
 
         // Add current rank to total package size
         spdi.module_size += cur_rank;
 
         // If not Asymmetrical, don't process the second rank
-        if ((get_spd(smb_idx, slot_idx, 234) >> 6) == 0) {
+        if ((get_spd(slot_idx, 234) >> 6) == 0) {
             break;
         }
     }
@@ -332,14 +332,14 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     uint16_t tCK, tCKtmp, tns;
     int xmp_offset = 0;
 
-    spdi.XMP = ((get_spd(smb_idx, slot_idx, 640) == 0x0C && get_spd(smb_idx, slot_idx, 641) == 0x4A)) ? 3 : 0;
+    spdi.XMP = ((get_spd(slot_idx, 640) == 0x0C && get_spd(slot_idx, 641) == 0x4A)) ? 3 : 0;
 
     if (spdi.XMP == 3) {
         // XMP 3.0 (enumerate all profiles to find the fastest)
         tCK = 0;
         for (int offset = 0; offset < 3*64; offset += 64) {
-            tCKtmp = get_spd(smb_idx, slot_idx, 710 + offset) << 8 |
-                     get_spd(smb_idx, slot_idx, 709 + offset);
+            tCKtmp = get_spd(slot_idx, 710 + offset) << 8 |
+                     get_spd(slot_idx, 709 + offset);
 
             if (tCKtmp != 0 && (tCK == 0 || tCKtmp < tCK)) {
                 xmp_offset = offset;
@@ -348,8 +348,8 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         }
     } else {
         // JEDEC
-        tCK = get_spd(smb_idx, slot_idx, 21) << 8 |
-              get_spd(smb_idx, slot_idx, 20);
+        tCK = get_spd(slot_idx, 21) << 8 |
+              get_spd(slot_idx, 20);
     }
 
     if (tCK == 0) {
@@ -366,28 +366,28 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         // ------------------
 
         // CAS# Latency
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 718 + xmp_offset) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 717 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 718 + xmp_offset) << 8 |
+               (uint16_t)get_spd(slot_idx, 717 + xmp_offset);
         spdi.tCL = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# to CAS# Latency
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 720 + xmp_offset) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 719 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 720 + xmp_offset) << 8 |
+               (uint16_t)get_spd(slot_idx, 719 + xmp_offset);
         spdi.tRCD = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# Precharge
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 722 + xmp_offset) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 721 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 722 + xmp_offset) << 8 |
+               (uint16_t)get_spd(slot_idx, 721 + xmp_offset);
         spdi.tRP = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Active Time
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 724 + xmp_offset) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 723 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 724 + xmp_offset) << 8 |
+               (uint16_t)get_spd(slot_idx, 723 + xmp_offset);
         spdi.tRAS = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Cycle Time
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 726 + xmp_offset) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 725 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 726 + xmp_offset) << 8 |
+               (uint16_t)get_spd(slot_idx, 725 + xmp_offset);
         spdi.tRC = (uint16_t)(tns/tCK + 0.5f);
     } else {
         // --------------------
@@ -395,39 +395,39 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
         // --------------------
 
         // CAS# Latency
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 31) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 30);
+        tns  = (uint16_t)get_spd(slot_idx, 31) << 8 |
+               (uint16_t)get_spd(slot_idx, 30);
         spdi.tCL = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# to CAS# Latency
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 33) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 32);
+        tns  = (uint16_t)get_spd(slot_idx, 33) << 8 |
+               (uint16_t)get_spd(slot_idx, 32);
         spdi.tRCD = (uint16_t)(tns/tCK + 0.5f);
 
         // RAS# Precharge
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 35) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 34);
+        tns  = (uint16_t)get_spd(slot_idx, 35) << 8 |
+               (uint16_t)get_spd(slot_idx, 34);
         spdi.tRP = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Active Time
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 37) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 36);
+        tns  = (uint16_t)get_spd(slot_idx, 37) << 8 |
+               (uint16_t)get_spd(slot_idx, 36);
         spdi.tRAS = (uint16_t)(tns/tCK + 0.5f);
 
         // Row Cycle Time
-        tns  = (uint16_t)get_spd(smb_idx, slot_idx, 39) << 8 |
-               (uint16_t)get_spd(smb_idx, slot_idx, 38);
+        tns  = (uint16_t)get_spd(slot_idx, 39) << 8 |
+               (uint16_t)get_spd(slot_idx, 38);
         spdi.tRC = (uint16_t)(tns/tCK + 0.5f);
     }
 
     // Module manufacturer
-    spdi.jedec_code = (get_spd(smb_idx, slot_idx, 512) & 0x1F) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, 513) & 0x7F;
+    spdi.jedec_code = (get_spd(slot_idx, 512) & 0x1F) << 8;
+    spdi.jedec_code |= get_spd(slot_idx, 513) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j <= 29; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 521+j);
+        sku_byte = get_spd(slot_idx, 521+j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
             spdi.sku_len--;
@@ -439,10 +439,10 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Week & Date (BCD to Int)
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 515);
+    uint8_t bcd = get_spd(slot_idx, 515);
     spdi.fab_year =  bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 516);
+    bcd = get_spd(slot_idx, 516);
     spdi.fab_week =  bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -450,7 +450,7 @@ static spd_info parse_spd_ddr5(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_ddr4(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -460,22 +460,22 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
 
     // Compute module size in MB with shifts
     spdi.module_size = 1U << (
-                              ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)   +  // Total SDRAM capacity: (256 Mbits << byte4[3:0] with an oddity for values >= 8) / 1 KB
-                              ((get_spd(smb_idx, slot_idx, 13) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte13[2:0]
-                              ((get_spd(smb_idx, slot_idx, 12) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte12[2:0]
-                              ((get_spd(smb_idx, slot_idx, 12) >> 3) & 0x7) +  // Number of Ranks: byte12[5:3]
-                              ((get_spd(smb_idx, slot_idx, 6) >> 4) & 0x7)     // Die count - 1: byte6[6:4]
+                              ((get_spd(slot_idx, 4) & 0xF) + 5)   +  // Total SDRAM capacity: (256 Mbits << byte4[3:0] with an oddity for values >= 8) / 1 KB
+                              ((get_spd(slot_idx, 13) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte13[2:0]
+                              ((get_spd(slot_idx, 12) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte12[2:0]
+                              ((get_spd(slot_idx, 12) >> 3) & 0x7) +  // Number of Ranks: byte12[5:3]
+                              ((get_spd(slot_idx, 6) >> 4) & 0x7)     // Die count - 1: byte6[6:4]
                              );
 
-    spdi.hasECC = (((get_spd(smb_idx, slot_idx, 13) >> 3) & 1) == 1);
+    spdi.hasECC = (((get_spd(slot_idx, 13) >> 3) & 1) == 1);
 
     // Module max clock
     float tns, tckns, ramfreq;
 
-    if (get_spd(smb_idx, slot_idx, 384) == 0x0C && get_spd(smb_idx, slot_idx, 385) == 0x4A) {
+    if (get_spd(slot_idx, 384) == 0x0C && get_spd(slot_idx, 385) == 0x4A) {
         // Max XMP
-        tckns = (uint8_t)get_spd(smb_idx, slot_idx, 396) * 0.125f +
-                (int8_t)get_spd(smb_idx, slot_idx, 431)  * 0.001f;
+        tckns = (uint8_t)get_spd(slot_idx, 396) * 0.125f +
+                (int8_t)get_spd(slot_idx, 431)  * 0.001f;
 
         ramfreq =  1.0f / tckns * 2.0f * 1000.0f;
 
@@ -486,8 +486,8 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
 
     } else {
         // Max JEDEC
-        tckns = (uint8_t)get_spd(smb_idx, slot_idx, 18) * 0.125f +
-                (int8_t)get_spd(smb_idx, slot_idx, 125) * 0.001f;
+        tckns = (uint8_t)get_spd(slot_idx, 18) * 0.125f +
+                (int8_t)get_spd(slot_idx, 125) * 0.001f;
 
         ramfreq = 1.0f / tckns * 2.0f * 1000.0f;
         spdi.freq = (uint16_t)ramfreq;
@@ -502,29 +502,29 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
         // ------------------
 
         // CAS# Latency
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 401) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 430)  * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 401) * 0.125f +
+               (int8_t)get_spd(slot_idx, 430)  * 0.001f;
         spdi.tCL = (uint16_t)(tns/tckns);
 
         // RAS# to CAS# Latency
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 402) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 429)  * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 402) * 0.125f +
+               (int8_t)get_spd(slot_idx, 429)  * 0.001f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 403) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 428)  * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 403) * 0.125f +
+               (int8_t)get_spd(slot_idx, 428)  * 0.001f;
         spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
-        tns = (uint8_t)get_spd(smb_idx, slot_idx, 405) * 0.125f +
-              (int8_t)get_spd(smb_idx, slot_idx, 427)  * 0.001f  +
-              (uint8_t)(get_spd(smb_idx, slot_idx, 404) & 0x0F) * 32.0f;
+        tns = (uint8_t)get_spd(slot_idx, 405) * 0.125f +
+              (int8_t)get_spd(slot_idx, 427)  * 0.001f  +
+              (uint8_t)(get_spd(slot_idx, 404) & 0x0F) * 32.0f;
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
-        tns = (uint8_t)get_spd(smb_idx, slot_idx, 406) * 0.125f +
-              (uint8_t)(get_spd(smb_idx, slot_idx, 404) >> 4) * 32.0f;
+        tns = (uint8_t)get_spd(slot_idx, 406) * 0.125f +
+              (uint8_t)(get_spd(slot_idx, 404) >> 4) * 32.0f;
         spdi.tRC = (uint16_t)(tns/tckns);
     } else {
         // --------------------
@@ -532,39 +532,39 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
         // --------------------
 
         // CAS# Latency
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 24) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 123) * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 24) * 0.125f +
+               (int8_t)get_spd(slot_idx, 123) * 0.001f;
         spdi.tCL = (uint16_t)(tns/tckns);
 
         // RAS# to CAS# Latency
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 25) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 122) * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 25) * 0.125f +
+               (int8_t)get_spd(slot_idx, 122) * 0.001f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 26) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 121) * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 26) * 0.125f +
+               (int8_t)get_spd(slot_idx, 121) * 0.001f;
         spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
-        tns = (uint8_t)get_spd(smb_idx, slot_idx, 28) * 0.125f +
-              (uint8_t)(get_spd(smb_idx, slot_idx, 27) & 0x0F) * 32.0f;
+        tns = (uint8_t)get_spd(slot_idx, 28) * 0.125f +
+              (uint8_t)(get_spd(slot_idx, 27) & 0x0F) * 32.0f;
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
-        tns = (uint8_t)get_spd(smb_idx, slot_idx, 29) * 0.125f +
-              (uint8_t)(get_spd(smb_idx, slot_idx, 27) >> 4) * 32.0f;
+        tns = (uint8_t)get_spd(slot_idx, 29) * 0.125f +
+              (uint8_t)(get_spd(slot_idx, 27) >> 4) * 32.0f;
         spdi.tRC = (uint16_t)(tns/tckns);
     }
 
     // Module manufacturer
-    spdi.jedec_code  = ((uint16_t)(get_spd(smb_idx, slot_idx, 320) & 0x1F)) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, 321) & 0x7F;
+    spdi.jedec_code  = ((uint16_t)(get_spd(slot_idx, 320) & 0x1F)) << 8;
+    spdi.jedec_code |= get_spd(slot_idx, 321) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j <= 20; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 329+j);
+        sku_byte = get_spd(slot_idx, 329+j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
             spdi.sku_len--;
@@ -576,10 +576,10 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Week & Date (BCD to Int)
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 323);
+    uint8_t bcd = get_spd(slot_idx, 323);
     spdi.fab_year =  bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 324);
+    bcd = get_spd(slot_idx, 324);
     spdi.fab_week =  bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -587,7 +587,7 @@ static spd_info parse_spd_ddr4(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_ddr3(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -598,18 +598,18 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
 
     // Compute module size in MB with shifts
     spdi.module_size = 1U << (
-                              ((get_spd(smb_idx, slot_idx, 4) & 0xF) + 5)  +  // Total SDRAM capacity: (256 Mbits << byte4[3:0]) / 1 KB
-                              ((get_spd(smb_idx, slot_idx, 8) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte8[2:0]
-                              ((get_spd(smb_idx, slot_idx, 7) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte7[2:0]
-                              ((get_spd(smb_idx, slot_idx, 7) >> 3) & 0x7)    // Number of Ranks: byte7[5:3]
+                              ((get_spd(slot_idx, 4) & 0xF) + 5)  +  // Total SDRAM capacity: (256 Mbits << byte4[3:0]) / 1 KB
+                              ((get_spd(slot_idx, 8) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte8[2:0]
+                              ((get_spd(slot_idx, 7) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte7[2:0]
+                              ((get_spd(slot_idx, 7) >> 3) & 0x7)    // Number of Ranks: byte7[5:3]
                              );
 
-    spdi.hasECC = (((get_spd(smb_idx, slot_idx, 8) >> 3) & 1) == 1);
+    spdi.hasECC = (((get_spd(slot_idx, 8) >> 3) & 1) == 1);
 
-    uint8_t tck = get_spd(smb_idx, slot_idx, 12);
+    uint8_t tck = get_spd(slot_idx, 12);
 
-    if (get_spd(smb_idx, slot_idx, 176) == 0x0C && get_spd(smb_idx, slot_idx, 177) == 0x4A) {
-        tck = get_spd(smb_idx, slot_idx, 186);
+    if (get_spd(slot_idx, 176) == 0x0C && get_spd(slot_idx, 177) == 0x4A) {
+        tck = get_spd(slot_idx, 186);
         spdi.XMP = 1;
     }
 
@@ -650,71 +650,71 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
         // ------------------
         // XMP Specifications
         // ------------------
-        tckns = get_spd(smb_idx, slot_idx, 186);
+        tckns = get_spd(slot_idx, 186);
 
         // CAS# Latency
-        tns  = get_spd(smb_idx, slot_idx, 187);
+        tns  = get_spd(slot_idx, 187);
         spdi.tCL = (uint16_t)(tns/tckns);
 
         // RAS# to CAS# Latency
-        tns  = get_spd(smb_idx, slot_idx, 192);
+        tns  = get_spd(slot_idx, 192);
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
-        tns  = get_spd(smb_idx, slot_idx, 191);
+        tns  = get_spd(slot_idx, 191);
         spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
-        tns  = (uint16_t)(get_spd(smb_idx, slot_idx, 194) & 0xF0) << 4 |
-               get_spd(smb_idx, slot_idx, 195);
+        tns  = (uint16_t)(get_spd(slot_idx, 194) & 0xF0) << 4 |
+               get_spd(slot_idx, 195);
                ;
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
-        tns  = (uint16_t)(get_spd(smb_idx, slot_idx, 194) & 0x0F) << 8 |
-               get_spd(smb_idx, slot_idx, 196);
+        tns  = (uint16_t)(get_spd(slot_idx, 194) & 0x0F) << 8 |
+               get_spd(slot_idx, 196);
         spdi.tRC = (uint16_t)(tns/tckns);
     } else {
         // --------------------
         // JEDEC Specifications
         // --------------------
-        tckns = (uint8_t)get_spd(smb_idx, slot_idx, 12) * 0.125f +
-                (int8_t)get_spd(smb_idx, slot_idx, 134) * 0.001f;
+        tckns = (uint8_t)get_spd(slot_idx, 12) * 0.125f +
+                (int8_t)get_spd(slot_idx, 134) * 0.001f;
 
         // CAS# Latency
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 16) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 35) * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 16) * 0.125f +
+               (int8_t)get_spd(slot_idx, 35) * 0.001f;
         spdi.tCL = (uint16_t)(tns/tckns);
 
         // RAS# to CAS# Latency
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 18) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 36) * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 18) * 0.125f +
+               (int8_t)get_spd(slot_idx, 36) * 0.001f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
-        tns  = (uint8_t)get_spd(smb_idx, slot_idx, 20) * 0.125f +
-               (int8_t)get_spd(smb_idx, slot_idx, 37) * 0.001f;
+        tns  = (uint8_t)get_spd(slot_idx, 20) * 0.125f +
+               (int8_t)get_spd(slot_idx, 37) * 0.001f;
         spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
-        tns = (uint8_t)get_spd(smb_idx, slot_idx, 22) * 0.125f +
-              (uint8_t)(get_spd(smb_idx, slot_idx, 21) & 0x0F) * 32.0f;
+        tns = (uint8_t)get_spd(slot_idx, 22) * 0.125f +
+              (uint8_t)(get_spd(slot_idx, 21) & 0x0F) * 32.0f;
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
-        tns = (uint8_t)get_spd(smb_idx, slot_idx, 23) * 0.125f +
-              (uint8_t)(get_spd(smb_idx, slot_idx, 21) >> 4) * 32.0f;
+        tns = (uint8_t)get_spd(slot_idx, 23) * 0.125f +
+              (uint8_t)(get_spd(slot_idx, 21) >> 4) * 32.0f;
         spdi.tRC = (uint16_t)(tns/tckns);
     }
 
     // Module manufacturer
-    spdi.jedec_code  = ((uint16_t)(get_spd(smb_idx, slot_idx, 117) & 0x1F)) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, 118) & 0x7F;
+    spdi.jedec_code  = ((uint16_t)(get_spd(slot_idx, 117) & 0x1F)) << 8;
+    spdi.jedec_code |= get_spd(slot_idx, 118) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j <= 20; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 128+j);
+        sku_byte = get_spd(slot_idx, 128+j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
             spdi.sku_len--;
@@ -725,10 +725,10 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 120);
+    uint8_t bcd = get_spd(slot_idx, 120);
     spdi.fab_year =  bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 121);
+    bcd = get_spd(slot_idx, 121);
     spdi.fab_week =  bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -736,7 +736,7 @@ static spd_info parse_spd_ddr3(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_ddr2(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -746,7 +746,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     spdi.XMP = 0;
 
     // Compute module size in MB
-    switch (get_spd(smb_idx, slot_idx, 31)) {
+    switch (get_spd(slot_idx, 31)) {
         case 1:
             spdi.module_size = 1024;
             break;
@@ -774,21 +774,21 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
             break;
     }
 
-    spdi.module_size *= (get_spd(smb_idx, slot_idx, 5) & 7) + 1;
+    spdi.module_size *= (get_spd(slot_idx, 5) & 7) + 1;
 
-    spdi.hasECC = ((get_spd(smb_idx, slot_idx, 11) >> 1) == 1);
+    spdi.hasECC = ((get_spd(slot_idx, 11) >> 1) == 1);
 
     float tckns, tns;
     uint8_t tbyte;
 
     // Module EPP Detection (we only support Full profiles)
     uint8_t epp_offset = 0;
-    if (get_spd(smb_idx, slot_idx, 99) == 0x6D && get_spd(smb_idx, slot_idx, 102) == 0xB1) {
-        epp_offset = (get_spd(smb_idx, slot_idx, 103) & 0x3) * 12;
-        tbyte = get_spd(smb_idx, slot_idx, 109 + epp_offset);
+    if (get_spd(slot_idx, 99) == 0x6D && get_spd(slot_idx, 102) == 0xB1) {
+        epp_offset = (get_spd(slot_idx, 103) & 0x3) * 12;
+        tbyte = get_spd(slot_idx, 109 + epp_offset);
         spdi.XMP = 20;
     } else {
-        tbyte = get_spd(smb_idx, slot_idx, 9);
+        tbyte = get_spd(slot_idx, 9);
     }
 
     // Module speed
@@ -814,7 +814,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     if (spdi.XMP == 20) {
         // Module Timings (EPP)
         // CAS# Latency
-        tbyte = get_spd(smb_idx, slot_idx, 110 + epp_offset);
+        tbyte = get_spd(slot_idx, 110 + epp_offset);
         for (int shft = 0; shft < 7; shft++) {
             if ((tbyte >> shft) & 1) {
                 spdi.tCL = shft;
@@ -823,17 +823,17 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
         }
 
         // RAS# to CAS# Latency
-        tbyte = get_spd(smb_idx, slot_idx, 111 + epp_offset);
+        tbyte = get_spd(slot_idx, 111 + epp_offset);
         tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
-        tbyte = get_spd(smb_idx, slot_idx, 112 + epp_offset);
+        tbyte = get_spd(slot_idx, 112 + epp_offset);
         tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
         spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
-        tns = get_spd(smb_idx, slot_idx, 113 + epp_offset);
+        tns = get_spd(slot_idx, 113 + epp_offset);
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
@@ -841,7 +841,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     } else {
         // Module Timings (JEDEC)
         // CAS# Latency
-        tbyte = get_spd(smb_idx, slot_idx, 18);
+        tbyte = get_spd(slot_idx, 18);
         for (int shft = 0; shft < 7; shft++) {
             if ((tbyte >> shft) & 1) {
                 spdi.tCL = shft;
@@ -850,17 +850,17 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
         }
 
         // RAS# to CAS# Latency
-        tbyte = get_spd(smb_idx, slot_idx, 29);
+        tbyte = get_spd(slot_idx, 29);
         tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
         spdi.tRCD = (uint16_t)(tns/tckns);
 
         // RAS# Precharge
-        tbyte = get_spd(smb_idx, slot_idx, 27);
+        tbyte = get_spd(slot_idx, 27);
         tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
         spdi.tRP = (uint16_t)(tns/tckns);
 
         // Row Active Time
-        tns = get_spd(smb_idx, slot_idx, 30);
+        tns = get_spd(slot_idx, 30);
         spdi.tRAS = (uint16_t)(tns/tckns);
 
         // Row Cycle Time
@@ -870,18 +870,18 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     // Module manufacturer
     uint8_t contcode;
     for (contcode = 64; contcode < 72; contcode++) {
-        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+        if (get_spd(slot_idx, contcode) != 0x7F) {
             break;
         }
     }
 
     spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+    spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+        sku_byte = get_spd(slot_idx, 73 + j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
             spdi.sku_len--;
@@ -892,10 +892,10 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
+    uint8_t bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 94);
+    bcd = get_spd(slot_idx, 94);
     spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -903,7 +903,7 @@ static spd_info parse_spd_ddr2(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_ddr(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -913,7 +913,7 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
     spdi.XMP = 0;
 
     // Compute module size in MB
-    switch (get_spd(smb_idx, slot_idx, 31)) {
+    switch (get_spd(slot_idx, 31)) {
         case 1:
             spdi.module_size = 1024;
             break;
@@ -943,19 +943,19 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
             break;
     }
 
-    spdi.module_size *= get_spd(smb_idx, slot_idx, 5);
+    spdi.module_size *= get_spd(slot_idx, 5);
 
-    spdi.hasECC = ((get_spd(smb_idx, slot_idx, 11) >> 1) == 1);
+    spdi.hasECC = ((get_spd(slot_idx, 11) >> 1) == 1);
 
     // Module speed
     float tns, tckns;
-    uint8_t spd_byte9 = get_spd(smb_idx, slot_idx, 9);
+    uint8_t spd_byte9 = get_spd(slot_idx, 9);
     tckns = (spd_byte9 >> 4) + (spd_byte9 & 0xF) * 0.1f;
 
     spdi.freq = (uint16_t)(1.0f / tckns * 1000.0f * 2.0f);
 
     // Module Timings
-    uint8_t spd_byte18 = get_spd(smb_idx, slot_idx, 18);
+    uint8_t spd_byte18 = get_spd(slot_idx, 18);
     for (int shft = 0; shft < 7; shft++) {
         if ((spd_byte18 >> shft) & 1) {
             spdi.tCL = 1.0f + shft * 0.5f; // TODO: .5 CAS
@@ -963,32 +963,32 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    tns = (get_spd(smb_idx, slot_idx, 29) >> 2) +
-          (get_spd(smb_idx, slot_idx, 29) & 0x3) * 0.25f;
+    tns = (get_spd(slot_idx, 29) >> 2) +
+          (get_spd(slot_idx, 29) & 0x3) * 0.25f;
     spdi.tRCD = (uint16_t)(tns/tckns);
 
-    tns = (get_spd(smb_idx, slot_idx, 27) >> 2) +
-          (get_spd(smb_idx, slot_idx, 27) & 0x3) * 0.25f;
+    tns = (get_spd(slot_idx, 27) >> 2) +
+          (get_spd(slot_idx, 27) & 0x3) * 0.25f;
     spdi.tRP = (uint16_t)(tns/tckns);
 
-    spdi.tRAS = (uint16_t)(get_spd(smb_idx, slot_idx, 30)/tckns);
+    spdi.tRAS = (uint16_t)(get_spd(slot_idx, 30)/tckns);
     spdi.tRC = 0;
 
     // Module manufacturer
     uint8_t contcode;
     for (contcode = 64; contcode < 72; contcode++) {
-        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+        if (get_spd(slot_idx, contcode) != 0x7F) {
             break;
         }
     }
 
     spdi.jedec_code = (contcode - 64) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+    spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+        sku_byte = get_spd(slot_idx, 73 + j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
             spdi.sku_len--;
@@ -999,10 +999,10 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
+    uint8_t bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 94);
+    bcd = get_spd(slot_idx, 94);
     spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -1010,7 +1010,7 @@ static spd_info parse_spd_ddr(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_rdram(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -1021,7 +1021,7 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
     spdi.XMP = 0;
 
     // Compute module size in MB
-    uint8_t tbyte = get_spd(smb_idx, slot_idx, 5);
+    uint8_t tbyte = get_spd(slot_idx, 5);
     switch(tbyte) {
         case 0x84:
             spdi.module_size = 8;
@@ -1033,17 +1033,17 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
             return spdi;
     }
 
-    spdi.module_size *= get_spd(smb_idx, slot_idx, 99);
+    spdi.module_size *= get_spd(slot_idx, 99);
 
-    tbyte = get_spd(smb_idx, slot_idx, 4);
+    tbyte = get_spd(slot_idx, 4);
     if (tbyte > 0x96) {
         spdi.module_size *= 1 + (((tbyte & 0xF0) >> 4) - 9) + ((tbyte & 0xF) - 6);
     }
 
-    spdi.hasECC = (get_spd(smb_idx, slot_idx, 100) == 0x12) ? true : false;
+    spdi.hasECC = (get_spd(slot_idx, 100) == 0x12) ? true : false;
 
     // Module speed
-    tbyte = get_spd(smb_idx, slot_idx, 15);
+    tbyte = get_spd(slot_idx, 15);
     switch(tbyte) {
         case 0x1A:
             spdi.freq = 600;
@@ -1065,27 +1065,27 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
     }
 
     // Module Timings
-    spdi.tCL = get_spd(smb_idx, slot_idx, 14);
-    spdi.tRCD = get_spd(smb_idx, slot_idx, 12);
-    spdi.tRP = get_spd(smb_idx, slot_idx, 10);
-    spdi.tRAS = get_spd(smb_idx, slot_idx, 11);
+    spdi.tCL = get_spd(slot_idx, 14);
+    spdi.tRCD = get_spd(slot_idx, 12);
+    spdi.tRP = get_spd(slot_idx, 10);
+    spdi.tRAS = get_spd(slot_idx, 11);
     spdi.tRC = 0;
 
     // Module manufacturer
     uint8_t contcode;
     for (contcode = 64; contcode < 72; contcode++) {
-        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+        if (get_spd(slot_idx, contcode) != 0x7F) {
             break;
         }
     }
 
     spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+    spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+        sku_byte = get_spd(slot_idx, 73 + j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
             spdi.sku_len--;
@@ -1096,10 +1096,10 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    uint8_t bcd = get_spd(smb_idx, slot_idx, 93);
+    uint8_t bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 94);
+    bcd = get_spd(slot_idx, 94);
     spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -1107,7 +1107,7 @@ static spd_info parse_spd_rdram(uint8_t smb_idx, uint8_t slot_idx)
     return spdi;
 }
 
-static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
+static spd_info parse_spd_sdram(uint8_t slot_idx)
 {
     spd_info spdi;
 
@@ -1118,10 +1118,10 @@ static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
     spdi.sku_len = 0;
     spdi.XMP = 0;
 
-    uint8_t spd_byte3  = get_spd(smb_idx, slot_idx, 3) & 0x0F; // Number of Row Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
-    uint8_t spd_byte4  = get_spd(smb_idx, slot_idx, 4) & 0x0F; // Number of Column Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
-    uint8_t spd_byte5  = get_spd(smb_idx, slot_idx, 5);        // Number of Banks on module (8 bits)
-    uint8_t spd_byte17 = get_spd(smb_idx, slot_idx, 17);       // SDRAM Device Attributes, Number of Banks on the discrete SDRAM Device (8 bits)
+    uint8_t spd_byte3  = get_spd(slot_idx, 3) & 0x0F; // Number of Row Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
+    uint8_t spd_byte4  = get_spd(slot_idx, 4) & 0x0F; // Number of Column Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
+    uint8_t spd_byte5  = get_spd(slot_idx, 5);        // Number of Banks on module (8 bits)
+    uint8_t spd_byte17 = get_spd(slot_idx, 17);       // SDRAM Device Attributes, Number of Banks on the discrete SDRAM Device (8 bits)
 
     // Size in MB
     if (   (spd_byte3 != 0)
@@ -1136,17 +1136,17 @@ static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
         spdi.module_size = 0;
     }
 
-    spdi.hasECC = ((get_spd(smb_idx, slot_idx, 11) >> 1) == 1);
+    spdi.hasECC = ((get_spd(slot_idx, 11) >> 1) == 1);
 
     // Module speed
     float tns, tckns;
-    uint8_t spd_byte9 = get_spd(smb_idx, slot_idx, 9);
+    uint8_t spd_byte9 = get_spd(slot_idx, 9);
     tckns = (spd_byte9 >> 4) + (spd_byte9 & 0xF) * 0.1f;
 
     spdi.freq = (uint16_t)(1000.0f / tckns);
 
     // Module Timings
-    uint8_t spd_byte18 = get_spd(smb_idx, slot_idx, 18);
+    uint8_t spd_byte18 = get_spd(slot_idx, 18);
     for (int shft = 0; shft < 7; shft++) {
         if ((spd_byte18 >> shft) & 1) {
             spdi.tCL = shft + 1;
@@ -1154,30 +1154,30 @@ static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    tns = get_spd(smb_idx, slot_idx, 29);
+    tns = get_spd(slot_idx, 29);
     spdi.tRCD = (uint16_t)(tns/tckns);
 
-    tns = get_spd(smb_idx, slot_idx, 27);
+    tns = get_spd(slot_idx, 27);
     spdi.tRP = (uint16_t)(tns/tckns);
 
-    spdi.tRAS = (uint16_t)(get_spd(smb_idx, slot_idx, 30)/tckns);
+    spdi.tRAS = (uint16_t)(get_spd(slot_idx, 30)/tckns);
     spdi.tRC = 0;
 
     // Module manufacturer
     uint8_t contcode;
     for (contcode = 64; contcode < 72; contcode++) {
-        if (get_spd(smb_idx, slot_idx, contcode) != 0x7F) {
+        if (get_spd(slot_idx, contcode) != 0x7F) {
             break;
         }
     }
 
     spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
-    spdi.jedec_code |= get_spd(smb_idx, slot_idx, contcode) & 0x7F;
+    spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
     // Module SKU
     uint8_t sku_byte;
     for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(smb_idx, slot_idx, 73 + j);
+        sku_byte = get_spd(slot_idx, 73 + j);
 
         if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
             spdi.sku_len--;
@@ -1188,10 +1188,10 @@ static spd_info parse_spd_sdram(uint8_t smb_idx, uint8_t slot_idx)
         }
     }
 
-    bcd = get_spd(smb_idx, slot_idx, 93);
+    bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
 
-    bcd = get_spd(smb_idx, slot_idx, 94);
+    bcd = get_spd(slot_idx, 94);
     spdi.fab_week = bcd - 6 * (bcd >> 4);
 
     spdi.isValid = true;
@@ -1299,8 +1299,6 @@ static void fch_zen_get_smb(void)
     pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
     __outb(AMD_PM_INDEX, AMD_INDEX_IO_PORT);
     pm_reg |= __inb(AMD_DATA_IO_PORT);
-
-    printf(22,0,"pmreg: 0x%x",pm_reg);
 
     // Special case for AMD Cezanne (get smb address in memory)
     if (imc_type == IMC_K19_CZN && pm_reg == 0xFFFF) {
