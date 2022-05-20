@@ -166,7 +166,11 @@ void cpuid_init(void)
                     thread_per_core = 2;
                 }
             } else if (cpuid_info.flags.htt) {
-                thread_per_core = 2;
+                if (cpuid_info.version.extendedFamily >= 8) {
+                    thread_per_core = 2;
+                } else {
+                    cpuid_info.flags.htt = 0; // Pre-ZEN never has SMT
+                }
             }
             cpuid_info.topology.core_count = cpuid_info.topology.thread_count / thread_per_core;
         }
