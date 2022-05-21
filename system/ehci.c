@@ -649,6 +649,7 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     if (num_keyboards == 0) {
         // Halt the host controller.
         (void)halt_host_controller(op_regs);
+        (void)reset_host_controller(op_regs);
 
         // Deallocate the workspace for this controller.
         pm_map[0].end += num_pages(sizeof(workspace_t));
