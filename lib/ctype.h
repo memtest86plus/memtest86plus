@@ -14,18 +14,31 @@
  * If c is a lower-case letter, returns its upper-case equivalent, otherwise
  * returns c. Assumes c is an ASCII character.
  */
-int toupper(int c);
+static inline int toupper(int c)
+{
+    if (c >= 'a' && c <= 'z') {
+        return c + 'A' -'a';
+    } else {
+        return c;
+    }
+}
 
 /**
  * Returns 1 if c is a decimal digit, otherwise returns 0. Assumes c is an
  * ASCII character.
  */
-int isdigit(int c);
+static inline int isdigit(int c)
+{
+    return c >= '0' && c <= '9';
+}
 
 /**
  * Returns 1 if c is a hexadecimal digit, otherwise returns 0. Assumes c is an
  * ASCII character.
  */
-int isxdigit(int c);
+static inline int isxdigit(int c)
+{
+    return isdigit(c) || (toupper(c) >= 'A' && toupper(c) <= 'F');
+}
 
 #endif // CTYPE_H

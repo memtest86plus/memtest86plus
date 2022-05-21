@@ -43,16 +43,6 @@ int memcmp(const void *s1, const void *s2, size_t n)
     return 0;
 }
 
-void *memcpy(void *dest, const void *src, size_t n)
-{
-    char *d = (char *)dest, *s = (char *)src;
-
-    for (size_t i = 0; i < n; i++) {
-        d[i] = s[i];
-    }
-    return dest;
-}
-
 void *memmove(void *dest, const void *src, size_t n)
 {
     char *d = (char *)dest, *s = (char *)src;
@@ -72,16 +62,6 @@ void *memmove(void *dest, const void *src, size_t n)
         }
     }
     return dest;
-}
-
-void *memset(void *s, int c, size_t n)
-{
-    char *d = (char *)s;
-
-    for (size_t i = 0; i < n; i++) {
-        d[i] = c;
-    }
-    return s;
 }
 
 size_t strlen(const char *s)

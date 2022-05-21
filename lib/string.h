@@ -24,8 +24,9 @@ int memcmp(const void *s1, const void *s2, size_t n);
  * Copies n bytes from the memory area pointed to by src to the memory area
  * pointed to by dest and returns a pointer to dest. The memory areas must
  * not overlap.
+ * void *memcpy(void *dst, const void *src, size_t n);
  */
-void *memcpy(void *dst, const void *src, size_t n);
+#define memcpy(d, s, n) __builtin_memcpy((d), (s), (n))
 
 /**
  * Copies n bytes from the memory area pointed to by src to the memory area
@@ -37,8 +38,9 @@ void *memmove(void *dest, const void *src, size_t n);
 /**
  * Fills the first n bytes of the memory area pointed to by s with the byte
  * value c.
+ * void *memset(void *s, int c, size_t n);
  */
-void *memset(void *s, int c, size_t n);
+#define memset(s, c, n) __builtin_memset((s), (c), (n))
 
 /**
  * Returns the string length, excluding the terminating null character.
