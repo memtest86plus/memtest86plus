@@ -111,6 +111,7 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     {0x8086, 0x7AA3, ich5_get_smb},    // Alder Lake-S (PCH)
     {0x8086, 0x51A3, ich5_get_smb},    // Alder Lake-P (PCH)
     {0x8086, 0x54A3, ich5_get_smb},    // Alder Lake-M (PCH)
+    {0x8086, 0x7A23, ich5_get_smb},    // Raptor Lake-S (PCH)
 
     // ATI SMBUS
     {0x1002, 0x4385, amd_sb_get_smb},  // ATI SB600+ (Now AMD)
