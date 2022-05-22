@@ -67,33 +67,24 @@ void serial_echo_print(const char *p)
     if (!port->enable) {
         return;
     }
+
     /* Now, do each character */
     while (*p) {
-        serial_wait_for_xmit(port);
-
         /* Send the character out. */
-        serial_write_reg(port, UART_TX, *p);
-        if (*p==10) {
-            serial_wait_for_xmit(port);
-            serial_write_reg(port, UART_TX, 13);
-        }
-        p++;
+        serial_wait_for_xmit(port);
+        serial_write_reg(port, UART_TX, *p++);
     }
 }
 
-void tty_print(int y, int x, const char *p)
+void tty_goto(int y, int x)
 {
-    static char sx[3], sy[3];
-
-    itoa(++x,sx);
-    itoa(++y,sy);
+    static char s[3];
 
     serial_echo_print("\x1b[");
-    serial_echo_print(sy);
+    serial_echo_print(itoa(y + 1, s));
     serial_echo_print(";");
-    serial_echo_print(sx);
+    serial_echo_print(itoa(x + 1, s));
     serial_echo_print("H");
-    serial_echo_print(p);
 }
 
 //------------------------------------------------------------------------------
@@ -135,8 +126,8 @@ void tty_init(void)
     serial_write_reg(&console_serial, UART_LCR, lcr);               /* Done with divisor */
 
     /* Prior to disabling interrupts, read the LSR and RBR registers */
-    uart_status = serial_read_reg(&console_serial, UART_LSR);           /* COM? LSR */
-    uart_status = serial_read_reg(&console_serial, UART_RX);	        /* COM? RBR */
+    uart_status = serial_read_reg(&console_serial, UART_LSR);       /* COM? LSR */
+    uart_status = serial_read_reg(&console_serial, UART_RX);        /* COM? RBR */
     serial_write_reg(&console_serial, UART_IER, 0x00);              /* Disable all interrupts */
 
     tty_clear_screen();
@@ -146,7 +137,9 @@ void tty_init(void)
 void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 {
     char p[SCREEN_WIDTH+1];
-    int col_len = end_col - start_col;
+    uint8_t ch;
+    int pos = 0;
+    int cur_inverse = -1, inverse = false;
 
     if (start_col > (SCREEN_WIDTH - 1) || end_col > (SCREEN_WIDTH - 1)) {
         return;
@@ -158,42 +151,69 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 
     for (int row = start_row; row <= end_row; row++) {
 
-        // Last line is inverted (Black on white)
-        if (row == SCREEN_HEIGHT-1) {
-            tty_inverse();
+        /* Move the cursor to the new position. If the starting col is not 0 or
+         * this is the first row we have to use absolute positioning, otherwise
+         * CR + LF can take us to col=0, row++ */
+        if (start_col || row == start_row) {
+            tty_goto(row, start_col);
+        } else {
+            serial_echo_print("\r\n");
         }
 
         // Copy Shadow buffer to TTY buffer
+        pos = 0;
         for (int col = start_col; col <= end_col; col++) {
-            p[col] = shadow_buffer[row][col].value & 0x7F;
+
+            inverse = ((shadow_buffer[row][col].attr & 0x70) >> 4 != BLUE);
+
+            if (cur_inverse != inverse) {
+
+                if (pos) {
+                  p[pos] = '\0';
+                  serial_echo_print(p);
+                  pos = 0;
+                }
+
+                if (inverse) {
+                    tty_inverse();
+                } else {
+                    tty_normal();
+                }
+
+                cur_inverse = inverse;
+            }
+
+            /* Make sure only VT100 characters are sent. */
+            ch = shadow_buffer[row][col].ch;
+
+            switch (ch) {
+                case 32 ... 127:
+                    break;
+
+                case 0xB3:
+                    ch = '|';
+                    break;
+
+                case 0xC1:
+                case 0xC2:
+                case 0xC4:
+                    ch = '-';
+                    break;
+
+                case 0xF8:
+                    ch = '*';
+                    break;
+
+                default:
+                    ch = '?';
+            }
+
+            p[pos++] = ch;
         }
 
-        // Add string terminator
-        p[end_col+1] = '\0';
-
-        // For first line, title on top-left must be inverted
-        // Do the switch, send to TTY then continue to next line.
-        if (row == 0 && start_col == 0 && col_len > 28) {
-            tty_inverse();
-            p[28] = '\0';
-            tty_print(row,0,p);
-            tty_normal();
-            p[28] = '|';
-            tty_print(row, 28, p + 28);
-            continue;
-        }
-
-        // Replace degree symbol with '*' for tty to avoid a C437/VT100 translation table.
-        if (row == 1 && (shadow_buffer[1][25].value & 0xFF) == 0xF8) {
-            p[25] = 0x2A;
-        }
-
-        // Send row to TTY
-        tty_print(row, start_col, p + start_col);
-
-        // Revert to normal if last line.
-        if (row == SCREEN_HEIGHT-1) {
-            tty_normal();
+        if (pos) {
+            p[pos] = '\0';
+            serial_echo_print(p);
         }
     }
 }
