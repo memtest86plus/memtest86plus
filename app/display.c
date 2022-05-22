@@ -298,6 +298,32 @@ void display_start_test(void)
     test_ticks = 0;
 }
 
+void display_temperature(void)
+{
+    if (!enable_temperature) {
+        return;
+    }
+
+    int actual_cpu_temp = get_cpu_temperature();
+
+    if (actual_cpu_temp == 0) {
+        if (max_cpu_temp == 0) {
+            enable_temperature = false;
+            no_temperature = true;
+        }
+        return;
+    }
+
+    if (max_cpu_temp < actual_cpu_temp ) {
+        max_cpu_temp = actual_cpu_temp;
+    }
+
+    int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
+
+    clear_screen_region(1, 18, 1, 22);
+    printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8);
+}
+
 void check_input(void)
 {
     switch (get_key()) {
@@ -430,18 +456,8 @@ void do_tick(int my_cpu)
     // This only tick one time per second
     if (!timed_update_done) {
 
-        // Update temperature one time per second
-        if (enable_temperature) {
-            int actual_cpu_temp = get_cpu_temperature();
-
-            if(max_cpu_temp < actual_cpu_temp ) {
-                max_cpu_temp = actual_cpu_temp;
-            }
-
-            if(actual_cpu_temp != 0) {
-                display_temperature(actual_cpu_temp, max_cpu_temp);
-            }
-        }
+        // Update temperature
+        display_temperature();
 
         // Update TTY one time every TTY_UPDATE_PERIOD second(s)
         if (enable_tty) {

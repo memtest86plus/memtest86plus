@@ -257,15 +257,8 @@ static void global_init(void)
 
     master_cpu = 0;
 
-    if (enable_temperature) {
-        int temp = get_cpu_temperature();
-        if (temp > 0) {
-            display_temperature(temp, temp);
-        } else {
-            enable_temperature = false;
-            no_temperature = true;
-        }
-    }
+    display_temperature();
+
     if (enable_trace) {
         display_pinned_message(0, 0,"CPU Trace");
         display_pinned_message(1, 0,"--- ----------------------------------------------------------------------------");
