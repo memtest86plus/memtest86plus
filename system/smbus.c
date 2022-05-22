@@ -112,7 +112,10 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     {0x8086, 0x51A3, ich5_get_smb},    // Alder Lake-P (PCH)
     {0x8086, 0x54A3, ich5_get_smb},    // Alder Lake-M (PCH)
 
-    //  AMD SMBUS
+    // ATI SMBUS
+    {0x1002, 0x4385, amd_sb_get_smb},  // ATI SB600+ (Now AMD)
+
+    // AMD SMBUS
     {0x1022, 0x780B, amd_sb_get_smb},  // AMD FCH (Pre-Zen)
     {0x1022, 0x790B, fch_zen_get_smb}, // AMD FCH (Zen)
     {0, 0, NULL}
