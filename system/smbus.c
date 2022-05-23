@@ -20,9 +20,12 @@ ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
 
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
+uint32_t smbus_dev_id;
 
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
+
+// Functions Prototypes
 
 static spd_info parse_spd_rdram (uint8_t slot_idx);
 static spd_info parse_spd_sdram (uint8_t slot_idx);
@@ -34,13 +37,16 @@ static spd_info parse_spd_ddr5  (uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
+static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
 
+static void nv_mcp_get_smb(void);
 static void amd_sb_get_smb(void);
 static void fch_zen_get_smb(void);
 static void piix4_get_smb(void);
 static void ich5_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
+static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
 // ----------------------------------------------------------
 // WARNING: Be careful when adding a controller ID!
@@ -119,6 +125,22 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     // AMD SMBUS
     {0x1022, 0x780B, amd_sb_get_smb},  // AMD FCH (Pre-Zen)
     {0x1022, 0x790B, fch_zen_get_smb}, // AMD FCH (Zen)
+
+    // nVidia SMBUS
+    // {0x10DE, 0x01B4, nv_mcp_get_smb},  // nForce
+    {0x10DE, 0x0064, nv_mcp_get_smb},     // nForce 2
+    // {0x10DE, 0x0084, nv_mcp_get_smb},  // nForce 2 Mobile
+    // {0x10DE, 0x00E4, nv_mcp_get_smb},  // nForce 3
+    // {0x10DE, 0x0052, nv_mcp_get_smb},  // nForce 4
+    // {0x10DE, 0x0264, nv_mcp_get_smb},  // nForce 410/430 MCP
+    // {0x10DE, 0x0446, nv_mcp_get_smb},  // nForce 520
+    // {0x10DE, 0x0542, nv_mcp_get_smb},  // nForce 560
+    // {0x10DE, 0x07D8, nv_mcp_get_smb},  // nForce 630i
+    // {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
+    // {0x10DE, 0x0752, nv_mcp_get_smb},  // nForce 720a
+    // {0x10DE, 0x0AA2, nv_mcp_get_smb},  // nForce 730i
+    // {0x10DE, 0x0368, nv_mcp_get_smb},  // nForce 790i Ultra
+
     {0, 0, NULL}
 };
 
@@ -1204,7 +1226,7 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
 }
 
 // --------------------------
-// Smbus Controller Functions
+// SMBUS Controller Functions
 // --------------------------
 
 static int find_smb_controller(void)
@@ -1220,6 +1242,7 @@ static int find_smb_controller(void)
                     if (valuev == smbcontrollers[i].vendor) {
                         valued = pci_config_read16(0, smbdev, smbfun, 2);
                         if (valued == smbcontrollers[i].device) {
+                            smbus_dev_id = (valuev << 16) | valued;
                             return i;
                         }
                     }
@@ -1227,7 +1250,6 @@ static int find_smb_controller(void)
             }
         }
     }
-
     return -1;
 }
 
@@ -1320,6 +1342,48 @@ static void fch_zen_get_smb(void)
     }
 }
 
+// -----------------------
+// nVidia SMBUS Controller
+// -----------------------
+
+static void nv_mcp_get_smb(void)
+{
+    int smbus_base_adr;
+
+    if ((smbus_dev_id & 0xFFFF) >= 0x200) {
+        smbus_base_adr = NV_SMBUS_ADR_REG;
+    } else {
+        smbus_base_adr = NV_OLD_SMBUS_ADR_REG;
+    }
+
+    // nForce SB has 2 I2C Busses. SPD is located on first I2C Bus.
+    uint16_t x = pci_config_read16(0, smbdev, smbfun, smbus_base_adr) & 0xFFFC;
+
+    if (x != 0) {
+        smbusbase = x;
+    }
+
+    for(int i = 73; i < 73+18; i++) {
+        printf(20, (i-73)*3, "%x", get_spd(0, 73 + i));
+        printf(21, (i-73)*3, "%x", get_spd(1, 73 + i));
+    }
+
+
+}
+
+// ------------------
+// get_spd() function
+// ------------------
+
+static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
+{
+    switch ((smbus_dev_id >> 16) & 0xFFFF) {
+      case 0x10DE:
+        return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
+      default:
+        return ich5_read_spd_byte(slot_idx, spd_adr);
+    }
+}
 
 /*************************************************************************************
 / *****************************         WARNING          *****************************
@@ -1419,4 +1483,35 @@ static uint8_t ich5_process(void)
     }
 
     return 0;
+}
+
+static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
+{
+    int i;
+
+    smbus_adr += 0x50;
+
+    // Set Slave ADR
+    __outb(smbus_adr << 1, NVSMBADD);
+
+    // Set Command (SPD Byte to Read)
+    __outb(spd_adr, NVSMBCMD);
+
+    // Start transaction
+    __outb(NVSMBCNT_BYTE_DATA | NVSMBCNT_READ, NVSMBCNT);
+
+    // Wait until transction complete
+    for (i = 500; i > 0; i--) {
+        usleep(50);
+        if (__inb(NVSMBCNT) == 0) {
+            break;
+        }
+    }
+
+    // If timeout or Error Status, quit
+    if (i == 0 || __inb(NVSMBSTS) & NVSMBSTS_STATUS) {
+        return 0xFF;
+    }
+
+    return __inb(NVSMBDAT(0));
 }

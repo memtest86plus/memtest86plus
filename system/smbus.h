@@ -13,6 +13,8 @@
 #define I2C_WRITE   0
 #define I2C_READ    1
 
+#define SPD5_MR11 11
+
 /* i801 Hosts Addresses */
 #define SMBHSTSTS   smbusbase
 #define SMBHSTCNT   smbusbase + 2
@@ -50,7 +52,27 @@
 #define AMD_SMBUS_BASE_REG  0x2C
 #define AMD_PM_INDEX        0x00
 
-#define SPD5_MR11 11
+/* nVidia-Specific constants */
+#define NV_SMBUS_ADR_REG        0x20
+#define NV_OLD_SMBUS_ADR_REG    0x50
+
+#define NVSMBCNT    smbusbase + 0
+#define NVSMBSTS    smbusbase + 1
+#define NVSMBADD    smbusbase + 2
+#define NVSMBCMD    smbusbase + 3
+#define NVSMBDAT(x) (smbusbase + 4 + (x))
+
+#define NVSMBCNT_WRITE      0x00
+#define NVSMBCNT_READ       0x01
+#define NVSMBCNT_QUICK      0x02
+#define NVSMBCNT_BYTE       0x04
+#define NVSMBCNT_BYTE_DATA  0x06
+#define NVSMBCNT_WORD_DATA  0x08
+
+#define NVSMBSTS_DONE       0x80
+#define NVSMBSTS_ALRM       0x40
+#define NVSMBSTS_RES        0x20
+#define NVSMBSTS_STATUS     0x1f
 
 struct pci_smbus_controller{
     unsigned vendor;
@@ -88,9 +110,6 @@ typedef struct ram_infos {
 } ram_info;
 
 extern ram_info ram;
-
-#define get_spd(slot_idx, spd_adr) \
-    ich5_read_spd_byte(slot_idx, spd_adr)
 
 /**
  * Print SMBUS Info
