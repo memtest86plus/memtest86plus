@@ -455,7 +455,8 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
     for (int j = 0; j <= 29; j++) {
         sku_byte = get_spd(slot_idx, 521+j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -592,7 +593,8 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
     for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(slot_idx, 329+j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -742,7 +744,8 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
     for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(slot_idx, 128+j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -909,7 +912,8 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
     for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(slot_idx, 73 + j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -1016,7 +1020,8 @@ static spd_info parse_spd_ddr(uint8_t slot_idx)
     for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(slot_idx, 73 + j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -1113,7 +1118,8 @@ static spd_info parse_spd_rdram(uint8_t slot_idx)
     for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(slot_idx, 73 + j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -1362,13 +1368,6 @@ static void nv_mcp_get_smb(void)
     if (x != 0) {
         smbusbase = x;
     }
-
-    for(int i = 73; i < 73+18; i++) {
-        printf(20, (i-73)*3, "%x", get_spd(0, 73 + i));
-        printf(21, (i-73)*3, "%x", get_spd(1, 73 + i));
-    }
-
-
 }
 
 // ------------------

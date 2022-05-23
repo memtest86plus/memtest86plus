@@ -86,7 +86,7 @@ typedef struct spd_infos {
     uint16_t    jedec_code;
     uint32_t    module_size;
     char        *type;
-    char        sku[32];
+    uint8_t     sku[32];
     uint8_t     sku_len;
     uint8_t     XMP;
     uint16_t    freq;
