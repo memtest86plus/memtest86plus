@@ -136,7 +136,7 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     // {0x10DE, 0x0446, nv_mcp_get_smb},  // nForce 520
     // {0x10DE, 0x0542, nv_mcp_get_smb},  // nForce 560
     // {0x10DE, 0x07D8, nv_mcp_get_smb},  // nForce 630i
-    // {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
+    {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
     // {0x10DE, 0x0752, nv_mcp_get_smb},  // nForce 720a
     // {0x10DE, 0x0AA2, nv_mcp_get_smb},  // nForce 730i
     // {0x10DE, 0x0368, nv_mcp_get_smb},  // nForce 790i Ultra
