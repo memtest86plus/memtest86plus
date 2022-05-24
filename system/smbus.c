@@ -20,7 +20,7 @@ ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
 
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
-uint32_t smbus_dev_id;
+uint32_t smbus_id;
 
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
@@ -136,8 +136,8 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     // {0x10DE, 0x0446, nv_mcp_get_smb},  // nForce 520
     // {0x10DE, 0x0542, nv_mcp_get_smb},  // nForce 560
     // {0x10DE, 0x07D8, nv_mcp_get_smb},  // nForce 630i
-    // {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
-    // {0x10DE, 0x0752, nv_mcp_get_smb},  // nForce 720a
+    {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
+    {0x10DE, 0x0752, nv_mcp_get_smb},  // nForce 720a
     // {0x10DE, 0x0AA2, nv_mcp_get_smb},  // nForce 730i
     // {0x10DE, 0x0368, nv_mcp_get_smb},  // nForce 790i Ultra
 
@@ -1248,7 +1248,7 @@ static int find_smb_controller(void)
                     if (valuev == smbcontrollers[i].vendor) {
                         valued = pci_config_read16(0, smbdev, smbfun, 2);
                         if (valued == smbcontrollers[i].device) {
-                            smbus_dev_id = (valuev << 16) | valued;
+                            smbus_id = (valuev << 16) | valued;
                             return i;
                         }
                     }
@@ -1305,13 +1305,14 @@ static void amd_sb_get_smb(void)
 
     rev_id = pci_config_read8(0, smbdev, smbfun, 0x08);
 
-    // AMD did the switch between PIIX4 and proprietary SMBase Access somewhere
-    // between rev 0x30 and 0x3A. Assume 0x3A (Tested OK on AM1 SoC)
-    if (rev_id < 0x3A) {
-         // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
-         piix4_get_smb();
+    if ((smbus_id & 0xFFFF) == 0x4385 && rev_id <= 0x3D) {
+        // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
+        piix4_get_smb();
+    } else if ((smbus_id & 0xFFFF) == 0x780B && rev_id == 0x42) {
+        // Latest Pre-Zen APUs use the newer Zen PM registers
+        fch_zen_get_smb();
     } else {
-         // Newer AMD SouthBridge (SB800 up to Zen) uses specific registers
+         // AMD SB (SB800 up to pre-FT3/FP4/AM4) uses specific registers
         __outb(AMD_SMBUS_BASE_REG + 1, AMD_INDEX_IO_PORT);
         pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
         __outb(AMD_SMBUS_BASE_REG, AMD_INDEX_IO_PORT);
@@ -1356,7 +1357,7 @@ static void nv_mcp_get_smb(void)
 {
     int smbus_base_adr;
 
-    if ((smbus_dev_id & 0xFFFF) >= 0x200) {
+    if ((smbus_id & 0xFFFF) >= 0x200) {
         smbus_base_adr = NV_SMBUS_ADR_REG;
     } else {
         smbus_base_adr = NV_OLD_SMBUS_ADR_REG;
@@ -1376,7 +1377,7 @@ static void nv_mcp_get_smb(void)
 
 static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
-    switch ((smbus_dev_id >> 16) & 0xFFFF) {
+    switch ((smbus_id >> 16) & 0xFFFF) {
       case 0x10DE:
         return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       default:
