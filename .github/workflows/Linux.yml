@@ -21,7 +21,6 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         os: [ubuntu-18.04, ubuntu-20.04]
-        version: [32, 64]
 
     steps:
       - uses: actions/checkout@v3
@@ -31,14 +30,26 @@ jobs:
       - name: Install Linux Dependencies
         run: sudo apt-get install build-essential gcc-multilib clang libc6-dev-i386-cross dosfstools mtools xorriso -y
 
-      - name: Make build${{ matrix.version }} all
+      - name: Make build32 all
         env:
           C: ${{matrix.compiler}}
-        working-directory: ./build${{ matrix.version }}
+        working-directory: ./build32
         run: make -j 2 all
 
-      - name: Make build${{ matrix.version }} iso
+      - name: Make build64 all
         env:
           C: ${{matrix.compiler}}
-        working-directory: ./build${{ matrix.version }}
+        working-directory: ./build64
+        run: make -j 2 all
+
+      - name: Make build32 iso
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build32
+        run: make -j 2 iso
+
+      - name: Make build64 iso
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build64
         run: make -j 2 iso
