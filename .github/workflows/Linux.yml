@@ -13,14 +13,13 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }}
+    name: ${{ matrix.os }} ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         compiler: [gcc, clang]
-        build_type: [Debug, Release]
         os: [ubuntu-18.04, ubuntu-20.04]
 
     steps:
@@ -30,7 +29,7 @@ jobs:
 
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get install build-essential clang dosfstools mtools -y
+        run: sudo apt-get install build-essential clang dosfstools mtools xorriso -y
 
       - name: Make build32 all
         env:
