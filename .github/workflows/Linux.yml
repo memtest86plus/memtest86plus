@@ -1,0 +1,57 @@
+name: Build and tests
+
+on:
+  push:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**/README.md"
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+        os: [ubuntu-18.04, ubuntu-20.04]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get install build-essential clang dosfstools mtools -y
+
+      - name: Make build32 all
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build32
+        run: make -j 2 all
+
+      - name: Make build64 all
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build64
+        run: make -j 2 all
+
+      - name: Make build32 iso
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build32
+        run: make -j 2 iso
+
+      - name: Make build64 iso
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build64
+        run: make -j 2 iso
