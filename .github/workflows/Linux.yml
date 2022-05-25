@@ -28,8 +28,7 @@ jobs:
           submodules: recursive
 
       - name: Install Linux Dependencies
-        if: runner.os == 'Linux'
-        run: sudo apt-get install build-essential clang dosfstools mtools xorriso -y
+        run: sudo apt-get install build-essential gcc-multilib clang libc6-dev-i386-cross dosfstools mtools xorriso -y
 
       - name: Make build32 all
         env:
