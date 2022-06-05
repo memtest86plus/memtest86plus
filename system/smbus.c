@@ -12,6 +12,7 @@
 #include "smbus.h"
 #include "smbios.h"
 #include "jedec_id.h"
+#include "hwquirks.h"
 
 #define LINE_SPD        13
 #define MAX_SPD_SLOT    8
@@ -152,6 +153,10 @@ void print_smbus_startup_info(void) {
     spd_info curspd;
     ram.freq = 0;
     curspd.isValid = false;
+
+    if (quirk.type == QUIRK_TYPE_SMBUS) {
+        quirk.process();
+    }
 
     index = find_smb_controller();
 

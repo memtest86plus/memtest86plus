@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #define QUIRK_TYPE_NONE     0b00000000
 #define QUIRK_TYPE_USB      0b00000001
@@ -28,6 +29,7 @@ typedef struct {
     uint8_t      type;
     uint16_t     root_vid;
     uint16_t     root_did;
+    void (*process)(void);
 } quirk_t;
 
 extern quirk_t quirk;
