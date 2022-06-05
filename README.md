@@ -122,6 +122,8 @@ recognised:
 
   * nosmp
     * disables ACPI table parsing and the use of multiple CPU cores
+  * nobench
+    * disables the integrated memory benchmark
   * nosm
     * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
   * nopause
@@ -137,12 +139,13 @@ recognised:
       *  1 = 0x2F8
       *  2 = 0x3E8 
       *  3 = 0x2E8
-    * and *y* is an optional single digit used to set the baud rate
-      * 0 = 9600 bps
-      * 1 = 19200 bps
-      * 2 = 38400 bps
-      * 3 = 57600 bps
-      * 4 = 115200 bps (default if no *y* value specified)
+    * and *y* is an optional baud rate to choose from the following list
+      * 9600
+      * 19200
+      * 38400
+      * 54600
+      * 115200 (default if not specified or invalid)
+      * 230400
 
 ## Keyboard Selection
 

@@ -1,0 +1,63 @@
+name: Build and tests
+
+on:
+  push:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**/README.md"
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }} ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Linux Dependencies
+        run: sudo apt-get install build-essential gcc-multilib clang libc6-dev-i386-cross dosfstools mtools xorriso -y
+
+      - name: Make all build32
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build32
+        run: make -j 2 all
+
+      - name: Make clean build32
+        working-directory: ./build32
+        run: make clean
+
+      - name: Make all build64
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build64
+        run: make -j 2 all
+
+      - name: Make clean build64
+        working-directory: ./build64
+        run: make clean
+
+      - name: Make iso build32
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build32
+        run: make -j 2 iso
+
+      - name: Make iso build64
+        env:
+          C: ${{matrix.compiler}}
+        working-directory: ./build64
+        run: make -j 2 iso

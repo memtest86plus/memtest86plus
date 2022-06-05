@@ -12,6 +12,7 @@
 #include "smbus.h"
 #include "smbios.h"
 #include "jedec_id.h"
+#include "hwquirks.h"
 
 #define LINE_SPD        13
 #define MAX_SPD_SLOT    8
@@ -20,9 +21,12 @@ ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
 
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
+uint32_t smbus_id;
 
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
+
+// Functions Prototypes
 
 static spd_info parse_spd_rdram (uint8_t slot_idx);
 static spd_info parse_spd_sdram (uint8_t slot_idx);
@@ -34,13 +38,16 @@ static spd_info parse_spd_ddr5  (uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static int find_smb_controller(void);
+static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
 
+static void nv_mcp_get_smb(void);
 static void amd_sb_get_smb(void);
 static void fch_zen_get_smb(void);
 static void piix4_get_smb(void);
 static void ich5_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
+static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
 // ----------------------------------------------------------
 // WARNING: Be careful when adding a controller ID!
@@ -111,10 +118,30 @@ static const struct pci_smbus_controller smbcontrollers[] = {
     {0x8086, 0x7AA3, ich5_get_smb},    // Alder Lake-S (PCH)
     {0x8086, 0x51A3, ich5_get_smb},    // Alder Lake-P (PCH)
     {0x8086, 0x54A3, ich5_get_smb},    // Alder Lake-M (PCH)
+    {0x8086, 0x7A23, ich5_get_smb},    // Raptor Lake-S (PCH)
 
-    //  AMD SMBUS
+    // ATI SMBUS
+    {0x1002, 0x4385, amd_sb_get_smb},  // ATI SB600+ (Now AMD)
+
+    // AMD SMBUS
     {0x1022, 0x780B, amd_sb_get_smb},  // AMD FCH (Pre-Zen)
     {0x1022, 0x790B, fch_zen_get_smb}, // AMD FCH (Zen)
+
+    // nVidia SMBUS
+    // {0x10DE, 0x01B4, nv_mcp_get_smb},  // nForce
+    {0x10DE, 0x0064, nv_mcp_get_smb},     // nForce 2
+    // {0x10DE, 0x0084, nv_mcp_get_smb},  // nForce 2 Mobile
+    // {0x10DE, 0x00E4, nv_mcp_get_smb},  // nForce 3
+    // {0x10DE, 0x0052, nv_mcp_get_smb},  // nForce 4
+    // {0x10DE, 0x0264, nv_mcp_get_smb},  // nForce 410/430 MCP
+    // {0x10DE, 0x0446, nv_mcp_get_smb},  // nForce 520
+    // {0x10DE, 0x0542, nv_mcp_get_smb},  // nForce 560
+    // {0x10DE, 0x07D8, nv_mcp_get_smb},  // nForce 630i
+    {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
+    {0x10DE, 0x0752, nv_mcp_get_smb},  // nForce 720a
+    // {0x10DE, 0x0AA2, nv_mcp_get_smb},  // nForce 730i
+    // {0x10DE, 0x0368, nv_mcp_get_smb},  // nForce 790i Ultra
+
     {0, 0, NULL}
 };
 
@@ -126,6 +153,10 @@ void print_smbus_startup_info(void) {
     spd_info curspd;
     ram.freq = 0;
     curspd.isValid = false;
+
+    if (quirk.type == QUIRK_TYPE_SMBUS) {
+        quirk.process();
+    }
 
     index = find_smb_controller();
 
@@ -429,7 +460,8 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
     for (int j = 0; j <= 29; j++) {
         sku_byte = get_spd(slot_idx, 521+j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -566,7 +598,8 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
     for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(slot_idx, 329+j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -716,7 +749,8 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
     for (int j = 0; j <= 20; j++) {
         sku_byte = get_spd(slot_idx, 128+j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j-1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -883,7 +917,8 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
     for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(slot_idx, 73 + j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -990,7 +1025,8 @@ static spd_info parse_spd_ddr(uint8_t slot_idx)
     for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(slot_idx, 73 + j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -1087,7 +1123,8 @@ static spd_info parse_spd_rdram(uint8_t slot_idx)
     for (int j = 0; j < 18; j++) {
         sku_byte = get_spd(slot_idx, 73 + j);
 
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
+        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
+            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
             spdi.sku_len--;
             break;
         } else {
@@ -1200,7 +1237,7 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
 }
 
 // --------------------------
-// Smbus Controller Functions
+// SMBUS Controller Functions
 // --------------------------
 
 static int find_smb_controller(void)
@@ -1216,6 +1253,7 @@ static int find_smb_controller(void)
                     if (valuev == smbcontrollers[i].vendor) {
                         valued = pci_config_read16(0, smbdev, smbfun, 2);
                         if (valued == smbcontrollers[i].device) {
+                            smbus_id = (valuev << 16) | valued;
                             return i;
                         }
                     }
@@ -1223,7 +1261,6 @@ static int find_smb_controller(void)
             }
         }
     }
-
     return -1;
 }
 
@@ -1273,13 +1310,14 @@ static void amd_sb_get_smb(void)
 
     rev_id = pci_config_read8(0, smbdev, smbfun, 0x08);
 
-    // AMD did the switch between PIIX4 and proprietary SMBase Access somewhere
-    // between rev 0x30 and 0x3A. Assume 0x3A (Tested OK on AM1 SoC)
-    if (rev_id < 0x3A) {
-         // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
-         piix4_get_smb();
+    if ((smbus_id & 0xFFFF) == 0x4385 && rev_id <= 0x3D) {
+        // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
+        piix4_get_smb();
+    } else if ((smbus_id & 0xFFFF) == 0x780B && rev_id == 0x42) {
+        // Latest Pre-Zen APUs use the newer Zen PM registers
+        fch_zen_get_smb();
     } else {
-         // Newer AMD SouthBridge (SB800 up to Zen) uses specific registers
+         // AMD SB (SB800 up to pre-FT3/FP4/AM4) uses specific registers
         __outb(AMD_SMBUS_BASE_REG + 1, AMD_INDEX_IO_PORT);
         pm_reg = __inb(AMD_DATA_IO_PORT) << 8;
         __outb(AMD_SMBUS_BASE_REG, AMD_INDEX_IO_PORT);
@@ -1316,6 +1354,41 @@ static void fch_zen_get_smb(void)
     }
 }
 
+// -----------------------
+// nVidia SMBUS Controller
+// -----------------------
+
+static void nv_mcp_get_smb(void)
+{
+    int smbus_base_adr;
+
+    if ((smbus_id & 0xFFFF) >= 0x200) {
+        smbus_base_adr = NV_SMBUS_ADR_REG;
+    } else {
+        smbus_base_adr = NV_OLD_SMBUS_ADR_REG;
+    }
+
+    // nForce SB has 2 I2C Busses. SPD is located on first I2C Bus.
+    uint16_t x = pci_config_read16(0, smbdev, smbfun, smbus_base_adr) & 0xFFFC;
+
+    if (x != 0) {
+        smbusbase = x;
+    }
+}
+
+// ------------------
+// get_spd() function
+// ------------------
+
+static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
+{
+    switch ((smbus_id >> 16) & 0xFFFF) {
+      case 0x10DE:
+        return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
+      default:
+        return ich5_read_spd_byte(slot_idx, spd_adr);
+    }
+}
 
 /*************************************************************************************
 / *****************************         WARNING          *****************************
@@ -1415,4 +1488,35 @@ static uint8_t ich5_process(void)
     }
 
     return 0;
+}
+
+static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
+{
+    int i;
+
+    smbus_adr += 0x50;
+
+    // Set Slave ADR
+    __outb(smbus_adr << 1, NVSMBADD);
+
+    // Set Command (SPD Byte to Read)
+    __outb(spd_adr, NVSMBCMD);
+
+    // Start transaction
+    __outb(NVSMBCNT_BYTE_DATA | NVSMBCNT_READ, NVSMBCNT);
+
+    // Wait until transction complete
+    for (i = 500; i > 0; i--) {
+        usleep(50);
+        if (__inb(NVSMBCNT) == 0) {
+            break;
+        }
+    }
+
+    // If timeout or Error Status, quit
+    if (i == 0 || __inb(NVSMBSTS) & NVSMBSTS_STATUS) {
+        return 0xFF;
+    }
+
+    return __inb(NVSMBDAT(0));
 }

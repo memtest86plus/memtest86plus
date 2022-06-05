@@ -175,9 +175,6 @@ typedef enum {
 #define display_run_time(hours, mins, secs) \
     printf(7, 51, "%i:%02i:%02i", hours, mins, secs)
 
-#define display_temperature(temp, maxtemp) \
-    printf(1, 20, "%2i/%2i%cC", temp, maxtemp, 0xf8)
-
 #define display_pass_count(count) \
     printi(8, 51, count, 0, false, true)
 
@@ -234,6 +231,8 @@ void display_start_run(void);
 void display_start_pass(void);
 
 void display_start_test(void);
+
+void display_temperature(void);
 
 void check_input(void);
 

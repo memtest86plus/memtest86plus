@@ -54,6 +54,7 @@ void quirks_init(void)
     quirk.type      = QUIRK_TYPE_NONE;
     quirk.root_vid  = pci_config_read16(0, 0, 0, 0);
     quirk.root_did  = pci_config_read16(0, 0, 0, 2);
+    quirk.process   = NULL;
 
     //  ------------------------
     //  -- ASUS TUSL2-C Quirk --
@@ -66,7 +67,7 @@ void quirks_init(void)
             if (pci_config_read16(0, 0, 0, 0x2E) == 0x8027) {       // TUSL2-C
                 quirk.id    = QUIRK_TUSL2;
                 quirk.type |= QUIRK_TYPE_SMBUS;
-                asus_tusl2_configure_mux();
+                quirk.process = asus_tusl2_configure_mux;
             }
         }
     }
