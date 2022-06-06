@@ -10,6 +10,16 @@
  * Copyright (C) 2004-2022 Samuel Demeulemeester.
  */
 
+/* Vendor IDs */
+#define VID_ATI          0x1002
+#define VID_AMD          0x1022
+#define VID_SIS          0x1039
+#define VID_NVIDIA       0x10DE
+#define VID_VIA          0x1106
+#define VID_SERVERWORKS  0x1166
+#define VID_HYGON        0x1D94
+#define VID_INTEL        0x8086
+
 #define I2C_WRITE   0
 #define I2C_READ    1
 
@@ -74,7 +84,7 @@
 #define NVSMBSTS_RES        0x20
 #define NVSMBSTS_STATUS     0x1f
 
-struct pci_smbus_controller{
+struct pci_smbus_controller {
     unsigned vendor;
     unsigned device;
     void (*get_adr)(void);
