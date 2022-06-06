@@ -1252,14 +1252,11 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             if (find_in_did_array(did, intel_ich5_dids, sizeof(intel_ich5_dids) / sizeof(intel_ich5_dids[0]))) {
                 return ich5_get_smb();
             }
-            if (   did == 0x7113 // 82371AB/EB/MB PIIX4
-//                || did == 0x719B // 82440/82443MX PMC
-               ) {
+            if (did == 0x7113) { // 82371AB/EB/MB PIIX4
                 return piix4_get_smb();
             }
-            // 0x0C59-0x0C5E, 0x18AC, 0x19AC, 0x1BFF, 0x1F15, 0x1F3D Atom S1200 / C2000 / C3000 SMBus controllers may not be SPD-related.
+            // 0x719B 82440/82443MX PMC ?
             // 0x0F13 ValleyView SMBus Controller ?
-            // 0x7603 82372FB PIIX5 ?
             // 0x8119 US15W ?
             return false;
         }
@@ -1268,15 +1265,11 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
         case VID_AMD:
             switch(did)
             {
-#if 0
-                case 0x740B: // AMD756
-                case 0x7413: // AMD766
-                case 0x7443: // AMD768
-                case 0x746B: // AMD8111_SMBUS
-                    // amd756 / nforce SMB controller
-                case 0x746A: // AMD8111_SMBUS2
-                    // amd8111 SMB controller
-#endif
+                // case 0x740B: // AMD756
+                // case 0x7413: // AMD766
+                // case 0x7443: // AMD768
+                // case 0x746B: // AMD8111_SMBUS
+                // case 0x746A: // AMD8111_SMBUS2
                 case 0x780B: // AMD FCH (Pre-Zen)
                     return amd_sb_get_smb();
                 case 0x790B: // AMD FCH (Zen 2/3)
@@ -1291,8 +1284,8 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             {
                 // case 0x4353: // SB200
                 // case 0x4363: // SB300
-                // case 0x4372: // IXP SB4x0
-                case 0x4385: // SB600+
+                // case 0x4372: // SB400
+                case 0x4385:    // SB600+
                     return amd_sb_get_smb();
                 default:
                     return false;
@@ -1302,73 +1295,68 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
         case VID_NVIDIA:
             switch(did)
             {
-#if 0
-                case 0x01B4: // nForce
-                    // amd756 / nforce SMB controller
-#endif
+                // case 0x01B4: // nForce
+                case 0x0064:    // nForce 2
+                // case 0x0084: // nForce 2 Mobile
+                // case 0x00E4: // nForce 3
                 // case 0x0034: // MCP04
-                // case 0x0052: // CK804
-                case 0x0064: // nForce2 (MCP)
-                // case 0x0084: // MCP2A
-                // case 0x00D4: // nForce3
-                // case 0x0264: // MCP51
-                // case 0x0368: // MCP55
-                case 0x03EB: // MCP61
-                // case 0x0446: // MCP65
-                // case 0x0542: // MCP67
-                case 0x0752: // MCP78S
-                // case 0x07D8: // MCP73
-                // case 0x0AA2: // MCP79
+                // case 0x0052: // nForce 4
+                // case 0x0264: // nForce 410/430 MCP
+                case 0x03EB:    // nForce 630a
+                // case 0x0446: // nForce 520
+                // case 0x0542: // nForce 560
+                case 0x0752:    // nForce 720a
+                // case 0x07D8: // nForce 630i
+                // case 0x0AA2: // nForce 730i
                 // case 0x0D79: // MCP89
+                // case 0x0368: // nForce 790i Ultra
                     return nv_mcp_get_smb();
                 default:
                     return false;
             }
             break;
-#if 0
+
         case VID_SIS:
             switch(did)
             {
                 case 0x0016: // SiS961/2/3
-                    // sis96x SMBus controller.
-                // There are also sis630 and sis5595 SMBus controllers.
+                    // There are also SiS630 and SiS5595 SMBus controllers.
                 default:
                     return false;
             }
             break;
-#endif
-#if 0
+
         case VID_VIA:
             switch(did)
             {
-                case 0x3040: // 82C586_3
+                // case 0x3040: // 82C586_3
                     // via SMBus controller.
-                case 0x3050: // 82C596_3
+                // case 0x3050: // 82C596_3
                     // Try SMB base address = 0x90, then SMB base address = 0x80
                     // viapro SMBus controller.
-                case 0x3051: // 82C596B_3
-                case 0x3057: // 82C686_4
-                case 0x8235: // 8231_4
+                // case 0x3051: // 82C596B_3
+                // case 0x3057: // 82C686_4
+                // case 0x8235: // 8231_4
                     // SMB base address = 0x90
                     // viapro SMBus controller.
-                case 0x3074: // 8233_0
-                case 0x3147: // 8233A
-                case 0x3177: // 8235
-                case 0x3227: // 8237
-                case 0x3337: // 8237A
-                case 0x3372: // 8237S
-                case 0x3287: // 8251
-                case 0x8324: // CX700
-                case 0x8353: // VX800
-                case 0x8409: // VX855
-                case 0x8410: // VX900
+                // case 0x3074: // 8233_0
+                // case 0x3147: // 8233A
+                // case 0x3177: // 8235
+                // case 0x3227: // 8237
+                // case 0x3337: // 8237A
+                // case 0x3372: // 8237S
+                // case 0x3287: // 8251
+                // case 0x8324: // CX700
+                // case 0x8353: // VX800
+                // case 0x8409: // VX855
+                // case 0x8410: // VX900
                     // SMB base address = 0xD0
                     // viapro I2C controller.
                 default:
                     return false;
             }
             break;
-#endif
+
         case VID_SERVERWORKS:
             switch(did)
             {
