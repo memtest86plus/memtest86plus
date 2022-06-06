@@ -12,6 +12,7 @@
 #include "io.h"
 #include "pci.h"
 #include "unistd.h"
+#include "cpuinfo.h"
 
 quirk_t quirk;
 
@@ -44,6 +45,25 @@ static void asus_tusl2_configure_mux(void)
     outb(0xAA, 0x2E);
 }
 
+static void get_m1541_l2_cache_size(void)
+{
+    if (l2_cache != 0) {
+        return;
+    }
+
+    // Check if L2 cache is enabled with L2CC-2 Register[0]
+    if ((pci_config_read8(0, 0, 0, 0x42) & 1) == 0) {
+        return;
+    }
+
+    // Get L2 Cache Size with L2CC-1 Register[3:2]
+    uint8_t reg = (pci_config_read8(0, 0, 0, 0x41) >> 2) & 3;
+
+    if (reg == 0b00) { l2_cache = 256; }
+    if (reg == 0b01) { l2_cache = 512; }
+    if (reg == 0b10) { l2_cache = 1024; }
+}
+
 // ---------------------
 // -- Public function --
 // ---------------------
@@ -55,6 +75,17 @@ void quirks_init(void)
     quirk.root_vid  = pci_config_read16(0, 0, 0, 0);
     quirk.root_did  = pci_config_read16(0, 0, 0, 2);
     quirk.process   = NULL;
+
+    //  -------------------------
+    //  -- ALi Aladdin V Quirk --
+    //  -------------------------
+    // As on many Socket 7 Motherboard, the L2 cache is external and must
+    // be detected by a proprietary way based on chipset registers
+    if (quirk.root_vid == 0x10B9 && quirk.root_did == 0x1541) {     // ALi Aladdin V (M1541)
+        quirk.id    = QUIRK_ALI_ALADDIN_V;
+        quirk.type |= QUIRK_TYPE_MEM_SIZE;
+        quirk.process = get_m1541_l2_cache_size;
+    }
 
     //  ------------------------
     //  -- ASUS TUSL2-C Quirk --

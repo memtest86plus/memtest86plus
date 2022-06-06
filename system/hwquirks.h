@@ -12,16 +12,18 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define QUIRK_TYPE_NONE     0b00000000
-#define QUIRK_TYPE_USB      0b00000001
-#define QUIRK_TYPE_SMP      0b00000010
-#define QUIRK_TYPE_SMBIOS   0b00000100
-#define QUIRK_TYPE_SMBUS    0b00001000
-#define QUIRK_TYPE_TIMER    0b00010000
+#define QUIRK_TYPE_NONE     (1 << 0)
+#define QUIRK_TYPE_USB      (1 << 1)
+#define QUIRK_TYPE_SMP      (1 << 2)
+#define QUIRK_TYPE_SMBIOS   (1 << 3)
+#define QUIRK_TYPE_SMBUS    (1 << 4)
+#define QUIRK_TYPE_TIMER    (1 << 5)
+#define QUIRK_TYPE_MEM_SIZE (1 << 6)
 
 typedef enum {
     QUIRK_NONE,
-    QUIRK_TUSL2
+    QUIRK_TUSL2,
+    QUIRK_ALI_ALADDIN_V
 } quirk_id_t;
 
 typedef struct {

@@ -154,7 +154,7 @@ void print_smbus_startup_info(void) {
     ram.freq = 0;
     curspd.isValid = false;
 
-    if (quirk.type == QUIRK_TYPE_SMBUS) {
+    if (quirk.type & QUIRK_TYPE_SMBUS) {
         quirk.process();
     }
 

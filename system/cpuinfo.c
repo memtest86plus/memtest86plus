@@ -25,6 +25,7 @@
 #include "pmem.h"
 #include "vmem.h"
 #include "memsize.h"
+#include "hwquirks.h"
 
 #include "cpuinfo.h"
 
@@ -1089,6 +1090,10 @@ void cpuinfo_init(void)
 
 void membw_init(void)
 {
+    if (quirk.type & QUIRK_TYPE_MEM_SIZE) {
+        quirk.process();
+    }
+
     if(enable_bench) {
         measure_memory_bandwidth();
     }

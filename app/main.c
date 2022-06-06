@@ -216,11 +216,11 @@ static void global_init(void)
 
     pci_init();
 
+    quirks_init();
+
     membw_init();
 
     smbios_init();
-
-    quirks_init();
 
     badram_init();
 
