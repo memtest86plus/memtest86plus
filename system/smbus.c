@@ -22,6 +22,7 @@ ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
 uint32_t smbus_id;
+static uint16_t extra_initial_sleep_for_smb_transaction = 0;
 
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
@@ -37,117 +38,22 @@ static spd_info parse_spd_ddr4  (uint8_t slot_idx);
 static spd_info parse_spd_ddr5  (uint8_t slot_idx);
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
-static int find_smb_controller(void);
+static bool setup_smb_controller(void);
+static bool find_smb_controller(uint16_t vid, uint16_t did);
+
 static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
 
-static void nv_mcp_get_smb(void);
-static void amd_sb_get_smb(void);
-static void fch_zen_get_smb(void);
-static void piix4_get_smb(void);
-static void ich5_get_smb(void);
+static bool nv_mcp_get_smb(void);
+static bool amd_sb_get_smb(void);
+static bool fch_zen_get_smb(void);
+static bool piix4_get_smb(void);
+static bool ich5_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
-// ----------------------------------------------------------
-// WARNING: Be careful when adding a controller ID!
-// Incorrect SMB accesses (ie: on bank switch) can brick your
-// motherboard or your memory module.
-//                           ----
-// No Pull Request including a new SMBUS Controller will be
-// accepted without a proof (screenshot) that it has been
-// tested successfully on a real motherboard.
-// ----------------------------------------------------------
-
-static const struct pci_smbus_controller smbcontrollers[] = {
-    {0x8086, 0x2413, ich5_get_smb},    // 82801AA (ICH)
-    {0x8086, 0x2423, ich5_get_smb},    // 82801AB (ICH)
-    {0x8086, 0x2443, ich5_get_smb},    // 82801BA (ICH2)
-    {0x8086, 0x2483, ich5_get_smb},    // 82801CA (ICH3)
-    {0x8086, 0x24C3, ich5_get_smb},    // 82801DB (ICH4)
-    {0x8086, 0x24D3, ich5_get_smb},    // 82801E (ICH5)
-    {0x8086, 0x25A4, ich5_get_smb},    // 6300ESB
-    {0x8086, 0x266A, ich5_get_smb},    // 82801F (ICH6)
-    {0x8086, 0x269B, ich5_get_smb},    // 6310ESB/6320ESB
-    {0x8086, 0x27DA, ich5_get_smb},    // 82801G (ICH7)
-    {0x8086, 0x283E, ich5_get_smb},    // 82801H (ICH8)
-    {0x8086, 0x2930, ich5_get_smb},    // 82801I (ICH9)
-    {0x8086, 0x5032, ich5_get_smb},    // EP80579 (Tolapai)
-    {0x8086, 0x3A30, ich5_get_smb},    // ICH10
-    {0x8086, 0x3A60, ich5_get_smb},    // ICH10
-    {0x8086, 0x3B30, ich5_get_smb},    // 5/3400 Series (PCH)
-    {0x8086, 0x1C22, ich5_get_smb},    // 6 Series (PCH)
-    {0x8086, 0x1D22, ich5_get_smb},    // Patsburg (PCH)
-    {0x8086, 0x1D70, ich5_get_smb},    // Patsburg (PCH) IDF
-    {0x8086, 0x1D71, ich5_get_smb},    // Patsburg (PCH) IDF
-    {0x8086, 0x1D72, ich5_get_smb},    // Patsburg (PCH) IDF
-    {0x8086, 0x2330, ich5_get_smb},    // DH89xxCC (PCH)
-    {0x8086, 0x1E22, ich5_get_smb},    // Panther Point (PCH)
-    {0x8086, 0x8C22, ich5_get_smb},    // Lynx Point (PCH)
-    {0x8086, 0x9C22, ich5_get_smb},    // Lynx Point-LP (PCH)
-    {0x8086, 0x1F3C, ich5_get_smb},    // Avoton (SOC)
-    {0x8086, 0x8D22, ich5_get_smb},    // Wellsburg (PCH)
-    {0x8086, 0x8D7D, ich5_get_smb},    // Wellsburg (PCH) MS
-    {0x8086, 0x8D7E, ich5_get_smb},    // Wellsburg (PCH) MS
-    {0x8086, 0x8D7F, ich5_get_smb},    // Wellsburg (PCH) MS
-    {0x8086, 0x23B0, ich5_get_smb},    // Coleto Creek (PCH)
-    {0x8086, 0x8CA2, ich5_get_smb},    // Wildcat Point (PCH)
-    {0x8086, 0x9CA2, ich5_get_smb},    // Wildcat Point-LP (PCH)
-    {0x8086, 0x0F12, ich5_get_smb},    // BayTrail (SOC)
-    {0x8086, 0x2292, ich5_get_smb},    // Braswell (SOC)
-    {0x8086, 0xA123, ich5_get_smb},    // Sunrise Point-H (PCH)
-    {0x8086, 0x9D23, ich5_get_smb},    // Sunrise Point-LP (PCH)
-    {0x8086, 0x19DF, ich5_get_smb},    // Denverton  (SOC)
-    {0x8086, 0x1BC9, ich5_get_smb},    // Emmitsburg (PCH)
-    {0x8086, 0xA1A3, ich5_get_smb},    // Lewisburg (PCH)
-    {0x8086, 0xA223, ich5_get_smb},    // Lewisburg Super (PCH)
-    {0x8086, 0xA2A3, ich5_get_smb},    // Kaby Lake (PCH-H)
-    {0x8086, 0x31D4, ich5_get_smb},    // Gemini Lake (SOC)
-    {0x8086, 0xA323, ich5_get_smb},    // Cannon Lake-H (PCH)
-    {0x8086, 0x9DA3, ich5_get_smb},    // Cannon Lake-LP (PCH)
-    {0x8086, 0x18DF, ich5_get_smb},    // Cedar Fork (PCH)
-    {0x8086, 0x34A3, ich5_get_smb},    // Ice Lake-LP (PCH)
-    {0x8086, 0x38A3, ich5_get_smb},    // Ice Lake-N (PCH)
-    {0x8086, 0x02A3, ich5_get_smb},    // Comet Lake (PCH)
-    {0x8086, 0x06A3, ich5_get_smb},    // Comet Lake-H (PCH)
-    {0x8086, 0x4B23, ich5_get_smb},    // Elkhart Lake (PCH)
-    {0x8086, 0xA0A3, ich5_get_smb},    // Tiger Lake-LP (PCH)
-    {0x8086, 0x43A3, ich5_get_smb},    // Tiger Lake-H (PCH)
-    {0x8086, 0x4DA3, ich5_get_smb},    // Jasper Lake (SOC)
-    {0x8086, 0xA3A3, ich5_get_smb},    // Comet Lake-V (PCH)
-    {0x8086, 0x7AA3, ich5_get_smb},    // Alder Lake-S (PCH)
-    {0x8086, 0x51A3, ich5_get_smb},    // Alder Lake-P (PCH)
-    {0x8086, 0x54A3, ich5_get_smb},    // Alder Lake-M (PCH)
-    {0x8086, 0x7A23, ich5_get_smb},    // Raptor Lake-S (PCH)
-
-    // ATI SMBUS
-    {0x1002, 0x4385, amd_sb_get_smb},  // ATI SB600+ (Now AMD)
-
-    // AMD SMBUS
-    {0x1022, 0x780B, amd_sb_get_smb},  // AMD FCH (Pre-Zen)
-    {0x1022, 0x790B, fch_zen_get_smb}, // AMD FCH (Zen)
-
-    // nVidia SMBUS
-    // {0x10DE, 0x01B4, nv_mcp_get_smb},  // nForce
-    {0x10DE, 0x0064, nv_mcp_get_smb},     // nForce 2
-    // {0x10DE, 0x0084, nv_mcp_get_smb},  // nForce 2 Mobile
-    // {0x10DE, 0x00E4, nv_mcp_get_smb},  // nForce 3
-    // {0x10DE, 0x0052, nv_mcp_get_smb},  // nForce 4
-    // {0x10DE, 0x0264, nv_mcp_get_smb},  // nForce 410/430 MCP
-    // {0x10DE, 0x0446, nv_mcp_get_smb},  // nForce 520
-    // {0x10DE, 0x0542, nv_mcp_get_smb},  // nForce 560
-    // {0x10DE, 0x07D8, nv_mcp_get_smb},  // nForce 630i
-    {0x10DE, 0x03EB, nv_mcp_get_smb},  // nForce 630a
-    {0x10DE, 0x0752, nv_mcp_get_smb},  // nForce 720a
-    // {0x10DE, 0x0AA2, nv_mcp_get_smb},  // nForce 730i
-    // {0x10DE, 0x0368, nv_mcp_get_smb},  // nForce 790i Ultra
-
-    {0, 0, NULL}
-};
-
-void print_smbus_startup_info(void) {
-
-    int8_t index;
+void print_smbus_startup_info(void)
+{
     uint8_t spdidx = 0, spd_line_idx = 0;
 
     spd_info curspd;
@@ -158,15 +64,7 @@ void print_smbus_startup_info(void) {
         quirk.process();
     }
 
-    index = find_smb_controller();
-
-    if (index == -1) {
-        return;
-    }
-
-    smbcontrollers[index].get_adr();
-
-    if (smbusbase == 0) {
+    if (!setup_smb_controller() || smbusbase == 0) {
         return;
     }
 
@@ -1236,52 +1134,295 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
     return spdi;
 }
 
+
 // --------------------------
 // SMBUS Controller Functions
 // --------------------------
 
-static int find_smb_controller(void)
+static bool setup_smb_controller(void)
 {
-    int i = 0;
-    unsigned long valuev, valued;
+    uint16_t vid, did;
 
     for (smbdev = 0; smbdev < 32; smbdev++) {
         for (smbfun = 0; smbfun < 8; smbfun++) {
-            valuev = pci_config_read16(0, smbdev, smbfun, 0);
-            if (valuev != 0xFFFF) {
-                for (i = 0; smbcontrollers[i].vendor > 0; i++) {
-                    if (valuev == smbcontrollers[i].vendor) {
-                        valued = pci_config_read16(0, smbdev, smbfun, 2);
-                        if (valued == smbcontrollers[i].device) {
-                            smbus_id = (valuev << 16) | valued;
-                            return i;
-                        }
+            vid = pci_config_read16(0, smbdev, smbfun, 0);
+            if (vid != 0xFFFF) {
+                did = pci_config_read16(0, smbdev, smbfun, 2);
+                if (did != 0xFFFF) {
+                    if (find_smb_controller(vid, did)) {
+                        return true;
                     }
                 }
             }
         }
     }
-    return -1;
+    return false;
+}
+
+// ----------------------------------------------------------
+// WARNING: Be careful when adding a controller ID!
+// Incorrect SMB accesses (ie: on bank switch) can brick your
+// motherboard or your memory module.
+//                           ----
+// No Pull Request including a new SMBUS Controller will be
+// accepted without a proof (screenshot) that it has been
+// tested successfully on a real motherboard.
+// ----------------------------------------------------------
+
+// PCI device IDs for Intel i801 SMBus controller.
+static const uint16_t intel_ich5_dids[] =
+{
+    0x2413,  // 82801AA (ICH)
+    0x2423,  // 82801AB (ICH)
+    0x2443,  // 82801BA (ICH2)
+    0x2483,  // 82801CA (ICH3)
+    0x24C3,  // 82801DB (ICH4)
+    0x24D3,  // 82801E (ICH5)
+    0x25A4,  // 6300ESB
+    0x266A,  // 82801F (ICH6)
+    0x269B,  // 6310ESB/6320ESB
+    0x27DA,  // 82801G (ICH7)
+    0x283E,  // 82801H (ICH8)
+    0x2930,  // 82801I (ICH9)
+    0x5032,  // EP80579 (Tolapai)
+    0x3A30,  // ICH10
+    0x3A60,  // ICH10
+    0x3B30,  // 5/3400 Series (PCH)
+    0x1C22,  // 6 Series (PCH)
+    0x1D22,  // Patsburg (PCH)
+    0x1D70,  // Patsburg (PCH) IDF
+    0x1D71,  // Patsburg (PCH) IDF
+    0x1D72,  // Patsburg (PCH) IDF
+    0x2330,  // DH89xxCC (PCH)
+    0x1E22,  // Panther Point (PCH)
+    0x8C22,  // Lynx Point (PCH)
+    0x9C22,  // Lynx Point-LP (PCH)
+    0x1F3C,  // Avoton (SOC)
+    0x8D22,  // Wellsburg (PCH)
+    0x8D7D,  // Wellsburg (PCH) MS
+    0x8D7E,  // Wellsburg (PCH) MS
+    0x8D7F,  // Wellsburg (PCH) MS
+    0x23B0,  // Coleto Creek (PCH)
+    0x8CA2,  // Wildcat Point (PCH)
+    0x9CA2,  // Wildcat Point-LP (PCH)
+    0x0F12,  // BayTrail (SOC)
+    0x2292,  // Braswell (SOC)
+    0xA123,  // Sunrise Point-H (PCH)
+    0x9D23,  // Sunrise Point-LP (PCH)
+    0x19DF,  // Denverton  (SOC)
+    0x1BC9,  // Emmitsburg (PCH)
+    0xA1A3,  // Lewisburg (PCH)
+    0xA223,  // Lewisburg Super (PCH)
+    0xA2A3,  // Kaby Lake (PCH-H)
+    0x31D4,  // Gemini Lake (SOC)
+    0xA323,  // Cannon Lake-H (PCH)
+    0x9DA3,  // Cannon Lake-LP (PCH)
+    0x18DF,  // Cedar Fork (PCH)
+    0x34A3,  // Ice Lake-LP (PCH)
+    0x38A3,  // Ice Lake-N (PCH)
+    0x02A3,  // Comet Lake (PCH)
+    0x06A3,  // Comet Lake-H (PCH)
+    0x4B23,  // Elkhart Lake (PCH)
+    0xA0A3,  // Tiger Lake-LP (PCH)
+    0x43A3,  // Tiger Lake-H (PCH)
+    0x4DA3,  // Jasper Lake (SOC)
+    0xA3A3,  // Comet Lake-V (PCH)
+    0x7AA3,  // Alder Lake-S (PCH)
+    0x51A3,  // Alder Lake-P (PCH)
+    0x54A3,  // Alder Lake-M (PCH)
+    0x7A23,  // Raptor Lake-S (PCH)
+};
+
+static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int size)
+{
+    for (unsigned int i = 0; i < size; i++) {
+        if (*ids++ == did) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool find_smb_controller(uint16_t vid, uint16_t did)
+{
+    switch(vid)
+    {
+        case VID_INTEL:
+        {
+            if (find_in_did_array(did, intel_ich5_dids, sizeof(intel_ich5_dids) / sizeof(intel_ich5_dids[0]))) {
+                return ich5_get_smb();
+            }
+            if (   did == 0x7113 // 82371AB/EB/MB PIIX4
+//                || did == 0x719B // 82440/82443MX PMC
+               ) {
+                return piix4_get_smb();
+            }
+            // 0x0C59-0x0C5E, 0x18AC, 0x19AC, 0x1BFF, 0x1F15, 0x1F3D Atom S1200 / C2000 / C3000 SMBus controllers may not be SPD-related.
+            // 0x0F13 ValleyView SMBus Controller ?
+            // 0x7603 82372FB PIIX5 ?
+            // 0x8119 US15W ?
+            return false;
+        }
+
+        case VID_AMD:
+            switch(did)
+            {
+#if 0
+                case 0x740B: // AMD756
+                case 0x7413: // AMD766
+                case 0x7443: // AMD768
+                case 0x746B: // AMD8111_SMBUS
+                    // amd756 / nforce SMB controller
+                case 0x746A: // AMD8111_SMBUS2
+                    // amd8111 SMB controller
+#endif
+                case 0x780B: // AMD FCH (Pre-Zen)
+                    return amd_sb_get_smb();
+                case 0x790B: // AMD FCH (Zen 2/3)
+                    return fch_zen_get_smb();
+                default:
+                return false;
+            }
+            break;
+
+        case VID_HYGON:
+            switch(did)
+            {
+                case 0x780B: // AMD FCH (Pre-Zen)
+                    return amd_sb_get_smb();
+                case 0x790B: // AMD FCH (Zen 2/3)
+                    return fch_zen_get_smb();
+                default:
+                    return false;
+            }
+            break;
+
+        case VID_ATI:
+            switch(did)
+            {
+                // case 0x4353: // SB200
+                // case 0x4363: // SB300
+                // case 0x4372: // IXP SB4x0
+                case 0x4385: // SB600+
+                    return amd_sb_get_smb();
+                default:
+                    return false;
+            }
+            break;
+
+        case VID_NVIDIA:
+            switch(did)
+            {
+#if 0
+                case 0x01B4: // nForce
+                    // amd756 / nforce SMB controller
+#endif
+                // case 0x0034: // MCP04
+                // case 0x0052: // CK804
+                case 0x0064: // nForce2 (MCP)
+                // case 0x0084: // MCP2A
+                // case 0x00D4: // nForce3
+                // case 0x0264: // MCP51
+                // case 0x0368: // MCP55
+                case 0x03EB: // MCP61
+                // case 0x0446: // MCP65
+                // case 0x0542: // MCP67
+                case 0x0752: // MCP78S
+                // case 0x07D8: // MCP73
+                // case 0x0AA2: // MCP79
+                // case 0x0D79: // MCP89
+                    return nv_mcp_get_smb();
+                default:
+                    return false;
+            }
+            break;
+#if 0
+        case VID_SIS:
+            switch(did)
+            {
+                case 0x0016: // SiS961/2/3
+                    // sis96x SMBus controller.
+                // There are also sis630 and sis5595 SMBus controllers.
+                default:
+                    return false;
+            }
+            break;
+#endif
+#if 0
+        case VID_VIA:
+            switch(did)
+            {
+                case 0x3040: // 82C586_3
+                    // via SMBus controller.
+                case 0x3050: // 82C596_3
+                    // Try SMB base address = 0x90, then SMB base address = 0x80
+                    // viapro SMBus controller.
+                case 0x3051: // 82C596B_3
+                case 0x3057: // 82C686_4
+                case 0x8235: // 8231_4
+                    // SMB base address = 0x90
+                    // viapro SMBus controller.
+                case 0x3074: // 8233_0
+                case 0x3147: // 8233A
+                case 0x3177: // 8235
+                case 0x3227: // 8237
+                case 0x3337: // 8237A
+                case 0x3372: // 8237S
+                case 0x3287: // 8251
+                case 0x8324: // CX700
+                case 0x8353: // VX800
+                case 0x8409: // VX855
+                case 0x8410: // VX900
+                    // SMB base address = 0xD0
+                    // viapro I2C controller.
+                default:
+                    return false;
+            }
+            break;
+#endif
+        case VID_SERVERWORKS:
+            switch(did)
+            {
+                case 0x0201: // CSB5
+                    // From Linux i2c-piix4 driver: unlike its siblings, this model needs a quirk.
+                    extra_initial_sleep_for_smb_transaction = 2100 - 500;
+                // Fall through.
+                // case 0x0200: // OSB4
+                // case 0x0203: // CSB6
+                // case 0x0205: // HT1000SB
+                // case 0x0408: // HT1100LD
+                    return piix4_get_smb();
+                default:
+                    return false;
+            }
+            break;
+        default:
+            return false;
+    }
+    return false;
 }
 
 // ----------------------
 // PIIX4 SMBUS Controller
 // ----------------------
 
-static void piix4_get_smb(void)
+static bool piix4_get_smb(void)
 {
     uint16_t x = pci_config_read16(0, smbdev, smbfun, 0x90) & 0xFFF0;
 
     if (x != 0) {
         smbusbase = x;
+        return true;
     }
+
+    return false;
 }
 
 // ----------------------------
 // i801 / ICH5 SMBUS Controller
 // ----------------------------
 
-static void ich5_get_smb(void)
+static bool ich5_get_smb(void)
 {
     uint16_t x;
 
@@ -1297,13 +1438,15 @@ static void ich5_get_smb(void)
     // Reset SMBUS Controller
     __outb(__inb(SMBHSTSTS) & 0x1F, SMBHSTSTS);
     usleep(1000);
+
+    return (smbusbase != 0);
 }
 
 // --------------------
 // AMD SMBUS Controller
 // --------------------
 
-static void amd_sb_get_smb(void)
+static bool amd_sb_get_smb(void)
 {
     uint8_t rev_id;
     uint16_t pm_reg;
@@ -1312,10 +1455,10 @@ static void amd_sb_get_smb(void)
 
     if ((smbus_id & 0xFFFF) == 0x4385 && rev_id <= 0x3D) {
         // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
-        piix4_get_smb();
+        return piix4_get_smb();
     } else if ((smbus_id & 0xFFFF) == 0x780B && rev_id == 0x42) {
         // Latest Pre-Zen APUs use the newer Zen PM registers
-        fch_zen_get_smb();
+        return fch_zen_get_smb();
     } else {
          // AMD SB (SB800 up to pre-FT3/FP4/AM4) uses specific registers
         __outb(AMD_SMBUS_BASE_REG + 1, AMD_INDEX_IO_PORT);
@@ -1325,11 +1468,14 @@ static void amd_sb_get_smb(void)
 
         if (pm_reg != 0xFFE0 && pm_reg != 0) {
             smbusbase = pm_reg;
+            return true;
         }
     }
+
+    return false;
 }
 
-static void fch_zen_get_smb(void)
+static bool fch_zen_get_smb(void)
 {
     uint16_t pm_reg;
 
@@ -1341,24 +1487,27 @@ static void fch_zen_get_smb(void)
     // Special case for AMD Cezanne (get smb address in memory)
     if (imc_type == IMC_K19_CZN && pm_reg == 0xFFFF) {
         smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
-        return;
+        return true;
     }
 
     // Check if IO Smbus is enabled.
     if ((pm_reg & 0x10) == 0) {
-        return;
+        return false;
     }
 
     if ((pm_reg & 0xFF00) != 0) {
         smbusbase = pm_reg & 0xFF00;
+        return true;
     }
+
+    return false;
 }
 
 // -----------------------
 // nVidia SMBUS Controller
 // -----------------------
 
-static void nv_mcp_get_smb(void)
+static bool nv_mcp_get_smb(void)
 {
     int smbus_base_adr;
 
@@ -1373,7 +1522,10 @@ static void nv_mcp_get_smb(void)
 
     if (x != 0) {
         smbusbase = x;
+        return true;
     }
+
+    return false;
 }
 
 // ------------------
@@ -1383,7 +1535,7 @@ static void nv_mcp_get_smb(void)
 static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
     switch ((smbus_id >> 16) & 0xFFFF) {
-      case 0x10DE:
+      case VID_NVIDIA:
         return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       default:
         return ich5_read_spd_byte(slot_idx, spd_adr);
@@ -1469,6 +1621,11 @@ static uint8_t ich5_process(void)
     }
 
     __outb(__inb(SMBHSTCNT) | SMBHSTCNT_START, SMBHSTCNT);
+
+    // Some SMB controllers need this quirk.
+    if (extra_initial_sleep_for_smb_transaction) {
+        usleep(extra_initial_sleep_for_smb_transaction);
+    }
 
     do {
         usleep(500);
