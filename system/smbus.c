@@ -1264,6 +1264,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             return false;
         }
 
+        case VID_HYGON:
         case VID_AMD:
             switch(did)
             {
@@ -1282,18 +1283,6 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                     return fch_zen_get_smb();
                 default:
                 return false;
-            }
-            break;
-
-        case VID_HYGON:
-            switch(did)
-            {
-                case 0x780B: // AMD FCH (Pre-Zen)
-                    return amd_sb_get_smb();
-                case 0x790B: // AMD FCH (Zen 2/3)
-                    return fch_zen_get_smb();
-                default:
-                    return false;
             }
             break;
 
