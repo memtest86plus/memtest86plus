@@ -22,17 +22,23 @@
 #define RSDPSignature1  ('R' | ('S' << 8) | ('D' << 16) | (' ' << 24))
 #define RSDPSignature2  ('P' | ('T' << 8) | ('R' << 16) | (' ' << 24))
 
-#define RSDTSignature   ('R' | ('S' << 8) | ('D' << 16) | ('T' << 24))
+#define RSDTSignature   ('R' | ('S' << 8) | ('D' << 16) | ('T' << 24)) // Root System Description Table
 
-#define XSDTSignature   ('X' | ('S' << 8) | ('D' << 16) | ('T' << 24))
+#define XSDTSignature   ('X' | ('S' << 8) | ('D' << 16) | ('T' << 24)) // Extended System Description Table
 
-#define MADTSignature   ('A' | ('P' << 8) | ('I' << 16) | ('C' << 24))
+#define MADTSignature   ('A' | ('P' << 8) | ('I' << 16) | ('C' << 24)) // Multiple APIC Description Table
 
-#define FADTSignature   ('F' | ('A' << 8) | ('C' << 16) | ('P' << 24))
+#define FADTSignature   ('F' | ('A' << 8) | ('C' << 16) | ('P' << 24)) // Fixed ACPI Description Table
 
-#define HPETSignature   ('H' | ('P' << 8) | ('E' << 16) | ('T' << 24))
+#define HPETSignature   ('H' | ('P' << 8) | ('E' << 16) | ('T' << 24)) // High Precision Event Timer
 
-#define EINJSignature   ('E' | ('I' << 8) | ('N' << 16) | ('J' << 24))
+#define EINJSignature   ('E' | ('I' << 8) | ('N' << 16) | ('J' << 24)) // Error Injection Table
+#define ERSTSignature   ('E' | ('R' << 8) | ('S' << 16) | ('T' << 24)) // Error Record Serialization Table
+#define CPEPSignature   ('C' | ('P' << 8) | ('E' << 16) | ('P' << 24)) // Corrected Platform Error Polling Table
+#define HESTSignature   ('H' | ('E' << 8) | ('S' << 16) | ('T' << 24)) //  Hardware Error Source Table
+
+#define SLITSignature   ('S' | ('L' << 8) | ('I' << 16) | ('T' << 24)) // System Locality System Information Table (NUMA)
+#define SRATSignature   ('S' | ('R' << 8) | ('A' << 16) | ('T' << 24)) // System Resource Affinity Table (NUMA)
 
 //------------------------------------------------------------------------------
 // Types
