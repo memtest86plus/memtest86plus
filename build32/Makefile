@@ -14,7 +14,8 @@ CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m32 -march=i586 -fpic -fno-builtin \
 
 INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app -Iapp
 
-SYS_OBJS = system/cpuid.o \
+SYS_OBJS = system/acpi.o \
+           system/cpuid.o \
            system/cpuinfo.o \
            system/cpulocal.o \
            system/ehci.o \

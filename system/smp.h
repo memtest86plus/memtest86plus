@@ -39,15 +39,6 @@ typedef enum  __attribute__ ((packed)) {
 extern int num_available_cpus;
 
 /**
- * The search step that located the ACPI RSDP (for debug).
- */
-extern const char *rsdp_source;
-/**
- * The address of the ACPI RSDP (for debug).
- */
-extern uintptr_t rsdp_addr;
-
-/**
  * Initialises the SMP state and detects the number of available CPU cores.
  */
 void smp_init(bool smp_enable);

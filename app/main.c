@@ -18,6 +18,7 @@
 #include "boot.h"
 #include "bootparams.h"
 
+#include "acpi.h"
 #include "cache.h"
 #include "cpuid.h"
 #include "cpuinfo.h"
@@ -218,6 +219,8 @@ static void global_init(void)
 
     quirks_init();
 
+    acpi_init();
+
     membw_init();
 
     smbios_init();
@@ -280,6 +283,8 @@ static void global_init(void)
     }
     if (rsdp_addr != 0) {
         trace(0, "ACPI RSDP found in %s at %0*x", rsdp_source, 2*sizeof(uintptr_t), rsdp_addr);
+        trace(0, "ACPI FADT found at %0*x", 2*sizeof(uintptr_t), fadt_addr);
+        trace(0, "ACPI HPET found at %0*x", 2*sizeof(uintptr_t), hpet_addr);
     }
     if (!load_addr_ok) {
         trace(0, "Cannot relocate program. Press any key to reboot...");
