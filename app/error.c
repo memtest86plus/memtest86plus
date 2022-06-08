@@ -369,6 +369,10 @@ void error_update(void)
         display_error_count(error_count);
         display_status("Failed!");
 
+        if (error_count == 1) {
+            display_big_status(false);
+        }
+
         if (enable_tty) {
             tty_error_redraw();
         }

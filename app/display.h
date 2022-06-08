@@ -218,6 +218,8 @@ typedef enum {
 
 extern int scroll_message_row;
 
+extern bool big_status_displayed;
+
 extern display_mode_t display_mode;
 
 void display_init(void);
@@ -233,6 +235,10 @@ void display_start_pass(void);
 void display_start_test(void);
 
 void display_temperature(void);
+
+void display_big_status(bool pass);
+
+void restore_big_status(void);
 
 void check_input(void);
 

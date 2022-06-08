@@ -629,7 +629,10 @@ void main(void)
             display_pass_count(pass_num);
             if (error_count == 0) {
                 display_status("Pass   ");
-                display_notice("** Pass completed, no errors **");
+                if (!big_status_displayed) {
+                    display_big_status(true);
+                }
+                //display_notice("** Pass completed, no errors **");
             }
         }
     }
