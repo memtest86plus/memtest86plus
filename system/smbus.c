@@ -21,7 +21,7 @@ ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
 
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
-uint32_t smbus_id;
+uint32_t smbus_id = 0;
 static uint16_t extra_initial_sleep_for_smb_transaction = 0;
 
 static int8_t spd_page = -1;
@@ -1156,6 +1156,7 @@ static bool setup_smb_controller(void)
             }
         }
     }
+    smbus_id = 0;
     return false;
 }
 
@@ -1245,6 +1246,7 @@ static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int s
 
 static bool find_smb_controller(uint16_t vid, uint16_t did)
 {
+    smbus_id = (((uint32_t)vid) << 16) | did;
     switch(vid)
     {
         case VID_INTEL:
