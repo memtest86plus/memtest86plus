@@ -1232,6 +1232,7 @@ static const uint16_t intel_ich5_dids[] =
     0x51A3,  // Alder Lake-P (PCH)
     0x54A3,  // Alder Lake-M (PCH)
     0x7A23,  // Raptor Lake-S (PCH)
+    0x7E22,  // Meteor Lake (PCH)
 };
 
 static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int size)
