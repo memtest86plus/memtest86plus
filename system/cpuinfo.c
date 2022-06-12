@@ -33,7 +33,6 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define PIT_TICKS_50mS      59659       // PIT clock is 1.193182MHz
 #define BENCH_MIN_START_ADR 0x1000000   // 16MB
 
 //------------------------------------------------------------------------------
@@ -861,37 +860,6 @@ static void determine_cpu_model(void)
     }
 }
 
-static void measure_cpu_speed(void)
-{
-    if (cpuid_info.flags.rdtsc == 0) {
-        return;
-    }
-
-    // Set up timer
-    outb((inb(0x61) & ~0x02) | 0x01, 0x61);
-    outb(0xb0, 0x43);
-    outb(PIT_TICKS_50mS & 0xff, 0x42);
-    outb(PIT_TICKS_50mS >> 8, 0x42);
-
-    uint32_t start_time;
-    rdtscl(start_time);
-
-    int loops = 0;
-    do {
-        loops++;
-    } while ((inb(0x61) & 0x20) == 0);
-
-    uint32_t end_time;
-    rdtscl(end_time);
-
-    uint32_t run_time = end_time - start_time;
-
-    // Make sure we have a credible result
-    if (loops >= 4 && run_time >= 50000) {
-       clks_per_msec = run_time / 50;
-    }
-}
-
 static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
 {
     uintptr_t dst;
@@ -1084,8 +1052,6 @@ void cpuinfo_init(void)
     determine_cache_size();
 
     determine_cpu_model();
-
-    measure_cpu_speed();
 }
 
 void membw_init(void)

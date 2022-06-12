@@ -33,6 +33,7 @@ SYS_OBJS = system/acpi.o \
            system/smbus.o \
            system/smp.o \
            system/temperature.o \
+           system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
            system/vmem.o \
