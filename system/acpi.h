@@ -14,30 +14,35 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define FADT_PM_TMR_BLK_OFFSET      76
+#define FADT_MINOR_REV_OFFSET       131
+#define FADT_X_PM_TMR_BLK_OFFSET    208
+
+/**
+ * A struct containing various ACPI-related infos for later uses.
+ */
+
+typedef struct {
+    uint8_t     ver_maj;
+    uint8_t     ver_min;
+    uint64_t    test;
+    uintptr_t   rsdp_addr;
+    uintptr_t   madt_addr;
+    uintptr_t   fadt_addr;
+    uintptr_t   hpet_addr;
+    uintptr_t   pm_addr;
+    bool        pm_is_io;
+} acpi_t;
+
 /**
  * The search step that located the ACPI RSDP (for debug).
  */
 extern const char *rsdp_source;
 
 /**
- * The address of the ACPI RSDP
+ * Global ACPI config struct
  */
-extern uintptr_t rsdp_addr;
-
-/**
- * The address of the ACPI MADT
- */
-extern uintptr_t madt_addr;
-
-/**
- * The address of the ACPI FADT
- */
-extern uintptr_t fadt_addr;
-
-/**
- * The address of the ACPI HPET
- */
-extern uintptr_t hpet_addr;
+extern acpi_t acpi_config;
 
 /**
  * ACPI Table Checksum Function
