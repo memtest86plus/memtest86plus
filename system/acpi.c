@@ -89,7 +89,7 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 const char *rsdp_source = "";
 
-acpi_t acpi_config = {0, 0, 0, 0, 0, 0, 0, 0, false};
+acpi_t acpi_config = {0, 0, 0, 0, 0, 0, 0, false};
 
 //------------------------------------------------------------------------------
 // Private Functions

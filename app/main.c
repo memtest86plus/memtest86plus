@@ -34,6 +34,7 @@
 #include "smbios.h"
 #include "smp.h"
 #include "temperature.h"
+#include "timers.h"
 #include "vmem.h"
 
 #include "unistd.h"
@@ -221,6 +222,8 @@ static void global_init(void)
 
     acpi_init();
 
+    timers_init();
+
     membw_init();
 
     smbios_init();
@@ -281,10 +284,9 @@ static void global_init(void)
     for (int i = 0; i < pm_map_size; i++) {
         trace(0, "pm %0*x - %0*x", 2*sizeof(uintptr_t), pm_map[i].start, 2*sizeof(uintptr_t), pm_map[i].end);
     }
-    if (rsdp_addr != 0) {
-        trace(0, "ACPI RSDP found in %s at %0*x", rsdp_source, 2*sizeof(uintptr_t), rsdp_addr);
-        trace(0, "ACPI FADT found at %0*x", 2*sizeof(uintptr_t), fadt_addr);
-        trace(0, "ACPI HPET found at %0*x", 2*sizeof(uintptr_t), hpet_addr);
+    if (acpi_config.rsdp_addr != 0) {
+        trace(0, "ACPI RSDP (v%u.%u) found in %s at %0*x", acpi_config.ver_maj, acpi_config.ver_min, rsdp_source, 2*sizeof(uintptr_t), acpi_config.rsdp_addr);
+        trace(0, "ACPI FADT found at %0*x", 2*sizeof(uintptr_t), acpi_config.fadt_addr);
     }
     if (!load_addr_ok) {
         trace(0, "Cannot relocate program. Press any key to reboot...");

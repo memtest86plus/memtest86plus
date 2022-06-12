@@ -22,10 +22,9 @@
  * A struct containing various ACPI-related infos for later uses.
  */
 
-typedef struct {
+typedef struct __attribute__ ((packed)) {
     uint8_t     ver_maj;
     uint8_t     ver_min;
-    uint64_t    test;
     uintptr_t   rsdp_addr;
     uintptr_t   madt_addr;
     uintptr_t   fadt_addr;
