@@ -35,7 +35,7 @@
 #define EINJSignature   ('E' | ('I' << 8) | ('N' << 16) | ('J' << 24)) // Error Injection Table
 #define ERSTSignature   ('E' | ('R' << 8) | ('S' << 16) | ('T' << 24)) // Error Record Serialization Table
 #define CPEPSignature   ('C' | ('P' << 8) | ('E' << 16) | ('P' << 24)) // Corrected Platform Error Polling Table
-#define HESTSignature   ('H' | ('E' << 8) | ('S' << 16) | ('T' << 24)) //  Hardware Error Source Table
+#define HESTSignature   ('H' | ('E' << 8) | ('S' << 16) | ('T' << 24)) // Hardware Error Source Table
 
 #define SLITSignature   ('S' | ('L' << 8) | ('I' << 16) | ('T' << 24)) // System Locality System Information Table (NUMA)
 #define SRATSignature   ('S' | ('R' << 8) | ('A' << 16) | ('T' << 24)) // System Resource Affinity Table (NUMA)
@@ -43,6 +43,14 @@
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
+
+typedef struct __attribute__ ((packed)) {
+    uint8_t     address_space;
+    uint8_t     bit_width;
+    uint8_t     bit_offset;
+    uint8_t     access_size;
+    uint64_t    address;
+} acpi_gen_addr_struct;
 
 typedef struct {
     char        signature[8];   // "RSD PTR "
@@ -81,10 +89,7 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 const char *rsdp_source = "";
 
-uintptr_t rsdp_addr = 0;
-uintptr_t madt_addr = 0;
-uintptr_t fadt_addr = 0;
-uintptr_t hpet_addr = 0;
+acpi_t acpi_config = {0, 0, 0, 0, 0, 0, 0, 0, false};
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -197,10 +202,15 @@ static uintptr_t find_rsdp(void)
 
 static uintptr_t find_acpi_table(uint32_t table_signature)
 {
-   rsdp_t *rp = (rsdp_t *)rsdp_addr;;
+   rsdp_t *rp = (rsdp_t *)acpi_config.rsdp_addr;
 
-    // Found the RSDP, now get either the RSDT or XSDT and scan it for a pointer to the MADT.
+    // Found the RSDP, now get either the RSDT or XSDT
+    // and scan it for a pointer to the table we're looking for
     rsdt_header_t *rt;
+
+    if (acpi_config.ver_maj < rp->revision) {
+        acpi_config.ver_maj = rp->revision;
+    }
 
     if (rp->revision >= 2) {
         rt = (rsdt_header_t *)map_region(rp->xsdt_addr, sizeof(rsdt_header_t), true);
@@ -215,7 +225,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
         if (rt == NULL || acpi_checksum(rt, rt->length) != 0) {
             return 0;
         }
-        // Scan the XSDT for a pointer to the MADT.
+        // Scan the XSDT for a pointer to the table we're looking for.
         uint64_t *tab_ptr = (uint64_t *)((uint8_t *)rt + sizeof(rsdt_header_t));
         uint64_t *tab_end = (uint64_t *)((uint8_t *)rt + rt->length);
 
@@ -240,7 +250,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
         if (rt == NULL || acpi_checksum(rt, rt->length) != 0) {
             return 0;
         }
-        // Scan the RSDT for a pointer to the MADT.
+        // Scan the RSDT for a pointer to the table we're looking for.
         uint32_t *tab_ptr = (uint32_t *)((uint8_t *)rt + sizeof(rsdt_header_t));
         uint32_t *tab_end = (uint32_t *)((uint8_t *)rt + rt->length);
 
@@ -255,6 +265,48 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
     }
 
     return 0;
+}
+
+static bool parse_fadt(uintptr_t fadt_addr)
+{
+    // FADT is a very big & complex table and we only need a few data.
+    // We use byte offset instead of a complete struct.
+
+    // FADT Header is identical to RSDP Header
+    rsdt_header_t *fadt = (rsdt_header_t *)fadt_addr;
+
+    // Validate FADT
+    if (fadt == NULL || acpi_checksum(fadt, fadt->length) != 0) {
+        return false;
+    }
+
+    // Get ACPI Version
+    acpi_config.ver_maj = fadt->revision;
+
+    if (fadt->length > FADT_MINOR_REV_OFFSET) {
+        acpi_config.ver_min = *(uint8_t *)(fadt_addr+FADT_MINOR_REV_OFFSET) & 0xF;
+    }
+
+    // Get Old PM Base Address (32bit IO)
+    acpi_config.pm_addr  = *(uint32_t *)(fadt_addr+FADT_PM_TMR_BLK_OFFSET);
+    acpi_config.pm_is_io = true;
+
+#ifdef __x86_64__
+    acpi_gen_addr_struct *rt;
+
+    // Get APIC Timer Address
+    if (fadt->length > FADT_X_PM_TMR_BLK_OFFSET) {
+        rt = (acpi_gen_addr_struct *)map_region(fadt_addr+FADT_X_PM_TMR_BLK_OFFSET, sizeof(acpi_gen_addr_struct), true);
+
+        acpi_config.pm_is_io = (rt->address_space == 1) ? true : false;
+
+        if (rt->address != 0) {
+            acpi_config.pm_addr = rt->address;
+        }
+    }
+#endif
+
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -275,14 +327,19 @@ int acpi_checksum(const void *data, int length)
 void acpi_init(void)
 {
     // Find ACPI RDST Table Address
-    rsdp_addr = find_rsdp();
+    acpi_config.rsdp_addr = find_rsdp();
 
     // Find ACPI MADT Table Address
-    madt_addr = find_acpi_table(MADTSignature);
+    acpi_config.madt_addr = find_acpi_table(MADTSignature);
 
     // Find ACPI FADT Table Address
-    fadt_addr = find_acpi_table(FADTSignature);
+    acpi_config.fadt_addr = find_acpi_table(FADTSignature);
+
+    // Parse FADT
+    if (acpi_config.fadt_addr) {
+        parse_fadt(acpi_config.fadt_addr);
+    }
 
     // Find ACPI HPET Table Address
-    hpet_addr = find_acpi_table(HPETSignature);
+    acpi_config.hpet_addr = find_acpi_table(HPETSignature);
 }
