@@ -4,11 +4,11 @@
 /**
  * \file
  *
- * Provides support for multi-threaded operation.
+ * Provides support for ACPI (Find & parse tables)
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2020-2022 Sam Whitaker.
+ * Copyright (C) 2004-2022 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -49,7 +49,8 @@ extern acpi_t acpi_config;
 int acpi_checksum(const void *data, int length);
 
 /**
- * Initialises the SMP state and detects the number of available CPU cores.
+ * Look for specific ACPI Tables Addresses (RSDP, MADT, ...)
+ * and parse some of the tables
  */
 void acpi_init(void);
 
