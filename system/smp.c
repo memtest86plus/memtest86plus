@@ -377,7 +377,7 @@ static bool find_cpus_in_floating_mp_struct(void)
 static bool find_cpus_in_madt(void)
 {
     if (acpi_config.madt_addr == 0) {
-        return false
+        return false;
     }
 
     madt_table_header_t *mpc = (madt_table_header_t *)map_region(acpi_config.madt_addr, sizeof(madt_table_header_t), true);
