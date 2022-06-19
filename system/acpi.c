@@ -37,7 +37,7 @@
 #define CPEPSignature   ('C' | ('P' << 8) | ('E' << 16) | ('P' << 24)) // Corrected Platform Error Polling Table
 #define HESTSignature   ('H' | ('E' << 8) | ('S' << 16) | ('T' << 24)) // Hardware Error Source Table
 
-#define SLITSignature   ('S' | ('L' << 8) | ('I' << 16) | ('T' << 24)) // System Locality System Information Table (NUMA)
+#define SLITSignature   ('S' | ('L' << 8) | ('I' << 16) | ('T' << 24)) // System Locality Information Table (NUMA)
 #define SRATSignature   ('S' | ('R' << 8) | ('A' << 16) | ('T' << 24)) // System Resource Affinity Table (NUMA)
 
 //------------------------------------------------------------------------------
@@ -326,20 +326,19 @@ int acpi_checksum(const void *data, int length)
 
 void acpi_init(void)
 {
-    // Find ACPI RDST Table Address
     acpi_config.rsdp_addr = find_rsdp();
 
-    // Find ACPI MADT Table Address
+    if (acpi_config.rsdp_addr == 0) {
+        return;
+    }
+
     acpi_config.madt_addr = find_acpi_table(MADTSignature);
 
-    // Find ACPI FADT Table Address
     acpi_config.fadt_addr = find_acpi_table(FADTSignature);
 
-    // Parse FADT
     if (acpi_config.fadt_addr) {
         parse_fadt(acpi_config.fadt_addr);
     }
 
-    // Find ACPI HPET Table Address
     acpi_config.hpet_addr = find_acpi_table(HPETSignature);
 }
