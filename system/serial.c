@@ -151,14 +151,9 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 
     for (int row = start_row; row <= end_row; row++) {
 
-        /* Move the cursor to the new position. If the starting col is not 0 or
-         * this is the first row we have to use absolute positioning, otherwise
-         * CR + LF can take us to col=0, row++ */
-        if (start_col || row == start_row) {
-            tty_goto(row, start_col);
-        } else {
-            serial_echo_print("\r\n");
-        }
+        // Always use absolute positioning instead of relying on CR-LF to avoid issues
+        // when a CR-LF is lost (especially with Industrial RS232/Ethernet converters).
+        tty_goto(row, start_col);
 
         // Copy Shadow buffer to TTY buffer
         pos = 0;
