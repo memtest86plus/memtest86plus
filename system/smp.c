@@ -20,10 +20,10 @@
 #include "efi.h"
 
 #include "cpuid.h"
+#include "heap.h"
 #include "memrw32.h"
 #include "memsize.h"
 #include "msr.h"
-#include "pmem.h"
 #include "string.h"
 #include "unistd.h"
 #include "vmem.h"
@@ -548,9 +548,9 @@ void smp_init(bool smp_enable)
         apic_id_to_cpu_num[cpu_num_to_apic_id[i]] = i;
     }
 
-    // Reserve last page of first segment for AP trampoline and sync objects.
+    // Allocate a page of low memory for AP trampoline and sync objects.
     // These need to remain pinned in place during relocation.
-    smp_heap_page = --pm_map[0].end;
+    smp_heap_page = lm_heap_alloc(PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
     ap_startup_addr = (uintptr_t)startup;
 
