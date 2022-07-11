@@ -5,10 +5,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "heap.h"
 #include "memrw32.h"
 #include "memsize.h"
 #include "pci.h"
-#include "pmem.h"
 #include "usb.h"
 
 #include "string.h"
@@ -225,11 +225,6 @@ typedef struct {
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
-
-static size_t num_pages(size_t size)
-{
-    return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-}
 
 static int usb_to_ehci_speed(usb_speed_t usb_speed)
 {
@@ -519,20 +514,26 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     if (!halt_host_controller(op_regs)) return false;
     if (!reset_host_controller(op_regs)) return false;
 
+    // Record the heap state to allow us to free memory.
+    uintptr_t initial_heap_mark = lm_heap_mark();
+
     // Allocate and initialise a periodic frame list. This needs to be aligned on a 4K page boundary. Some controllers
     // don't support a programmable list length, so we just use the default length.
-    pm_map[0].end -= num_pages(EHCI_MAX_PFL_LENGTH * sizeof(uint32_t));
-    uintptr_t pfl_addr = pm_map[0].end << PAGE_SHIFT;
+    uintptr_t pfl_addr = lm_heap_alloc(EHCI_MAX_PFL_LENGTH * sizeof(uint32_t), PAGE_SIZE);
+    if (pfl_addr == 0) {
+        goto no_keyboards_found;
+    }
     uint32_t *pfl = (uint32_t *)pfl_addr;
+
     for (int i = 0; i < EHCI_MAX_PFL_LENGTH; i++) {
         pfl[i] = EHCI_LP_TERMINATE;
     }
 
-    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory,
-    // so allocate it in the first segment.
-    // TODO: check for segment overflow.
-    pm_map[0].end -= num_pages(sizeof(workspace_t));
-    uintptr_t workspace_addr = pm_map[0].end << PAGE_SHIFT;
+    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory.
+    uintptr_t workspace_addr = lm_heap_alloc(sizeof(workspace_t), PAGE_SIZE);
+    if (workspace_addr == 0) {
+        goto no_keyboards_found;
+    }
     workspace_t *ws = (workspace_t *)workspace_addr;
 
     memset(ws, 0, sizeof(workspace_t));
@@ -549,9 +550,7 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     write32(&op_regs->periodic_list_base, pfl_addr);
     write32(&op_regs->async_list_addr, (uintptr_t)(ws->qhd));
     if (!start_host_controller(op_regs)) {
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-        pm_map[0].end += num_pages(EHCI_MAX_PFL_LENGTH * sizeof(uint32_t));
-        return false;
+        goto no_keyboards_found;
     }
     flush32(&op_regs->config_flag, 1);
 
@@ -647,17 +646,9 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     }
 
     if (num_keyboards == 0) {
-        // Halt the host controller.
         (void)halt_host_controller(op_regs);
         (void)reset_host_controller(op_regs);
-
-        // Deallocate the workspace for this controller.
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-
-        // Deallocate the periodic frame list.
-        pm_map[0].end += num_pages(EHCI_MAX_PFL_LENGTH * sizeof(uint32_t));
-
-        return false;
+        goto no_keyboards_found;
     }
 
     ws->num_keyboards = num_keyboards;
@@ -691,4 +682,8 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     enable_periodic_schedule(op_regs);
 
     return true;
+
+no_keyboards_found:
+    lm_heap_rewind(initial_heap_mark);
+    return false;
 }
