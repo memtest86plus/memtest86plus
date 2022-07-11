@@ -5,11 +5,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "heap.h"
 #include "io.h"
 #include "memrw32.h"
 #include "memsize.h"
 #include "pci.h"
-#include "pmem.h"
 #include "usb.h"
 
 #include "string.h"
@@ -194,11 +194,6 @@ typedef struct {
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
-
-static size_t num_pages(size_t size)
-{
-    return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-}
 
 static bool io_wait_until_clr(uint16_t io_reg, uint16_t bit_mask, int max_time)
 {
@@ -434,16 +429,21 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
     if (!halt_host_controller(io_base)) return false;
     if (!reset_host_controller(io_base)) return false;
 
-    // Allocate and initialise the frame list. This needs to be aligned on a 4K page boundary.
-    pm_map[0].end -= num_pages(UHCI_FL_LENGTH * sizeof(uint32_t));
-    uintptr_t fl_addr = pm_map[0].end << PAGE_SHIFT;
+    // Record the heap state to allow us to free memory.
+    uintptr_t initial_heap_mark = lm_heap_mark();
+
+    // Allocate the frame list. This needs to be aligned on a 4K page boundary.
+    uintptr_t fl_addr = lm_heap_alloc(UHCI_FL_LENGTH * sizeof(uint32_t), PAGE_SIZE);
+    if (fl_addr == 0) {
+        goto no_keyboards_found;
+    }
     uint32_t *fl = (uint32_t *)fl_addr;
 
-    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory,
-    // so allocate it in the first segment.
-    // TODO: check for segment overflow.
-    pm_map[0].end -= num_pages(sizeof(workspace_t));
-    uintptr_t workspace_addr = pm_map[0].end << PAGE_SHIFT;
+    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory.
+    uintptr_t workspace_addr = lm_heap_alloc(sizeof(workspace_t), PAGE_SIZE);
+    if (workspace_addr == 0) {
+        goto no_keyboards_found;
+    }
     workspace_t *ws = (workspace_t *)workspace_addr;
 
     memset(ws, 0, sizeof(workspace_t));
@@ -469,9 +469,7 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
     outl(fl_addr,           UHCI_FLBASE);
     outb(UHCI_SOF_DEFAULT,  UHCI_SOF);
     if (!start_host_controller(io_base)) {
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-        pm_map[0].end += num_pages(UHCI_FL_LENGTH * sizeof(uint32_t));
-        return false;
+        goto no_keyboards_found;
     }
 
     // Construct a hub descriptor for the root hub.
@@ -535,16 +533,8 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
                    num_keyboards, num_keyboards != 1 ? "s" : "");
 
     if (num_keyboards == 0) {
-        // Halt the host controller.
         (void)halt_host_controller(io_base);
-
-        // Deallocate the workspace for this controller.
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-
-        // Deallocate the periodic frame list.
-        pm_map[0].end += num_pages(UHCI_FL_LENGTH * sizeof(uint32_t));
-
-        return false;
+        goto no_keyboards_found;
     }
 
     ws->num_keyboards = num_keyboards;
@@ -582,4 +572,8 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
     }
 
     return true;
+
+no_keyboards_found:
+    lm_heap_rewind(initial_heap_mark);
+    return false;
 }
