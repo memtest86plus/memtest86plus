@@ -5,9 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "heap.h"
 #include "memrw32.h"
 #include "memsize.h"
-#include "pmem.h"
 #include "usb.h"
 
 #include "string.h"
@@ -243,11 +243,6 @@ typedef struct {
 // Private Functions
 //------------------------------------------------------------------------------
 
-static size_t num_pages(size_t size)
-{
-    return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-}
-
 static bool reset_ohci_port(ohci_op_regs_t *op_regs, int port_idx)
 {
     // The OHCI reset lasts for 10ms, but the USB specification calls for 50ms (but not necessarily continuously).
@@ -461,11 +456,14 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         return false;
     }
 
-    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory,
-    // so allocate it in the first segment.
-    // TODO: check for segment overflow.
-    pm_map[0].end -= num_pages(sizeof(workspace_t));
-    uintptr_t workspace_addr = pm_map[0].end << PAGE_SHIFT;
+    // Record the heap state to allow us to free memory.
+    uintptr_t initial_heap_mark = lm_heap_mark();
+
+    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory.
+    uintptr_t workspace_addr = lm_heap_alloc(sizeof(workspace_t), PAGE_SIZE);
+    if (workspace_addr == 0) {
+        goto no_keyboards_found;
+    }
     workspace_t *ws = (workspace_t *)workspace_addr;
 
     memset(ws, 0, sizeof(workspace_t));
@@ -574,10 +572,7 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         // Delay to allow the controller to reset.
         usleep(10);
 
-        // Deallocate the workspace for this controller.
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-
-        return false;
+        goto no_keyboards_found;
     }
 
 
@@ -611,4 +606,8 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     flush32(&op_regs->interrupt_status, ~0);
 
     return true;
+
+no_keyboards_found:
+    lm_heap_rewind(initial_heap_mark);
+    return false;
 }
