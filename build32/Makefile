@@ -20,6 +20,7 @@ SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
            system/font.o \
+           system/heap.o \
            system/hwctrl.o \
            system/hwquirks.o \
            system/keyboard.o \
