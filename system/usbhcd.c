@@ -543,12 +543,12 @@ bool assign_usb_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num
     ep0->max_packet_size = default_max_packet_size(device_speed);
     ep0->interval        = 0;
 
-    // The device should currently be in Default state. For loww and full speed devices, We first fetch the first
+    // The device should currently be in Default state. For low and full speed devices, we first fetch the first
     // 8 bytes of the device descriptor to discover the maximum packet size for the control endpoint. We then set
     // the device address, which moves the device into Address state, and fetch the full device descriptor.
 
     size_t fetch_length = sizeof(usb_device_desc_t);
-    if (device_speed < USB_SPEED_HIGH) {
+    if (device_speed < USB_SPEED_HIGH || usb_init_options & USB_2_STEP_INIT) {
         fetch_length = 8;
         goto fetch_descriptor;
     }
