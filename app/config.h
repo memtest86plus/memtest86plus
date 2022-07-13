@@ -63,6 +63,7 @@ extern bool         enable_bench;
 extern bool         enable_mch_read;
 extern bool         enable_ecc_polling;
 extern bool         enable_numa;
+extern bool         enable_nontemporal;
 
 extern bool         pause_at_start;
 
