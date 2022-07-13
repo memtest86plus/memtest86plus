@@ -226,6 +226,20 @@ static inline void cpuid(uint32_t op, uint32_t count, uint32_t *eax, uint32_t *e
           "2"  (*ecx)
     );
 }
+
+/**
+ * Returns whether the processor supports nontemporal writes
+ */
+#define nontemporal_writes_supported() (cpuid_info.flags.sse2)
+
+#elif defined(__loongarch_lp64)
+
+/**
+ * Returns whether the processor supports nontemporal writes
+ */
+// TODO
+#define nontemporal_writes_supported() (0)
+
 #endif
 
 #endif // CPUID_H
