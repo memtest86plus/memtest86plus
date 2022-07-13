@@ -45,6 +45,20 @@ static inline void write64(const volatile uint64_t *ptr, uint64_t val)
 }
 
 /**
+ * Writes val to the 64-bit memory location pointed to by ptr, using non-temporal hint.
+ */
+static inline void write64_nt(const volatile uint64_t *ptr, uint64_t val)
+{
+    __asm__ __volatile__(
+        "movnti %1, %0"
+        :
+        : "m" (*ptr),
+          "r" (val)
+        : "memory"
+    );
+}
+
+/**
  * Writes val to the 64-bit memory location pointed to by ptr. Reads it
  * back (and discards it) to ensure the write is complete.
  */

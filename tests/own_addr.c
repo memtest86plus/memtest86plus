@@ -19,6 +19,8 @@
 #include "display.h"
 #include "error.h"
 #include "test.h"
+#include "config.h"
+#include "cpuid.h"
 
 #include "test_funcs.h"
 #include "test_helper.h"
@@ -35,7 +37,7 @@ static int pattern_fill(int my_cpu, testword_t offset)
         display_test_pattern_name("own address");
     }
 
-    // Write each address with it's own address.
+    // Write each address with its own address.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start = vm_map[i].start;
         testword_t *end   = vm_map[i].end;
@@ -57,9 +59,32 @@ static int pattern_fill(int my_cpu, testword_t offset)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                write_word(p, (testword_t)p + offset);
-            } while (p++ < pe); // test before increment in case pointer overflows
+            if (!offset) {
+                if (enable_nontemporal && cpuid_info.flags.sse2) {
+                    do {
+                        write_word_nt(p, (testword_t)p);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                    __asm__ __volatile__ ("mfence");
+                }
+                else {
+                    do {
+                        write_word(p, (testword_t)p);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                }
+            }
+            else {
+                if (enable_nontemporal && cpuid_info.flags.sse2) {
+                    do {
+                        write_word_nt(p, (testword_t)p + offset);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                    __asm__ __volatile__ ("mfence");
+                }
+                else {
+                    do {
+                        write_word(p, (testword_t)p + offset);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                }
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
@@ -96,13 +121,24 @@ static int pattern_check(int my_cpu, testword_t offset)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                testword_t expect = (testword_t)p + offset;
-                testword_t actual = read_word(p);
-                if (unlikely(actual != expect)) {
-                    data_error(p, expect, actual, true);
-                }
-            } while (p++ < pe); // test before increment in case pointer overflows
+            if (!offset) {
+                do {
+                    testword_t expect = (testword_t)p;
+                    testword_t actual = read_word(p);
+                    if (unlikely(actual != expect)) {
+                        data_error(p, expect, actual, true);
+                    }
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
+            else {
+                do {
+                    testword_t expect = (testword_t)p + offset;
+                    testword_t actual = read_word(p);
+                    if (unlikely(actual != expect)) {
+                        data_error(p, expect, actual, true);
+                    }
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point

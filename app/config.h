@@ -57,6 +57,7 @@ extern bool         enable_trace;
 extern bool         enable_sm;
 extern bool         enable_tty;
 extern bool         enable_bench;
+extern bool         enable_nontemporal;
 
 extern bool         pause_at_start;
 

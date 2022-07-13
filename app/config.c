@@ -96,6 +96,7 @@ bool            enable_trace       = false;
 
 bool            enable_sm          = true;
 bool            enable_bench       = true;
+bool            enable_nontemporal = false;
 
 bool            pause_at_start     = true;
 
@@ -212,6 +213,8 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "nosm", 5) == 0) {
         enable_sm = false;
+    } else if (strncmp(option, "nontemporal", 12) == 0) {
+        enable_nontemporal = true;
     }
 }
 

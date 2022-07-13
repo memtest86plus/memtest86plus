@@ -45,6 +45,20 @@ static inline void write32(const volatile uint32_t *ptr, uint32_t val)
 }
 
 /**
+ * Writes val to the 32-bit memory location pointed to by ptr, using non-temporal hint.
+ */
+static inline void write32_nt(const volatile uint32_t *ptr, uint32_t val)
+{
+    __asm__ __volatile__(
+        "movntil %1, %0"
+        :
+        : "m" (*ptr),
+          "r" (val)
+        : "memory"
+    );
+}
+
+/**
  * Writes val to the 32-bit memory location pointed to by ptr. Reads it
  * back (and discards it) to ensure the write is complete.
  */
