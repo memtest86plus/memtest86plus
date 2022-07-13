@@ -21,11 +21,13 @@
  */
 #include "memrw.h"
 #if (ARCH_BITS == 64)
-#define read_word   read64
-#define write_word  write64
+#define read_word      read64
+#define write_word     write64
+#define write_word_nt  write64nt
 #else
-#define read_word   read32
-#define write_word  write32
+#define read_word      read32
+#define write_word     write32
+#define write_word_nt  write32nt
 #endif
 
 /**
