@@ -23,6 +23,7 @@
 #define __MEMRW_SUFFIX_64BIT "q"
 #define __MEMRW_READ_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
 #define __MEMRW_WRITE_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
+#define __MEMRW_WRITENT_INSTRUCTIONS(bitwidth) "movnti" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
 #define __MEMRW_FLUSH_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0; mov" __MEMRW_SUFFIX_##bitwidth##BIT " %0, %1"
 
 #elif defined(__loongarch_lp64)
@@ -55,6 +56,18 @@ static inline void write##bitwidth(const volatile uint##bitwidth##_t *ptr, uint#
 { \
     __asm__ __volatile__( \
        __MEMRW_WRITE_INSTRUCTIONS(bitwidth) \
+        : \
+        : "m" (*ptr), \
+          "r" (val) \
+        : "memory" \
+    ); \
+}
+
+#define __MEMRW_WRITENT_FUNC(bitwidth) \
+static inline void write##bitwidth##nt(const volatile uint##bitwidth##_t *ptr, uint##bitwidth##_t val) \
+{ \
+    __asm__ __volatile__( \
+       __MEMRW_WRITENT_INSTRUCTIONS(bitwidth) \
         : \
         : "m" (*ptr), \
           "r" (val) \
@@ -107,6 +120,15 @@ __MEMRW_WRITE_FUNC(32)
  * Writes val to the 64-bit memory location pointed to by ptr.
  */
 __MEMRW_WRITE_FUNC(64)
+
+/**
+ * Writes val to the 32-bit memory location pointed to by ptr, using non-temporal hint.
+ */
+__MEMRW_WRITENT_FUNC(32)
+/**
+ * Writes val to the 64-bit memory location pointed to by ptr, using non-temporal hint.
+ */
+__MEMRW_WRITENT_FUNC(64)
 
 /**
  * Writes val to the 8-bit memory location pointed to by ptr. Only returns when the write is complete.
