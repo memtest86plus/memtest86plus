@@ -559,7 +559,7 @@ static efi_status_t set_efi_info_and_exit_boot_services(efi_handle_t handle, boo
     boot_params->efi_info.mem_desc_version  = mem_desc_version;
     boot_params->efi_info.mem_map           = (uintptr_t)mem_map;
     boot_params->efi_info.mem_map_size      = mem_map_size;
-#ifdef __X86_64__
+#ifdef __x86_64__
     boot_params->efi_info.sys_tab_hi        = (uintptr_t)sys_table >> 32;
     boot_params->efi_info.mem_map_hi        = (uintptr_t)mem_map   >> 32;
 #endif
@@ -571,7 +571,7 @@ fail:
 static void set_e820_map(boot_params_t *params)
 {
     uintptr_t mem_map_addr = params->efi_info.mem_map;
-#ifdef __X86_64__
+#ifdef __x86_64__
     mem_map_addr |= (uintptr_t)params->efi_info.mem_map_hi << 32;
 #endif
     size_t mem_map_size  = params->efi_info.mem_map_size;
