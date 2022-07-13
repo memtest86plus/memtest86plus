@@ -98,6 +98,7 @@ bool            enable_trace       = false;
 bool            enable_sm          = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
+bool            enable_nontemporal = false;
 
 bool            enable_ecc_polling = false;
 
@@ -239,6 +240,8 @@ static void parse_option(const char *option, const char *params)
         usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nomch", 6) == 0) {
         enable_mch_read = false;
+    } else if (strncmp(option, "nontemporal", 12) == 0) {
+        enable_nontemporal = true;
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
     } else if (strncmp(option, "nosm", 5) == 0) {

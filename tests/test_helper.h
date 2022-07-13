@@ -21,12 +21,14 @@
  */
 #ifdef __x86_64__
 #include "memrw64.h"
-#define read_word   read64
-#define write_word  write64
+#define read_word      read64
+#define write_word     write64
+#define write_word_nt  write64_nt
 #else
 #include "memrw32.h"
-#define read_word   read32
-#define write_word  write32
+#define read_word      read32
+#define write_word     write32
+#define write_word_nt  write32_nt
 #endif
 
 /**
