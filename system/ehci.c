@@ -515,11 +515,11 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     if (!reset_host_controller(op_regs)) return false;
 
     // Record the heap state to allow us to free memory.
-    uintptr_t initial_heap_mark = lm_heap_mark();
+    uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
 
     // Allocate and initialise a periodic frame list. This needs to be aligned on a 4K page boundary. Some controllers
     // don't support a programmable list length, so we just use the default length.
-    uintptr_t pfl_addr = lm_heap_alloc(EHCI_MAX_PFL_LENGTH * sizeof(uint32_t), PAGE_SIZE);
+    uintptr_t pfl_addr = heap_alloc(HEAP_TYPE_LM_1, EHCI_MAX_PFL_LENGTH * sizeof(uint32_t), PAGE_SIZE);
     if (pfl_addr == 0) {
         goto no_keyboards_found;
     }
@@ -530,7 +530,7 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     }
 
     // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory.
-    uintptr_t workspace_addr = lm_heap_alloc(sizeof(workspace_t), PAGE_SIZE);
+    uintptr_t workspace_addr = heap_alloc(HEAP_TYPE_LM_1, sizeof(workspace_t), PAGE_SIZE);
     if (workspace_addr == 0) {
         goto no_keyboards_found;
     }
@@ -684,6 +684,6 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     return true;
 
 no_keyboards_found:
-    lm_heap_rewind(initial_heap_mark);
+    heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
     return false;
 }

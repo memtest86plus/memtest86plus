@@ -24,8 +24,10 @@ typedef struct {
 // Private Variables
 //------------------------------------------------------------------------------
 
-static heap_t lm_heap = { .segment = -1, .start = 0, .end = 0 };
-static heap_t hm_heap = { .segment = -1, .start = 0, .end = 0 };
+static heap_t heaps[HEAP_TYPE_LAST] = {
+    { .segment = -1, .start = 0, .end = 0 },
+    { .segment = -1, .start = 0, .end = 0 }
+};
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -36,8 +38,9 @@ static size_t num_pages(size_t size)
     return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 }
 
-static uintptr_t heap_alloc(const heap_t *heap, size_t size, uintptr_t alignment)
+uintptr_t heap_alloc(heap_type_t heap_id, size_t size, uintptr_t alignment)
 {
+    const heap_t * heap = &heaps[heap_id];
     if (heap->segment < 0) {
         return 0;
     }
@@ -50,16 +53,18 @@ static uintptr_t heap_alloc(const heap_t *heap, size_t size, uintptr_t alignment
     return addr << PAGE_SHIFT;
 }
 
-static uintptr_t heap_mark(const heap_t *heap)
+uintptr_t heap_mark(heap_type_t heap_id)
 {
+    const heap_t * heap = &heaps[heap_id];
     if (heap->segment < 0) {
         return 0;
     }
     return pm_map[heap->segment].end;
 }
 
-static void heap_rewind(const heap_t *heap, uintptr_t mark)
+void heap_rewind(heap_type_t heap_id, uintptr_t mark)
 {
+    const heap_t * heap = &heaps[heap_id];
     if (heap->segment >= 0 && mark > pm_map[heap->segment].end && mark <= heap->end) {
         pm_map[heap->segment].end = mark;
     }
@@ -86,43 +91,13 @@ void heap_init(void)
         if (segment_size >= max_segment_size) {
             max_segment_size = segment_size;
             if (try_heap_end <= PAGE_C(1,MB)) {
-                lm_heap.segment = i;
-                lm_heap.start   = try_heap_start;
-                lm_heap.end     = try_heap_end;
+                heaps[HEAP_TYPE_LM_1].segment = i;
+                heaps[HEAP_TYPE_LM_1].start   = try_heap_start;
+                heaps[HEAP_TYPE_LM_1].end     = try_heap_end;
             }
-            hm_heap.segment = i;
-            hm_heap.start   = try_heap_start;
-            hm_heap.end     = try_heap_end;
+            heaps[HEAP_TYPE_HM_1].segment = i;
+            heaps[HEAP_TYPE_HM_1].start   = try_heap_start;
+            heaps[HEAP_TYPE_HM_1].end     = try_heap_end;
         }
     }
-}
-
-uintptr_t lm_heap_alloc(size_t size, uintptr_t alignment)
-{
-    return heap_alloc(&lm_heap, size, alignment);
-}
-
-uintptr_t lm_heap_mark(void)
-{
-    return heap_mark(&lm_heap);
-}
-
-void lm_heap_rewind(uintptr_t mark)
-{
-    heap_rewind(&lm_heap, mark);
-}
-
-uintptr_t hm_heap_alloc(size_t size, uintptr_t alignment)
-{
-    return heap_alloc(&hm_heap, size, alignment);
-}
-
-uintptr_t hm_heap_mark(void)
-{
-    return heap_mark(&hm_heap);
-}
-
-void hm_heap_rewind(uintptr_t mark)
-{
-    heap_rewind(&hm_heap, mark);
 }
