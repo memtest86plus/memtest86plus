@@ -550,7 +550,7 @@ void smp_init(bool smp_enable)
 
     // Allocate a page of low memory for AP trampoline and sync objects.
     // These need to remain pinned in place during relocation.
-    smp_heap_page = lm_heap_alloc(PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
+    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
     ap_startup_addr = (uintptr_t)startup;
 

@@ -645,10 +645,10 @@ static int allocate_slot(const usb_hcd_t *hcd)
     xhci_trb_t event;
 
     // Record the heap state to allow us to free memory.
-    ws->initial_heap_mark = lm_heap_mark();
+    ws->initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
 
     // Allocate and initialise a private workspace for this device.
-    uintptr_t device_workspace_addr = lm_heap_alloc(DEVICE_WS_SIZE, PAGE_SIZE);
+    uintptr_t device_workspace_addr = heap_alloc(HEAP_TYPE_LM_1, DEVICE_WS_SIZE, PAGE_SIZE);
     if (device_workspace_addr == 0) {
         goto free_memory;
     }
@@ -672,7 +672,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
     return slot_id;
 
 free_memory:
-    lm_heap_rewind(ws->initial_heap_mark);
+    heap_rewind(HEAP_TYPE_LM_1, ws->initial_heap_mark);
     return 0;
 }
 
@@ -690,7 +690,7 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
 
     write64(&ws->device_context_index[slot_id], 0);
 
-    lm_heap_rewind(ws->initial_heap_mark);
+    heap_rewind(HEAP_TYPE_LM_1, ws->initial_heap_mark);
 
     return true;
 }
@@ -987,8 +987,8 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     if (!reset_host_controller(op_regs)) return false;
 
     // Record the heap states to allow us to free memory.
-    uintptr_t initial_lm_heap_mark = lm_heap_mark();
-    uintptr_t initial_hm_heap_mark = hm_heap_mark();
+    uintptr_t initial_lm_heap_mark = heap_mark(HEAP_TYPE_LM_1);
+    uintptr_t initial_hm_heap_mark = heap_mark(HEAP_TYPE_HM_1);
 
     // Record the controller page size.
     uintptr_t xhci_page_size = (read32(&op_regs->page_size) & 0xffff) << 12;
@@ -1002,7 +1002,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Allocate and clear the scratchpad memory on the heap. This must be aligned to the controller page size.
     uintptr_t scratchpad_size = num_scratchpad_buffers * xhci_page_size;
-    uintptr_t scratchpad_paddr = hm_heap_alloc(scratchpad_size, xhci_page_size);
+    uintptr_t scratchpad_paddr = heap_alloc(HEAP_TYPE_HM_1, scratchpad_size, xhci_page_size);
     if (scratchpad_paddr == 0) {
         goto no_keyboards_found;
     }
@@ -1018,7 +1018,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     uintptr_t device_context_index_size = (1 + max_slots) * sizeof(uint64_t);
     uintptr_t scratchpad_buffer_index_offs = round_up(device_context_index_size, 64);
     uintptr_t scratchpad_buffer_index_size = num_scratchpad_buffers * sizeof(uint64_t);
-    uintptr_t device_context_index_paddr = hm_heap_alloc(scratchpad_buffer_index_offs + scratchpad_buffer_index_size, 64);
+    uintptr_t device_context_index_paddr = heap_alloc(HEAP_TYPE_HM_1, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, 64);
     if (device_context_index_paddr == 0) {
         goto no_keyboards_found;
     }
@@ -1041,7 +1041,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     }
 
     // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory.
-    uintptr_t workspace_addr = lm_heap_alloc(sizeof(workspace_t), PAGE_SIZE);
+    uintptr_t workspace_addr = heap_alloc(HEAP_TYPE_LM_1, sizeof(workspace_t), PAGE_SIZE);
     if (workspace_addr == 0) {
         goto no_keyboards_found;
     }
@@ -1061,7 +1061,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     ws->er_dequeue_state = WS_ER_SIZE;  // cycle = 1, index = 0
 
     // Allocate and initialise the input context data structure. This needs to be contained within a single page.
-    ws->input_context_addr = lm_heap_alloc(XHCI_MAX_IP_CONTEXT_SIZE, PAGE_SIZE);
+    ws->input_context_addr = heap_alloc(HEAP_TYPE_LM_1, XHCI_MAX_IP_CONTEXT_SIZE, PAGE_SIZE);
     if (ws->input_context_addr == 0) {
         goto no_keyboards_found;
     }
@@ -1167,7 +1167,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     return true;
 
 no_keyboards_found:
-    lm_heap_rewind(initial_lm_heap_mark);
-    hm_heap_rewind(initial_hm_heap_mark);
+    heap_rewind(HEAP_TYPE_LM_1, initial_lm_heap_mark);
+    heap_rewind(HEAP_TYPE_HM_1, initial_hm_heap_mark);
     return false;
 }
