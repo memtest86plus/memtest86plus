@@ -187,6 +187,8 @@ void cpuid_init(void)
             cpuid(0x7, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
             if (reg[3] & (1 << 15)) {
                 cpuid_info.topology.is_hybrid = 1;
+                cpuid_info.topology.pcore_count  = 1; // We have at least 1 P-Core as BSP
+                cpuid_info.topology.ecore_count  = 0;
             }
 
             for (int i=0; i < 4; i++) {
@@ -224,5 +226,21 @@ void cpuid_init(void)
         break;
       default:
         break;
+    }
+}
+
+core_type_t get_ap_hybrid_type(void)
+{
+    uint32_t eax, ebx, ecx, edx;
+
+    cpuid(0x1A, 0, &eax, &ebx, &ecx, &edx);
+
+    switch ((eax >> 24) & 0xFF) {
+        case CPU_PCORE_ID:
+            return CORE_PCORE;
+        case CPU_ECORE_ID:
+            return CORE_ECORE;
+        default:
+            return CORE_UNKNOWN;
     }
 }

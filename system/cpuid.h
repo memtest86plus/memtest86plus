@@ -15,6 +15,15 @@
 
 #include <stdint.h>
 
+#define CPU_ECORE_ID 0x20
+#define CPU_PCORE_ID 0x40
+
+typedef enum {
+    CORE_UNKNOWN,
+    CORE_PCORE,
+    CORE_ECORE
+} core_type_t;
+
 /**
  * Structures that hold the collected CPUID information.
  */
@@ -193,6 +202,11 @@ extern cpuid_info_t cpuid_info;
  * Reads the CPUID information and stores it in cpuid_info.
  */
 void cpuid_init(void);
+
+/**
+ * Return the Core Type (for Hybrid CPUs)
+ */
+core_type_t get_ap_hybrid_type(void);
 
 /**
  * Executes the cpuid instruction.
