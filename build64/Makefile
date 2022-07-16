@@ -21,6 +21,7 @@ SYS_OBJS = system/acpi.o \
            system/ehci.o \
            system/font.o \
            system/hwctrl.o \
+           system/heap.o \
            system/hwquirks.o \
            system/keyboard.o \
            system/ohci.o \

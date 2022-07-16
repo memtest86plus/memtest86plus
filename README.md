@@ -132,7 +132,13 @@ recognised:
     * where *type* is one of
       * legacy
       * usb
-      * buggy-usb
+  * usbdebug
+    * pauses after probing for USB keyboards
+  * usbinit=*mode*
+    * where *mode* is one of
+      * 1 = use the two-step init sequence for high speed devices
+      * 2 = add a second USB reset in the init sequence
+      * 3 = the combination of modes 1 and 2
   * console=ttyS*x*,*y*
     * activate serial/tty console output, where *x* is one of the following IO port
       *  0 = 0x3F8
@@ -152,9 +158,7 @@ recognised:
 Memtest86+ supports both the legacy keyboard interface (using I/O ports 0x60
 and 0x64) and USB keyboards (using its own USB device drivers). One or the
 other can be selected via the boot command line, If neither is selected, the
-default is to use both. An additional option on the boot command line is
-`buggy-usb` which enables the longer initialisation sequence required by some
-older USB devices.
+default is to use both.
 
 Older BIOSs usually support USB legacy keyboard emulation, which makes USB
 keyboards act like legacy keyboards connected to ports 0x60 and 0x64. This
@@ -169,6 +173,10 @@ emulation and add `keyboard=legacy` on the boot command line.
 **NOTE**: Some UEFI BIOSs only support USB legacy keyboard emulation when
 you enable the Compatibility System Module (CSM) in the BIOS setup. Others
 only support it when actually booting in legacy mode.
+
+Many USB devices don't fully conform to the USB specification. If the USB
+keyboard probe hangs or fails to detect your keyboard, try the various
+workarounds provided by the "usbinit" boot option.
 
 **NOTE**: Memtest86+'s USB device drivers are work in progress. Not all USB
 devices are supported yet, and there may be problems on some hardware.

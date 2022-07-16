@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "heap.h"
 #include "memrw32.h"
 #include "memsize.h"
-#include "pmem.h"
 #include "usb.h"
 #include "vmem.h"
 
@@ -329,9 +329,11 @@ typedef struct {
     uint32_t            cr_enqueue_state;
     uint32_t            er_dequeue_state;
 
-    // Transient values used during device enumeration and configuration.
+    // Input context for controller commands.
     uintptr_t           input_context_addr;
-    uintptr_t           output_context_addr;
+
+    // Transient values used during device enumeration and configuration.
+    uintptr_t           initial_heap_mark;
     uintptr_t           control_ep_tr_addr;
     uintptr_t           interrupt_ep_tr_addr;
 
@@ -343,24 +345,8 @@ typedef struct {
 } workspace_t  __attribute__ ((aligned (64)));
 
 //------------------------------------------------------------------------------
-// Private Variables
-//------------------------------------------------------------------------------
-
-// The heap segment of the physical memory map is used when allocating memory
-// to the controller that we don't need to access during normal operation.
-// Any memory we do need to access during normal operation is allocated from
-// segment 0, which is permanently mapped into the virtual memory address space.
-
-static int heap_segment = -1;
-
-//------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
-
-static size_t num_pages(size_t size)
-{
-    return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-}
 
 static size_t round_up(size_t size, size_t alignment)
 {
@@ -658,37 +644,36 @@ static int allocate_slot(const usb_hcd_t *hcd)
 
     xhci_trb_t event;
 
-    // Allocate and initialise a private workspace for this device.
-    // TODO: check for heap overflow.
+    // Record the heap state to allow us to free memory.
+    ws->initial_heap_mark = lm_heap_mark();
 
-    pm_map[0].end -= num_pages(DEVICE_WS_SIZE);
-    uintptr_t device_workspace_addr = pm_map[0].end << PAGE_SHIFT;
-    ws->output_context_addr  = device_workspace_addr;
-    ws->control_ep_tr_addr   = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE;
-    ws->interrupt_ep_tr_addr = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE + sizeof(ep_tr_t);
+    // Allocate and initialise a private workspace for this device.
+    uintptr_t device_workspace_addr = lm_heap_alloc(DEVICE_WS_SIZE, PAGE_SIZE);
+    if (device_workspace_addr == 0) {
+        goto free_memory;
+    }
 
     memset((void *)device_workspace_addr, 0, DEVICE_WS_SIZE);
 
-    // Temporarily allocate and initialise the input context data structure on the heap.
-    // As we only use this temporarily, there's no need to adjust pm_map.
-
-    ws->input_context_addr = device_workspace_addr - XHCI_MAX_IP_CONTEXT_SIZE;
-
-    memset((void *)ws->input_context_addr, 0, XHCI_MAX_IP_CONTEXT_SIZE);
+    ws->control_ep_tr_addr   = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE;
+    ws->interrupt_ep_tr_addr = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE + sizeof(ep_tr_t);
 
     // Allocate a device slot and set up its output context.
 
     enqueue_xhci_command(ws, XHCI_TRB_ENABLE_SLOT | XHCI_TRB_USB2_SLOT, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
     if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
-        pm_map[0].end += num_pages(DEVICE_WS_SIZE);
-        return 0;
+        goto free_memory;
     }
     int slot_id = event_slot_id(&event);
 
-    write64(&ws->device_context_index[slot_id], ws->output_context_addr);
+    write64(&ws->device_context_index[slot_id], device_workspace_addr);
 
     return slot_id;
+
+free_memory:
+    lm_heap_rewind(ws->initial_heap_mark);
+    return 0;
 }
 
 static bool release_slot(const usb_hcd_t *hcd, int slot_id)
@@ -705,7 +690,7 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
 
     write64(&ws->device_context_index[slot_id], 0);
 
-    pm_map[0].end += num_pages(DEVICE_WS_SIZE);
+    lm_heap_rewind(ws->initial_heap_mark);
 
     return true;
 }
@@ -903,20 +888,6 @@ static void poll_keyboards(const usb_hcd_t *hcd)
     }
 }
 
-static bool set_heap_segment(void)
-{
-    // Use the largest 32-bit addressable physical memory segment for the heap.
-    uintptr_t max_segment_size = 0;
-    for (int i = 0; i < pm_map_size && pm_map[i].end <= PAGE_C(4,GB); i++) {
-        uintptr_t segment_size = pm_map[i].end - pm_map[i].start;
-        if (segment_size >= max_segment_size) {
-            max_segment_size = segment_size;
-            heap_segment = i;
-        }
-    }
-    return max_segment_size > 0;
-}
-
 //------------------------------------------------------------------------------
 // Driver Method Table
 //------------------------------------------------------------------------------
@@ -939,11 +910,6 @@ static const hcd_methods_t methods = {
 
 bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 {
-    if (heap_segment < 0) {
-        if (!set_heap_segment()) return false;
-    }
-    uintptr_t heap_segment_end = pm_map[heap_segment].end;
-
     uint8_t port_type[XHCI_MAX_PORTS];
 
     memset(port_type, 0, sizeof(port_type));
@@ -1018,12 +984,14 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Ensure the controller is halted and then reset it.
     if (!halt_host_controller(op_regs)) return false;
-
     if (!reset_host_controller(op_regs)) return false;
+
+    // Record the heap states to allow us to free memory.
+    uintptr_t initial_lm_heap_mark = lm_heap_mark();
+    uintptr_t initial_hm_heap_mark = hm_heap_mark();
 
     // Record the controller page size.
     uintptr_t xhci_page_size = (read32(&op_regs->page_size) & 0xffff) << 12;
-    uintptr_t xhci_page_mask = xhci_page_size - 1;
 
     // Find the maximum number of device slots the controller supports.
     int max_slots = cap_regs->hcs_params1 & 0xff;
@@ -1033,31 +1001,30 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
                                      | ((cap_regs->hcs_params2 >> 27) & 0x1f);
 
     // Allocate and clear the scratchpad memory on the heap. This must be aligned to the controller page size.
-    // TODO: check for heap overflow.
     uintptr_t scratchpad_size = num_scratchpad_buffers * xhci_page_size;
-    pm_map[heap_segment].end -= num_pages(scratchpad_size);
-    pm_map[heap_segment].end &= ~(xhci_page_mask >> PAGE_SHIFT);
-    uintptr_t scratchpad_paddr = pm_map[heap_segment].end << PAGE_SHIFT;
+    uintptr_t scratchpad_paddr = hm_heap_alloc(scratchpad_size, xhci_page_size);
+    if (scratchpad_paddr == 0) {
+        goto no_keyboards_found;
+    }
     uintptr_t scratchpad_vaddr = map_region(scratchpad_paddr, scratchpad_size, true);
     if (scratchpad_vaddr == 0) {
-        pm_map[heap_segment].end = heap_segment_end;
-        return false;
+        goto no_keyboards_found;
     }
 
     memset((void *)scratchpad_vaddr, 0, scratchpad_size);
 
     // Allocate and initialise the device context base address and scratchpad buffer arrays on the heap.
     // Both need to be aligned on a 64 byte boundary.
-    // TODO: check for heap overflow.
     uintptr_t device_context_index_size = (1 + max_slots) * sizeof(uint64_t);
     uintptr_t scratchpad_buffer_index_offs = round_up(device_context_index_size, 64);
     uintptr_t scratchpad_buffer_index_size = num_scratchpad_buffers * sizeof(uint64_t);
-    pm_map[heap_segment].end -= num_pages(scratchpad_buffer_index_offs + scratchpad_buffer_index_size);
-    uintptr_t device_context_index_paddr = pm_map[heap_segment].end << PAGE_SHIFT;
+    uintptr_t device_context_index_paddr = hm_heap_alloc(scratchpad_buffer_index_offs + scratchpad_buffer_index_size, 64);
+    if (device_context_index_paddr == 0) {
+        goto no_keyboards_found;
+    }
     uintptr_t device_context_index_vaddr = map_region(device_context_index_paddr, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, true);
     if (device_context_index_vaddr == 0) {
-        pm_map[heap_segment].end = heap_segment_end;
-        return false;
+        goto no_keyboards_found;
     }
 
     memset((void *)device_context_index_vaddr, 0, device_context_index_size);
@@ -1073,11 +1040,11 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         }
     }
 
-    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory,
-    // so allocate it in the first segment.
-    // TODO: check for segment overflow.
-    pm_map[0].end -= num_pages(sizeof(workspace_t));
-    uintptr_t workspace_addr = pm_map[0].end << PAGE_SHIFT;
+    // Allocate and initialise a workspace for this controller. This needs to be permanently mapped into virtual memory.
+    uintptr_t workspace_addr = lm_heap_alloc(sizeof(workspace_t), PAGE_SIZE);
+    if (workspace_addr == 0) {
+        goto no_keyboards_found;
+    }
     workspace_t *ws = (workspace_t *)workspace_addr;
 
     memset(ws, 0, sizeof(workspace_t));
@@ -1092,6 +1059,14 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     ws->cr_enqueue_state = WS_CR_SIZE;  // cycle = 1, index = 0
     ws->er_dequeue_state = WS_ER_SIZE;  // cycle = 1, index = 0
+
+    // Allocate and initialise the input context data structure. This needs to be contained within a single page.
+    ws->input_context_addr = lm_heap_alloc(XHCI_MAX_IP_CONTEXT_SIZE, PAGE_SIZE);
+    if (ws->input_context_addr == 0) {
+        goto no_keyboards_found;
+    }
+
+    memset((void *)ws->input_context_addr, 0, XHCI_MAX_IP_CONTEXT_SIZE);
 
     // Initialise the driver object for this controller.
     hcd->methods = &methods;
@@ -1110,9 +1085,7 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     write64(&op_regs->dcbaap,     device_context_index_paddr);
     write32(&op_regs->config,     (read32(&op_regs->config) & 0xfffffc00) | max_slots);
     if (!start_host_controller(op_regs)) {
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-        pm_map[heap_segment].end = heap_segment_end;
-        return false;
+        goto no_keyboards_found;
     }
 
     // Construct a hub descriptor for the root hub.
@@ -1177,16 +1150,8 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
                    num_keyboards, num_keyboards != 1 ? "s" : "");
 
     if (num_keyboards == 0) {
-        // Halt the host controller.
         (void)halt_host_controller(op_regs);
-
-        // Free the pages we allocated in segment 0.
-        pm_map[0].end += num_pages(sizeof(workspace_t));
-
-        // Free the pages we allocated in the heap segment.
-        pm_map[heap_segment].end = heap_segment_end;
-
-        return false;
+        goto no_keyboards_found;
     }
 
     // Initialise the interrupt TRB ring for each keyboard interface.
@@ -1200,4 +1165,9 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     }
 
     return true;
+
+no_keyboards_found:
+    lm_heap_rewind(initial_lm_heap_mark);
+    hm_heap_rewind(initial_hm_heap_mark);
+    return false;
 }

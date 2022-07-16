@@ -22,6 +22,7 @@
 #include "cache.h"
 #include "cpuid.h"
 #include "cpuinfo.h"
+#include "heap.h"
 #include "hwctrl.h"
 #include "hwquirks.h"
 #include "io.h"
@@ -215,6 +216,8 @@ static void global_init(void)
     cpuinfo_init();
 
     pmem_init();
+
+    heap_init();
 
     pci_init();
 
