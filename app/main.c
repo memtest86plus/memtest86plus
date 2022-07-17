@@ -4,8 +4,8 @@
 // Derived from memtest86+ main.c:
 //
 // MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
+// By Samuel DEMEULEMEESTER, memtest@memtest.org
+// https://www.memtest.org
 // ------------------------------------------------
 // main.c - MemTest-86  Version 3.5
 //
@@ -629,9 +629,7 @@ void main(void)
             display_pass_count(pass_num);
             if (error_count == 0) {
                 display_status("Pass   ");
-                if (!big_status_displayed) {
-                    display_big_status(true);
-                }
+                display_big_status(true);
                 //display_notice("** Pass completed, no errors **");
             }
         }

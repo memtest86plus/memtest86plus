@@ -218,8 +218,6 @@ typedef enum {
 
 extern int scroll_message_row;
 
-extern bool big_status_displayed;
-
 extern display_mode_t display_mode;
 
 void display_init(void);

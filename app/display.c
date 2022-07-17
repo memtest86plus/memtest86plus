@@ -72,6 +72,7 @@ static uint64_t next_spin_time = 0; // TSC time stamp
 static int prev_sec = -1;               // previous second
 static bool timed_update_done = false;  // update cycle status
 
+bool big_status_displayed = false;
 static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 
 //------------------------------------------------------------------------------
@@ -81,8 +82,6 @@ static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 int scroll_message_row;
 
 int max_cpu_temp = 0;
-
-bool big_status_displayed = false;
 
 display_mode_t display_mode = DISPLAY_MODE_NA;
 
@@ -342,6 +341,10 @@ void display_temperature(void)
 
 void display_big_status(bool pass)
 {
+    if (big_status_displayed) {
+        return;
+    }
+
     save_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
 
     set_background_colour(BLACK);
