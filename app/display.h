@@ -194,10 +194,10 @@ typedef enum {
     printf(scroll_message_row, col, __VA_ARGS__)
 
 #define display_notice(str) \
-    prints(ROW_MESSAGE_T + 6, (SCREEN_WIDTH - strlen(str)) / 2, str)
+    prints(ROW_MESSAGE_T + 8, (SCREEN_WIDTH - strlen(str)) / 2, str)
 
 #define display_notice_with_args(length, ...) \
-    printf(ROW_MESSAGE_T + 6, (SCREEN_WIDTH - length) / 2, __VA_ARGS__)
+    printf(ROW_MESSAGE_T + 8, (SCREEN_WIDTH - length) / 2, __VA_ARGS__)
 
 #define clear_footer_message() \
     { \
