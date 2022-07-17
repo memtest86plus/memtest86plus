@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2004-2022 Sam Demeulemeester.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -31,6 +32,17 @@
 // Constants
 //------------------------------------------------------------------------------
 
+#define POP_STAT_R       12
+#define POP_STAT_C       18
+
+#define POP_STAT_W       44
+#define POP_STAT_H       9
+
+#define POP_STAT_LAST_R  (POP_STAT_R + POP_STAT_H - 1)
+#define POP_STAT_LAST_C  (POP_STAT_C + POP_STAT_W - 1)
+
+#define POP_STATUS_REGION  POP_STAT_R, POP_STAT_C, POP_STAT_LAST_R, POP_STAT_LAST_C
+
 #define SPINNER_PERIOD  100     // milliseconds
 
 #define NUM_SPIN_STATES 4
@@ -59,6 +71,9 @@ static uint64_t next_spin_time = 0; // TSC time stamp
 
 static int prev_sec = -1;               // previous second
 static bool timed_update_done = false;  // update cycle status
+
+bool big_status_displayed = false;
+static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 
 //------------------------------------------------------------------------------
 // Variables
@@ -339,9 +354,57 @@ void display_temperature(void)
     printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8);
 }
 
+void display_big_status(bool pass)
+{
+    if (big_status_displayed) {
+        return;
+    }
+
+    save_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
+
+    set_background_colour(BLACK);
+    set_foreground_colour(pass ? GREEN : RED);
+    clear_screen_region(POP_STATUS_REGION);
+
+    if (pass) {
+        prints(POP_STAT_R+1, POP_STAT_C+5, "######      ##      #####    #####  ");
+        prints(POP_STAT_R+2, POP_STAT_C+5, "##   ##    ####    ##   ##  ##   ## ");
+        prints(POP_STAT_R+3, POP_STAT_C+5, "##   ##   ##  ##   ##       ##      ");
+        prints(POP_STAT_R+4, POP_STAT_C+5, "######   ##    ##   #####    #####  ");
+        prints(POP_STAT_R+5, POP_STAT_C+5, "##       ########       ##       ## ");
+        prints(POP_STAT_R+6, POP_STAT_C+5, "##       ##    ##  ##   ##  ##   ## ");
+        prints(POP_STAT_R+7, POP_STAT_C+5, "##       ##    ##   #####    #####  ");
+    } else {
+        prints(POP_STAT_R+1, POP_STAT_C+5, "#######     ##      ######   ##     ");
+        prints(POP_STAT_R+2, POP_STAT_C+5, "##         ####       ##     ##     ");
+        prints(POP_STAT_R+3, POP_STAT_C+5, "##        ##  ##      ##     ##     ");
+        prints(POP_STAT_R+4, POP_STAT_C+5, "#####    ##    ##     ##     ##     ");
+        prints(POP_STAT_R+5, POP_STAT_C+5, "##       ########     ##     ##     ");
+        prints(POP_STAT_R+6, POP_STAT_C+5, "##       ##    ##     ##     ##     ");
+        prints(POP_STAT_R+7, POP_STAT_C+5, "##       ##    ##   ######   ###### ");
+    }
+    set_background_colour(BLUE);
+    set_foreground_colour(WHITE);
+    big_status_displayed = true;
+}
+
+void restore_big_status(void)
+{
+    restore_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
+    big_status_displayed = false;
+}
+
 void check_input(void)
 {
-    switch (get_key()) {
+    char input_key = get_key();
+
+    if (input_key == '\0') {
+        return;
+    } else if (big_status_displayed) {
+        restore_big_status();
+    }
+
+    switch (input_key) {
       case ESC:
         clear_message_area();
         display_notice("Rebooting...");
