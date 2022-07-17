@@ -1303,7 +1303,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 // case 0x00E4: // nForce 3
                 // case 0x0034: // MCP04
                 // case 0x0052: // nForce 4
-                // case 0x0264: // nForce 410/430 MCP
+                case 0x0264:    // nForce 410/430 MCP
                 case 0x03EB:    // nForce 630a
                 // case 0x0446: // nForce 520
                 // case 0x0542: // nForce 560
@@ -1311,7 +1311,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 // case 0x07D8: // nForce 630i
                 // case 0x0AA2: // nForce 730i
                 // case 0x0D79: // MCP89
-                // case 0x0368: // nForce 790i Ultra
+                case 0x0368:    // nForce 680a/680i/780i/790i
                     return nv_mcp_get_smb();
                 default:
                     return false;
