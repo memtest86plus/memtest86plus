@@ -24,6 +24,23 @@
 // Private Functions
 //------------------------------------------------------------------------------
 
+static inline void setup_pit() {
+    /* Set the gate high, disable speaker. */
+    outb((inb(0x61) & ~0x02) | 0x01, 0x61);
+
+    /**
+     * 10       = Channel #2
+     *   11     = Access mode: lobyte/hibyte
+     *     000  = Mode 0: Interrupt On Terminal Count
+     *        0 = 16-bit binary
+     *
+     * 10110010 = 0xb0
+     */
+    outb(0xb0, 0x43);
+    outb(PIT_TICKS_50mS & 0xff, 0x42);
+    outb(PIT_TICKS_50mS >> 8, 0x42);
+}
+
 static void correct_tsc(void)
 {
     uint32_t start_time, end_time, run_time, counter;
@@ -62,10 +79,7 @@ static void correct_tsc(void)
     }
 
     // Use PIT Timer to find TSC correction factor if APIC not available
-    outb((inb(0x61) & ~0x02) | 0x01, 0x61);
-    outb(0xb0, 0x43);
-    outb(PIT_TICKS_50mS & 0xff, 0x42);
-    outb(PIT_TICKS_50mS >> 8, 0x42);
+    setup_pit();
 
     rdtscl(start_time);
 
@@ -84,6 +98,60 @@ static void correct_tsc(void)
     }
 }
 
+static void calculate_loops_per_usec(void) {
+    // For accuracy, uint64_t has to be used both here and in usleep().
+    uint64_t loops_per_50ms = 0;
+    uint64_t increment;
+    uint32_t step = 0;
+
+    /**
+     * Start with an initial estimate. This is going to be significantly
+     * underestimated due to extra cycles taken by executing and evaluating
+     * inb() but should be a good starting point.
+     */
+    setup_pit();
+    do {
+       loops_per_50ms++;
+    } while ((inb(0x61) & 0x20) == 0);
+
+    // Fast systems could benefit from a larger initial value.
+    increment = loops_per_50ms = loops_per_50ms * 8;
+
+    /**
+     * Now continue incremeneting count until we execute a loop that ends
+     * when PIT has already triggered. Then execute binary search until
+     * increment is lower than we care about.
+     */
+    for(;;) {
+        volatile uint64_t count = loops_per_50ms;
+        uint8_t pit_state;
+
+        setup_pit();
+        while (count > 0) {
+            count--;
+        }
+        pit_state = inb(0x61);
+
+        if (!(step % 2) ^ !(pit_state & 0x20)) {
+            increment = increment / 2;
+
+            // Stop if we are below the accuracy threshold.
+            if (increment < 25000)
+                break;
+
+            step++;
+        }
+
+        if (step % 2)
+            loops_per_50ms -= increment;
+        else
+            loops_per_50ms += increment;
+    }
+
+    // Calculate the loop count. Add 1 for rounding up.
+    loops_per_usec = (loops_per_50ms / 50000) + 1;
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -91,4 +159,10 @@ static void correct_tsc(void)
 void timers_init(void)
 {
     correct_tsc();
+
+    // Calculate loops_per_usec for the busy loop if TSC is not available.
+    if (!clks_per_msec) {
+        calculate_loops_per_usec();
+    }
+
 }
