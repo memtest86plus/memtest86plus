@@ -215,7 +215,11 @@ void cpuid_init(void)
             cpuid_info.topology.thread_count = cpuid_info.topology.core_count;
 
             if (cpuid_info.flags.htt){
-                cpuid_info.topology.thread_count *= 2;
+                if (((cpuid_info.proc_info.raw >> 16) & 0xFF) > (uint32_t)cpuid_info.topology.core_count) {
+                    cpuid_info.topology.thread_count *= 2;
+                } else {
+                    cpuid_info.flags.htt = !cpuid_info.flags.htt;
+                }
             }
         } else if (cpuid_info.max_cpuid >= 0x2) {
             if(cpuid_info.flags.htt){
