@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "bootparams.h"
+
 #include "io.h"
 #include "usbhcd.h"
 
@@ -212,7 +214,7 @@ static const char usb_hid_keymap[] = {
 // Public Variables
 //------------------------------------------------------------------------------
 
-keyboard_types_t keyboard_types = KT_LEGACY | KT_USB;
+keyboard_types_t keyboard_types = KT_NONE;
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -220,6 +222,16 @@ keyboard_types_t keyboard_types = KT_LEGACY | KT_USB;
 
 void keyboard_init(void)
 {
+    if (keyboard_types == KT_NONE) {
+        // No command line option was found, so set the default according to
+        // how we were booted.
+        const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
+        if (boot_params->efi_info.loader_signature != 0) {
+            keyboard_types = KT_USB|KT_LEGACY;
+        } else {
+            keyboard_types = KT_LEGACY;
+        }
+    }
     if (keyboard_types & KT_USB) {
         find_usb_keyboards(keyboard_types == KT_USB);
     }

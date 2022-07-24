@@ -177,6 +177,8 @@ static void parse_option(const char *option, const char *params)
             keyboard_types = KT_LEGACY;
         } else if (strncmp(params, "usb", 4) == 0) {
             keyboard_types = KT_USB;
+        } else if (strncmp(params, "both", 5) == 0) {
+            keyboard_types = KT_USB|KT_LEGACY;
         }
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {

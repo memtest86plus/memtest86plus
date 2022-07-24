@@ -15,6 +15,8 @@
 
 #include <stdint.h>
 
+#include <boot.h>
+
 typedef struct {
     uint8_t 	orig_x;
     uint8_t  	orig_y;
