@@ -181,7 +181,7 @@ void cpuid_init(void)
        case 'G':
         if (cpuid_info.vendor_id.str[7] == 'T') break; // Transmeta
         // Intel
-        if (cpuid_info.max_cpuid >= 0xB) {
+        if (cpuid_info.max_cpuid >= 0xB && cpuid_info.flags.x2apic) {
 
             // Populate Hybrid Status (CPUID 7.EDX[15]) for Alder Lake+
             cpuid(0x7, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
