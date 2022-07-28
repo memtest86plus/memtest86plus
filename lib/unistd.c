@@ -22,8 +22,8 @@ void usleep(unsigned int usec)
             __builtin_ia32_pause();
         } while ((get_tsc() - t0) < cycles);
     } else {
-        // This will be highly inaccurate, but should give at least the requested delay.
-        volatile uint64_t count = (uint64_t)usec * 1000;
+        // This will be inaccurate, but should be close enough to the requested delay.
+        volatile uint64_t count = (uint64_t)usec * loops_per_usec;
         while (count > 0) {
             count--;
         }

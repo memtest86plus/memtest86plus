@@ -55,6 +55,7 @@ uint32_t    ram_speed = 0;
 bool        no_temperature = false;
 
 uint32_t    clks_per_msec = 0;
+uint32_t    loops_per_usec = 0;
 
 //------------------------------------------------------------------------------
 // Private Functions

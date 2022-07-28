@@ -71,10 +71,51 @@ void reboot(void)
     outb(0xfe, 0x64);
     usleep(150000);
 
+#ifndef __x86_64__
     if (efi_rs_table == NULL) {
         // In last resort, (very) obsolete reboot method using BIOS
-        *((uint16_t *)0x472) = 0x1234;
+        *((uint16_t *)0x472) = 0;            // Request cold reboot.
+
+        // Switch the CPU back to the real mode.
+        __asm__ __volatile__("\t"
+            "movl    $16, %ecx\n\t"
+            "movl    %ecx, %ds\n\t"
+            "movl    %ecx, %es\n\t"
+            "movl    %ecx, %fs\n\t"
+            "movl    %ecx, %gs\n\t"
+            "movl    %ecx, %ss\n\t"
+
+            "xorl    %ecx, %ecx\n\t"
+            "movl    %cr0, %edx\n\t"
+            "andl    $0x00000011, %edx\n\t"
+            "orl     $0x60000000, %edx\n\t"
+            "movl    %edx, %cr0\n\t"
+            "movl    %ecx, %cr3\n\t"
+
+            "movl    %cr0, %edx\n\t"
+            "testl   $0x60000000, %edx\n\t"  // If no cache bits -> no wbinvd.
+            "jz      2f\n\t"
+            "wbinvd\n\t"
+
+            "2:\n\t"
+            "andb    $0x10, %dl\n\t"
+            "movl    %edx, %cr0\n\t"
+
+            // call BIOS reboot routine.
+            "ljmpw   $0xf000, $0xfff0\n\t"
+        );
     }
+#endif
+
+    /**
+     * Make sure we won't return to the calling function in case all
+     * of the above methods failed.
+     */
+
+    for (;;) {
+         __asm__ __volatile__("hlt");
+    }
+
 }
 
 void floppy_off()
