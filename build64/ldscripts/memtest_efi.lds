@@ -17,10 +17,27 @@ SECTIONS {
 		. = ALIGN(512);
 		_text_end = . ;
 	}
+	. = ALIGN(512);
+	.reloc : {
+		_reloc_start = . ;
+		*(.reloc)
+		_reloc_end = . ;
+	}
+	. = ALIGN(512);
+	.sbat : {
+		_sbat_start = . ;
+		*(.sbat)
+		. = ALIGN(512);
+		_sbat_end = . ;
+	}
+	. = ALIGN(4096);
+	_img_end = . ;
 	/DISCARD/ : { *(*) }
 
 	_text_size = (_text_end  - _text_start);
 
+	_reloc_size = (_reloc_end - _reloc_start);
+	_sbat_size = (_sbat_end - _sbat_start);
 	_sys_size  = _text_size >> 4;
 	_init_size = _text_size + _bss_size;
 }

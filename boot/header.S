@@ -21,6 +21,7 @@
 #define __ASSEMBLY__
 
 #include "boot.h"
+#include "peimage.h"
 
 # The EFI loader loads the header at ImageBase, so we have to locate the main program
 # after that. This means we can't load the main program at HIGH_LOAD_ADDR. Pick a load
@@ -85,50 +86,46 @@ pe_header:
 
 coff_header:
 #ifdef __x86_64__
-	.word	0x8664				# Machine (x86-64)
+	.word	IMAGE_FILE_MACHINE_X64		# Machine (x86-64)
 #else
-	.word	0x14c				# Machine (i386)
+	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
-	.word	1				# NumberOfSections
+	.word	3				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
 	.word	section_table - optional_header	# SizeOfOptionalHeader
 #ifdef __x86_64__
-	.word	0x20f				# Characteristics
-						# IMAGE_FILE_DEBUG_STRIPPED |
-						# IMAGE_FILE_LOCAL_SYMS_STRIPPED |
-						# IMAGE_FILE_LINE_NUMS_STRIPPED |
-						# IMAGE_FILE_EXECUTABLE_IMAGE |
-						# IMAGE_FILE_RELOCS_STRIPPED
+	.word	IMAGE_FILE_DEBUG_STRIPPED	\
+		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
+		| IMAGE_FILE_LINE_NUMS_STRIPPED	\
+		| IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics
 #else
-	.word	0x30f				# Characteristics.
-						# IMAGE_FILE_32BIT_MACHINE |
-						# IMAGE_FILE_DEBUG_STRIPPED |
-						# IMAGE_FILE_LOCAL_SYMS_STRIPPED |
-						# IMAGE_FILE_LINE_NUMS_STRIPPED |
-						# IMAGE_FILE_EXECUTABLE_IMAGE |
-						# IMAGE_FILE_RELOCS_STRIPPED
+	.word	IMAGE_FILE_32BIT_MACHINE	\
+		| IMAGE_FILE_DEBUG_STRIPPED	\
+		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
+		| IMAGE_FILE_LINE_NUMS_STRIPPED \
+		| IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics.
 #endif
 
 optional_header:
 #ifdef __x86_64__
-	.word	0x20b 				# PE32+ format
+	.word	IMAGE_NT_OPTIONAL_HDR64_MAGIC	# PE32+ format
 #else
-	.word	0x10b				# PE32 format
+	.word	IMAGE_NT_OPTIONAL_HDR32_MAGIC	# PE32 format
 #endif
 	.byte	0x02				# MajorLinkerVersion
 	.byte	0x14				# MinorLinkerVersion
 
 	.long	_text_size			# SizeOfCode
-	.long	0				# SizeOfInitializedData
+	.long	_sbat_size			# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
 	.long	BASE_OF_CODE + 0x1e0		# AddressOfEntryPoint
 
 	.long	BASE_OF_CODE			# BaseOfCode
 #ifndef __x86_64__
-	.long	0				# data
+	.long	_sbat_start			# BaseOfData
 #endif
 
 extra_header_fields:
@@ -147,11 +144,11 @@ extra_header_fields:
 	.word	0				# MinorSubsystemVersion
 	.long	0				# Win32VersionValue
 
-	.long	BASE_OF_CODE + _init_size	# SizeOfImage
-	.long	512				# SizeOfHeaders
+	.long	BASE_OF_CODE + _img_end		# SizeOfImage
+	.long	end_of_headers			# SizeOfHeaders
 	.long	0				# CheckSum
 	.word	10				# Subsystem (EFI application)
-	.word	0				# DllCharacteristics
+	.word	IMAGE_DLLCHARACTERISTICS_NX_COMPAT	# DllCharacteristics
 #ifdef __x86_64__
 	.quad	0				# SizeOfStackReserve
 	.quad	0				# SizeOfStackCommit
@@ -164,7 +161,20 @@ extra_header_fields:
 	.long	0				# SizeOfHeapCommit
 #endif
 	.long	0				# LoaderFlags
-	.long	0				# NumberOfRvaAndSizes
+	.long	IMAGE_DIRECTORY_ENTRY_DEBUG	# NumberOfRvaAndSizes
+
+	.long	0				# DataDirectory.Export.VirtualAddress
+	.long	0				# DataDirectory.Export.Size
+	.long	0				# DataDirectory.Import.VirtualAddress
+	.long	0				# DataDirectory.Import.Size
+	.long	0				# DataDirectory.Resource.VirtualAddress
+	.long	0				# DataDirectory.Resource.Size
+	.long	0				# DataDirectory.Exception.VirtualAddress
+	.long	0				# DataDirectory.Exception.Size
+	.long	0				# DataDirectory.Certs.VirtualAddress
+	.long	0				# DataDirectory.Certs.Size
+	.long	_reloc_start			# DataDirectory.BaseReloc.VirtualAddress
+	.long	_reloc_size			# DataDirectory.BaseReloc.Size
 
 	# Section table
 section_table:
@@ -180,7 +190,41 @@ section_table:
 	.long	0				# PointerToLineNumbers
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
-	.long	0x60500020			# Characteristics (section flags)
+	.long	IMAGE_SCN_MEM_READ		\
+		| IMAGE_SCN_MEM_EXECUTE		\
+		| IMAGE_SCN_ALIGN_16BYTES	\
+		| IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
+
+	.ascii	".reloc"
+	.byte	0
+	.byte	0
+	.long	_reloc_size			# VirtualSize
+	.long	_reloc_start			# VirtualAddress
+	.long	_reloc_size			# SizeOfRawData
+	.long	_reloc_start			# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+		| IMAGE_SCN_ALIGN_4BYTES	\
+		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+
+	.ascii	".sbat"
+	.byte	0
+	.byte	0
+	.byte	0
+	.long	_sbat_size			# VirtualSize
+	.long	_sbat_start			# VirtualAddress
+	.long	_sbat_size			# SizeOfRawData
+	.long	_sbat_start			# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+		| IMAGE_SCN_ALIGN_4096BYTES	\
+		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.
 
@@ -199,3 +243,14 @@ root_dev:
 	.word	0
 boot_flag:
 	.word	0xAA55
+
+	.org	512
+end_of_headers:
+
+.section ".reloc", "a", @progbits
+	.long	0					// Page RVA
+	.long	10					// Block Size (2*4+2)
+	.word	(IMAGE_REL_AMD64_ABSOLUTE<<12) + 0	// reloc 0 -> 0
+
+.section ".sbat", "a", @progbits
+.incbin "../boot/sbat.csv"
