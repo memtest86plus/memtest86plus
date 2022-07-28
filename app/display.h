@@ -48,6 +48,9 @@ typedef enum {
 #define display_cpu_addr_mode(str) \
     prints(4, 75, str)
 
+#define display_cpu_cache_mode() \
+    prints(2, 10, "Disabled")
+
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))
 

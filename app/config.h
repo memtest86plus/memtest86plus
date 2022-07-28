@@ -53,6 +53,7 @@ extern bool         smp_enabled;
 
 extern bool         enable_temperature;
 extern bool         enable_trace;
+extern bool         enable_cpu_cache;
 
 extern bool         enable_sm;
 extern bool         enable_tty;
