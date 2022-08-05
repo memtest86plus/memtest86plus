@@ -718,6 +718,8 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
 
     // Prepare the input context for the ADDRESS_DEVICE command.
 
+    memset((xhci_input_context_t *)ws->input_context_addr, 0, sizeof(xhci_input_context_t));
+
     xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
     ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(1);
 
@@ -734,6 +736,7 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
     } else {
         slot_context->root_hub_port_num = port_num;
     }
+
     xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + 2 * ws->context_size);
     ep_context->params2             = XHCI_EP_CONTROL << 3 | 3 << 1; // EP Type | CErr
     ep_context->max_burst_size      = 0;
