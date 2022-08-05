@@ -757,7 +757,7 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
 
     size_t fetch_length = sizeof(usb_device_desc_t);
     uint32_t command_flags = 0;
-    if (device_speed < USB_SPEED_HIGH) {
+    if (device_speed < USB_SPEED_HIGH || usb_init_options & USB_2_STEP_INIT) {
         fetch_length  = 8;
         command_flags = XHCI_TRB_BSR;
     }
