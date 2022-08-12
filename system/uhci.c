@@ -59,7 +59,7 @@
 #define UHCI_USBCMD_GR          0x0004              // Global Reset
 #define UHCI_USBCMD_MAXP        0x0080              // Max Packet
 
-// USB Status register 
+// USB Status register
 
 #define UHCI_USBSTS_INT         0x0001              // Interrupt
 #define UHCI_USBSTS_ERR         0x0002              // Error interrupt

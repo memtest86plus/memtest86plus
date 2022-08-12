@@ -69,7 +69,7 @@ booted directly by a legacy BIOS (in floppy mode) or by an intermediate
 bootloader using the Linux 16-bit boot protocol and a `memtest.efi` binary
 image file which can be booted directly by a 32-bit UEFI BIOS. Either image
 can be booted by an intermediate bootloader using the Linux 32-bit or 32-bit
-EFI handover boot protocols. 
+EFI handover boot protocols.
 
 To build a 64-bit image, change directory into the `build64` directory and
 type `make`. The result is a `memtest.bin` binary image file which can be
@@ -144,7 +144,7 @@ recognised:
     * activate serial/tty console output, where *x* is one of the following IO port
       *  0 = 0x3F8
       *  1 = 0x2F8
-      *  2 = 0x3E8 
+      *  2 = 0x3E8
       *  3 = 0x2E8
     * and *y* is an optional baud rate to choose from the following list
       * 9600

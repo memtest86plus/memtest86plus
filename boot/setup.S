@@ -132,7 +132,7 @@ do_setup:
 	call	empty_8042
 	movb	$0xd1, %al		# send write command
 	outb	%al, $0x64
-	call	empty_8042      
+	call	empty_8042
 	movb	$0xdf, %al		# A20 on
 	outb	%al, $0x60
 	call	empty_8042
@@ -352,7 +352,7 @@ empty_8042:
 	call	delay
 	inb	$0x60, %al		# read it
 	jmp	empty_8042
-        
+
 no_output:
 	testb	$2, %al 		# is input buffer full?
 	jnz	empty_8042		# yes - loop

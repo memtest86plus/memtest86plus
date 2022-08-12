@@ -196,7 +196,7 @@ void interrupt(struct trap_regs *trap_regs)
 
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, "Press any key to reboot...");
-   
+
     while (get_key() == 0) { }
     reboot();
 }

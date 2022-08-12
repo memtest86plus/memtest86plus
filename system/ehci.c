@@ -47,7 +47,7 @@
 
 #define EHCI_USBCMD_ITC(n)      ((n) << 16)     // Interrupt Threshold Control = n (n = 1,2,4,8,16,32,64)
 
-// USB Status register 
+// USB Status register
 
 #define EHCI_USBSTS_INT         0x00000001      // Interrupt
 #define EHCI_USBSTS_ERR         0x00000002      // Error interrupt
@@ -60,7 +60,7 @@
 #define EHCI_USBSTS_PSS         0x00004000      // Periodic Schedule Status
 #define EHCI_USBSTS_ASS         0x00008000      // Asynchronous Schedule Status
 
-// Port Status and Control register 
+// Port Status and Control register
 
 #define EHCI_PORT_SC_CCS        0x00000001      // Current Connect Status
 #define EHCI_PORT_SC_CCSC       0x00000002      // Current Connect Status Change
@@ -78,7 +78,7 @@
 #define EHCI_PORT_SC_LS_J       0x00000800      // Line Status is J-state
 #define EHCI_PORT_SC_LS_U       0x00000c00      // Line Status is undefined
 
-// Link Pointer 
+// Link Pointer
 
 #define EHCI_LP_TERMINATE       0x00000001      // Terminate (T) bit
 
