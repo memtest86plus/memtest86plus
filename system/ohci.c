@@ -410,7 +410,7 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 {
     ohci_op_regs_t *op_regs = (ohci_op_regs_t *)base_addr;
 
-    // Check the host controller revison.
+    // Check the host controller revision.
     if ((read32(&op_regs->revision) & 0xff) != 0x10) {
         return false;
     }

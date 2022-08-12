@@ -334,7 +334,7 @@ void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_
 void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_badram)
 {
 #if USB_WORKAROUND
-    /* Skip any errrors that appear to be due to the BIOS using location
+    /* Skip any errors that appear to be due to the BIOS using location
      * 0x4e0 for USB keyboard support.  This often happens with Intel
      * 810, 815 and 820 chipsets.  It is possible that we will skip
      * a real error but the odds are very low.
