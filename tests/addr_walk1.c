@@ -70,7 +70,7 @@ int test_addr_walk1(int my_cpu)
                         break;
                     }
                     write_word(p2, ~invert ^ (testword_t)p2);
-    
+
                     testword_t actual = read_word(p1);
                     if (unlikely(actual != expect)) {
                         addr_error(p1, p2, expect, actual);

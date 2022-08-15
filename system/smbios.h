@@ -135,7 +135,7 @@ extern struct mem_dev *dmi_memory_device;
 int smbios_init(void);
 
 /**
- * Print DMI 
+ * Print DMI
  */
 
 void print_smbios_startup_info(void);

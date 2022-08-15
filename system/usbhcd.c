@@ -600,7 +600,7 @@ bool assign_usb_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num
     return true;
 }
 
-bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num, 
+bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num,
                                  usb_speed_t device_speed, int device_id, int *num_devices,
                                  usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {

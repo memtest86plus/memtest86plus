@@ -192,7 +192,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
     spdi.sku_len = 0;
     spdi.module_size = 0;
 
-    // Compute module size for symmetric & assymetric configuration
+    // Compute module size for symmetric & asymmetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
         uint32_t cur_rank = 0;
         uint8_t sbyte = get_spd(slot_idx, sbyte_adr * 4);
@@ -871,7 +871,7 @@ static spd_info parse_spd_ddr(uint8_t slot_idx)
         case 128:
             spdi.module_size = 512;
             break;
-        default: // we don't support asymetric banking
+        default: // we don't support asymmetric banking
             spdi.module_size = 0;
             break;
     }

@@ -84,7 +84,7 @@ int test_block_move(int my_cpu, int iterations)
     }
     flush_caches(my_cpu);
 
-    // Now move the data around. First move the data up half of the segment size 
+    // Now move the data around. First move the data up half of the segment size
     // we are testing. Then move the data to the original location + 32 bytes.
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
