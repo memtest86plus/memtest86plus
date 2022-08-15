@@ -181,7 +181,11 @@ void cpuid_init(void)
        case 'G':
         if (cpuid_info.vendor_id.str[7] == 'T') break; // Transmeta
         // Intel
-        if (cpuid_info.max_cpuid >= 0xB && cpuid_info.flags.x2apic) {
+        if (cpuid_info.max_cpuid >= 0xB) {
+            cpuid(0xB, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
+        }
+
+        if (cpuid_info.max_cpuid >= 0xB && (reg[1] & 0xFF) != 0) { // Check if Extended Topology Information is available
 
             // Populate Hybrid Status (CPUID 7.EDX[15]) for Alder Lake+
             cpuid(0x7, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
@@ -191,7 +195,7 @@ void cpuid_init(void)
                 cpuid_info.topology.ecore_count  = 0;
             }
 
-            for (int i=0; i < 4; i++) {
+            for (int i = 0; i < 4; i++) {
                 cpuid(0xB, i, &reg[0], &reg[1], &reg[2], &reg[3]);
 
                 switch((reg[2] >> 8) & 0xFF) {
