@@ -1379,6 +1379,8 @@ static bool nv_mcp_get_smb(void)
 // get_spd() function
 // ------------------
 
+#undef get_spd // Needed for selftests
+
 static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
     switch ((smbus_id >> 16) & 0xFFFF) {
