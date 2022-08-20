@@ -42,9 +42,9 @@ of the PCMemTest rewrite was to:
 
 In the process of creating PCMemTest, a number of features of Memtest86+ v5.01
 that were not strictly required for testing the system memory were dropped. In
-particular, no attempt is made to measure the cache and main memory speed, or
-to identify and report the DRAM type. These features will be added back
-in Memtest86+ v6.0 in an attempt to create an unified, fully-featured release.
+particular, no attempt was made to measure the cache and main memory speed, or
+to identify and report the DRAM type. These features were added back in
+Memtest86+ v6.0 to create a unified, fully-featured release.
 
 ## Licensing
 
@@ -537,7 +537,8 @@ of all zeros and all ones.
 
 ## Known Limitations and Bugs
 
-  * Keyboard may not be detected at launch in UEFI mode
+Please see the list of [open issues](https://github.com/memtest86plus/memtest86plus/issues)
+on GitHub.
 
 Feel free to submit bug reports!
 
