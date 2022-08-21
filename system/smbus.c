@@ -54,6 +54,11 @@ static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
+static inline uint8_t bcd_to_ui8(uint8_t bcd)
+{
+    return bcd - 6 * (bcd >> 4);
+}
+
 void print_smbus_startup_info(void)
 {
     uint8_t spdidx = 0, spd_line_idx = 0;
@@ -385,12 +390,8 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 521, 30);
 
-    // Week & Date (BCD to Int)
-    uint8_t bcd = get_spd(slot_idx, 515);
-    spdi->fab_year =  bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 516);
-    spdi->fab_week =  bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 515));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 516));
 
     spdi->isValid = true;
 }
@@ -508,12 +509,8 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 329, 20);
 
-    // Week & Date (BCD to Int)
-    uint8_t bcd = get_spd(slot_idx, 323);
-    spdi->fab_year =  bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 324);
-    spdi->fab_week =  bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 323));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 324));
 
     spdi->isValid = true;
 }
@@ -650,11 +647,8 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 128, 18);
 
-    uint8_t bcd = get_spd(slot_idx, 120);
-    spdi->fab_year =  bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 121);
-    spdi->fab_week =  bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 120));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 121));
 
     spdi->isValid = true;
 }
@@ -790,11 +784,8 @@ static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 73, 18);
 
-    uint8_t bcd = get_spd(slot_idx, 93);
-    spdi->fab_year = bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 94);
-    spdi->fab_week = bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
     spdi->isValid = true;
 }
@@ -882,11 +873,8 @@ static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 73, 18);
 
-    uint8_t bcd = get_spd(slot_idx, 93);
-    spdi->fab_year = bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 94);
-    spdi->fab_week = bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
     spdi->isValid = true;
 }
@@ -958,19 +946,14 @@ static void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 73, 18);
 
-    uint8_t bcd = get_spd(slot_idx, 93);
-    spdi->fab_year = bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 94);
-    spdi->fab_week = bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
     spdi->isValid = true;
 }
 
 static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
 {
-    uint8_t bcd;
-
     spdi->type = "SDRAM";
 
     uint8_t spd_byte3  = get_spd(slot_idx, 3) & 0x0F; // Number of Row Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
@@ -1029,11 +1012,8 @@ static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 73, 18);
 
-    bcd = get_spd(slot_idx, 93);
-    spdi->fab_year = bcd - 6 * (bcd >> 4);
-
-    bcd = get_spd(slot_idx, 94);
-    spdi->fab_week = bcd - 6 * (bcd >> 4);
+    spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
+    spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
     spdi->isValid = true;
 }
