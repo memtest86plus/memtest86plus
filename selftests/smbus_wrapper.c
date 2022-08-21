@@ -33,6 +33,10 @@ void parse_spd_ddr_wrapper(spd_info *spdi, uint8_t slot_idx) {
     parse_spd_ddr(spdi, slot_idx);
 }
 
+void parse_spd_wrapper(spd_info *spdi, uint8_t slot_idx) {
+    parse_spd(spdi, slot_idx);
+}
+
 void print_spdi_wrapper(spd_info spdi, uint8_t lidx) {
     print_spdi(spdi, lidx);
 }

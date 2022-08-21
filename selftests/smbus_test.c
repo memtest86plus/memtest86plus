@@ -36,6 +36,9 @@ void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx);
 #define parse_spd_ddr parse_spd_ddr_wrapper
 void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx);
 
+#define parse_spd parse_spd_wrapper
+void parse_spd(spd_info *spdi, uint8_t slot_idx);
+
 #define print_spdi print_spdi_wrapper
 void print_spdi(spd_info spdi, uint8_t lidx);
 
@@ -272,6 +275,46 @@ void test_parse_spd_ddr() {
     check_int(spdi.tRAS, 5);
 }
 
+void test_parse_spd() {
+
+    spd_info spdi;
+    uint8_t slot_idx = 0;
+
+    load_spd(++slot_idx, "data/DDR4-M393A1G40EB1-CPB.spd");
+    parse_spd(&spdi, slot_idx);
+    check_int(spdi.slot_num, slot_idx);
+    check_int(spdi.isValid, 1);
+    check_str(spdi.type, "DDR4");
+
+    load_spd(++slot_idx, "data/DDR3-9905403-440.A00LF.spd");
+    parse_spd(&spdi, slot_idx);
+    check_int(spdi.slot_num, slot_idx);
+    check_int(spdi.isValid, 1);
+    check_str(spdi.type, "DDR3");
+
+    load_spd(++slot_idx, "data/DDR2-2G-UDIMM.spd");
+    parse_spd(&spdi, slot_idx);
+    check_int(spdi.slot_num, slot_idx);
+    check_int(spdi.isValid, 1);
+    check_str(spdi.type, "DDR2");
+
+    load_spd(++slot_idx, "data/DDR-OCZ4001024ELPE.spd");
+    parse_spd(&spdi, slot_idx);
+    check_int(spdi.slot_num, slot_idx);
+    check_int(spdi.isValid, 1);
+    check_str(spdi.type, "DDR");
+
+    load_spd(++slot_idx, "data/DDR-OCZ4001024ELPE.spd");
+    spd[0] = 0xff;          // Invalid SPD
+    parse_spd(&spdi, slot_idx);
+    check_int(spdi.isValid, 0);
+
+    load_spd(++slot_idx, "data/DDR-OCZ4001024ELPE.spd");
+    spd[2] = 0;             // Unsupported module type
+    parse_spd(&spdi, slot_idx);
+    check_int(spdi.isValid, 0);
+}
+
 void test_print_spdi() {
     spd_info spdi;
 
@@ -303,6 +346,8 @@ int main() {
     test_parse_spd_ddr3();
     test_parse_spd_ddr2();
     test_parse_spd_ddr();
+
+    test_parse_spd();
 
     test_print_spdi();
 

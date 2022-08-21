@@ -38,6 +38,8 @@ static void parse_spd_ddr2  (spd_info *spdi, uint8_t slot_idx);
 static void parse_spd_ddr3  (spd_info *spdi, uint8_t slot_idx);
 static void parse_spd_ddr4  (spd_info *spdi, uint8_t slot_idx);
 static void parse_spd_ddr5  (spd_info *spdi, uint8_t slot_idx);
+static void parse_spd       (spd_info *spdi, uint8_t slot_idx);
+
 static void print_spdi(spd_info spdi, uint8_t lidx);
 
 static bool setup_smb_controller(void);
@@ -65,7 +67,6 @@ void print_smbus_startup_info(void)
 
     spd_info curspd;
     ram.freq = 0;
-    curspd.isValid = false;
 
     if (quirk.type & QUIRK_TYPE_SMBUS) {
         quirk.process();
@@ -76,50 +77,18 @@ void print_smbus_startup_info(void)
     }
 
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
+        parse_spd(&curspd, spdidx);
 
-        memset(&curspd, 0, sizeof(curspd));
-        curspd.slot_num = spdidx;
+        if (!curspd.isValid)
+            continue;
 
-        if (get_spd(spdidx, 0) != 0xFF) {
-            switch(get_spd(spdidx, 2))
-            {
-                default:
-                    continue;
-                case 0x12: // DDR5
-                    parse_spd_ddr5(&curspd, spdidx);
-                    break;
-                case 0x0C: // DDR4
-                    parse_spd_ddr4(&curspd, spdidx);
-                    break;
-                case 0x0B: // DDR3
-                    parse_spd_ddr3(&curspd, spdidx);
-                    break;
-                case 0x08: // DDR2
-                    parse_spd_ddr2(&curspd, spdidx);
-                    break;
-                case 0x07: // DDR
-                    parse_spd_ddr(&curspd, spdidx);
-                    break;
-                case 0x04: // SDRAM
-                    parse_spd_sdram(&curspd, spdidx);
-                    break;
-                case 0x01: // RAMBUS - RDRAM
-                    if (get_spd(spdidx, 1) == 8) {
-                        parse_spd_rdram(&curspd, spdidx);
-                    }
-                    break;
-            }
-
-            if (curspd.isValid) {
-                if (spd_line_idx == 0) {
-                    prints(LINE_SPD-2, 0, "Memory SPD Information");
-                    prints(LINE_SPD-1, 0, "----------------------");
-                }
-
-                print_spdi(curspd, spd_line_idx);
-                spd_line_idx++;
-            }
+        if (spd_line_idx == 0) {
+            prints(LINE_SPD-2, 0, "Memory SPD Information");
+            prints(LINE_SPD-1, 0, "----------------------");
         }
+
+        print_spdi(curspd, spd_line_idx);
+        spd_line_idx++;
     }
 }
 
@@ -1000,6 +969,42 @@ static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
     spdi->isValid = true;
+}
+
+static void parse_spd(spd_info *spdi, uint8_t slot_idx)
+{
+    memset(spdi, 0, sizeof(*spdi));     // Also sets isValid to False
+    spdi->slot_num = slot_idx;
+
+    if (get_spd(slot_idx, 0) == 0xFF)
+        return;
+
+    switch(get_spd(slot_idx, 2))
+    {
+        case 0x12: // DDR5
+            parse_spd_ddr5(spdi, slot_idx);
+            break;
+        case 0x0C: // DDR4
+            parse_spd_ddr4(spdi, slot_idx);
+            break;
+        case 0x0B: // DDR3
+            parse_spd_ddr3(spdi, slot_idx);
+            break;
+        case 0x08: // DDR2
+            parse_spd_ddr2(spdi, slot_idx);
+            break;
+        case 0x07: // DDR
+            parse_spd_ddr(spdi, slot_idx);
+            break;
+        case 0x04: // SDRAM
+            parse_spd_sdram(spdi, slot_idx);
+            break;
+        case 0x01: // RAMBUS - RDRAM
+            if (get_spd(slot_idx, 1) == 8) {
+                parse_spd_rdram(spdi, slot_idx);
+            }
+            break;
+    }
 }
 
 
