@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -std=c11 -Wall -Wextra -Wshadow -O3 -D_DEFAULT_SOURCE -g
 INC_DIRS = -I. -I../system
 
-all: print_test smbus_test
+all: print_test smbus_test spd-decode
 
 all_tests_run: print_test_run smbus_test_run
 
@@ -17,6 +17,7 @@ smbus.o: smbus_wrapper.c ../system/smbus.c
 
 print_test: print_test.o print.o selftests.o
 smbus_test: smbus_test.o smbus.o print.o selftests.o
+spd-decode: spd-decode.o smbus.o print.o
 
 print_test_run: print_test
 	./print_test
@@ -25,4 +26,4 @@ smbus_test_run: smbus_test
 	./smbus_test
 
 clean:
-	rm -rf *.o print_test smbus_test
+	rm -rf *.o print_test smbus_test spd-decode
