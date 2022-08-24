@@ -297,27 +297,28 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 718 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 717 + xmp_offset);
-        spdi.tCL = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tCL = (tns + tCK - 1) / tCK;
+        spdi.tCL += (spdi.tCL % 2 != 0) ? 1 : 0; // if tCL is odd, round to upper even.
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 720 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 719 + xmp_offset);
-        spdi.tRCD = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRCD = (tns + tCK - 1) / tCK;
 
         // RAS# Precharge
         tns  = (uint16_t)get_spd(slot_idx, 722 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 721 + xmp_offset);
-        spdi.tRP = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRP = (tns + tCK - 1) / tCK;
 
         // Row Active Time
         tns  = (uint16_t)get_spd(slot_idx, 724 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 723 + xmp_offset);
-        spdi.tRAS = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRAS = (tns + tCK - 1) / tCK;
 
         // Row Cycle Time
         tns  = (uint16_t)get_spd(slot_idx, 726 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 725 + xmp_offset);
-        spdi.tRC = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRC = (tns + tCK - 1) / tCK;
     } else {
         // --------------------
         // JEDEC Specifications
@@ -326,27 +327,28 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 31) << 8 |
                (uint16_t)get_spd(slot_idx, 30);
-        spdi.tCL = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tCL = (tns + tCK - 1) / tCK;
+        spdi.tCL += (spdi.tCL % 2 != 0) ? 1 : 0;
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 33) << 8 |
                (uint16_t)get_spd(slot_idx, 32);
-        spdi.tRCD = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRCD = (tns + tCK - 1) / tCK;
 
         // RAS# Precharge
         tns  = (uint16_t)get_spd(slot_idx, 35) << 8 |
                (uint16_t)get_spd(slot_idx, 34);
-        spdi.tRP = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRP = (tns + tCK - 1) / tCK;
 
         // Row Active Time
         tns  = (uint16_t)get_spd(slot_idx, 37) << 8 |
                (uint16_t)get_spd(slot_idx, 36);
-        spdi.tRAS = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRAS = (tns + tCK - 1) / tCK;
 
         // Row Cycle Time
         tns  = (uint16_t)get_spd(slot_idx, 39) << 8 |
                (uint16_t)get_spd(slot_idx, 38);
-        spdi.tRC = (uint16_t)(tns/tCK + 0.5f);
+        spdi.tRC = (tns + tCK - 1) / tCK;
     }
 
     // Module manufacturer

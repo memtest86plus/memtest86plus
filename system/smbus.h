@@ -121,6 +121,8 @@ typedef struct ram_infos {
 
 extern ram_info ram;
 
+#define CEIL(X) ((X-(int)(X)) > 0 ? (int)(X+1) : (int)(X))
+
 /**
  * Print SMBUS Info
  */
