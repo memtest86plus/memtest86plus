@@ -302,28 +302,28 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 718 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 717 + xmp_offset);
-        spdi.tCL = (tns + tCK - 1) / tCK;
+        spdi.tCL = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
         spdi.tCL += (spdi.tCL % 2 != 0) ? 1 : 0; // if tCL is odd, round to upper even.
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 720 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 719 + xmp_offset);
-        spdi.tRCD = (tns + tCK - 1) / tCK;
+        spdi.tRCD = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // RAS# Precharge
         tns  = (uint16_t)get_spd(slot_idx, 722 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 721 + xmp_offset);
-        spdi.tRP = (tns + tCK - 1) / tCK;
+        spdi.tRP = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Active Time
         tns  = (uint16_t)get_spd(slot_idx, 724 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 723 + xmp_offset);
-        spdi.tRAS = (tns + tCK - 1) / tCK;
+        spdi.tRAS = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Cycle Time
         tns  = (uint16_t)get_spd(slot_idx, 726 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 725 + xmp_offset);
-        spdi.tRC = (tns + tCK - 1) / tCK;
+        spdi.tRC = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
     } else {
         // --------------------
         // JEDEC Specifications
@@ -332,28 +332,28 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 31) << 8 |
                (uint16_t)get_spd(slot_idx, 30);
-        spdi.tCL = (tns + tCK - 1) / tCK;
+        spdi.tCL = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
         spdi.tCL += (spdi.tCL % 2 != 0) ? 1 : 0;
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 33) << 8 |
                (uint16_t)get_spd(slot_idx, 32);
-        spdi.tRCD = (tns + tCK - 1) / tCK;
+        spdi.tRCD = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // RAS# Precharge
         tns  = (uint16_t)get_spd(slot_idx, 35) << 8 |
                (uint16_t)get_spd(slot_idx, 34);
-        spdi.tRP = (tns + tCK - 1) / tCK;
+        spdi.tRP = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Active Time
         tns  = (uint16_t)get_spd(slot_idx, 37) << 8 |
                (uint16_t)get_spd(slot_idx, 36);
-        spdi.tRAS = (tns + tCK - 1) / tCK;
+        spdi.tRAS = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Cycle Time
         tns  = (uint16_t)get_spd(slot_idx, 39) << 8 |
                (uint16_t)get_spd(slot_idx, 38);
-        spdi.tRC = (tns + tCK - 1) / tCK;
+        spdi.tRC = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
     }
 
     // Module manufacturer
