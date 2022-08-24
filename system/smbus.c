@@ -251,7 +251,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         sbyte = get_spd(slot_idx, 234);
 
         // Package ranks per Channel
-        cur_rank *= 1U << (sbyte >> 3);
+        cur_rank *= 1U << ((sbyte >> 3) & 7);
 
         // Add current rank to total package size
         spdi.module_size += cur_rank;
