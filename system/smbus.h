@@ -85,6 +85,7 @@
 #define NVSMBSTS_STATUS     0x1f
 
 #define DDR5_ROUNDING_FACTOR    30
+#define DDR4_ROUNDING_FACTOR    0.9f
 
 struct pci_smbus_controller {
     unsigned vendor;

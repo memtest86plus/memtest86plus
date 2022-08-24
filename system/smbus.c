@@ -407,30 +407,36 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
     spdi.hasECC = (((get_spd(slot_idx, 13) >> 3) & 1) == 1);
 
     // Module max clock
-    float tns, tckns, ramfreq;
+    float tns, tCK, ramfreq, fround;
 
     if (get_spd(slot_idx, 384) == 0x0C && get_spd(slot_idx, 385) == 0x4A) {
         // Max XMP
-        tckns = (uint8_t)get_spd(slot_idx, 396) * 0.125f +
-                (int8_t)get_spd(slot_idx, 431)  * 0.001f;
-
-        ramfreq =  1.0f / tckns * 2.0f * 1000.0f;
-
-        spdi.freq = (ramfreq+50)/100;
-        spdi.freq *= 100;
+        tCK = (uint8_t)get_spd(slot_idx, 396) * 0.125f +
+              (int8_t)get_spd(slot_idx, 431)  * 0.001f;
 
         spdi.XMP = 2;
 
     } else {
         // Max JEDEC
-        tckns = (uint8_t)get_spd(slot_idx, 18) * 0.125f +
-                (int8_t)get_spd(slot_idx, 125) * 0.001f;
-
-        ramfreq = 1.0f / tckns * 2.0f * 1000.0f;
-        spdi.freq = (uint16_t)ramfreq;
+        tCK = (uint8_t)get_spd(slot_idx, 18) * 0.125f +
+              (int8_t)get_spd(slot_idx, 125) * 0.001f;
 
         spdi.XMP = 0;
     }
+
+    ramfreq = 1.0f / tCK * 2.0f * 1000.0f;
+
+    // Round DRAM Freq to nearest x00/x33/x66
+    fround = ((int)(ramfreq * 0.01 + .5) / 0.01) - ramfreq;
+    ramfreq += fround;
+
+    if (fround < -16.5) {
+        ramfreq += 33;
+    } else if (fround > 16.5) {
+        ramfreq -= 34;
+    }
+
+    spdi.freq = ramfreq;
 
     // Module Timings
     if (spdi.XMP == 2) {
@@ -441,28 +447,28 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint8_t)get_spd(slot_idx, 401) * 0.125f +
                (int8_t)get_spd(slot_idx, 430)  * 0.001f;
-        spdi.tCL = (uint16_t)(tns/tckns);
+        spdi.tCL = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // RAS# to CAS# Latency
         tns  = (uint8_t)get_spd(slot_idx, 402) * 0.125f +
                (int8_t)get_spd(slot_idx, 429)  * 0.001f;
-        spdi.tRCD = (uint16_t)(tns/tckns);
+        spdi.tRCD = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // RAS# Precharge
         tns  = (uint8_t)get_spd(slot_idx, 403) * 0.125f +
                (int8_t)get_spd(slot_idx, 428)  * 0.001f;
-        spdi.tRP = (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // Row Active Time
         tns = (uint8_t)get_spd(slot_idx, 405) * 0.125f +
               (int8_t)get_spd(slot_idx, 427)  * 0.001f  +
               (uint8_t)(get_spd(slot_idx, 404) & 0x0F) * 32.0f;
-        spdi.tRAS = (uint16_t)(tns/tckns);
+        spdi.tRAS = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // Row Cycle Time
         tns = (uint8_t)get_spd(slot_idx, 406) * 0.125f +
               (uint8_t)(get_spd(slot_idx, 404) >> 4) * 32.0f;
-        spdi.tRC = (uint16_t)(tns/tckns);
+        spdi.tRC = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
     } else {
         // --------------------
         // JEDEC Specifications
@@ -471,27 +477,27 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
         // CAS# Latency
         tns  = (uint8_t)get_spd(slot_idx, 24) * 0.125f +
                (int8_t)get_spd(slot_idx, 123) * 0.001f;
-        spdi.tCL = (uint16_t)(tns/tckns);
+        spdi.tCL = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // RAS# to CAS# Latency
         tns  = (uint8_t)get_spd(slot_idx, 25) * 0.125f +
                (int8_t)get_spd(slot_idx, 122) * 0.001f;
-        spdi.tRCD = (uint16_t)(tns/tckns);
+        spdi.tRCD = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // RAS# Precharge
         tns  = (uint8_t)get_spd(slot_idx, 26) * 0.125f +
                (int8_t)get_spd(slot_idx, 121) * 0.001f;
-        spdi.tRP = (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // Row Active Time
         tns = (uint8_t)get_spd(slot_idx, 28) * 0.125f +
               (uint8_t)(get_spd(slot_idx, 27) & 0x0F) * 32.0f;
-        spdi.tRAS = (uint16_t)(tns/tckns);
+        spdi.tRAS = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
 
         // Row Cycle Time
         tns = (uint8_t)get_spd(slot_idx, 29) * 0.125f +
               (uint8_t)(get_spd(slot_idx, 27) >> 4) * 32.0f;
-        spdi.tRC = (uint16_t)(tns/tckns);
+        spdi.tRC = (uint16_t)(tns/tCK + DDR4_ROUNDING_FACTOR);
     }
 
     // Module manufacturer
