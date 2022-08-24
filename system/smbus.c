@@ -303,7 +303,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         tns  = (uint16_t)get_spd(slot_idx, 718 + xmp_offset) << 8 |
                (uint16_t)get_spd(slot_idx, 717 + xmp_offset);
         spdi.tCL = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
-        spdi.tCL += (spdi.tCL % 2 != 0) ? 1 : 0; // if tCL is odd, round to upper even.
+        spdi.tCL += spdi.tCL % 2; // if tCL is odd, round to upper even.
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 720 + xmp_offset) << 8 |
@@ -333,7 +333,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         tns  = (uint16_t)get_spd(slot_idx, 31) << 8 |
                (uint16_t)get_spd(slot_idx, 30);
         spdi.tCL = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
-        spdi.tCL += (spdi.tCL % 2 != 0) ? 1 : 0;
+        spdi.tCL += spdi.tCL % 2;
 
         // RAS# to CAS# Latency
         tns  = (uint16_t)get_spd(slot_idx, 33) << 8 |
