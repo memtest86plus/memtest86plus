@@ -248,11 +248,16 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
         sbyte = get_spd(slot_idx, (sbyte_adr * 4) + 2);
         cur_rank /= 1U << (((sbyte >> 5) & 3) + 2);
 
+        sbyte = get_spd(slot_idx, 234);
+
+        // Package ranks per Channel
+        cur_rank *= 1U << (sbyte >> 3);
+
         // Add current rank to total package size
         spdi.module_size += cur_rank;
 
         // If not Asymmetrical, don't process the second rank
-        if ((get_spd(slot_idx, 234) >> 6) == 0) {
+        if ((sbyte >> 6) == 0) {
             break;
         }
     }
