@@ -551,9 +551,16 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
     spdi.hasECC = (((get_spd(slot_idx, 8) >> 3) & 1) == 1);
 
     uint8_t tck = get_spd(slot_idx, 12);
+    uint8_t tck2 = get_spd(slot_idx, 221);
 
     if (get_spd(slot_idx, 176) == 0x0C && get_spd(slot_idx, 177) == 0x4A) {
         tck = get_spd(slot_idx, 186);
+
+        // Check if profile #2 is faster
+        if (tck2 > 5 && tck2 < tck) {
+            tck = tck2;
+        }
+
         spdi.XMP = 1;
     }
 
@@ -573,6 +580,10 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
             break;
         case 10:
             spdi.freq = 1600;
+            // Quirk for early Kingston DDR3-1866 with XMP < 1.1
+            if (spdi.XMP == 1 && get_spd(slot_idx, 181) == 0x0E) {
+                spdi.freq = 1866;
+            }
             break;
         case 9:
             spdi.freq = 1866;
@@ -598,57 +609,57 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
 
         // CAS# Latency
         tns  = get_spd(slot_idx, 187);
-        spdi.tCL = (uint16_t)(tns/tckns);
+        spdi.tCL = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // RAS# to CAS# Latency
         tns  = get_spd(slot_idx, 192);
-        spdi.tRCD = (uint16_t)(tns/tckns);
+        spdi.tRCD = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // RAS# Precharge
         tns  = get_spd(slot_idx, 191);
-        spdi.tRP = (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // Row Active Time
-        tns  = (uint16_t)(get_spd(slot_idx, 194) & 0xF0) << 4 |
-               get_spd(slot_idx, 195);
+        tns  = (uint16_t)((get_spd(slot_idx, 194) & 0xF0) << 3 |
+               get_spd(slot_idx, 195));
                ;
-        spdi.tRAS = (uint16_t)(tns/tckns);
+        spdi.tRAS = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // Row Cycle Time
-        tns  = (uint16_t)(get_spd(slot_idx, 194) & 0x0F) << 8 |
-               get_spd(slot_idx, 196);
-        spdi.tRC = (uint16_t)(tns/tckns);
+        tns  = (uint16_t)((get_spd(slot_idx, 194) & 0x0F) << 8 |
+               get_spd(slot_idx, 196));
+        spdi.tRC = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
     } else {
         // --------------------
         // JEDEC Specifications
         // --------------------
         tckns = (uint8_t)get_spd(slot_idx, 12) * 0.125f +
-                (int8_t)get_spd(slot_idx, 134) * 0.001f;
+                (int8_t)get_spd(slot_idx, 34) * 0.001f;
 
         // CAS# Latency
         tns  = (uint8_t)get_spd(slot_idx, 16) * 0.125f +
                (int8_t)get_spd(slot_idx, 35) * 0.001f;
-        spdi.tCL = (uint16_t)(tns/tckns);
+        spdi.tCL = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // RAS# to CAS# Latency
         tns  = (uint8_t)get_spd(slot_idx, 18) * 0.125f +
                (int8_t)get_spd(slot_idx, 36) * 0.001f;
-        spdi.tRCD = (uint16_t)(tns/tckns);
+        spdi.tRCD = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // RAS# Precharge
         tns  = (uint8_t)get_spd(slot_idx, 20) * 0.125f +
                (int8_t)get_spd(slot_idx, 37) * 0.001f;
-        spdi.tRP = (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // Row Active Time
         tns = (uint8_t)get_spd(slot_idx, 22) * 0.125f +
               (uint8_t)(get_spd(slot_idx, 21) & 0x0F) * 32.0f;
-        spdi.tRAS = (uint16_t)(tns/tckns);
+        spdi.tRAS = (uint16_t)(tns/tckns + DDR3_ROUNDING_FACTOR);
 
         // Row Cycle Time
         tns = (uint8_t)get_spd(slot_idx, 23) * 0.125f +
-              (uint8_t)(get_spd(slot_idx, 21) >> 4) * 32.0f;
-        spdi.tRC = (uint16_t)(tns/tckns);
+              (uint8_t)(get_spd(slot_idx, 21) >> 4) * 32.0f + 1;
+        spdi.tRC = (uint16_t)(tns/tckns  + DDR3_ROUNDING_FACTOR);
     }
 
     // Module manufacturer
