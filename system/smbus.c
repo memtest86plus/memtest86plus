@@ -1082,10 +1082,11 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
 
     uint8_t bcd;
 
-    spdi.type = "SDRAM";
+    spdi.type = "SDRAM PC";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.XMP = 0;
+    spdi.tCL_dec = 0;
 
     uint8_t spd_byte3  = get_spd(slot_idx, 3) & 0x0F; // Number of Row Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
     uint8_t spd_byte4  = get_spd(slot_idx, 4) & 0x0F; // Number of Column Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
@@ -1119,17 +1120,16 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
     for (int shft = 0; shft < 7; shft++) {
         if ((spd_byte18 >> shft) & 1) {
             spdi.tCL = shft + 1;
-            break;
         }
     }
 
     tns = get_spd(slot_idx, 29);
-    spdi.tRCD = (uint16_t)(tns/tckns);
+    spdi.tRCD = (uint16_t)(tns/tckns + SDR_ROUNDING_FACTOR);
 
     tns = get_spd(slot_idx, 27);
-    spdi.tRP = (uint16_t)(tns/tckns);
+    spdi.tRP = (uint16_t)(tns/tckns + SDR_ROUNDING_FACTOR);
 
-    spdi.tRAS = (uint16_t)(get_spd(slot_idx, 30)/tckns);
+    spdi.tRAS = (uint16_t)(get_spd(slot_idx, 30)/tckns + SDR_ROUNDING_FACTOR);
     spdi.tRC = 0;
 
     // Module manufacturer

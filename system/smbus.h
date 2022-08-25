@@ -95,6 +95,7 @@
 #define DDR3_ROUNDING_FACTOR    0.5f
 #define EPP_ROUNDING_FACTOR     0.9f
 #define DDR1_ROUNDING_FACTOR    0.9f
+#define SDR_ROUNDING_FACTOR     0.9f
 
 struct pci_smbus_controller {
     unsigned vendor;
