@@ -84,9 +84,11 @@
 #define NVSMBSTS_RES        0x20
 #define NVSMBSTS_STATUS     0x1f
 
+/* Rounding factors for timing computation */
 #define DDR5_ROUNDING_FACTOR    30
 #define DDR4_ROUNDING_FACTOR    0.9f
 #define DDR3_ROUNDING_FACTOR    0.5f
+#define EPP_ROUNDING_FACTOR     0.9f
 
 struct pci_smbus_controller {
     unsigned vendor;

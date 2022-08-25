@@ -774,23 +774,22 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
         for (int shft = 0; shft < 7; shft++) {
             if ((tbyte >> shft) & 1) {
                 spdi.tCL = shft;
-                break;
             }
         }
 
         // RAS# to CAS# Latency
         tbyte = get_spd(slot_idx, 111 + epp_offset);
         tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
-        spdi.tRCD = (uint16_t)(tns/tckns);
+        spdi.tRCD = (uint16_t)(tns/tckns + EPP_ROUNDING_FACTOR);
 
         // RAS# Precharge
         tbyte = get_spd(slot_idx, 112 + epp_offset);
         tns = ((tbyte & 0xFC) >> 2) + (tbyte & 0x3) * 0.25f;
-        spdi.tRP = (uint16_t)(tns/tckns);
+        spdi.tRP = (uint16_t)(tns/tckns + EPP_ROUNDING_FACTOR);
 
         // Row Active Time
         tns = get_spd(slot_idx, 113 + epp_offset);
-        spdi.tRAS = (uint16_t)(tns/tckns);
+        spdi.tRAS = (uint16_t)(tns/tckns + EPP_ROUNDING_FACTOR);
 
         // Row Cycle Time
         spdi.tRC = 0;
@@ -801,7 +800,6 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
         for (int shft = 0; shft < 7; shft++) {
             if ((tbyte >> shft) & 1) {
                 spdi.tCL = shft;
-                break;
             }
         }
 
