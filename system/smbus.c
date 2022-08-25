@@ -175,10 +175,11 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
         ram.freq = spdi.freq;
     }
     if (ram.tCL < spdi.tCL) {
-        ram.tCL  = spdi.tCL;
-        ram.tRCD = spdi.tRCD;
-        ram.tRP  = spdi.tRP;
-        ram.tRAS = spdi.tRAS;
+        ram.tCL     = spdi.tCL;
+        ram.tCL_dec = spdi.tCL_dec;
+        ram.tRCD    = spdi.tRCD;
+        ram.tRP     = spdi.tRP;
+        ram.tRAS    = spdi.tRAS;
     }
 }
 
@@ -910,23 +911,29 @@ static spd_info parse_spd_ddr(uint8_t slot_idx)
     spdi.freq = (uint16_t)(1.0f / tckns * 1000.0f * 2.0f);
 
     // Module Timings
+    spdi.tCL_dec = 0;
     uint8_t spd_byte18 = get_spd(slot_idx, 18);
     for (int shft = 0; shft < 7; shft++) {
         if ((spd_byte18 >> shft) & 1) {
-            spdi.tCL = 1.0f + shft * 0.5f; // TODO: .5 CAS
-            break;
+            spdi.tCL = 1.0f + shft * 0.5f;
+            // Check tCL decimal (x.5 CAS)
+            if (shft == 1 || shft == 3 || shft == 5) {
+                spdi.tCL_dec = 5;
+            } else {
+                spdi.tCL_dec = 0;
+            }
         }
     }
 
     tns = (get_spd(slot_idx, 29) >> 2) +
           (get_spd(slot_idx, 29) & 0x3) * 0.25f;
-    spdi.tRCD = (uint16_t)(tns/tckns);
+    spdi.tRCD = (uint16_t)(tns/tckns + DDR1_ROUNDING_FACTOR);
 
     tns = (get_spd(slot_idx, 27) >> 2) +
           (get_spd(slot_idx, 27) & 0x3) * 0.25f;
-    spdi.tRP = (uint16_t)(tns/tckns);
+    spdi.tRP = (uint16_t)(tns/tckns + DDR1_ROUNDING_FACTOR);
 
-    spdi.tRAS = (uint16_t)(get_spd(slot_idx, 30)/tckns);
+    spdi.tRAS = (uint16_t)((float)get_spd(slot_idx, 30)/tckns + DDR1_ROUNDING_FACTOR);
     spdi.tRC = 0;
 
     // Module manufacturer

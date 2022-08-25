@@ -84,11 +84,17 @@
 #define NVSMBSTS_RES        0x20
 #define NVSMBSTS_STATUS     0x1f
 
-/* Rounding factors for timing computation */
+/** Rounding factors for timing computation
+ *
+ *  These factors are used as a configurable CEIL() function
+ *  to get the upper int from a float past a specific decimal point.
+ */
+
 #define DDR5_ROUNDING_FACTOR    30
 #define DDR4_ROUNDING_FACTOR    0.9f
 #define DDR3_ROUNDING_FACTOR    0.5f
 #define EPP_ROUNDING_FACTOR     0.9f
+#define DDR1_ROUNDING_FACTOR    0.9f
 
 struct pci_smbus_controller {
     unsigned vendor;
@@ -110,6 +116,7 @@ typedef struct spd_infos {
     uint8_t     fab_year;
     uint8_t     fab_week;
     uint16_t    tCL;
+    uint8_t     tCL_dec;
     uint16_t    tRCD;
     uint16_t    tRP;
     uint16_t    tRAS;
@@ -119,6 +126,7 @@ typedef struct spd_infos {
 typedef struct ram_infos {
     uint16_t    freq;
     uint16_t    tCL;
+    uint8_t     tCL_dec;
     uint16_t    tRCD;
     uint16_t    tRP;
     uint16_t    tRAS;
