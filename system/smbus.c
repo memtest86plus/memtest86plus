@@ -17,7 +17,7 @@
 #define LINE_SPD        13
 #define MAX_SPD_SLOT    8
 
-ram_info ram = { 0, 0, 0, 0, 0, "N/A"};
+ram_info ram = { 0, 0, 0, 0, 0, 0, "N/A"};
 
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
@@ -192,6 +192,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.module_size = 0;
+    spdi.tCL_dec = 0;
 
     // Compute module size for symmetric & asymmetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
@@ -395,6 +396,7 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
     spdi.type = "DDR4";
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
+    spdi.tCL_dec = 0;
 
     // Compute module size in MB with shifts
     spdi.module_size = 1U << (
@@ -540,6 +542,7 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.XMP = 0;
+    spdi.tCL_dec = 0;
 
     // Compute module size in MB with shifts
     spdi.module_size = 1U << (
@@ -701,6 +704,7 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
     spdi.slot_num = slot_idx;
     spdi.sku_len = 0;
     spdi.XMP = 0;
+    spdi.tCL_dec = 0;
 
     // Compute module size in MB
     switch (get_spd(slot_idx, 31)) {
@@ -1029,6 +1033,7 @@ static spd_info parse_spd_rdram(uint8_t slot_idx)
 
     // Module Timings
     spdi.tCL = get_spd(slot_idx, 14);
+    spdi.tCL_dec = 0;
     spdi.tRCD = get_spd(slot_idx, 12);
     spdi.tRP = get_spd(slot_idx, 10);
     spdi.tRAS = get_spd(slot_idx, 11);
