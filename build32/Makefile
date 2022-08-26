@@ -23,6 +23,7 @@ SYS_OBJS = system/acpi.o \
            system/heap.o \
            system/hwctrl.o \
            system/hwquirks.o \
+           system/jedec_id.o \
            system/keyboard.o \
            system/ohci.o \
            system/pci.o \
@@ -96,6 +97,11 @@ system/reloc.o: ../system/reloc32.c
 system/%.o: ../system/%.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+system/jedec_id.o: ../system/generate_jep106.pl
+	@mkdir -p system
+	perl -W ../system/generate_jep106.pl > system/jedec_id.s
+	$(AS) system/jedec_id.s -o $@
 
 lib/%.o: ../lib/%.c
 	@mkdir -p lib

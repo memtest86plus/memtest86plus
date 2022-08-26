@@ -150,7 +150,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     // Print Manufacturer from JEDEC106
     for (i = 0; i < JEP106_CNT; i++) {
         if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(LINE_SPD+lidx, ++curcol, "- %s", jep106[i].name);
+            curcol = printf(LINE_SPD+lidx, ++curcol, "- %s", JEP106_NAME(i));
             break;
         }
     }
