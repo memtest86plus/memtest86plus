@@ -53,7 +53,7 @@ void print_spdi(spd_info spdi, uint8_t row)
     // Print Manufacturer from JEDEC106
     for (i = 0; i < JEP106_CNT; i++) {
         if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(row, ++curcol, "- %s", jep106[i].name);
+            curcol = printf(row, ++curcol, "- %s", JEP106_NAME(i));
             break;
         }
     }
