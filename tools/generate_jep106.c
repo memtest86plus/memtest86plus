@@ -1,14 +1,16 @@
 /* MemTest86+ V5 Specific code (GPL V2.0)
  * By Samuel DEMEULEMEESTER, memtest@memtest.org
  * https://x86.fr - https://www.memtest.org
+ *
+ * Generator by Lionel Debroux, lionel_debroux@yahoo.fr
  * ------------------------------------------------
  * Based on JEDEC JEP106-BA - January 2022
  */
 
-#define JEDEC_CONT_CODE_MAX 14
-
-#define JEP106_CNT \
-    sizeof(jep106)/sizeof(jep106[0])
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 struct __attribute__((packed)) spd_jedec_manufacturer {
     uint16_t jedec_code;
@@ -1682,3 +1684,56 @@ static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
     { 0x0F33, "Xllbyte" },
     { 0xFFFF, "Unknown"}
 };
+
+#define STR_SIZE (16384)
+
+int main(int argc, char ** argv) {
+    (void)argc, (void)argv;
+
+    char structstr[STR_SIZE];
+    char stringstr[STR_SIZE];
+    char idstr[5];
+
+    char * ptr1 = structstr;
+    char * ptr2 = stringstr;
+
+    for (size_t i = 0; i < sizeof(jep106) / sizeof(jep106[0]); i++) {
+        int written;
+        sprintf(idstr, "%04X", jep106[i].jedec_code);
+        written = sprintf(ptr1, "\t\t.dc.w 0x%s\n\t\t.dc.w jep106_str_%s - jep106_str_start\n", idstr, idstr);
+        ptr1 += written;
+        written = sprintf(ptr2, "jep106_str_%s:\n\t.asciz \"%s\"\n", idstr, jep106[i].name);
+        ptr2 += written;
+    }
+
+    fprintf(stderr,
+"\t.section \".rodata\", \"a\", @progbits\n\t.globl jep106_str_start\njep106_str_start:\n%s\n"
+"\t.balign 2\n\t.globl jep106\njep106:\n%s",
+            stringstr, structstr);
+
+    fprintf(stdout,
+"/* MemTest86+ V5 Specific code (GPL V2.0)\n"
+" * By Samuel DEMEULEMEESTER, memtest@memtest.org\n"
+" * https://x86.fr - https://www.memtest.org\n"
+" * ------------------------------------------------\n"
+" * Based on JEDEC JEP106-BA - January 2022\n"
+" */\n"
+"\n"
+"#define JEDEC_CONT_CODE_MAX 14\n"
+"\n"
+"struct spd_jedec_manufacturer {\n"
+"    uint16_t jedec_code;\n"
+"    uint16_t offset;\n"
+"};\n"
+"\n"
+"extern const char jep106_str_start;\n"
+"extern const struct spd_jedec_manufacturer jep106[];\n"
+"\n"
+"#define JEP106_CNT (%zu)\n"
+"\n"
+"#define JEP106_NAME(i) \\\n"
+"    (&jep106_str_start + jep106[i].offset)\n",
+            sizeof(jep106) / sizeof(jep106[0]));
+
+    return 0;
+}
