@@ -25,7 +25,7 @@ else
   MS_LDS=ldscripts/memtest_shared.lds
 endif
 
-INC_DIRS = -I../../boot -I../../system -I../../system/imc -I../../system/x86 -I../../lib -I../../tests -I../../app -Iapp
+INC_DIRS = -I../../boot -I../../system -Isystem -I../../system/imc -I../../system/x86 -I../../lib -I../../tests -I../../app -Iapp
 
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
@@ -33,6 +33,7 @@ SYS_OBJS = system/acpi.o \
            system/font.o \
            system/heap.o \
            system/hwquirks.o \
+           system/jedec_id.o \
            system/keyboard.o \
            system/ohci.o \
            system/pci.o \
@@ -119,7 +120,19 @@ system/reloc.o: ../../system/reloc64.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) -fno-strict-aliasing $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/%.o: ../../system/%.c
+tools/generate_jep106: ../tools/generate_jep106.c
+	@mkdir -p tools
+	$(CC) -std=c11 -Wall -Wextra -Wshadow -o $@ $<
+
+system/jedec_id.h: tools/generate_jep106
+	@mkdir -p system
+	$< > system/jedec_id.h 2> system/jedec_id.s
+
+system/jedec_id.o: system/jedec_id.h
+	@mkdir -p system
+	$(AS) system/jedec_id.s -o $@
+
+system/%.o: ../../system/%.c system/jedec_id.h
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
@@ -207,7 +220,7 @@ memtest.iso: memtest.mbr floppy.img esp.img
 iso: memtest.iso
 
 clean:
-	rm -rf boot system lib tests app *.img *.iso memtest* mt86plus iso grub-*
+	rm -rf boot system lib tests app tools *.img *.iso memtest* mt86plus iso grub-*
 
 # grub-memtest.iso uses GRUB as an intermediate bootloader to allow Memtest86+
 # to be started with the native USB keyboard drivers either enabled or disabled,
