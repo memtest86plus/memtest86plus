@@ -11,6 +11,7 @@
 build_version.h
 gdbscript
 memtest_shared_debug.lds
+jedec_id.h
 
 # Binaries
 memtest_shared
@@ -21,6 +22,7 @@ memtest_shared.bin
 *.iso
 *.mbr
 *.debug
+generate_jep106
 
 # Directories
 grub-iso
