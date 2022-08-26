@@ -266,7 +266,7 @@ void post_display_init(void)
     if (false) {
         // Try to get RAM information from IMC (TODO)
         display_spec_mode("IMC: ");
-        display_spec_ddr(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
+        display_spec_ddr(ram.freq, ram.type, ram.tCL, ram.tCL_dec, ram.tRCD, ram.tRP, ram.tRAS);
         display_mode = DISPLAY_MODE_IMC;
     } else if (ram.freq > 0 && ram.tCL > 0) {
         // If not available, grab max memory specs from SPD
@@ -274,7 +274,7 @@ void post_display_init(void)
         if (ram.freq <= 166) {
             display_spec_sdr(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
         } else {
-            display_spec_ddr(ram.freq, ram.type, ram.tCL, ram.tRCD, ram.tRP, ram.tRAS);
+            display_spec_ddr(ram.freq, ram.type, ram.tCL, ram.tCL_dec, ram.tRCD, ram.tRP, ram.tRAS);
         }
         display_mode = DISPLAY_MODE_SPD;
     } else {
