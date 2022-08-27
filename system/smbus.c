@@ -28,6 +28,7 @@ static int8_t spd_page = -1;
 static int8_t last_adr = -1;
 
 // Functions Prototypes
+static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len);
 
 static spd_info parse_spd_rdram (uint8_t slot_idx);
 static spd_info parse_spd_sdram (uint8_t slot_idx);
@@ -153,9 +154,8 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 
     // Print SKU
-    for(i = 0; i < spdi.sku_len; i++) {
-        curcol = printc(LINE_SPD+lidx, i ? curcol : ++curcol, spdi.sku[i]);
-    }
+    if (*spdi.sku)
+        curcol = prints(LINE_SPD+lidx, curcol + 1, spdi.sku);
 
     // Check manufacturing date and print if valid.
     // fab_year is uint8_t and carries only the last two digits.
@@ -183,6 +183,30 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     }
 }
 
+static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len)
+{
+    uint8_t sku_len;
+
+    if (max_len > SPD_SKU_LEN)
+        max_len = SPD_SKU_LEN;
+
+    for (sku_len = 0; sku_len < max_len; sku_len++) {
+        uint8_t sku_byte = get_spd(slot_idx, offset + sku_len);
+
+        // Stop on the first non-ASCII char
+        if (sku_byte < 0x20 || sku_byte > 0x7F)
+            break;
+
+        sku[sku_len] = (char)sku_byte;
+    }
+
+    // Trim spaces from the end
+    while (sku_len && sku[sku_len - 1] == 0x20)
+        sku_len--;
+
+    sku[sku_len] = '\0';
+}
+
 static spd_info parse_spd_ddr5(uint8_t slot_idx)
 {
     spd_info spdi;
@@ -190,7 +214,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
     spdi.isValid = false;
     spdi.type = "DDR5";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.module_size = 0;
     spdi.tCL_dec = 0;
 
@@ -362,20 +386,7 @@ static spd_info parse_spd_ddr5(uint8_t slot_idx)
     spdi.jedec_code = (get_spd(slot_idx, 512) & 0x1F) << 8;
     spdi.jedec_code |= get_spd(slot_idx, 513) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j <= 29; j++) {
-        sku_byte = get_spd(slot_idx, 521+j);
-
-        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
-            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 521, 30);
 
     // Week & Date (BCD to Int)
     uint8_t bcd = get_spd(slot_idx, 515);
@@ -395,7 +406,7 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
 
     spdi.type = "DDR4";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.tCL_dec = 0;
 
     // Compute module size in MB with shifts
@@ -507,20 +518,7 @@ static spd_info parse_spd_ddr4(uint8_t slot_idx)
     spdi.jedec_code  = ((uint16_t)(get_spd(slot_idx, 320) & 0x1F)) << 8;
     spdi.jedec_code |= get_spd(slot_idx, 321) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j <= 20; j++) {
-        sku_byte = get_spd(slot_idx, 329+j);
-
-        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
-            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 329, 20);
 
     // Week & Date (BCD to Int)
     uint8_t bcd = get_spd(slot_idx, 323);
@@ -540,7 +538,7 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
 
     spdi.type = "DDR3";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.XMP = 0;
     spdi.tCL_dec = 0;
 
@@ -670,20 +668,7 @@ static spd_info parse_spd_ddr3(uint8_t slot_idx)
     spdi.jedec_code  = ((uint16_t)(get_spd(slot_idx, 117) & 0x1F)) << 8;
     spdi.jedec_code |= get_spd(slot_idx, 118) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j <= 20; j++) {
-        sku_byte = get_spd(slot_idx, 128+j);
-
-        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
-            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 128, 18);
 
     uint8_t bcd = get_spd(slot_idx, 120);
     spdi.fab_year =  bcd - 6 * (bcd >> 4);
@@ -702,7 +687,7 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
 
     spdi.type = "DDR2";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.XMP = 0;
     spdi.tCL_dec = 0;
 
@@ -837,20 +822,7 @@ static spd_info parse_spd_ddr2(uint8_t slot_idx)
     spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
     spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(slot_idx, 73 + j);
-
-        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
-            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 73, 18);
 
     uint8_t bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
@@ -869,7 +841,7 @@ static spd_info parse_spd_ddr(uint8_t slot_idx)
 
     spdi.type = "DDR";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.XMP = 0;
 
     // Compute module size in MB
@@ -951,20 +923,7 @@ static spd_info parse_spd_ddr(uint8_t slot_idx)
     spdi.jedec_code = (contcode - 64) << 8;
     spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(slot_idx, 73 + j);
-
-        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
-            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 73, 18);
 
     uint8_t bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
@@ -984,7 +943,7 @@ static spd_info parse_spd_rdram(uint8_t slot_idx)
     spdi.isValid = false;
     spdi.type = "RDRAM";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.XMP = 0;
 
     // Compute module size in MB
@@ -1050,20 +1009,7 @@ static spd_info parse_spd_rdram(uint8_t slot_idx)
     spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
     spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(slot_idx, 73 + j);
-
-        if ((sku_byte <= 0x20 || sku_byte == 0xFF) && j > 0
-            && (spdi.sku[j - 1] <= 0x20 || spdi.sku[j - 1] == 0xFF)) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 73, 18);
 
     uint8_t bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
@@ -1084,7 +1030,7 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
 
     spdi.type = "SDRAM";
     spdi.slot_num = slot_idx;
-    spdi.sku_len = 0;
+    spdi.sku[0] = '\0';
     spdi.XMP = 0;
     spdi.tCL_dec = 0;
 
@@ -1143,19 +1089,7 @@ static spd_info parse_spd_sdram(uint8_t slot_idx)
     spdi.jedec_code  = ((uint16_t)(contcode - 64)) << 8;
     spdi.jedec_code |= get_spd(slot_idx, contcode) & 0x7F;
 
-    // Module SKU
-    uint8_t sku_byte;
-    for (int j = 0; j < 18; j++) {
-        sku_byte = get_spd(slot_idx, 73 + j);
-
-        if (sku_byte <= 0x20 && j > 0 && spdi.sku[j - 1] <= 0x20) {
-            spdi.sku_len--;
-            break;
-        } else {
-            spdi.sku[j] = sku_byte;
-            spdi.sku_len++;
-        }
-    }
+    read_sku(spdi.sku, slot_idx, 73, 18);
 
     bcd = get_spd(slot_idx, 93);
     spdi.fab_year = bcd - 6 * (bcd >> 4);
