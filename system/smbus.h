@@ -93,6 +93,8 @@
 #define DDR5_ROUNDING_FACTOR    30
 #define ROUNDING_FACTOR         0.9f
 
+#define SPD_SKU_LEN         32
+
 struct pci_smbus_controller {
     unsigned vendor;
     unsigned device;
@@ -105,8 +107,7 @@ typedef struct spd_infos {
     uint16_t    jedec_code;
     uint32_t    module_size;
     char        *type;
-    uint8_t     sku[32];
-    uint8_t     sku_len;
+    char        sku[SPD_SKU_LEN + 1];
     uint8_t     XMP;
     uint16_t    freq;
     bool        hasECC;
