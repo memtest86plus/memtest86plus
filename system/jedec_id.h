@@ -742,7 +742,7 @@ static const struct spd_jedec_manufacturer jep106[] = {
 //  { 0x055F, "Connect One Ltd" },
 //  { 0x0560, "Opulan Technologies" },
 //  { 0x0561, "Septentrio NV" },
-//  { 0x0562, "Goldenmars Technology Inc" },
+    { 0x0562, "Goldenmars" },
     { 0x0563, "Kreton Corp." },
 //  { 0x0564, "Cochlear Ltd" },
 //  { 0x0565, "Altair Semiconductor" },

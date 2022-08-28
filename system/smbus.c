@@ -559,10 +559,6 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
             break;
         case 10:
             spdi->freq = 1600;
-            // Quirk for early Kingston DDR3-1866 with XMP < 1.1
-            if (spdi->XMP == 1 && get_spd(slot_idx, 181) == 0x0E) {
-                spdi->freq = 1866;
-            }
             break;
         case 9:
             spdi->freq = 1866;
@@ -578,65 +574,87 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
             break;
     }
 
+
     // Module Timings
-    float tckns, tns;
+    float tckns, tns, mtb;
+
     if (spdi->XMP == 1) {
         // ------------------
         // XMP Specifications
         // ------------------
-        tckns = get_spd(slot_idx, 186);
+        float mtb_dividend = get_spd(slot_idx, 180);
+        float mtb_divisor = get_spd(slot_idx, 181);
+
+        mtb = (mtb_divisor == 0) ? 0.125f : mtb_dividend / mtb_divisor;
+
+        tckns = (float)get_spd(slot_idx, 186);
+
+        // XMP Draft with non-standard MTB divisors (!= 0.125)
+        if (mtb_divisor == 12.0f && tckns == 10.0f) {
+            spdi->freq = 2400;
+        } else if (mtb_divisor == 14.0f && tckns == 15.0f) {
+            spdi->freq = 1866;
+        }
+
+        if (spdi->freq >= 1866 && mtb_divisor == 8.0f) {
+            tckns -= 0.4f;
+        }
+
+        tckns *= mtb;
 
         // CAS# Latency
         tns  = get_spd(slot_idx, 187);
-        spdi->tCL = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
+        spdi->tCL = (uint16_t)((tns*mtb)/tckns + ROUNDING_FACTOR);
 
         // RAS# to CAS# Latency
         tns  = get_spd(slot_idx, 192);
-        spdi->tRCD = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
+        spdi->tRCD = (uint16_t)((tns*mtb)/tckns + ROUNDING_FACTOR);
 
         // RAS# Precharge
         tns  = get_spd(slot_idx, 191);
-        spdi->tRP = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
+        spdi->tRP = (uint16_t)((tns*mtb)/tckns + ROUNDING_FACTOR);
 
         // Row Active Time
-        tns  = (uint16_t)((get_spd(slot_idx, 194) & 0xF0) << 3 |
+        tns  = (uint16_t)((get_spd(slot_idx, 194) & 0x0F) << 8 |
                get_spd(slot_idx, 195));
-               ;
-        spdi->tRAS = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
+
+        spdi->tRAS = (uint16_t)((tns*mtb)/tckns + ROUNDING_FACTOR);
 
         // Row Cycle Time
-        tns  = (uint16_t)((get_spd(slot_idx, 194) & 0x0F) << 8 |
+        tns  = (uint16_t)((get_spd(slot_idx, 194) & 0xF0) << 4 |
                get_spd(slot_idx, 196));
-        spdi->tRC = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
+        spdi->tRC = (uint16_t)((tns*mtb)/tckns + ROUNDING_FACTOR);
     } else {
         // --------------------
         // JEDEC Specifications
         // --------------------
-        tckns = (uint8_t)get_spd(slot_idx, 12) * 0.125f +
+        mtb = 0.125f;
+
+        tckns = (uint8_t)get_spd(slot_idx, 12) * mtb +
                 (int8_t)get_spd(slot_idx, 34) * 0.001f;
 
         // CAS# Latency
-        tns  = (uint8_t)get_spd(slot_idx, 16) * 0.125f +
+        tns  = (uint8_t)get_spd(slot_idx, 16) * mtb +
                (int8_t)get_spd(slot_idx, 35) * 0.001f;
         spdi->tCL = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
 
         // RAS# to CAS# Latency
-        tns  = (uint8_t)get_spd(slot_idx, 18) * 0.125f +
+        tns  = (uint8_t)get_spd(slot_idx, 18) * mtb +
                (int8_t)get_spd(slot_idx, 36) * 0.001f;
         spdi->tRCD = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
 
         // RAS# Precharge
-        tns  = (uint8_t)get_spd(slot_idx, 20) * 0.125f +
+        tns  = (uint8_t)get_spd(slot_idx, 20) * mtb +
                (int8_t)get_spd(slot_idx, 37) * 0.001f;
         spdi->tRP = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
 
         // Row Active Time
-        tns = (uint8_t)get_spd(slot_idx, 22) * 0.125f +
+        tns = (uint8_t)get_spd(slot_idx, 22) * mtb +
               (uint8_t)(get_spd(slot_idx, 21) & 0x0F) * 32.0f;
         spdi->tRAS = (uint16_t)(tns/tckns + ROUNDING_FACTOR);
 
         // Row Cycle Time
-        tns = (uint8_t)get_spd(slot_idx, 23) * 0.125f +
+        tns = (uint8_t)get_spd(slot_idx, 23) * mtb +
               (uint8_t)(get_spd(slot_idx, 21) >> 4) * 32.0f + 1;
         spdi->tRC = (uint16_t)(tns/tckns  + ROUNDING_FACTOR);
     }
