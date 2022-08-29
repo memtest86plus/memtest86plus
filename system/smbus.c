@@ -523,9 +523,10 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
     spdi->module_size = 1U << (
                                ((get_spd(slot_idx, 4) & 0xF) + 5)  +  // Total SDRAM capacity: (256 Mbits << byte4[3:0]) / 1 KB
                                ((get_spd(slot_idx, 8) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte8[2:0]
-                               ((get_spd(slot_idx, 7) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte7[2:0]
-                               ((get_spd(slot_idx, 7) >> 3) & 0x7)    // Number of Ranks: byte7[5:3]
+                               ((get_spd(slot_idx, 7) & 0x7) + 2)     // SDRAM Device Width: 4 << byte7[2:0]
                               );
+
+    spdi->module_size *= ((get_spd(slot_idx, 7) >> 3) & 0x7) + 1;     // Number of Ranks: byte7[5:3]
 
     spdi->hasECC = (((get_spd(slot_idx, 8) >> 3) & 1) == 1);
 
