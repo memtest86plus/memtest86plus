@@ -171,7 +171,7 @@ static void print_spdi(spd_info spdi, uint8_t lidx)
     //  - for 0..31 we assume 20xx, and 0 means 2000.
     //  - for 96..99 we assume 19xx.
     //  - values 32..95 and > 99 are considered invalid.
-    if (curcol <= 69 && spdi.fab_week < 53 && spdi.fab_week != 0 &&
+    if (curcol <= 69 && spdi.fab_week <= 53 && spdi.fab_week != 0 &&
         (spdi.fab_year < 32 || (spdi.fab_year >= 96 && spdi.fab_year <= 99))) {
         curcol = printf(LINE_SPD+lidx, ++curcol, "(%02i%02i-W%02i)",
                         spdi.fab_year >= 96 ? 19 : 20,
