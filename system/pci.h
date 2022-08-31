@@ -12,6 +12,19 @@
 
 #include <stdint.h>
 
+/* Vendor IDs */
+#define PCI_VID_ATI          0x1002
+#define PCI_VID_AMD          0x1022
+#define PCI_VID_SIS          0x1039
+#define PCI_VID_ASUS         0x1043
+#define PCI_VID_EFAR         0x1055
+#define PCI_VID_ALI          0x10B9
+#define PCI_VID_NVIDIA       0x10DE
+#define PCI_VID_VIA          0x1106
+#define PCI_VID_SERVERWORKS  0x1166
+#define PCI_VID_HYGON        0x1D94
+#define PCI_VID_INTEL        0x8086
+
 #define PCI_MAX_BUS     256
 #define PCI_MAX_DEV     32
 #define PCI_MAX_FUNC    8

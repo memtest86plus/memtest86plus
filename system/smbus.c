@@ -1152,7 +1152,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
     smbus_id = (((uint32_t)vid) << 16) | did;
     switch(vid)
     {
-        case VID_INTEL:
+        case PCI_VID_INTEL:
         {
             if (find_in_did_array(did, intel_ich5_dids, sizeof(intel_ich5_dids) / sizeof(intel_ich5_dids[0]))) {
                 return ich5_get_smb();
@@ -1160,14 +1160,14 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             if (did == 0x7113) { // 82371AB/EB/MB PIIX4
                 return piix4_get_smb();
             }
-            // 0x719B 82440/82443MX PMC ?
+            // 0x719B 82440/82443MX PMC - PIIX4
             // 0x0F13 ValleyView SMBus Controller ?
             // 0x8119 US15W ?
             return false;
         }
 
-        case VID_HYGON:
-        case VID_AMD:
+        case PCI_VID_HYGON:
+        case PCI_VID_AMD:
             switch(did)
             {
                 // case 0x740B: // AMD756
@@ -1184,7 +1184,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             }
             break;
 
-        case VID_ATI:
+        case PCI_VID_ATI:
             switch(did)
             {
                 // case 0x4353: // SB200
@@ -1197,7 +1197,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             }
             break;
 
-        case VID_NVIDIA:
+        case PCI_VID_NVIDIA:
             switch(did)
             {
                 // case 0x01B4: // nForce
@@ -1221,17 +1221,22 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             }
             break;
 
-        case VID_SIS:
+        case PCI_VID_SIS:
             switch(did)
             {
-                case 0x0016: // SiS961/2/3
-                    // There are also SiS630 and SiS5595 SMBus controllers.
+                // case 0x0008:
+                    // SiS5595, SiS630 or other SMBus controllers - it's complicated.
+                // case 0x0016:
+                    // SiS961/2/3, known as "SiS96x" SMBus controllers.
+                // case 0x0018:
+                // case 0x0964:
+                    // SiS630 SMBus controllers.
                 default:
                     return false;
             }
             break;
 
-        case VID_VIA:
+        case PCI_VID_VIA:
             switch(did)
             {
                 // case 0x3040: // 82C586_3
@@ -1262,7 +1267,26 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             }
             break;
 
-        case VID_SERVERWORKS:
+        case PCI_VID_EFAR:
+            switch(did)
+            {
+                // case 0x9463: // SLC90E66_3: PIIX4
+                default:
+                    return false;
+            }
+            break;
+
+        case PCI_VID_ALI:
+            switch(did)
+            {
+                // case 0x1563: // ali1563 (M1563) SMBus controller
+                // case 0x7101: // ali1535 (M1535) or ali15x3 (M1533/M1543) SMBus controllers
+                default:
+                    return false;
+            }
+            break;
+
+        case PCI_VID_SERVERWORKS:
             switch(did)
             {
                 case 0x0201: // CSB5
@@ -1417,7 +1441,7 @@ static bool nv_mcp_get_smb(void)
 static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
     switch ((smbus_id >> 16) & 0xFFFF) {
-      case VID_NVIDIA:
+      case PCI_VID_NVIDIA:
         return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       default:
         return ich5_read_spd_byte(slot_idx, spd_adr);
