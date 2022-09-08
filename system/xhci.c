@@ -729,10 +729,9 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
         uint32_t route = usb_route(hub, port_num);
         slot_context->params1 |= route & 0xfffff;
         slot_context->root_hub_port_num = route >> 24;
-        if (device_speed < USB_SPEED_HIGH && hub->ep0->device_speed == USB_SPEED_HIGH) {
-            slot_context->parent_slot_id  = hub->ep0->device_id;
-            slot_context->parent_port_num = port_num;
-        }
+        usb_parent_t hs_parent = usb_hs_parent(hub, port_num, device_speed);
+        slot_context->parent_slot_id  = hs_parent.device_id;
+        slot_context->parent_port_num = hs_parent.port_num;
     } else {
         slot_context->root_hub_port_num = port_num;
     }
@@ -818,7 +817,7 @@ static bool configure_interrupt_endpoint(workspace_t *ws, const usb_ep_t *ep, in
     xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
     slot_context->params1           = ep_id << 27 | hub_flag << 26 | (slot_context->params1 & 0x00ffffff);
     slot_context->num_ports         = num_ports;
-    slot_context->params2           = tt_think_time;
+    slot_context->params2           = ep->device_speed == USB_SPEED_HIGH ? tt_think_time : 0;
 
     xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * ws->context_size);
     ep_context->params1             = 0;
@@ -1093,11 +1092,9 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Construct a hub descriptor for the root hub.
     usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
     root_hub.ep0            = NULL;
-    root_hub.level          = 0;
-    root_hub.route          = 0;
     root_hub.num_ports      = cap_regs->hcs_params1 & 0xff;
-    root_hub.power_up_delay = 0;
 
     usleep(100*MILLISEC);  // USB maximum device attach time.
 

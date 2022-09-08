@@ -136,6 +136,8 @@ static bool build_hub_info(const usb_hcd_t *hcd, const usb_hub_t *parent, int po
     hub->num_ports      = hub_desc.num_ports;
     hub->tt_think_time  = hub_desc.characteristics & 0x0060 >> 5;
     hub->power_up_delay = hub_desc.power_up_delay;
+    hub->hs_parent      = usb_hs_parent(parent, port_num, ep0->device_speed);
+
     usb_endpoint_desc_t *ep1_desc = find_hub_endpoint_descriptor(hcd->ws->data_buffer, hcd->ws->data_length);
     if (ep1_desc == NULL) {
         return false;
@@ -454,6 +456,20 @@ uint32_t usb_route(const usb_hub_t *hub, int port_num)
         port_num = 15;
     }
     return hub->route | (port_num << (4 * (hub->level - 1)));
+}
+
+usb_parent_t usb_hs_parent(const usb_hub_t *hub, int port_num, usb_speed_t device_speed)
+{
+    usb_parent_t hs_parent = { 0, 0 };
+    if (device_speed < USB_SPEED_HIGH && hub->level > 0) {
+        if (hub->ep0->device_speed < USB_SPEED_HIGH) {
+            hs_parent = hub->hs_parent;
+        } else {
+            hs_parent.device_id = hub->ep0->device_id;
+            hs_parent.port_num  = port_num;
+        }
+    }
+    return hs_parent;
 }
 
 bool wait_until_clr(const volatile uint32_t *reg, uint32_t bit_mask, int max_time)

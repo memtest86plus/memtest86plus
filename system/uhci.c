@@ -474,11 +474,9 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
 
     // Construct a hub descriptor for the root hub.
     usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
     root_hub.ep0            = NULL;
-    root_hub.level          = 0;
-    root_hub.route          = 0;
     root_hub.num_ports      = MAX_UHCI_PORTS;
-    root_hub.power_up_delay = 0;
 
     usleep(100*MILLISEC);  // USB maximum device attach time
 

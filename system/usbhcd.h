@@ -63,6 +63,14 @@ typedef struct __attribute__ ((packed)) {
 } usb_ep_t;
 
 /**
+ * A USB parent device descriptor (used internally by the various HCI drivers).
+ */
+typedef struct __attribute__ ((packed)) {
+    uint8_t         device_id;
+    uint8_t         port_num;
+} usb_parent_t;
+
+/**
  * A USB hub descriptor (used internally by the various HCI drivers).
  */
 typedef struct __attribute__ ((packed)) {
@@ -72,6 +80,8 @@ typedef struct __attribute__ ((packed)) {
     uint8_t         num_ports;
     uint8_t         tt_think_time;
     uint8_t         power_up_delay;
+    usb_parent_t    hs_parent;
+    uint16_t        reserved;
 } usb_hub_t;
 
 /**
@@ -209,6 +219,17 @@ static inline bool valid_usb_config_descriptor(const uint8_t *buffer)
  * Used internally by the various HCI drivers.
  */
 uint32_t usb_route(const usb_hub_t *hub, int port_num);
+
+/**
+ * Returns the high-speed parent device ID and port number (as defined by
+ * the EHCI and XHCI specifications) for the device attached to the hub
+ * port specified by hub and port_num. Returns zero values if the device
+ * is operating at high speed (as specified by device_speed) or is directly
+ * attached to a root hub port.
+ *
+ * Used internally by the various HCI drivers.
+ */
+usb_parent_t usb_hs_parent(const usb_hub_t *hub, int port_num, usb_speed_t device_speed);
 
 /**
  * Waits for all the bits set in bit_mask to be cleared in the register pointed

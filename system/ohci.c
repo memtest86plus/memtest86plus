@@ -498,9 +498,8 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Construct a hub descriptor for the root hub.
     usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
     root_hub.ep0            = NULL;
-    root_hub.level          = 0;
-    root_hub.route          = 0;
     root_hub.num_ports      = rh_descriptor_a & 0xf;
     root_hub.power_up_delay = rh_descriptor_a >> 24;
 

@@ -405,10 +405,9 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
                     usb_speed_t device_speed, int device_id, usb_ep_t *ep0)
 {
     // Store the extra information needed by build_ehci_qhd().
-    ep0->driver_data = port_num << 8;
-    if (hub->level > 0) {
-        ep0->driver_data |= hub->ep0->device_id;
-    }
+    usb_parent_t hs_parent = usb_hs_parent(hub, port_num, device_speed);
+    ep0->driver_data = hs_parent.port_num << 8 | hs_parent.device_id;
+
     if (!assign_usb_address(hcd, hub, port_num, device_speed, device_id, ep0)) {
         return false;
     }
@@ -558,9 +557,8 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
 
     // Construct a hub descriptor for the root hub.
     usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
     root_hub.ep0            = NULL;
-    root_hub.level          = 0;
-    root_hub.route          = 0;
     root_hub.num_ports      = num_ehci_ports(hcs_params);
     root_hub.power_up_delay = 10;  // 20ms
 
