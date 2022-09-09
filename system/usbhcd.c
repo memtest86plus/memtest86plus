@@ -751,6 +751,10 @@ void find_usb_keyboards(bool pause_if_none)
                     uint16_t class_code = pci_config_read16(bus, dev, func, 0x0a);
                     if (class_code == 0x0c03) {
                         controller_type[func] = pci_config_read8(bus, dev, func, 0x09) >> 4;
+                        if (controller_type[func] >= MAX_HCI_TYPE) {
+                            // Unsupported or invalid controller type - ignore it.
+                            controller_type[func] = NOT_HCI;
+                        }
                         // We need to initialise EHCI controllers before initialising any of their companion
                         // controllers, so do it now.
                         if (controller_type[func] == EHCI) {
