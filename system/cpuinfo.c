@@ -296,10 +296,12 @@ static void determine_imc(void)
             imc_type = IMC_K18; // Hygon (Family 18h)
             break;
           case 0xA:
-            if(cpuid_info.version.extendedModel == 5) {
+            if (cpuid_info.version.extendedModel == 5) {
                 imc_type = IMC_K19_CZN; // AMD Cezanne APU (Model 0x50-5F - Family 19h)
+            } else if (cpuid_info.version.extendedModel >= 6) {
+                imc_type = IMC_K19_RPL; // Zen4 (Family 19h)
             } else {
-                imc_type = IMC_K19;     // Zen3 & Zen4 (Family 19h)
+                imc_type = IMC_K19;     // Zen3 (Family 19h)
             }
           default:
             break;
