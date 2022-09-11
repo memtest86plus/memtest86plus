@@ -22,7 +22,9 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define MAX_USB_CONTROLLERS     8       // an arbitrary limit - must match the initialisation of usb_controllers
+#define MAX_HCI                 16      // an arbitrary limit - only affects stack usage
+
+#define MAX_HCD                 8       // an arbitrary limit - must match the initialisation of hcd_list
 
 #define PAUSE_IF_NONE_TIME      10      // seconds
 
@@ -40,6 +42,14 @@ typedef enum {
     XHCI            = 3,
     MAX_HCI_TYPE    = 4
 } hci_type_t;
+
+typedef struct {
+    hci_type_t      type;
+    uint8_t         bus;
+    uint8_t         dev;
+    uint8_t         func;
+    uintptr_t       base_addr;
+} hci_info_t;
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -60,7 +70,7 @@ static const hcd_methods_t methods = {
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.
-static usb_hcd_t usb_controllers[MAX_USB_CONTROLLERS] = {
+static usb_hcd_t hcd_list[MAX_HCD] = {
     { &methods, NULL },
     { &methods, NULL },
     { &methods, NULL },
@@ -71,7 +81,7 @@ static usb_hcd_t usb_controllers[MAX_USB_CONTROLLERS] = {
     { &methods, NULL }
 };
 
-static int num_usb_controllers = 0;
+static int num_hcd = 0;
 
 static int print_row = 0;
 static int print_col = 0;
@@ -349,8 +359,56 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
     return keyboard_found;
 }
 
-static void probe_usb_controller(int bus, int dev, int func, hci_type_t controller_type)
+static int find_usb_controllers(hci_info_t hci_list[])
 {
+    int num_hci = 0;
+    for (int bus = 0; bus < PCI_MAX_BUS; bus++) {
+        for (int dev = 0; dev < PCI_MAX_DEV; dev++) {
+            for (int func = 0; func < PCI_MAX_FUNC; func++) {
+                // Test for device/function present.
+                uint16_t vendor_id = pci_config_read16(bus, dev, func, 0x00);
+                uint8_t  hdr_type  = pci_config_read8 (bus, dev, func, 0x0e);
+                if (vendor_id != 0xffff) {
+                    // Test for a USB controller.
+                    uint16_t class_code = pci_config_read16(bus, dev, func, 0x0a);
+                    if (class_code == 0x0c03) {
+                        hci_type_t controller_type = pci_config_read8(bus, dev, func, 0x09) >> 4;
+                        if (controller_type < MAX_HCI_TYPE) {
+                            hci_list[num_hci].type = controller_type;
+                            hci_list[num_hci].bus  = bus;
+                            hci_list[num_hci].dev  = dev;
+                            hci_list[num_hci].func = func;
+                            num_hci++;
+                            // If we've filled the table, abort now.
+                            if (num_hci == MAX_HCI) {
+                                return num_hci;
+                            }
+                        }
+                    }
+                    // Break out if this is a single function device.
+                    if (func == 0 && (hdr_type & 0x80) == 0) {
+                        break;
+                    }
+                } else {
+                    // Break out if no device is present.
+                    if (func == 0) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return num_hci;
+}
+
+static void reset_usb_controller(hci_info_t *hci)
+{
+    hci_type_t controller_type = hci->type;
+
+    int bus  = hci->bus;
+    int dev  = hci->dev;
+    int func = hci->func;
+
     uint16_t vendor_id  = pci_config_read16(bus, dev, func, 0x00);
     uint16_t device_id  = pci_config_read16(bus, dev, func, 0x02);
     uint16_t pci_status = pci_config_read16(bus, dev, func, 0x06);
@@ -382,22 +440,27 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
     // Restore access to the device and set the bus master flag in case the BIOS hasn't.
     pci_config_write16(bus, dev, func, 0x04, pci_command | (in_io_space ? 0x0005 : 0x0006));
 
+    hci->base_addr = base_addr;
+
     print_usb_info("Found %s controller %04x:%04x at %08x size %08x in %s space", hci_name[controller_type],
                    (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size, in_io_space ? "I/O" : "Mem");
 
     if (in_io_space) {
         if (controller_type != UHCI) {
             print_usb_info(" Unsupported address mapping for this controller type");
+            hci->type = NOT_HCI;  // mark this controller as unusable
             return;
         }
     } else {
         if (controller_type == UHCI) {
             print_usb_info(" Unsupported address mapping for this controller type");
+            hci->type = NOT_HCI;  // mark this controller as unusable
             return;
         }
         base_addr = map_region(base_addr, mmio_size, false);
         if (base_addr == 0) {
             print_usb_info(" Failed to map device into virtual memory");
+            hci->type = NOT_HCI;  // mark this controller as unusable
             return;
         }
     }
@@ -422,22 +485,53 @@ static void probe_usb_controller(int bus, int dev, int func, hci_type_t controll
         }
     }
 
-    // Initialise the device according to its type.
+    // Reset the device according to its type.
+    bool success = false;
+    switch (controller_type) {
+      case UHCI:
+        success = uhci_reset(bus, dev, func, base_addr);
+        break;
+      case OHCI:
+        success = ohci_reset(base_addr);
+        break;
+      case EHCI:
+        success = ehci_reset(bus, dev, func, base_addr);
+        break;
+      case XHCI:
+        success = xhci_reset(base_addr);
+        break;
+      default:
+        break;
+    }
+    if (!success) {
+        hci->type = NOT_HCI;  // mark this controller as unusable
+    }
+}
+
+static void probe_usb_controller(hci_type_t controller_type, uintptr_t base_addr)
+{
+    print_usb_info("Probing %s controller at %08x", hci_name[controller_type], base_addr);
+
+    // Probe the device according to its type.
     bool keyboards_found = false;
-    if (controller_type == UHCI) {
-        keyboards_found = uhci_init(bus, dev, func, base_addr, &usb_controllers[num_usb_controllers]);
-    }
-    if (controller_type == OHCI) {
-        keyboards_found = ohci_init(base_addr, &usb_controllers[num_usb_controllers]);
-    }
-    if (controller_type == EHCI) {
-        keyboards_found = ehci_init(bus, dev, func, base_addr, &usb_controllers[num_usb_controllers]);
-    }
-    if (controller_type == XHCI) {
-        keyboards_found = xhci_init(base_addr, &usb_controllers[num_usb_controllers]);
+    switch (controller_type) {
+      case UHCI:
+        keyboards_found = uhci_probe(base_addr, &hcd_list[num_hcd]);
+        break;
+      case OHCI:
+        keyboards_found = ohci_probe(base_addr, &hcd_list[num_hcd]);
+        break;
+      case EHCI:
+        keyboards_found = ehci_probe(base_addr, &hcd_list[num_hcd]);
+        break;
+      case XHCI:
+        keyboards_found = xhci_probe(base_addr, &hcd_list[num_hcd]);
+        break;
+      default:
+        break;
     }
     if (keyboards_found) {
-        num_usb_controllers++;
+        num_hcd++;
     }
 }
 
@@ -735,66 +829,40 @@ void find_usb_keyboards(bool pause_if_none)
     clear_screen();
     print_usb_info("Scanning for USB keyboards...");
 
-    num_usb_controllers = 0;
-    for (int bus = 0; bus < PCI_MAX_BUS; bus++) {
-        for (int dev = 0; dev < PCI_MAX_DEV; dev++) {
-            hci_type_t controller_type[PCI_MAX_FUNC];
-            for (int func = 0; func < PCI_MAX_FUNC; func++) {
-                controller_type[func] = NOT_HCI;
+    hci_info_t hci_list[MAX_HCI];
+
+    int num_hci = find_usb_controllers(hci_list);
+
+    // Take ownership of all controllers and reset them.
+    for (int i = 0; i < num_hci; i++) {
+        reset_usb_controller(&hci_list[i]);
+    }
+
+    num_hcd = 0;
+
+    // As we don't support hot plugging, we need to probe EHCI controllers before
+    // probing any of their companion controllers, to ensure any low and full speed
+    // devices are routed to the companion controllers before we probe them.
+    for (int i = 0; i < num_hci && num_hcd < MAX_HCD; i++) {
+        if (hci_list[i].type == EHCI) {
+            if (~usb_init_options & USB_IGNORE_EHCI) {
+                probe_usb_controller(EHCI, hci_list[i].base_addr);
             }
-            for (int func = 0; func < PCI_MAX_FUNC; func++) {
-                // Test for device/function present.
-                uint16_t vendor_id = pci_config_read16(bus, dev, func, 0x00);
-                uint8_t  hdr_type  = pci_config_read8 (bus, dev, func, 0x0e);
-                if (vendor_id != 0xffff) {
-                    // Test for a USB controller.
-                    uint16_t class_code = pci_config_read16(bus, dev, func, 0x0a);
-                    if (class_code == 0x0c03) {
-                        controller_type[func] = pci_config_read8(bus, dev, func, 0x09) >> 4;
-                        if (controller_type[func] >= MAX_HCI_TYPE) {
-                            // Unsupported or invalid controller type - ignore it.
-                            controller_type[func] = NOT_HCI;
-                        }
-                        // We need to initialise EHCI controllers before initialising any of their companion
-                        // controllers, so do it now.
-                        if (controller_type[func] == EHCI) {
-                            if (~usb_init_options & USB_IGNORE_EHCI) {
-                                probe_usb_controller(bus, dev, func, controller_type[func]);
-                            }
-                            // If we've filled the controller table, abort now.
-                            if (num_usb_controllers == MAX_USB_CONTROLLERS) {
-                                return;
-                            }
-                            controller_type[func] = NOT_HCI;  // prevent reprobing
-                        }
-                    }
-                    // Break out if this is a single function device.
-                    if (func == 0 && (hdr_type & 0x80) == 0) {
-                        break;
-                    }
-                } else {
-                    // Break out if no device is present.
-                    if (func == 0) {
-                        break;
-                    }
-                }
-            }
-            for (int func = 0; func < PCI_MAX_FUNC; func++) {
-                if (controller_type[func] != NOT_HCI) {
-                    probe_usb_controller(bus, dev, func, controller_type[func]);
-                    // If we've filled the controller table, abort now.
-                    if (num_usb_controllers == MAX_USB_CONTROLLERS) {
-                        return;
-                    }
-                }
-            }
+            hci_list[i].type = NOT_HCI;  // prevent this controller from being scanned again
+        }
+    }
+
+    // Now probe the other controllers.
+    for (int i = 0; i < num_hci && num_hcd < MAX_HCD; i++) {
+        if (hci_list[i].type != NOT_HCI) {
+            probe_usb_controller(hci_list[i].type, hci_list[i].base_addr);
         }
     }
 
     if (usb_init_options & USB_DEBUG) {
         print_usb_info("Press any key to continue...");
         while (get_key() == 0) {}
-    } else if (pause_if_none && num_usb_controllers == 0) {
+    } else if (pause_if_none && num_hcd == 0) {
         for (int i = PAUSE_IF_NONE_TIME; i > 0; i--) {
             print_usb_info("No USB keyboards found. Continuing in %i second%c ", i, i == 1 ? ' ' : 's');
             sleep(1);
@@ -805,10 +873,10 @@ void find_usb_keyboards(bool pause_if_none)
 
 uint8_t get_usb_keycode(void)
 {
-    for (int i = 0; i < num_usb_controllers; i++) {
-        const usb_hcd_t *hcd = &usb_controllers[i];
+    for (int i = 0; i < num_hcd; i++) {
+        const usb_hcd_t *hcd = &hcd_list[i];
 
-        usb_controllers[i].methods->poll_keyboards(hcd);
+        hcd->methods->poll_keyboards(hcd);
 
         int kc_index_o = hcd->ws->kc_index_o;
         if (kc_index_o != hcd->ws->kc_index_i) {

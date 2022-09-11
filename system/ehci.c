@@ -486,7 +486,7 @@ static const hcd_methods_t methods = {
 // Public Functions
 //------------------------------------------------------------------------------
 
-bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
+bool ehci_reset(int bus, int dev, int func, uintptr_t base_addr)
 {
     ehci_cap_regs_t *cap_regs = (ehci_cap_regs_t *)base_addr;
 
@@ -512,6 +512,15 @@ bool ehci_init(int bus, int dev, int func, uintptr_t base_addr, usb_hcd_t *hcd)
     // Ensure the controller is halted and then reset it.
     if (!halt_host_controller(op_regs)) return false;
     if (!reset_host_controller(op_regs)) return false;
+
+    return true;
+}
+
+bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
+{
+    ehci_cap_regs_t *cap_regs = (ehci_cap_regs_t *)base_addr;
+
+    ehci_op_regs_t *op_regs = (ehci_op_regs_t *)(base_addr + cap_regs->cap_length);
 
     // Record the heap state to allow us to free memory.
     uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);

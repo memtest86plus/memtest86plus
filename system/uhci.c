@@ -420,7 +420,7 @@ static const hcd_methods_t methods = {
 // Public Functions
 //------------------------------------------------------------------------------
 
-bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
+bool uhci_reset(int bus, int dev, int func, uint16_t io_base)
 {
     // Disable PCI and SMM interrupts.
     pci_config_write16(bus, dev, func, UHCI_LEGSUP, UHCI_LEGSUP_CLEAR);
@@ -429,6 +429,11 @@ bool uhci_init(int bus, int dev, int func, uint16_t io_base, usb_hcd_t *hcd)
     if (!halt_host_controller(io_base)) return false;
     if (!reset_host_controller(io_base)) return false;
 
+    return true;
+}
+
+bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
+{
     // Record the heap state to allow us to free memory.
     uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
 
