@@ -79,9 +79,9 @@ void quirks_init(void)
     //  -------------------------
     //  -- ALi Aladdin V Quirk --
     //  -------------------------
-    // As on many Socket 7 Motherboard, the L2 cache is external and must
+    // As on many Socket 7 Motherboards, the L2 cache is external and must
     // be detected by a proprietary way based on chipset registers
-    if (quirk.root_vid == 0x10B9 && quirk.root_did == 0x1541) {     // ALi Aladdin V (M1541)
+    if (quirk.root_vid == PCI_VID_ALI && quirk.root_did == 0x1541) {    // ALi Aladdin V (M1541)
         quirk.id    = QUIRK_ALI_ALADDIN_V;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
         quirk.process = get_m1541_l2_cache_size;
@@ -93,9 +93,9 @@ void quirks_init(void)
     // This motherboard has an ASB100 ASIC with a SMBUS Mux Integrated.
     // To access SPD later in the code, we need to configure the mux.
     // PS: Detection via DMI is unreliable, so using Root PCI Registers
-    if (quirk.root_vid == 0x8086 && quirk.root_did == 0x1130) {     // Intel i815
-        if (pci_config_read16(0, 0, 0, 0x2C) == 0x1043) {           // ASUS
-            if (pci_config_read16(0, 0, 0, 0x2E) == 0x8027) {       // TUSL2-C
+    if (quirk.root_vid == PCI_VID_INTEL && quirk.root_did == 0x1130) {  // Intel i815
+        if (pci_config_read16(0, 0, 0, 0x2C) == PCI_VID_ASUS) {         // ASUS
+            if (pci_config_read16(0, 0, 0, 0x2E) == 0x8027) {           // TUSL2-C
                 quirk.id    = QUIRK_TUSL2;
                 quirk.type |= QUIRK_TYPE_SMBUS;
                 quirk.process = asus_tusl2_configure_mux;
