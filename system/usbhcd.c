@@ -56,7 +56,7 @@ typedef struct {
 // Private Variables
 //------------------------------------------------------------------------------
 
-static const char *hci_name[MAX_HCI_TYPE] = { "UHCI", "OHCI", "EHCI", "XHCI" };
+static const char hci_name[MAX_HCI_TYPE][5] = { "UHCI", "OHCI", "EHCI", "XHCI" };
 
 static const hcd_methods_t methods = {
     .reset_root_hub_port = NULL,

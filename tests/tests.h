@@ -22,7 +22,7 @@ typedef struct {
     int             stages;
     int             iterations;
     int             errors;
-    char            *description;
+    char            description[40];
 } test_pattern_t;
 
 extern test_pattern_t test_list[NUM_TEST_PATTERNS];
