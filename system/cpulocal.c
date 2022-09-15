@@ -43,14 +43,6 @@ static uint32_t *stack_canary_addr(int cpu_num)
 // Public Functions
 //------------------------------------------------------------------------------
 
-int allocate_local_flag(void)
-{
-    if (local_bytes_used == LOCALS_SIZE) {
-        return -1;
-    }
-    return local_bytes_used += sizeof(bool);
-}
-
 void stack_canary_arm(int cpu_num)
 {
     if (cpu_num < 0 || cpu_num >= MAX_CPUS) {
