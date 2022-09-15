@@ -305,17 +305,6 @@ static bool parse_fadt(uintptr_t fadt_addr)
 // Public Functions
 //------------------------------------------------------------------------------
 
-int acpi_checksum(const void *data, int length)
-{
-    uint8_t sum = 0;
-
-    uint8_t *ptr = (uint8_t *)data;
-    while (length--) {
-        sum += *ptr++;
-    }
-    return sum;
-}
-
 void acpi_init(void)
 {
     acpi_config.rsdp_addr = find_rsdp();

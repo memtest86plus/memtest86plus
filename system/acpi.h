@@ -63,7 +63,16 @@ extern acpi_t acpi_config;
 /**
  * ACPI Table Checksum Function
  */
-int acpi_checksum(const void *data, int length);
+static inline int acpi_checksum(const void *data, int length)
+{
+    uint8_t sum = 0;
+
+    uint8_t *ptr = (uint8_t *)data;
+    while (length--) {
+        sum += *ptr++;
+    }
+    return sum;
+}
 
 /**
  * Look for specific ACPI Tables Addresses (RSDP, MADT, ...)

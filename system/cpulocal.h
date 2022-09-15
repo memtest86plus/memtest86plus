@@ -24,13 +24,22 @@ typedef struct __attribute__((packed)) {
     uint8_t	spacing[AP_STACK_SIZE - sizeof(bool)];
 } local_flag_t;
 
+
 /**
  * Allocates an array of thread-local flags, one per CPU core, and returns
  * a ID number that identifies the allocated array. Returns -1 if there is
  * insufficient thread local storage remaining to allocate a new array of
  * flags.
  */
-int allocate_local_flag(void);
+static inline int allocate_local_flag(void)
+{
+    extern int local_bytes_used;
+    if (local_bytes_used == LOCALS_SIZE) {
+        return -1;
+    }
+    return local_bytes_used += sizeof(bool);
+}
+
 
 /**
  * Returns a pointer to the previously allocated array of thread-local flags
