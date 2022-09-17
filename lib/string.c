@@ -31,18 +31,6 @@ void reverse(char s[])
 // Public Functions
 //------------------------------------------------------------------------------
 
-int memcmp(const void *s1, const void *s2, size_t n)
-{
-    const unsigned char *src1 = s1, *src2 = s2;
-
-    for (size_t i = 0; i < n; i++) {
-        if (src1[i] != src2[i]) {
-            return (int)src1[i] - (int)src2[i];
-        }
-    }
-    return 0;
-}
-
 void *memmove(void *dest, const void *src, size_t n)
 {
     char *d = (char *)dest, *s = (char *)src;
@@ -62,28 +50,6 @@ void *memmove(void *dest, const void *src, size_t n)
         }
     }
     return dest;
-}
-
-size_t strlen(const char *s)
-{
-    size_t len = 0;
-    while (*s++) {
-        len++;
-    }
-    return len;
-}
-
-int strncmp(const char *s1, const char *s2, size_t n)
-{
-    for (size_t i = 0; i < n; i++) {
-        if (s1[i] != s2[i]) {
-            return (int)s1[i] - (int)s2[i];
-        }
-        if (s1[i] == '\0') {
-            return 0;
-        }
-    }
-    return 0;
 }
 
 char *strstr(const char *haystack, const char *needle)
