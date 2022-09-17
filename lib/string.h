@@ -18,7 +18,17 @@
  * between the first mismatching byte in s1 (interpreted as an unsigned
  * value) and the corresponding byte in s2.
  */
-int memcmp(const void *s1, const void *s2, size_t n);
+static inline int memcmp(const void *s1, const void *s2, size_t n)
+{
+    const unsigned char *src1 = s1, *src2 = s2;
+
+    for (size_t i = 0; i < n; i++) {
+        if (src1[i] != src2[i]) {
+            return (int)src1[i] - (int)src2[i];
+        }
+    }
+    return 0;
+}
 
 /**
  * Copies n bytes from the memory area pointed to by src to the memory area
@@ -45,7 +55,14 @@ void *memmove(void *dest, const void *src, size_t n);
 /**
  * Returns the string length, excluding the terminating null character.
  */
-size_t strlen(const char *s);
+static inline size_t strlen(const char *s)
+{
+    size_t len = 0;
+    while (*s++) {
+        len++;
+    }
+    return len;
+}
 
 /**
  * Compares at most the first n characters in the strings s1 and s2 and
@@ -53,7 +70,18 @@ size_t strlen(const char *s);
  * between the first mismatching character in s1 (interpreted as a signed
  * value) and the corresponding character in s2.
  */
-int strncmp(const char *s1, const char *s2, size_t n);
+static inline int strncmp(const char *s1, const char *s2, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        if (s1[i] != s2[i]) {
+            return (int)s1[i] - (int)s2[i];
+        }
+        if (s1[i] == '\0') {
+            return 0;
+        }
+    }
+    return 0;
+}
 
 /**
  * Finds the first occurrence of the substring needle in the string haystack
