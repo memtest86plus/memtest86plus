@@ -185,6 +185,16 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "rr", 3) == 0 || strncmp(params, "one", 4) == 0) {
             cpu_mode = ONE;
         }
+    } else if (strncmp(option, "reportmode", 11) == 0) {
+        if (strncmp(params, "none", 5) == 0) {
+            error_mode = ERROR_MODE_NONE;
+        } else if (strncmp(params, "summary", 8) == 0) {
+            error_mode = ERROR_MODE_SUMMARY;
+        } else if (strncmp(params, "address", 8) == 0) {
+            error_mode = ERROR_MODE_ADDRESS;
+        } else if (strncmp(params, "badram", 7) == 0) {
+            error_mode = ERROR_MODE_BADRAM;
+        }
     } else if (strncmp(option, "keyboard", 9) == 0 && params != NULL) {
         if (strncmp(params, "legacy", 7) == 0) {
             keyboard_types = KT_LEGACY;
