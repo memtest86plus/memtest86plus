@@ -49,7 +49,7 @@
 
 static const char spin_state[NUM_SPIN_STATES] = { '|', '/', '-', '\\' };
 
-static const char *cpu_mode_str[] = { "PAR", "SEQ", "RR " };
+static const char cpu_mode_str[3][4] = { "PAR", "SEQ", "RR " };
 
 //------------------------------------------------------------------------------
 // Private Variables

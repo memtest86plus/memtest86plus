@@ -175,7 +175,17 @@ static void parse_option(const char *option, const char *params)
 {
     if (option[0] == '\0') return;
 
-    if (strncmp(option, "keyboard", 9) == 0 && params != NULL) {
+    if (strncmp(option, "console", 8) == 0) {
+        parse_serial_params(params);
+    } else if (strncmp(option, "cpuseqmode", 11) == 0) {
+        if (strncmp(params, "par", 4) == 0) {
+            cpu_mode = PAR;
+        } else if (strncmp(params, "seq", 4) == 0) {
+            cpu_mode = SEQ;
+        } else if (strncmp(params, "rr", 3) == 0 || strncmp(params, "one", 4) == 0) {
+            cpu_mode = ONE;
+        }
+    } else if (strncmp(option, "keyboard", 9) == 0 && params != NULL) {
         if (strncmp(params, "legacy", 7) == 0) {
             keyboard_types = KT_LEGACY;
         } else if (strncmp(params, "usb", 4) == 0) {
@@ -183,16 +193,6 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "both", 5) == 0) {
             keyboard_types = KT_USB|KT_LEGACY;
         }
-    } else if (strncmp(option, "powersave", 10) == 0) {
-        if (strncmp(params, "off", 4) == 0) {
-            power_save = POWER_SAVE_OFF;
-        } else if (strncmp(params, "low", 4) == 0) {
-            power_save = POWER_SAVE_LOW;
-        } else if (strncmp(params, "high", 5) == 0) {
-            power_save = POWER_SAVE_HIGH;
-        }
-    } else if (strncmp(option, "console", 8) == 0) {
-        parse_serial_params(params);
     } else if (strncmp(option, "nobench", 8) == 0) {
         enable_bench = false;
     } else if (strncmp(option, "nobigstatus", 12) == 0) {
@@ -201,8 +201,18 @@ static void parse_option(const char *option, const char *params)
         usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
+    } else if (strncmp(option, "nosm", 5) == 0) {
+        enable_sm = false;
     } else if (strncmp(option, "nosmp", 6) == 0) {
         smp_enabled = false;
+    } else if (strncmp(option, "powersave", 10) == 0) {
+        if (strncmp(params, "off", 4) == 0) {
+            power_save = POWER_SAVE_OFF;
+        } else if (strncmp(params, "low", 4) == 0) {
+            power_save = POWER_SAVE_LOW;
+        } else if (strncmp(params, "high", 5) == 0) {
+            power_save = POWER_SAVE_HIGH;
+        }
     } else if (strncmp(option, "trace", 6) == 0) {
         enable_trace = true;
     } else if (strncmp(option, "usbdebug", 9) == 0) {
@@ -215,8 +225,6 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "3", 2) == 0) {
             usb_init_options |= USB_2_STEP_INIT|USB_EXTRA_RESET;
         }
-    } else if (strncmp(option, "nosm", 5) == 0) {
-        enable_sm = false;
     }
 }
 
