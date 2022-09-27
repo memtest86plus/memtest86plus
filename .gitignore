@@ -7,8 +7,10 @@
 # Object files
 *.o
 
-# Generated file
+# Generated files
 build_version.h
+gdbscript
+memtest_shared_debug.lds
 
 # Binaries
 memtest_shared
@@ -18,10 +20,14 @@ memtest_shared.bin
 *.img
 *.iso
 *.mbr
+*.debug
 
 # Directories
 grub-iso
 html
 latex
+
+# OVMF
+OVMF*
 
 

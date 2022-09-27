@@ -36,7 +36,11 @@ static inline int memcmp(const void *s1, const void *s2, size_t n)
  * not overlap.
  * void *memcpy(void *dst, const void *src, size_t n);
  */
-#define memcpy(d, s, n) __builtin_memcpy((d), (s), (n))
+#ifndef DEBUG_GDB
+    #define memcpy(d, s, n) __builtin_memcpy((d), (s), (n))
+#else
+    void *memcpy (void *dest, const void *src, size_t len);
+#endif
 
 /**
  * Copies n bytes from the memory area pointed to by src to the memory area
@@ -50,7 +54,12 @@ void *memmove(void *dest, const void *src, size_t n);
  * value c.
  * void *memset(void *s, int c, size_t n);
  */
-#define memset(s, c, n) __builtin_memset((s), (c), (n))
+
+#ifndef DEBUG_GDB
+    #define memset(s, c, n) __builtin_memset((s), (c), (n))
+#else
+    void *memset (void *dest, int val, size_t len);
+#endif
 
 /**
  * Returns the string length, excluding the terminating null character.
