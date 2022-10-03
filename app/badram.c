@@ -171,19 +171,21 @@ void badram_init(void)
 
 bool badram_insert(uintptr_t addr)
 {
+    uintptr_t mask = DEFAULT_MASK;
+
     if (cheap_index(addr, DEFAULT_MASK, 1) != -1) {
         return false;
     }
 
     if (num_patterns < MAX_PATTERNS) {
         patterns[num_patterns].addr = addr;
-        patterns[num_patterns].mask = DEFAULT_MASK;
+        patterns[num_patterns].mask = mask;
         num_patterns++;
         relocate_if_free(num_patterns - 1);
     } else {
-        int idx = cheap_index(addr, DEFAULT_MASK, UINTPTR_MAX);
+        int idx = cheap_index(addr, mask, UINTPTR_MAX);
         uintptr_t caddr, cmask;
-        combine(patterns[idx].addr, patterns[idx].mask, addr, DEFAULT_MASK, &caddr, &cmask);
+        combine(patterns[idx].addr, patterns[idx].mask, addr, mask, &caddr, &cmask);
         patterns[idx].addr = caddr;
         patterns[idx].mask = cmask;
         relocate_if_free(idx);
