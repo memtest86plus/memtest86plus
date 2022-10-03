@@ -62,7 +62,9 @@ static int          num_patterns = 0;
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define COMBINE_MASK(a,b,c,d) ((a & b & c & d) | (~a & b & ~c & d))
+// New mask is 1 where both masks were 1 (b & d) and the addresses were equal ~(a ^ c).
+// If addresses were unequal the new mask must be 0 to allow for both values.
+#define COMBINE_MASK(a,b,c,d) ((b & d) & ~(a ^ c))
 
 /*
  * Combine two addr/mask pairs to one addr/mask pair.
