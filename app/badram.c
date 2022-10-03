@@ -55,7 +55,7 @@ typedef struct {
 // Private Variables
 //------------------------------------------------------------------------------
 
-static pattern_t    pattern[MAX_PATTERNS];
+static pattern_t    patterns[MAX_PATTERNS];
 static int          num_patterns = 0;
 
 //------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ static int cheap_index(uintptr_t addr1, uintptr_t mask1, uintptr_t min_cost)
     int i = num_patterns;
     int idx = -1;
     while (i-- > 0) {
-        uintptr_t tmp_cost = combi_cost(pattern[i].addr, pattern[i].mask, addr1, mask1);
+        uintptr_t tmp_cost = combi_cost(patterns[i].addr, patterns[i].mask, addr1, mask1);
         if (tmp_cost < min_cost) {
             min_cost = tmp_cost;
             idx = i;
@@ -127,11 +127,11 @@ static int cheap_index(uintptr_t addr1, uintptr_t mask1, uintptr_t min_cost)
  */
 static int relocate_index(int idx)
 {
-    uintptr_t addr = pattern[idx].addr;
-    uintptr_t mask = pattern[idx].mask;
-    pattern[idx].addr = ~pattern[idx].addr;    // Never select idx
+    uintptr_t addr = patterns[idx].addr;
+    uintptr_t mask = patterns[idx].mask;
+    patterns[idx].addr = ~patterns[idx].addr;    // Never select idx
     int new = cheap_index(addr, mask, 1 + addresses(mask));
-    pattern[idx].addr = addr;
+    patterns[idx].addr = addr;
     return new;
 }
 
@@ -145,14 +145,14 @@ static void relocate_if_free(int idx)
     int newidx = relocate_index(idx);
     if (newidx >= 0) {
         uintptr_t caddr, cmask;
-        combine(pattern[newidx].addr, pattern[newidx].mask,
-                pattern[   idx].addr, pattern[   idx].mask,
+        combine(patterns[newidx].addr, patterns[newidx].mask,
+                patterns[   idx].addr, patterns[   idx].mask,
                 &caddr, &cmask);
-        pattern[newidx].addr = caddr;
-        pattern[newidx].mask = cmask;
+        patterns[newidx].addr = caddr;
+        patterns[newidx].mask = cmask;
         if (idx < --num_patterns) {
-            pattern[idx].addr = pattern[num_patterns].addr;
-            pattern[idx].mask = pattern[num_patterns].mask;
+            patterns[idx].addr = patterns[num_patterns].addr;
+            patterns[idx].mask = patterns[num_patterns].mask;
         }
         relocate_if_free (newidx);
     }
@@ -174,16 +174,16 @@ bool badram_insert(uintptr_t addr)
     }
 
     if (num_patterns < MAX_PATTERNS) {
-        pattern[num_patterns].addr = addr;
-        pattern[num_patterns].mask = DEFAULT_MASK;
+        patterns[num_patterns].addr = addr;
+        patterns[num_patterns].mask = DEFAULT_MASK;
         num_patterns++;
         relocate_if_free(num_patterns - 1);
     } else {
         int idx = cheap_index(addr, DEFAULT_MASK, UINTPTR_MAX);
         uintptr_t caddr, cmask;
-        combine(pattern[idx].addr, pattern[idx].mask, addr, DEFAULT_MASK, &caddr, &cmask);
-        pattern[idx].addr = caddr;
-        pattern[idx].mask = cmask;
+        combine(patterns[idx].addr, patterns[idx].mask, addr, DEFAULT_MASK, &caddr, &cmask);
+        patterns[idx].addr = caddr;
+        patterns[idx].mask = cmask;
         relocate_if_free(idx);
     }
     return true;
@@ -214,8 +214,8 @@ void badram_display(void)
             col = 7;
         }
         display_scrolled_message(col, "0x%0*x,0x%0*x",
-                                 TESTWORD_DIGITS, pattern[i].addr,
-                                 TESTWORD_DIGITS, pattern[i].mask);
+                                 TESTWORD_DIGITS, patterns[i].addr,
+                                 TESTWORD_DIGITS, patterns[i].mask);
         col += text_width;
     }
 }
