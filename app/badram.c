@@ -181,6 +181,11 @@ static void relocate_if_free(int idx)
 void badram_init(void)
 {
     num_patterns = 0;
+
+    for (int idx = 0; idx < MAX_PATTERNS; idx++) {
+        patterns[idx].addr = 0u;
+        patterns[idx].mask = 0u;
+    }
 }
 
 bool badram_insert(uintptr_t addr)
