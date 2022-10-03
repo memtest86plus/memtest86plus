@@ -106,6 +106,20 @@ static uintptr_t combi_cost(uintptr_t addr1, uintptr_t mask1, uintptr_t addr2, u
 }
 
 /*
+ * Determine if (addr1, mask1) is already covered by an existing pattern.
+ * Return true if that's the case, else false.
+ */
+static bool is_covered(uintptr_t addr1, uintptr_t mask1)
+{
+    for (int i = 0; i < num_patterns; i++) {
+        if (combi_cost(patterns[i].addr, patterns[i].mask, addr1, mask1) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
  * Find the cheapest array index to extend with the given addr/mask pair.
  * Return -1 if nothing below the given minimum cost can be found.
  */
@@ -173,7 +187,8 @@ bool badram_insert(uintptr_t addr)
 {
     uintptr_t mask = DEFAULT_MASK;
 
-    if (cheap_index(addr, DEFAULT_MASK, 1) != -1) {
+    // If covered by existing entry we return immediately
+    if (is_covered(addr, mask)) {
         return false;
     }
 
