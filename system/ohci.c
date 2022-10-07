@@ -243,6 +243,36 @@ typedef struct {
 // Private Functions
 //------------------------------------------------------------------------------
 
+static bool reset_host_controller(ohci_op_regs_t *op_regs)
+{
+    // Prepare for host controller setup (see section 5.1.1.3 of the OHCI spec.).
+    switch (read32(&op_regs->control) & OHCI_CTRL_HCFS) {
+      case OHCI_CTRL_HCFS_RST:
+        usleep(50*MILLISEC);
+        break;
+      case OHCI_CTRL_HCFS_SUS:
+      case OHCI_CTRL_HCFS_RES:
+        flush32(&op_regs->control, OHCI_CTRL_HCFS_RES);
+        usleep(20*MILLISEC);
+        break;
+      default: // operational
+        break;
+    }
+
+    // Reset the host controller.
+    write32(&op_regs->command_status, OHCI_CMD_HCR);
+    if (!wait_until_clr(&op_regs->command_status, OHCI_CMD_HCR, 30)) {
+        return false;
+    }
+
+    // Check we are now in SUSPEND state.
+    if ((read32(&op_regs->control) & OHCI_CTRL_HCFS) != OHCI_CTRL_HCFS_SUS) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool reset_ohci_port(ohci_op_regs_t *op_regs, int port_idx)
 {
     // The OHCI reset lasts for 10ms, but the USB specification calls for 50ms (but not necessarily continuously).
@@ -406,7 +436,7 @@ static const hcd_methods_t methods = {
 // Public Functions
 //------------------------------------------------------------------------------
 
-bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
+bool ohci_reset(uintptr_t base_addr)
 {
     ohci_op_regs_t *op_regs = (ohci_op_regs_t *)base_addr;
 
@@ -424,6 +454,20 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         }
     }
 
+    // Reset the controller, but preserve the frame interval set by the SMM or BIOS.
+    uint32_t fm_interval = read32(&op_regs->fm_interval);
+    if (!reset_host_controller(op_regs)) {
+        return false;
+    }
+    write32(&op_regs->fm_interval, fm_interval);
+
+    return true;
+}
+
+bool ohci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
+{
+    ohci_op_regs_t *op_regs = (ohci_op_regs_t *)base_addr;
+
     // Preserve the frame interval set by the SMM or BIOS.
     // If not set, use the default value.
     uint32_t frame_interval = read32(&op_regs->fm_interval) & 0x3fff;
@@ -431,28 +475,10 @@ bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd)
         frame_interval = 0x2edf;
     }
 
-    // Prepare for host controller setup (see section 5.1.1.3 of the OHCI spec.).
-    switch (read32(&op_regs->control) & OHCI_CTRL_HCFS) {
-      case OHCI_CTRL_HCFS_RST:
-        usleep(50*MILLISEC);
-        break;
-      case OHCI_CTRL_HCFS_SUS:
-      case OHCI_CTRL_HCFS_RES:
-        flush32(&op_regs->control, OHCI_CTRL_HCFS_RES);
-        usleep(10*MILLISEC);
-        break;
-      default: // operational
-        break;
-    }
-
-    // Reset the host controller.
-    write32(&op_regs->command_status, OHCI_CMD_HCR);
-    if (!wait_until_clr(&op_regs->command_status, OHCI_CMD_HCR, 30)) {
-        return false;
-    }
-
-    // Check we are now in SUSPEND state.
-    if ((read32(&op_regs->control) & OHCI_CTRL_HCFS) != OHCI_CTRL_HCFS_SUS) {
+    // We will have already reset the controller, but can't guarantee to get
+    // here within the 2ms time limit for moving directly from suspend state
+    // to operational state. So reset it again.
+    if (!reset_host_controller(op_regs)) {
         return false;
     }
 

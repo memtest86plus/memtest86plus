@@ -15,12 +15,32 @@
 #include "usbhcd.h"
 
 /**
- * Initialises the OHCI device found at base_addr, scans all the attached USB
- * devices, and configures any HID USB keyboard devices it finds to generate
- * periodic interrupt transfers that report key presses. Initialises hcd and
- * returns true if the device was successfully initialised and one or more
- * keyboards were found.
+ * If necessary, takes ownership of the OHCI device at the specified base
+ * address, then resets it.
+ *
+ * \param base_addr - the base address of the device in virtual memory
+ *
+ * \returns
+ * true if ownership was acquired and the device was successfully reset,
+ * otherwise false.
  */
-bool ohci_init(uintptr_t base_addr, usb_hcd_t *hcd);
+bool ohci_reset(uintptr_t base_addr);
+
+/**
+ * Initialises the OHCI device at the specified base address, probes all
+ * the attached USB devices, and configures any HID USB keyboard devices
+ * it finds to generate periodic interrupt transfers that report key
+ * presses. If successful, initialises the specified host controller
+ * driver object accordingly.
+ *
+ * \param base_addr - the base address of the device in virtual memory
+ * \param hcd       - a pointer to a pre-allocated host controller
+ *                    driver object that can be used for this device
+ *
+ * \returns
+ * true if the device was successfully initialised and one or more
+ * keyboards were found, otherwise false.
+ */
+bool ohci_probe(uintptr_t base_addr, usb_hcd_t *hcd);
 
 #endif // OHCI_H

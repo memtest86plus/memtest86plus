@@ -910,12 +910,8 @@ static const hcd_methods_t methods = {
 // Public Functions
 //------------------------------------------------------------------------------
 
-bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
+bool xhci_reset(uintptr_t base_addr)
 {
-    uint8_t port_type[XHCI_MAX_PORTS];
-
-    memset(port_type, 0, sizeof(port_type));
-
     xhci_cap_regs_t *cap_regs = (xhci_cap_regs_t *)base_addr;
 
 #ifdef QEMU_WORKAROUND
@@ -947,6 +943,44 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
                 timer--;
             }
         }
+        ext_cap_offs = ext_cap->next_offset;
+    }
+
+    xhci_op_regs_t *op_regs = (xhci_op_regs_t *)(base_addr + cap_regs->cap_length);
+
+    // Ensure the controller is halted and then reset it.
+    if (!halt_host_controller(op_regs)) return false;
+    if (!reset_host_controller(op_regs)) return false;
+
+    return true;
+}
+
+bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
+{
+    uint8_t port_type[XHCI_MAX_PORTS];
+
+    memset(port_type, 0, sizeof(port_type));
+
+    xhci_cap_regs_t *cap_regs = (xhci_cap_regs_t *)base_addr;
+
+#ifdef QEMU_WORKAROUND
+    xhci_cap_regs_t cap_regs_copy;
+    memcpy32(&cap_regs_copy, cap_regs, sizeof(cap_regs_copy));
+    cap_regs = &cap_regs_copy;
+#endif
+
+    // Walk the extra capabilities list.
+    uintptr_t ext_cap_base = base_addr;
+    uintptr_t ext_cap_offs = cap_regs->hcc_params1 >> 16;
+    while (ext_cap_offs != 0) {
+        ext_cap_base += ext_cap_offs * sizeof(uint32_t);
+        xhci_ext_cap_t *ext_cap = (xhci_ext_cap_t *)ext_cap_base;
+
+#ifdef QEMU_WORKAROUND
+        xhci_ext_cap_t ext_cap_copy;
+        memcpy32(&ext_cap_copy, ext_cap, sizeof(ext_cap_copy));
+        ext_cap = &ext_cap_copy;
+#endif
         if (ext_cap->id == XHCI_EXT_CAP_SUPPORTED_PROTOCOL) {
             xhci_supported_protocol_t *protocol = (xhci_supported_protocol_t *)ext_cap_base;
 
@@ -983,10 +1017,6 @@ bool xhci_init(uintptr_t base_addr, usb_hcd_t *hcd)
     xhci_op_regs_t *op_regs = (xhci_op_regs_t *)(base_addr + cap_regs->cap_length);
     xhci_rt_regs_t *rt_regs = (xhci_rt_regs_t *)(base_addr + cap_regs->rts_offset);
     xhci_db_reg_t  *db_regs = (xhci_db_reg_t  *)(base_addr + cap_regs->db_offset);
-
-    // Ensure the controller is halted and then reset it.
-    if (!halt_host_controller(op_regs)) return false;
-    if (!reset_host_controller(op_regs)) return false;
 
     // Record the heap states to allow us to free memory.
     uintptr_t initial_lm_heap_mark = heap_mark(HEAP_TYPE_LM_1);
