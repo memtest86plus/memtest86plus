@@ -654,7 +654,6 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
     if (num_keyboards == 0) {
         (void)halt_host_controller(op_regs);
-        (void)reset_host_controller(op_regs);
         goto no_keyboards_found;
     }
 
