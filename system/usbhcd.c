@@ -48,7 +48,8 @@ typedef struct {
     uint8_t         bus;
     uint8_t         dev;
     uint8_t         func;
-    uintptr_t       base_addr;
+    uintptr_t       pm_base_addr;
+    uintptr_t       vm_base_addr;
 } hci_info_t;
 
 //------------------------------------------------------------------------------
@@ -440,7 +441,7 @@ static void reset_usb_controller(hci_info_t *hci)
     // Restore access to the device and set the bus master flag in case the BIOS hasn't.
     pci_config_write16(bus, dev, func, 0x04, pci_command | (in_io_space ? 0x0005 : 0x0006));
 
-    hci->base_addr = base_addr;
+    hci->pm_base_addr = base_addr;
 
     print_usb_info("Found %s controller %04x:%04x at %08x size %08x in %s space", hci_name[controller_type],
                    (uintptr_t)vendor_id, (uintptr_t)device_id, base_addr, mmio_size, in_io_space ? "I/O" : "Mem");
@@ -464,6 +465,8 @@ static void reset_usb_controller(hci_info_t *hci)
             return;
         }
     }
+
+    hci->vm_base_addr = base_addr;
 
     // Search for power management capability.
     //uint8_t pm_cap_ptr;
@@ -508,24 +511,24 @@ static void reset_usb_controller(hci_info_t *hci)
     }
 }
 
-static void probe_usb_controller(hci_type_t controller_type, uintptr_t base_addr)
+static void probe_usb_controller(hci_type_t controller_type, uintptr_t pm_base_addr, uintptr_t vm_base_addr)
 {
-    print_usb_info("Probing %s controller at %08x", hci_name[controller_type], base_addr);
+    print_usb_info("Probing %s controller at %08x", hci_name[controller_type], pm_base_addr);
 
     // Probe the device according to its type.
     bool keyboards_found = false;
     switch (controller_type) {
       case UHCI:
-        keyboards_found = uhci_probe(base_addr, &hcd_list[num_hcd]);
+        keyboards_found = uhci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       case OHCI:
-        keyboards_found = ohci_probe(base_addr, &hcd_list[num_hcd]);
+        keyboards_found = ohci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       case EHCI:
-        keyboards_found = ehci_probe(base_addr, &hcd_list[num_hcd]);
+        keyboards_found = ehci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       case XHCI:
-        keyboards_found = xhci_probe(base_addr, &hcd_list[num_hcd]);
+        keyboards_found = xhci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       default:
         break;
@@ -846,7 +849,7 @@ void find_usb_keyboards(bool pause_if_none)
     for (int i = 0; i < num_hci && num_hcd < MAX_HCD; i++) {
         if (hci_list[i].type == EHCI) {
             if (~usb_init_options & USB_IGNORE_EHCI) {
-                probe_usb_controller(EHCI, hci_list[i].base_addr);
+                probe_usb_controller(EHCI, hci_list[i].pm_base_addr, hci_list[i].vm_base_addr);
             }
             hci_list[i].type = NOT_HCI;  // prevent this controller from being scanned again
         }
@@ -855,7 +858,7 @@ void find_usb_keyboards(bool pause_if_none)
     // Now probe the other controllers.
     for (int i = 0; i < num_hci && num_hcd < MAX_HCD; i++) {
         if (hci_list[i].type != NOT_HCI) {
-            probe_usb_controller(hci_list[i].type, hci_list[i].base_addr);
+            probe_usb_controller(hci_list[i].type, hci_list[i].pm_base_addr, hci_list[i].vm_base_addr);
         }
     }
 
