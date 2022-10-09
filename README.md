@@ -28,6 +28,7 @@ later 32-bit or 64-bit CPU.
   * [Memtest86+ Test Algorithms](#memory-testing-philosophy)
   * [Individual Test Descriptions](#individual-test-descriptions)
   * [Known Limitations and Bugs](#known-limitations-and-bugs)
+  * [Code Contributions](#code-contributions)
   * [Acknowledgments](#acknowledgments)
 
 ## Origins
