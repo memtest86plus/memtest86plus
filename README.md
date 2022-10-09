@@ -547,6 +547,11 @@ on GitHub.
 
 Feel free to submit bug reports!
 
+## Code Contributions
+
+Code contributions are welcomed, either to fix bugs or to make enhancements.
+See the README_DEVEL.md in the doc directory for some basic guidelines.
+
 ## Acknowledgments
 
 Memtest86+ v6.0 was based on PCMemTest, developed by Martin Whitaker, which
