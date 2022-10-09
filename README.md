@@ -181,6 +181,10 @@ Many USB devices don't fully conform to the USB specification. If the USB
 keyboard probe hangs or fails to detect your keyboard, try the various
 workarounds provided by the "usbinit" boot option.
 
+**NOTE**: Hot-plugging is not currently supported by the Memtest86+ USB
+drivers. When using these, your USB keyboard should be plugged in before
+running Memtest86+ and should remain plugged in throughout the test.
+
 ## Operation
 
 Once booted, Memtest86+ will initialise its display, then pause for a few
@@ -538,6 +542,7 @@ of all zeros and all ones.
 ## Known Limitations and Bugs
 
 Please see the list of [open issues](https://github.com/memtest86plus/memtest86plus/issues)
+and [enhancement requests](https://github.com/memtest86plus/memtest86plus/discussions)
 on GitHub.
 
 Feel free to submit bug reports!
