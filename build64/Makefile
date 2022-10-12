@@ -168,8 +168,13 @@ iso: memtest.iso
 clean:
 	rm -rf boot system lib tests app *.img *.iso memtest* iso grub-*
 
-# grub-memtest.iso can be used for testing the various different boot modes,
-# using GRUB as an intermediate bootloader. Upstream GRUB only supports the
+# grub-memtest.iso uses GRUB as an intermediate bootloader to allow Memtest86+
+# to be started with the native USB keyboard drivers either enabled or disabled,
+# or to be started in a fail-safe mode with SMP and memory identification &
+# speed testing disabled.
+#
+# By setting GRUB_CFG to "grub-test", grub-memtest.iso can instead be used for
+# testing the various different boot modes. Upstream GRUB only supports the
 # 16-bit and 32-bit boot protocols, via the "linux16" and "linux" commands.
 # Fedora add support for the EFI handover boot protocols, via the "linuxefi"
 # command, and, since 2019, remove support for the 32-bit protocol, aliasing
@@ -178,6 +183,8 @@ clean:
 # for the 32-bit protocol, via the "linux32" command. Other distributions no
 # doubt do their own thing. The boot menu on grub-memtest.iso attempts to
 # support all these options.
+
+GRUB_CFG ?= grub
 
 GRUB_FONT_DIR ?= /usr/share/grub
 
@@ -194,22 +201,22 @@ grub-eltorito.img:
 grub-bootx64.efi:
 	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format x86_64-efi $(GRUB_MODULES)
 
-grub-esp.img: memtest.efi grub-bootx64.efi ../grub/grub-efi.cfg
+grub-esp.img: memtest.efi grub-bootx64.efi ../grub/${GRUB_CFG}-efi.cfg
 	@mkdir -p grub-iso/EFI/BOOT/grub/x86_64-efi grub-iso/EFI/BOOT/grub/fonts
 	cp memtest.efi grub-iso/EFI/BOOT/memtest
 	cp grub-bootx64.efi grub-iso/EFI/BOOT/bootx64.efi
-	cp ../grub/grub-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
+	cp ../grub/${GRUB_CFG}-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
 	cp $(GRUB_LIB_DIR)/x86_64-efi/*.mod grub-iso/EFI/BOOT/grub/x86_64-efi/
 	@rm -f grub-esp.img
 	/sbin/mkdosfs -n MT86P_ESP -F12 -C grub-esp.img 8192
 	mcopy -s -i grub-esp.img grub-iso/EFI ::
 
-grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/grub-legacy.cfg grub-esp.img
+grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/${GRUB_CFG}-legacy.cfg grub-esp.img
 	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
 	cp memtest.bin grub-iso/boot/memtest
 	cp grub-eltorito.img grub-iso/boot/eltorito.img
-	cp ../grub/grub-legacy.cfg grub-iso/boot/grub/grub.cfg
+	cp ../grub/${GRUB_CFG}-legacy.cfg grub-iso/boot/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
 	cp $(GRUB_LIB_DIR)/i386-pc/*.mod grub-iso/boot/grub/i386-pc/
 	xorrisofs -pad -R -J -volid MT86PLUS_64 -graft-points -hide-rr-moved \
