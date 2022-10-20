@@ -390,6 +390,10 @@ void display_big_status(bool pass)
 
 void restore_big_status(void)
 {
+    if (!big_status_displayed) {
+        return;
+    }
+
     restore_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
     big_status_displayed = false;
 }
@@ -509,7 +513,7 @@ void do_tick(int my_cpu)
     if (clks_per_msec > 0) {
         uint64_t current_time = get_tsc();
 
-        int secs = (current_time - run_start_time) / (1000 * (uint64_t)clks_per_msec);
+        int secs  = (current_time - run_start_time) / (1000 * (uint64_t)clks_per_msec);
         int mins  = secs / 60; secs %= 60; act_sec = secs;
         int hours = mins / 60; mins %= 60;
         display_run_time(hours, mins, secs);
@@ -533,6 +537,11 @@ void do_tick(int my_cpu)
 
     // This only tick one time per second
     if (!timed_update_done) {
+
+        // Display FAIL banner if (new) errors detected
+        if (!big_status_displayed && error_count > 0) {
+            display_big_status(false);
+        }
 
         // Update temperature
         display_temperature();
