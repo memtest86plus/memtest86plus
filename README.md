@@ -1,18 +1,20 @@
----
-[DISCLAIMER] Memtest86+ v6.0 is NOT READY FOR PRODUCTION yet. The base code has basically been rewritten from scratch and many side functions are still under active development. A lot of additional beta-testing is needed. Please consider the actual code as experimental and expect crashes and freezes. Bugs reports are welcome and very helpful! Binary beta release are available on [memtest.org](https://memtest.org). The first production-ready stable release is planned for this summer.
-
----
-
 # Memtest86+
 
-Memtest86+ is a stand-alone memory tester for x86 and x86-64 architecture
-computers. It provides a more thorough memory check than that provided by
-BIOS memory tests.
+Memtest86+ is a free, open-source, stand-alone memory tester for x86 and
+x86-64 architecture computers. It provides a much more thorough memory
+check than that provided by BIOS memory tests.
+
+It is also able to access almost all the computer's memory, not being
+restricted by the memory used by the operating system and not depending
+on any underlying software like UEFI libraries.
 
 Memtest86+ can be loaded and run either directly by a PC BIOS (legacy or UEFI)
 or via an intermediate bootloader that supports the Linux 16-bit, 32-bit,
 64-bit, or EFI handover boot protocol. It should work on any Pentium class or
 later 32-bit or 64-bit CPU.
+
+Binary releases (both stable and nightly dev builds) are available on
+[memtest.org](https://memtest.org).
 
 ## Table of Contents
 
@@ -33,15 +35,15 @@ later 32-bit or 64-bit CPU.
 
 ## Origins
 
-Memtest86+ v6.0 was based on PCMemTest, which was a fork and rewrite of the
-earlier Memtest86+ v5.01, which in turn was a fork of Memtest86. The purpose
+Memtest86+ v6.00 was based on PCMemTest, which was a fork and rewrite of the
+earlier Memtest86+ v5, which in turn was a fork of MemTest-86. The purpose
 of the PCMemTest rewrite was to:
 
   * make the code more readable and easier to maintain
   * make the code 64-bit clean and support UEFI boot
   * fix failures seen when building with newer versions of GCC
 
-In the process of creating PCMemTest, a number of features of Memtest86+ v5.01
+In the process of creating PCMemTest, a number of features of Memtest86+ v5
 that were not strictly required for testing the system memory were dropped. In
 particular, no attempt was made to measure the cache and main memory speed, or
 to identify and report the DRAM type. These features were added back in
@@ -106,8 +108,10 @@ For test purposes, there is also an option to build an ISO image that uses
 GRUB as an intermediate bootloader. See the `Makefile` in the `build32` or
 `build64` directory for details. The ISO image is both legacy and UEFI
 bootable, so you need GRUB modules for both legacy and EFI boot installed
-on your build system. You may need to adjust some path and file names in
-the make file to match the naming on your system.
+on your build system (e.g. on Debian, the required GRUB modules are located
+in packages `grub-pc-bin`, `grub-efi-ia32-bin` and `grub-efi-amd64-bin`).
+You may need to adjust some path and file names in the make file to match
+the naming on your system.
 
 The GRUB configuration files contained in the `grub` directory are there for
 use on the test ISO, but also serve as an example of how to boot Memtest86+
