@@ -103,7 +103,7 @@ void display_init(void)
     set_foreground_colour(BLACK);
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
-    prints(0, 0, "     Memtest86+ v6.00b3");
+    prints(0, 0, "      Memtest86+ v6.00");
     set_foreground_colour(RED);
     printc(0, 14, '+');
     set_foreground_colour(WHITE);
