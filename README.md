@@ -46,8 +46,8 @@ of the PCMemTest rewrite was to:
 In the process of creating PCMemTest, a number of features of Memtest86+ v5
 that were not strictly required for testing the system memory were dropped. In
 particular, no attempt was made to measure the cache and main memory speed, or
-to identify and report the DRAM type. These features were added back in
-Memtest86+ v6.0 to create a unified, fully-featured release.
+to identify and report the DRAM type. These features were added back and expanded
+in Memtest86+ v6.0 to create a unified, fully-featured release.
 
 ## Licensing
 
@@ -110,7 +110,7 @@ GRUB as an intermediate bootloader. See the `Makefile` in the `build32` or
 bootable, so you need GRUB modules for both legacy and EFI boot installed
 on your build system (e.g. on Debian, the required GRUB modules are located
 in packages `grub-pc-bin`, `grub-efi-ia32-bin` and `grub-efi-amd64-bin`).
-You may need to adjust some path and file names in the make file to match
+You may need to adjust some path and file names in the Makefile to match
 the naming on your system.
 
 The GRUB configuration files contained in the `grub` directory are there for
