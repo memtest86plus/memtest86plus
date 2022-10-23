@@ -151,6 +151,8 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
 {
     spin_lock(error_mutex);
 
+    restore_big_status();
+
     bool new_header = (error_count == 0) || (error_mode != last_error_mode);
     if (new_header) {
         clear_message_area();
@@ -369,6 +371,7 @@ void error_update(void)
         display_error_count(error_count);
         display_status("Failed!");
 
+        // Display FAIL banner on first error
         if (error_count == 1) {
             display_big_status(false);
         }
