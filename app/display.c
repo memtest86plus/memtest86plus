@@ -105,7 +105,7 @@ void display_init(void)
     clear_screen_region(0, 0, 0, 27);
     prints(0, 0, "      Memtest86+ v6.00");
     set_foreground_colour(RED);
-    printc(0, 14, '+');
+    printc(0, 15, '+');
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
     prints(1, 0, "CLK/Temp:   N/A             | Pass   %");
