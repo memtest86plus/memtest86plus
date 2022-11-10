@@ -68,4 +68,11 @@ char *strstr(const char *haystack, const char *needle);
 
 char *itoa(int num, char *str);
 
+/**
+ * Convert string to int
+ * Returns on first non-numeric char
+ */
+
+int atoi(const char* str);
+
 #endif // STRING_H

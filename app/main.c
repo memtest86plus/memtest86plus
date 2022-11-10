@@ -666,6 +666,17 @@ void main(void)
                 display_status("Pass   ");
                 display_big_status(true);
                 //display_notice("** Pass completed, no errors **");
+
+                if (autoreboot && pass_num >= autoreboot) {
+                    if (rtc_result) {
+                        // rtc_result option on the commandline:
+                        // communicate the successful pass of memtest
+                        // by setting the date in RTC to 2012-01-01
+                        set_rtc_date(12,1,1);
+                    }
+
+                    reboot();
+                }
             }
         }
     }
