@@ -666,6 +666,9 @@ void main(void)
                 display_status("Pass   ");
                 display_big_status(true);
                 //display_notice("** Pass completed, no errors **");
+
+                if (autoreboot && pass_num >= autoreboot)
+                    reboot();
             }
         }
     }

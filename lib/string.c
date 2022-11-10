@@ -126,3 +126,26 @@ char *itoa(int num, char *str)
 
     return str;
 }
+
+int atoi(const char* str)
+{
+    int sign = 1;
+    int base = 0;
+    int i = 0;
+
+    // handle negative numbers
+    if (str[i] == '-')
+    {
+        sign = -1;
+        i++;
+    }
+
+    // return current value on first non-numeric char
+    while (str[i] >= '0' && str[i] <= '9')
+    {
+        // simple implementation: no overflow handling
+        base = 10 * base + (str[i++] - '0');
+    }
+
+    return base * sign;
+}

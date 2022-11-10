@@ -158,6 +158,11 @@ recognised:
       * 54600
       * 115200 (default if not specified or invalid)
       * 230400
+  * autoreboot=*n*
+    * automatically reboot after *n* successful passes. memtest will continue to
+      run when a failure is detected. This can be used to automate running memtest.
+      Be aware that faulty hardware can sometimes also trigger a reboot, so a reboot
+      can not be taken as a guarantee for a successful test run.
 
 ## Keyboard Selection
 

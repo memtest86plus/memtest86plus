@@ -106,6 +106,8 @@ int             tty_params_port    = SERIAL_PORT_0x3F8;
 int             tty_params_baud    = SERIAL_DEFAULT_BAUDRATE;
 int             tty_update_period  = 2; // Update TTY every 2 seconds (default)
 
+int             autoreboot         = 0;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
@@ -212,6 +214,12 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "nosm", 5) == 0) {
         enable_sm = false;
+    } else if (strncmp(option, "autoreboot", 11) == 0) {
+        if (strlen(params) > 0) {
+            autoreboot=atoi(params);
+            if (autoreboot < 0)
+                autoreboot=0;
+        }
     }
 }
 
