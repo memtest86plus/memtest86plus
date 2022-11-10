@@ -32,10 +32,10 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define POP_STAT_R       12
-#define POP_STAT_C       18
+#define POP_STAT_R       2
+#define POP_STAT_C       0
 
-#define POP_STAT_W       44
+#define POP_STAT_W       33
 #define POP_STAT_H       9
 
 #define POP_STAT_LAST_R  (POP_STAT_R + POP_STAT_H - 1)
@@ -367,21 +367,21 @@ void display_big_status(bool pass)
     clear_screen_region(POP_STATUS_REGION);
 
     if (pass) {
-        prints(POP_STAT_R+1, POP_STAT_C+5, "######      ##      #####    #####  ");
-        prints(POP_STAT_R+2, POP_STAT_C+5, "##   ##    ####    ##   ##  ##   ## ");
-        prints(POP_STAT_R+3, POP_STAT_C+5, "##   ##   ##  ##   ##       ##      ");
-        prints(POP_STAT_R+4, POP_STAT_C+5, "######   ##    ##   #####    #####  ");
-        prints(POP_STAT_R+5, POP_STAT_C+5, "##       ########       ##       ## ");
-        prints(POP_STAT_R+6, POP_STAT_C+5, "##       ##    ##  ##   ##  ##   ## ");
-        prints(POP_STAT_R+7, POP_STAT_C+5, "##       ##    ##   #####    #####  ");
+        prints(POP_STAT_R+1, POP_STAT_C+2, "######    ##     ####   #### ");
+        prints(POP_STAT_R+2, POP_STAT_C+2, "##   ##  ####   ##  ## ##  ##");
+        prints(POP_STAT_R+3, POP_STAT_C+2, "##   ## ##  ##  ##     ##    ");
+        prints(POP_STAT_R+4, POP_STAT_C+2, "###### ##    ##  ####   #### ");
+        prints(POP_STAT_R+5, POP_STAT_C+2, "##     ########     ##     ##");
+        prints(POP_STAT_R+6, POP_STAT_C+2, "##     ##    ## ##  ## ##  ##");
+        prints(POP_STAT_R+7, POP_STAT_C+2, "##     ##    ##  ####   #### ");
     } else {
-        prints(POP_STAT_R+1, POP_STAT_C+5, "#######     ##      ######   ##     ");
-        prints(POP_STAT_R+2, POP_STAT_C+5, "##         ####       ##     ##     ");
-        prints(POP_STAT_R+3, POP_STAT_C+5, "##        ##  ##      ##     ##     ");
-        prints(POP_STAT_R+4, POP_STAT_C+5, "#####    ##    ##     ##     ##     ");
-        prints(POP_STAT_R+5, POP_STAT_C+5, "##       ########     ##     ##     ");
-        prints(POP_STAT_R+6, POP_STAT_C+5, "##       ##    ##     ##     ##     ");
-        prints(POP_STAT_R+7, POP_STAT_C+5, "##       ##    ##   ######   ###### ");
+        prints(POP_STAT_R+1, POP_STAT_C+2, "#######   ##    ###### ##    ");
+        prints(POP_STAT_R+2, POP_STAT_C+2, "##       ####     ##   ##    ");
+        prints(POP_STAT_R+3, POP_STAT_C+2, "##      ##  ##    ##   ##    ");
+        prints(POP_STAT_R+4, POP_STAT_C+2, "#####  ##    ##   ##   ##    ");
+        prints(POP_STAT_R+5, POP_STAT_C+2, "##     ########   ##   ##    ");
+        prints(POP_STAT_R+6, POP_STAT_C+2, "##     ##    ##   ##   ##    ");
+        prints(POP_STAT_R+7, POP_STAT_C+2, "##     ##    ## ###### ######");
     }
     set_background_colour(BLUE);
     set_foreground_colour(WHITE);
