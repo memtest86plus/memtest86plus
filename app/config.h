@@ -67,6 +67,7 @@ extern int tty_params_baud;
 extern int tty_update_period;
 
 extern int autoreboot;
+extern bool rtc_result;
 
 void config_init(void);
 

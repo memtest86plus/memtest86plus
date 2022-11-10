@@ -92,3 +92,21 @@ void cursor_off()
     outb(0x0e, 0x3d4);
     outb(0xff, 0x3d5);
 }
+
+// year: 0-99, month: 1-12, day: 1-31
+void set_rtc_date(int year, int month, int day)
+{
+    // keep second, minute and hour as they are
+
+    // bit 0x80 of port 0x70 controls the NMI disable bit, always set it
+
+    // day at register 0x07
+    outb(0x87, 0x70);
+    outb(day, 0x71);
+    // month at register 0x08
+    outb(0x88, 0x70);
+    outb(month, 0x71);
+    // year at register 0x09
+    outb(0x89, 0x70);
+    outb(year, 0x71);
+}

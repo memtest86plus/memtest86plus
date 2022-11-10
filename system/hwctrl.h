@@ -30,4 +30,11 @@ void floppy_off();
  */
 void cursor_off();
 
+/**
+ * Set date in the hardware realtime clock (RTC)
+ *
+ * year: 0-99, month: 1-12, day: 1-31
+ */
+void set_rtc_date(int year, int month, int day);
+
 #endif // HWCTRL_H

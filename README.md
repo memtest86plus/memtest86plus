@@ -160,9 +160,15 @@ recognised:
       * 230400
   * autoreboot=*n*
     * automatically reboot after *n* successful passes. memtest will continue to
-      run when a failure is detected. This can be used to automate running memtest.
+      run when a failure is detected. This can be used to
+      [automate running memtest](./doc/README_automation.md).
       Be aware that faulty hardware can sometimes also trigger a reboot, so a reboot
       can not be taken as a guarantee for a successful test run.
+  * rtc_result
+    * when set and an automatic reboot due to the "autoreboot" option should be triggered,
+      also set the date of the hardware real time clock (RTC) to 2012-01-01. This acts
+      as indicator that the memtest really was successful and the reboot did not occur
+      due to faulty hardware, power loss or similar things.
 
 ## Keyboard Selection
 
