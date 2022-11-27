@@ -36,7 +36,7 @@
 #define POP_STAT_C       18
 
 #define POP_STAT_W       44
-#define POP_STAT_H       9
+#define POP_STAT_H       11
 
 #define POP_STAT_LAST_R  (POP_STAT_R + POP_STAT_H - 1)
 #define POP_STAT_LAST_C  (POP_STAT_C + POP_STAT_W - 1)
@@ -383,6 +383,10 @@ void display_big_status(bool pass)
         prints(POP_STAT_R+6, POP_STAT_C+5, "##       ##    ##     ##     ##     ");
         prints(POP_STAT_R+7, POP_STAT_C+5, "##       ##    ##   ######   ###### ");
     }
+
+    prints(POP_STAT_R+8, POP_STAT_C+5, "                                    ");
+    prints(POP_STAT_R+9, POP_STAT_C+5, "Press any key to remove this banner ");
+
     set_background_colour(BLUE);
     set_foreground_colour(WHITE);
     big_status_displayed = true;
@@ -539,7 +543,7 @@ void do_tick(int my_cpu)
     if (!timed_update_done) {
 
         // Display FAIL banner if (new) errors detected
-        if (!big_status_displayed && error_count > 0) {
+        if (err_banner_redraw && !big_status_displayed && error_count > 1) {
             display_big_status(false);
         }
 

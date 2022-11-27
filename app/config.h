@@ -66,6 +66,8 @@ extern int tty_params_port;
 extern int tty_params_baud;
 extern int tty_update_period;
 
+extern bool err_banner_redraw;
+
 void config_init(void);
 
 void config_menu(bool initial);

@@ -104,7 +104,9 @@ power_save_t    power_save         = POWER_SAVE_HIGH;
 bool            enable_tty         = false;
 int             tty_params_port    = SERIAL_PORT_0x3F8;
 int             tty_params_baud    = SERIAL_DEFAULT_BAUDRATE;
-int             tty_update_period  = 2; // Update TTY every 2 seconds (default)
+int             tty_update_period  = 2;     // Update TTY every 2 seconds (default)
+
+bool            err_banner_redraw  = false; // Redraw banner on new errors (if previsouly removed)
 
 //------------------------------------------------------------------------------
 // Private Functions
