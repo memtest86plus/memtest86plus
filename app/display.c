@@ -538,11 +538,6 @@ void do_tick(int my_cpu)
     // This only tick one time per second
     if (!timed_update_done) {
 
-        // Display FAIL banner if (new) errors detected
-        if (!big_status_displayed && error_count > 0) {
-            display_big_status(false);
-        }
-
         // Update temperature
         display_temperature();
 
