@@ -39,6 +39,7 @@ int test_block_move(int my_cpu, int iterations)
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
+        if ((end - start) < 15) continue;  // we need at least 16 words for this test
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -89,6 +90,7 @@ int test_block_move(int my_cpu, int iterations)
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
+        if ((end - start) < 15) continue;  // we need at least 16 words for this test
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -201,6 +203,7 @@ int test_block_move(int my_cpu, int iterations)
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
+        if ((end - start) < 15) continue;  // we need at least 16 words for this test
 
         testword_t *p  = start;
         testword_t *pe = start;
