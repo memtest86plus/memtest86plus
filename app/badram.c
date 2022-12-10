@@ -128,7 +128,7 @@ static bool is_covered(pattern_t pattern)
 static int cheapest_pair()
 {
     // This is guaranteed to be overwritten with >= 0 as long as num_patterns > 1
-    int mergeidx = -1;
+    int merge_idx = -1;
 
     uintptr_t min_cost = UINTPTR_MAX;
     for (int i = 0; i < num_patterns - 1; i++) {
@@ -140,10 +140,10 @@ static int cheapest_pair()
         );
         if (tmp_cost <= min_cost) {
             min_cost = tmp_cost;
-            mergeidx = i;
+            merge_idx = i;
         }
     }
-    return mergeidx;
+    return merge_idx;
 }
 
 /*
@@ -202,15 +202,15 @@ static void insert_sorted(pattern_t pattern)
     pattern.addr &= pattern.mask;
 
     // Find index to insert entry into
-    int newidx = num_patterns;
+    int new_idx = num_patterns;
     for (int i = 0; i < num_patterns; i++) {
         if (pattern.addr < patterns[i].addr) {
-            newidx = i;
+            new_idx = i;
             break;
         }
     }
 
-    insert_at(pattern, newidx);
+    insert_at(pattern, new_idx);
 }
 
 //------------------------------------------------------------------------------
@@ -245,13 +245,13 @@ bool badram_insert(uintptr_t addr)
     // If we have more patterns than the max we need to force a merge
     if (num_patterns > MAX_PATTERNS) {
         // Find the pair that is the cheapest to merge
-        // mergeidx will be -1 if num_patterns < 2, but that means MAX_PATTERNS = 0 which is not a valid state anyway
-        int mergeidx = cheapest_pair();
+        // merge_idx will be -1 if num_patterns < 2, but that means MAX_PATTERNS = 0 which is not a valid state anyway
+        int merge_idx = cheapest_pair();
 
-        pattern_t combined = combined_pattern(mergeidx, mergeidx + 1);
+        pattern_t combined = combined_pattern(merge_idx, merge_idx + 1);
 
-        // Remove the source pair so that we can maintain order as combined does not necessarily belong in mergeidx
-        remove_pair(mergeidx);
+        // Remove the source pair so that we can maintain order as combined does not necessarily belong in merge_idx
+        remove_pair(merge_idx);
 
         insert_sorted(combined);
     }
