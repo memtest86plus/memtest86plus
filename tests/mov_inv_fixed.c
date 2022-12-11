@@ -19,6 +19,8 @@
 #include "display.h"
 #include "error.h"
 #include "test.h"
+#include "config.h"
+#include "cpuid.h"
 
 #include "test_funcs.h"
 #include "test_helper.h"
@@ -119,13 +121,26 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                     continue;
                 }
                 test_addr[my_cpu] = (uintptr_t)p;
-                do {
-                    testword_t actual = read_word(p);
-                    if (unlikely(actual != pattern1)) {
-                        data_error(p, pattern1, actual, true);
-                    }
-                    write_word(p, pattern2);
-                } while (p++ < pe); // test before increment in case pointer overflows
+                // Nontemporal stores seem to be bad for performance here.
+                if (enable_nontemporal && cpuid_info.flags.sse2) {
+                    do {
+                        testword_t actual = read_word(p);
+                        if (unlikely(actual != pattern1)) {
+                            data_error(p, pattern1, actual, true);
+                        }
+                        write_word_nt(p, pattern2);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                    __asm__ __volatile__ ("mfence");
+                }
+                else {
+                    do {
+                        testword_t actual = read_word(p);
+                        if (unlikely(actual != pattern1)) {
+                            data_error(p, pattern1, actual, true);
+                        }
+                        write_word(p, pattern2);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                }
                 do_tick(my_cpu);
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
@@ -155,13 +170,26 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                     continue;
                 }
                 test_addr[my_cpu] = (uintptr_t)p;
-                do {
-                    testword_t actual = read_word(p);
-                    if (unlikely(actual != pattern2)) {
-                        data_error(p, pattern2, actual, true);
-                    }
-                    write_word(p, pattern1);
-                } while (p-- > ps); // test before decrement in case pointer overflows
+                // Nontemporal stores seem to be bad for performance here.
+                if (enable_nontemporal && cpuid_info.flags.sse2) {
+                    do {
+                        testword_t actual = read_word(p);
+                        if (unlikely(actual != pattern2)) {
+                            data_error(p, pattern2, actual, true);
+                        }
+                        write_word_nt(p, pattern1);
+                    } while (p-- > ps); // test before decrement in case pointer overflows
+                    __asm__ __volatile__ ("mfence");
+                }
+                else {
+                    do {
+                        testword_t actual = read_word(p);
+                        if (unlikely(actual != pattern2)) {
+                            data_error(p, pattern2, actual, true);
+                        }
+                        write_word(p, pattern1);
+                    } while (p-- > ps); // test before decrement in case pointer overflows
+                }
                 do_tick(my_cpu);
                 BAILOUT;
             } while (!at_start && --ps); // advance ps to next start point

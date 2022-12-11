@@ -19,6 +19,8 @@
 #include "display.h"
 #include "error.h"
 #include "test.h"
+#include "config.h"
+#include "cpuid.h"
 
 #include "test_funcs.h"
 #include "test_helper.h"
@@ -59,26 +61,52 @@ int test_block_move(int my_cpu, int iterations)
             }
             test_addr[my_cpu] = (uintptr_t)p;
             testword_t pattern1 = 1;
-            do {
-                testword_t pattern2 = ~pattern1;
-                write_word(p + 0,  pattern1);
-                write_word(p + 1,  pattern1);
-                write_word(p + 2,  pattern1);
-                write_word(p + 3,  pattern1);
-                write_word(p + 4,  pattern2);
-                write_word(p + 5,  pattern2);
-                write_word(p + 6,  pattern1);
-                write_word(p + 7,  pattern1);
-                write_word(p + 8,  pattern1);
-                write_word(p + 9,  pattern1);
-                write_word(p + 10, pattern2);
-                write_word(p + 11, pattern2);
-                write_word(p + 12, pattern1);
-                write_word(p + 13, pattern1);
-                write_word(p + 14, pattern2);
-                write_word(p + 15, pattern2);
-                pattern1 = pattern1 << 1 | pattern1 >> (TESTWORD_WIDTH - 1);  // rotate left
-            } while (p <= (pe - 16) && (p += 16)); // test before increment in case pointer overflows
+            // Nontemporal stores seem to be mostly bad for performance here.
+            if (enable_nontemporal && cpuid_info.flags.sse2) {
+                do {
+                    testword_t pattern2 = ~pattern1;
+                    write_word_nt(p + 0,  pattern1);
+                    write_word_nt(p + 1,  pattern1);
+                    write_word_nt(p + 2,  pattern1);
+                    write_word_nt(p + 3,  pattern1);
+                    write_word_nt(p + 4,  pattern2);
+                    write_word_nt(p + 5,  pattern2);
+                    write_word_nt(p + 6,  pattern1);
+                    write_word_nt(p + 7,  pattern1);
+                    write_word_nt(p + 8,  pattern1);
+                    write_word_nt(p + 9,  pattern1);
+                    write_word_nt(p + 10, pattern2);
+                    write_word_nt(p + 11, pattern2);
+                    write_word_nt(p + 12, pattern1);
+                    write_word_nt(p + 13, pattern1);
+                    write_word_nt(p + 14, pattern2);
+                    write_word_nt(p + 15, pattern2);
+                    pattern1 = pattern1 << 1 | pattern1 >> (TESTWORD_WIDTH - 1);  // rotate left
+                } while (p <= (pe - 16) && (p += 16)); // test before increment in case pointer overflows
+                __asm__ __volatile__ ("mfence");
+            }
+            else {
+                do {
+                    testword_t pattern2 = ~pattern1;
+                    write_word(p + 0,  pattern1);
+                    write_word(p + 1,  pattern1);
+                    write_word(p + 2,  pattern1);
+                    write_word(p + 3,  pattern1);
+                    write_word(p + 4,  pattern2);
+                    write_word(p + 5,  pattern2);
+                    write_word(p + 6,  pattern1);
+                    write_word(p + 7,  pattern1);
+                    write_word(p + 8,  pattern1);
+                    write_word(p + 9,  pattern1);
+                    write_word(p + 10, pattern2);
+                    write_word(p + 11, pattern2);
+                    write_word(p + 12, pattern1);
+                    write_word(p + 13, pattern1);
+                    write_word(p + 14, pattern2);
+                    write_word(p + 15, pattern2);
+                    pattern1 = pattern1 << 1 | pattern1 >> (TESTWORD_WIDTH - 1);  // rotate left
+                } while (p <= (pe - 16) && (p += 16)); // test before increment in case pointer overflows
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point

@@ -16,12 +16,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "cpuid.h"
-#include "tsc.h"
-
 #include "display.h"
 #include "error.h"
 #include "test.h"
+#include "config.h"
+#include "cpuid.h"
+#include "tsc.h"
 
 #include "test_funcs.h"
 #include "test_helper.h"
@@ -70,10 +70,19 @@ int test_mov_inv_random(int my_cpu)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                prsg_state = prsg(prsg_state);
-                write_word(p, prsg_state);
-            } while (p++ < pe); // test before increment in case pointer overflows
+            if (enable_nontemporal && cpuid_info.flags.sse2) {
+                do {
+                    prsg_state = prsg(prsg_state);
+                    write_word_nt(p, prsg_state);
+                } while (p++ < pe); // test before increment in case pointer overflows
+                __asm__ __volatile__ ("mfence");
+            }
+            else {
+                do {
+                    prsg_state = prsg(prsg_state);
+                    write_word(p, prsg_state);
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
@@ -108,15 +117,29 @@ int test_mov_inv_random(int my_cpu)
                     continue;
                 }
                 test_addr[my_cpu] = (uintptr_t)p;
-                do {
-                    prsg_state = prsg(prsg_state);
-                    testword_t expect = prsg_state ^ invert;
-                    testword_t actual = read_word(p);
-                    if (unlikely(actual != expect)) {
-                        data_error(p, expect, actual, true);
-                    }
-                    write_word(p, ~expect);
-                } while (p++ < pe); // test before increment in case pointer overflows
+                if (enable_nontemporal && cpuid_info.flags.sse2) {
+                    do {
+                        prsg_state = prsg(prsg_state);
+                        testword_t expect = prsg_state ^ invert;
+                        testword_t actual = read_word(p);
+                        if (unlikely(actual != expect)) {
+                            data_error(p, expect, actual, true);
+                        }
+                        write_word_nt(p, ~expect);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                    __asm__ __volatile__ ("mfence");
+                }
+                else {
+                    do {
+                        prsg_state = prsg(prsg_state);
+                        testword_t expect = prsg_state ^ invert;
+                        testword_t actual = read_word(p);
+                        if (unlikely(actual != expect)) {
+                            data_error(p, expect, actual, true);
+                        }
+                        write_word(p, ~expect);
+                    } while (p++ < pe); // test before increment in case pointer overflows
+                }
                 do_tick(my_cpu);
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
