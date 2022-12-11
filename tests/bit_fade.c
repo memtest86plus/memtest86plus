@@ -25,6 +25,8 @@
 #include "test_funcs.h"
 #include "test_helper.h"
 
+#define HAND_OPTIMISED  1   // Use hand-optimised assembler code for performance.
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
@@ -58,9 +60,33 @@ static int pattern_fill(int my_cpu, testword_t pattern)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
+#if HAND_OPTIMISED
+#ifdef __x86_64__
+            uint64_t length = pe - p + 1;
+            __asm__  __volatile__ ("\t"
+                "rep    \n\t"
+                "stosq  \n\t"
+                :
+                : "c" (length), "D" (p), "a" (pattern)
+                :
+            );
+            p = pe;
+#else
+            uint32_t length = pe - p + 1;
+            __asm__  __volatile__ ("\t"
+                "rep    \n\t"
+                "stosl  \n\t"
+                :
+                : "c" (length), "D" (p), "a" (pattern)
+                :
+            );
+            p = pe;
+#endif
+#else
             do {
                 write_word(p, pattern);
             } while (p++ < pe); // test before increment in case pointer overflows
+#endif
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
