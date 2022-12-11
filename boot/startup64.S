@@ -38,7 +38,7 @@ startup32:
 
 	# Save the boot params pointer.
 
-	movl	%esi, (boot_params_addr - startup32)(%ebx)
+	movl	%esi, (boot_params_addr_ - startup32)(%ebx)
 
 	# Use the startup stack until we pick the correct one.
 
@@ -46,21 +46,21 @@ startup32:
 
 	# Initialise the pml4 and pdp tables.
 
-	leal	(pml4 - startup32)(%ebx), %ecx
-	leal	(pdp - startup32)(%ebx), %edx
+	leal	(pml4_ - startup32)(%ebx), %ecx
+	leal	(pdp_ - startup32)(%ebx), %edx
 	movl	%edx, %eax
 	addl	$0x3, %eax
 	movl	%eax, 0(%ecx)
-	leal	(pd0 - startup32)(%ebx), %eax
+	leal	(pd0_ - startup32)(%ebx), %eax
 	addl	$0x3, %eax
 	movl	%eax, 0(%edx)
-	leal	(pd1 - startup32)(%ebx), %eax
+	leal	(pd1_ - startup32)(%ebx), %eax
 	addl	$0x3, %eax
 	movl	%eax, 8(%edx)
-	leal	(pd2 - startup32)(%ebx), %eax
+	leal	(pd2_ - startup32)(%ebx), %eax
 	addl	$0x3, %eax
 	movl	%eax, 16(%edx)
-	leal	(pd3 - startup32)(%ebx), %eax
+	leal	(pd3_ - startup32)(%ebx), %eax
 	addl	$0x3, %eax
 	movl	%eax, 24(%edx)
 
@@ -122,7 +122,7 @@ startup64:
 
 	# Save the boot params pointer.
 
-	movq	%rsi, boot_params_addr(%rip)
+	movq	%rsi, boot_params_addr_(%rip)
 
 	jmp	startup
 
@@ -136,7 +136,7 @@ efi_handover:
 
 	# Save the boot params pointer.
 
-	movq	%rax, boot_params_addr(%rip)
+	movq	%rax, boot_params_addr_(%rip)
 
 # The 64-bit entry point for AP boot and for restart after relocation.
 
@@ -164,21 +164,21 @@ startup:
 
 	# Initialise the pml4 and pdp tables.
 
-	leaq	pml4(%rip), %rcx
-	leaq	pdp(%rip), %rdx
+	leaq	pml4_(%rip), %rcx
+	leaq	pdp_(%rip), %rdx
 	movq	%rdx, %rax
 	addq	$0x3, %rax
 	movq	%rax, 0(%rcx)
-	leaq	pd0(%rip), %rax
+	leaq	pd0_(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 0(%rdx)
-	leaq	pd1(%rip), %rax
+	leaq	pd1_(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 8(%rdx)
-	leaq	pd2(%rip), %rax
+	leaq	pd2_(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 16(%rdx)
-	leaq	pd3(%rip), %rax
+	leaq	pd3_(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 24(%rdx)
 
@@ -453,14 +453,14 @@ gdt_descr:
 	.quad	0			# addr: filled in at run time
 
 	.align	4
-	.globl	gdt
+//	.globl	gdt
 gdt:
 	.quad	0x0000000000000000	# NULL descriptor
 	.quad	0x0000000000000000	# not used
 	.quad	0x00209a0000000000	# 0x10 64-bit code at 0x000000
 	.quad	0x0000920000000000	# 0x18 64-bit data at 0x000000
 
-	.globl	gdt_end
+//	.globl	gdt_end
 gdt_end:
 
 	.data
@@ -492,6 +492,7 @@ gdt_end:
 	.align	4096
 	.globl	pml4
 pml4:
+pml4_:
 	.quad	0			# filled in at run time
 
 # Page Directory Pointer Table:
@@ -500,6 +501,7 @@ pml4:
 	.align	4096
 	.globl	pdp
 pdp:
+pdp_:
 	.quad	0			# filled in at run time
 	.quad	0			# filled in at run time
 	.quad	0			# filled in at run time
@@ -514,21 +516,25 @@ pdp:
 	.align	4096
 	.globl	pd0
 pd0:
+pd0_:
 	ptes64	0x0000000000000000
 
 	.align	4096
 	.globl	pd1
 pd1:
+pd1_:
 	ptes64	0x0000000040000000
 
 	.align	4096
 	.globl	pd2
 pd2:
+pd2_:
 	ptes64	0x0000000080000000
 
 	.align	4096
 	.globl	pd3
 pd3:
+pd3_:
 	ptes64	0x00000000C0000000
 
 	.previous
@@ -561,7 +567,7 @@ data32	lgdt	ap_gdt_descr - ap_trampoline
 	# Set the page directory base address.
 
 	movl	%ebx, %eax
-	addl	$(pml4 - startup), %eax
+	addl	$(pml4_ - startup), %eax
 	movl	%eax, %cr3
 
 	# Enable PAE.
@@ -608,6 +614,7 @@ ap_trampoline_end:
 	.align	4
 
 	.globl	boot_params_addr
+boot_params_addr_:
 boot_params_addr:
 	.quad	0
 

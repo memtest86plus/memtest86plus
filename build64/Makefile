@@ -1,4 +1,4 @@
-AS = as -64
+AS = gcc
 CC = gcc
 OBJCOPY = objcopy
 
@@ -11,7 +11,7 @@ else
 endif
 
 CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector \
+         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -flto \
          -DARCH_BITS=64
 
 ifeq ($(DEBUG), 1)
@@ -157,9 +157,14 @@ FORCE:
 # Link it statically once so I know I don't have undefined symbols and
 # then link it dynamically so I have full relocation information.
 
-memtest_shared: $(OBJS) $(MS_LDS) Makefile
-	$(LD) --warn-constructors --warn-common -static -T $(MS_LDS) -o $@ $(OBJS) && \
-	$(LD) -shared -Bsymbolic -T $(MS_LDS) -o $@ $(OBJS)
+memtest_shared: $(OBJS) ldscripts/memtest_shared.lds Makefile
+	$(CC) -fpic -flto -ffreestanding -nostdlib -Wl,--warn-constructors -Wl,--warn-common -static -T $(MS_LDS) -o $@ $(OBJS) && \
+	cp memtest_shared memtest_shared2 && \
+	echo STEP2 && \
+	$(CC) -fpic -flto -r -o $@.o $(OBJS) && \
+	cp memtest_shared.o memtest_shared3 && \
+	echo STEP3 && \
+	$(CC) -fpic -flto -nostdlib -shared -Bsymbolic -T $(MS_LDS) -o $@ memtest_shared.o
 
 memtest_shared.bin: memtest_shared
 	$(OBJCOPY) -O binary $< memtest_shared.bin
