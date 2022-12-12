@@ -21,6 +21,39 @@
 
 #include "temperature.h"
 
+static int k8_temp(void)
+{
+        // k8temp is stored on a PCI device
+        // TODO: perhaps is will be better to have a way to find the PCI device via its IDs instead of relying on its bus position (0, 24, 3)
+#define K8_TEMP_BUS   0
+#define K8_TEMP_DEV  24
+#define K8_TEMP_FUNC  3
+#define K8_REG_TEMP   0xe4
+#define K8_SEL_CORE   0x04
+        uint32_t reg;
+        int temp = 0;
+
+        if (cpuid_info.version.model == 4 && cpuid_info.version.stepping == 0)
+            return 0;
+        if (cpuid_info.version.model == 5 && cpuid_info.version.stepping <= 1)
+            return 0;
+        // TODO: backport Linux test is_rev_g_desktop()
+
+        // We want temperature of core0
+        if (cpuid_info.version.model >= 0x40)
+            temp = K8_SEL_CORE;
+        pci_config_write8(K8_TEMP_BUS, K8_TEMP_DEV, K8_TEMP_FUNC, K8_REG_TEMP, temp);
+        reg = pci_config_read32(K8_TEMP_BUS, K8_TEMP_DEV, K8_TEMP_FUNC, K8_REG_TEMP);
+        // formula is taken from k8temp Linux driver
+        temp = (reg >> 16) & 0xFF;
+
+        // nobody will use memtest in a frozen env
+        if (temp < 49)
+            return 0;
+
+        return temp - 49;
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -47,6 +80,11 @@ int get_cpu_temperature(void)
     }
 
     // AMD CPU
+    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily == 0) {
+
+        return k8_temp();
+    }
+    // K10 temp
     if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily > 0 && cpuid_info.version.extendedFamily < 8) {
 
         // Untested yet
