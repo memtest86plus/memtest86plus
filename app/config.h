@@ -51,6 +51,7 @@ extern bool         exclude_ecores;
 
 extern bool         smp_enabled;
 
+extern bool         enable_big_status;
 extern bool         enable_temperature;
 extern bool         enable_trace;
 

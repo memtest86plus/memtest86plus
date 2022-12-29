@@ -129,6 +129,8 @@ recognised:
     * disables ACPI table parsing and the use of multiple CPU cores
   * nobench
     * disables the integrated memory benchmark
+  * nobigstatus
+    * disables the big PASS/FAIL pop-up status display
   * nosm
     * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
   * nopause
