@@ -106,20 +106,22 @@ tests/%.o: ../tests/%.c
 	@mkdir -p tests
 	$(CC) -c $(CFLAGS) -O3 $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-app/%.o: ../app/%.c app/githash.h
+app/%.o: ../app/%.c app/build_version.h
 	@mkdir -p app
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-app/githash.h: FORCE
+app/build_version.h: FORCE
 	@mkdir -p app
 	@( \
+	  cp -f ../app/version.h $@.tmp; \
 	  if $(GIT_AVAILABLE) && test -d ../.git ; then \
 	    hash=`git rev-parse HEAD | cut -c1-7`; \
+	    sed -i 's/GIT_HASH\s\".*"/GIT_HASH "'$$hash'"/' $@.tmp; \
 	  else \
-	    hash="unknown"; \
+	    sed -i 's/GIT_HASH\s\".*"/GIT_HASH "unknown"/' $@.tmp; \
 	  fi; \
-	  define=`echo "#define GIT_HASH \"$$hash\""`; \
-	  echo $$define | diff - $@ > /dev/null 2>&1 || echo $$define > $@; \
+	  cmp $@ $@.tmp 2>/dev/null || cp -f $@.tmp $@; \
+	  rm -f $@.tmp; \
 	)
 
 FORCE:

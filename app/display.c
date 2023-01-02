@@ -22,7 +22,7 @@
 
 #include "config.h"
 #include "error.h"
-#include "githash.h"
+#include "build_version.h"
 
 #include "tests.h"
 
@@ -103,7 +103,7 @@ void display_init(void)
     set_foreground_colour(BLACK);
     set_background_colour(WHITE);
     clear_screen_region(0, 0, 0, 27);
-    prints(0, 0, "      Memtest86+ v6.01");
+    prints(0, 0, "      Memtest86+ v" MT_VERSION);
     set_foreground_colour(RED);
     printc(0, 15, '+');
     set_foreground_colour(WHITE);
@@ -137,8 +137,7 @@ void display_init(void)
     set_background_colour(WHITE);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
-    prints(ROW_FOOTER, 64, "6.01.");
-    prints(ROW_FOOTER, 69, GIT_HASH);
+    prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
 #if TESTWORD_WIDTH > 32
     prints(ROW_FOOTER, 76, ".x64");
 #else
