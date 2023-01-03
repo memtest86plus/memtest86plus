@@ -8,7 +8,7 @@
 *.o
 
 # Generated file
-githash.h
+build_version.h
 
 # Binaries
 memtest_shared
