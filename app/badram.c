@@ -34,6 +34,7 @@
 //------------------------------------------------------------------------------
 
 #define MAX_PATTERNS 10
+#define PATTERNS_SIZE (MAX_PATTERNS + 1)
 
 // DEFAULT_MASK covers a uintptr_t, since that is the testing granularity.
 #ifdef __x86_64__
@@ -55,14 +56,16 @@ typedef struct {
 // Private Variables
 //------------------------------------------------------------------------------
 
-static pattern_t    pattern[MAX_PATTERNS];
+static pattern_t    patterns[PATTERNS_SIZE];
 static int          num_patterns = 0;
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
-#define COMBINE_MASK(a,b,c,d) ((a & b & c & d) | (~a & b & ~c & d))
+// New mask is 1 where both masks were 1 (b & d) and the addresses were equal ~(a ^ c).
+// If addresses were unequal the new mask must be 0 to allow for both values.
+#define COMBINE_MASK(a,b,c,d) ((b & d) & ~(a ^ c))
 
 /*
  * Combine two addr/mask pairs to one addr/mask pair.
@@ -72,7 +75,7 @@ static void combine(uintptr_t addr1, uintptr_t mask1, uintptr_t addr2, uintptr_t
     *mask = COMBINE_MASK(addr1, mask1, addr2, mask2);
 
     *addr  = addr1 | addr2;
-    *addr &= *mask;    // Normalise, no fundamental need for this
+    *addr &= *mask;    // Normalise to ensure sorting on .addr will work as intended
 }
 
 /*
@@ -104,58 +107,110 @@ static uintptr_t combi_cost(uintptr_t addr1, uintptr_t mask1, uintptr_t addr2, u
 }
 
 /*
- * Find the cheapest array index to extend with the given addr/mask pair.
- * Return -1 if nothing below the given minimum cost can be found.
+ * Determine if pattern is already covered by an existing pattern.
+ * Return true if that's the case, else false.
  */
-static int cheap_index(uintptr_t addr1, uintptr_t mask1, uintptr_t min_cost)
+static bool is_covered(pattern_t pattern)
 {
-    int i = num_patterns;
-    int idx = -1;
-    while (i-- > 0) {
-        uintptr_t tmp_cost = combi_cost(pattern[i].addr, pattern[i].mask, addr1, mask1);
-        if (tmp_cost < min_cost) {
+    for (int i = 0; i < num_patterns; i++) {
+        if (combi_cost(patterns[i].addr, patterns[i].mask, pattern.addr, pattern.mask) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
+ * Find the pair of entries that would be the cheapest to merge.
+ * Assumes patterns is sorted by .addr asc and that for each index i, the cheapest entry to merge with is at i-1 or i+1.
+ * Return -1 if <= 1 patterns exist, else the index of the first entry of the pair (the other being that + 1).
+ */
+static int cheapest_pair()
+{
+    // This is guaranteed to be overwritten with >= 0 as long as num_patterns > 1
+    int merge_idx = -1;
+
+    uintptr_t min_cost = UINTPTR_MAX;
+    for (int i = 0; i < num_patterns - 1; i++) {
+        uintptr_t tmp_cost = combi_cost(
+                patterns[i].addr,
+                patterns[i].mask,
+                patterns[i+1].addr,
+                patterns[i+1].mask
+        );
+        if (tmp_cost <= min_cost) {
             min_cost = tmp_cost;
-            idx = i;
+            merge_idx = i;
         }
     }
-    return idx;
+    return merge_idx;
 }
 
 /*
- * Try to find a relocation index for idx if it costs nothing.
- * Return -1 if no such index exists.
+ * Remove entries at idx and idx+1.
  */
-static int relocate_index(int idx)
+static void remove_pair(int idx)
 {
-    uintptr_t addr = pattern[idx].addr;
-    uintptr_t mask = pattern[idx].mask;
-    pattern[idx].addr = ~pattern[idx].addr;    // Never select idx
-    int new = cheap_index(addr, mask, 1 + addresses(mask));
-    pattern[idx].addr = addr;
-    return new;
+    for (int i = idx; i < num_patterns - 2; i++) {
+        patterns[i] = patterns[i + 2];
+    }
+    patterns[num_patterns - 1].addr = 0u;
+    patterns[num_patterns - 1].mask = 0u;
+    patterns[num_patterns - 2].addr = 0u;
+    patterns[num_patterns - 2].mask = 0u;
+    num_patterns -= 2;
 }
 
 /*
- * Relocate the given index idx only if free of charge.
- * This is useful to combine to `neighbouring' sections to integrate.
- * Inspired on the Buddy memalloc principle in the Linux kernel.
+ * Get the combined entry of idx1 and idx2.
  */
-static void relocate_if_free(int idx)
+static pattern_t combined_pattern(int idx1, int idx2)
 {
-    int newidx = relocate_index(idx);
-    if (newidx >= 0) {
-        uintptr_t caddr, cmask;
-        combine(pattern[newidx].addr, pattern[newidx].mask,
-                pattern[   idx].addr, pattern[   idx].mask,
-                &caddr, &cmask);
-        pattern[newidx].addr = caddr;
-        pattern[newidx].mask = cmask;
-        if (idx < --num_patterns) {
-            pattern[idx].addr = pattern[num_patterns].addr;
-            pattern[idx].mask = pattern[num_patterns].mask;
-        }
-        relocate_if_free (newidx);
+    pattern_t combined;
+    combine(
+            patterns[idx1].addr,
+            patterns[idx1].mask,
+            patterns[idx2].addr,
+            patterns[idx2].mask,
+            &combined.addr,
+            &combined.mask
+    );
+    return combined;
+}
+
+/*
+ * Insert pattern at index idx, shuffling other entries on index towards the end.
+ */
+static void insert_at(pattern_t pattern, int idx)
+{
+    // Move all entries >= idx one index towards the end to make space for the new entry
+    for (int i = num_patterns - 1; i >= idx; i--) {
+        patterns[i + 1] = patterns[i];
     }
+
+    patterns[idx] = pattern;
+    num_patterns++;
+}
+
+/*
+ * Insert entry (addr, mask) in patterns in an index i so that patterns[i-1].addr < patterns[i]
+ * NOTE: Assumes patterns is already sorted by .addr asc!
+ */
+static void insert_sorted(pattern_t pattern)
+{
+    // Normalise to ensure sorting on .addr will work as intended
+    pattern.addr &= pattern.mask;
+
+    // Find index to insert entry into
+    int new_idx = num_patterns;
+    for (int i = 0; i < num_patterns; i++) {
+        if (pattern.addr < patterns[i].addr) {
+            new_idx = i;
+            break;
+        }
+    }
+
+    insert_at(pattern, new_idx);
 }
 
 //------------------------------------------------------------------------------
@@ -165,26 +220,40 @@ static void relocate_if_free(int idx)
 void badram_init(void)
 {
     num_patterns = 0;
+
+    for (int idx = 0; idx < PATTERNS_SIZE; idx++) {
+        patterns[idx].addr = 0u;
+        patterns[idx].mask = 0u;
+    }
 }
 
 bool badram_insert(uintptr_t addr)
 {
-    if (cheap_index(addr, DEFAULT_MASK, 1) != -1) {
+    pattern_t pattern = {
+            .addr = addr,
+            .mask = DEFAULT_MASK
+    };
+
+    // If covered by existing entry we return immediately
+    if (is_covered(pattern)) {
         return false;
     }
 
-    if (num_patterns < MAX_PATTERNS) {
-        pattern[num_patterns].addr = addr;
-        pattern[num_patterns].mask = DEFAULT_MASK;
-        num_patterns++;
-        relocate_if_free(num_patterns - 1);
-    } else {
-        int idx = cheap_index(addr, DEFAULT_MASK, UINTPTR_MAX);
-        uintptr_t caddr, cmask;
-        combine(pattern[idx].addr, pattern[idx].mask, addr, DEFAULT_MASK, &caddr, &cmask);
-        pattern[idx].addr = caddr;
-        pattern[idx].mask = cmask;
-        relocate_if_free(idx);
+    // Add entry in order sorted by .addr asc
+    insert_sorted(pattern);
+
+    // If we have more patterns than the max we need to force a merge
+    if (num_patterns > MAX_PATTERNS) {
+        // Find the pair that is the cheapest to merge
+        // merge_idx will be -1 if num_patterns < 2, but that means MAX_PATTERNS = 0 which is not a valid state anyway
+        int merge_idx = cheapest_pair();
+
+        pattern_t combined = combined_pattern(merge_idx, merge_idx + 1);
+
+        // Remove the source pair so that we can maintain order as combined does not necessarily belong in merge_idx
+        remove_pair(merge_idx);
+
+        insert_sorted(combined);
     }
     return true;
 }
@@ -214,8 +283,8 @@ void badram_display(void)
             col = 7;
         }
         display_scrolled_message(col, "0x%0*x,0x%0*x",
-                                 TESTWORD_DIGITS, pattern[i].addr,
-                                 TESTWORD_DIGITS, pattern[i].mask);
+                                 TESTWORD_DIGITS, patterns[i].addr,
+                                 TESTWORD_DIGITS, patterns[i].mask);
         col += text_width;
     }
 }
