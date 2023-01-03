@@ -82,7 +82,7 @@ boot/startup.o: ../boot/startup64.S ../boot/boot.h
 
 boot/%.o: ../boot/%.S ../boot/boot.h
 	@mkdir -p boot
-	$(CC) -x assembler-with-cpp -c -I../boot -o $@ $<
+	$(CC) -x assembler-with-cpp -c -I../boot -Iapp -o $@ $<
 
 boot/efisetup.o: ../boot/efisetup.c
 	@mkdir -p boot

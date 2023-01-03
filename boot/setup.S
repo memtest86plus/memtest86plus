@@ -18,6 +18,7 @@
 #define __ASSEMBLY__
 
 #include "boot.h"
+#include "build_version.h"
 
 #define	BOOT_PARAMS_START	(SETUP_SECS * 512)
 #define	BOOT_PARAMS_END		(BOOT_PARAMS_START + 4096)
@@ -41,7 +42,7 @@ realmode_swtch:
 start_sys_seg:
 	.word	0x1000
 kernel_version:
-	.word	0
+	.word	mt86plus_version-512
 type_of_loader:
 	.byte	0
 loadflags:
@@ -384,6 +385,10 @@ gdt_descr:
 idt_descr:
 	.word	0			# idt limit=0
 	.long	0			# idt base=0
+
+mt86plus_version:
+	.ascii "Memtest86+ v" , MT_VERSION
+	.byte   0
 
 # Pad to the declared size.
 
