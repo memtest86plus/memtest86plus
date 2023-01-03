@@ -255,6 +255,10 @@ static void global_init(void)
 
     clear_message_area();
 
+    if (!smp_enabled) {
+        num_available_cpus = 1;
+    }
+
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
