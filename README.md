@@ -483,8 +483,9 @@ selected by the user.
 
 ### Test 2 : Address test, own address + window
 
-Across all memory regions, each address is written with its own address plus
-the window number and then each address is checked for consistency. This
+Across all memory regions, each address is written with its own virtual
+address plus the window number (for 32-bit images) or own physical address
+(for 64-bit images) and then each address is checked for consistency. This
 catches any errors in the high order address bits that would be missed when
 testing each window in turn. This test is performed sequentially with each
 available CPU, regardless of the CPU sequencing mode selected by the user.

@@ -16,6 +16,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "vmem.h"
+
 #include "display.h"
 #include "error.h"
 #include "test.h"
@@ -127,12 +129,20 @@ int test_own_addr1(int my_cpu)
 
 int test_own_addr2(int my_cpu, int stage)
 {
-    static testword_t offset = 0;
-    static int last_stage = -1;
-
     int ticks = 0;
 
-    offset = (stage == last_stage) ? offset + 1 : 1;
+    testword_t offset;
+
+    // Calculate the offset (in pages) between the virtual address and the physical address.
+    offset = (vm_map[0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
+    offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
+#ifdef __x86_64__
+    // Convert to a byte address offset. This will translate the virtual address into a physical address.
+    offset *= PAGE_SIZE;
+#else
+    // Convert to a VM window offset. This will get added into the LSBs of the virtual address.
+    offset /= VM_WINDOW_SIZE;
+#endif
 
     switch (stage) {
       case 0:
@@ -145,6 +155,5 @@ int test_own_addr2(int my_cpu, int stage)
         break;
     }
 
-    last_stage = stage;
     return ticks;
 }
