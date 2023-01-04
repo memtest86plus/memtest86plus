@@ -355,7 +355,7 @@ void display_temperature(void)
 
 void display_big_status(bool pass)
 {
-    if (big_status_displayed) {
+    if (!enable_big_status || big_status_displayed) {
         return;
     }
 

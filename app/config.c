@@ -91,6 +91,7 @@ bool            exclude_ecores     = true;
 
 bool            smp_enabled        = true;
 
+bool            enable_big_status  = true;
 bool            enable_temperature = true;
 bool            enable_trace       = false;
 
@@ -194,6 +195,8 @@ static void parse_option(const char *option, const char *params)
         parse_serial_params(params);
     } else if (strncmp(option, "nobench", 8) == 0) {
         enable_bench = false;
+    } else if (strncmp(option, "nobigstatus", 12) == 0) {
+        enable_big_status = false;
     } else if (strncmp(option, "noehci", 7) == 0) {
         usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nopause", 8) == 0) {
