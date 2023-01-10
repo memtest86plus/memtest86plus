@@ -81,7 +81,7 @@ boot/startup.o: ../boot/startup32.S ../boot/boot.h
 	@mkdir -p boot
 	$(CC) -m32 -x assembler-with-cpp -c -I../boot -o $@ $<
 
-boot/%.o: ../boot/%.S ../boot/boot.h
+boot/%.o: ../boot/%.S ../boot/boot.h app/build_version.h
 	@mkdir -p boot
 	$(CC) -m32 -x assembler-with-cpp -c -I../boot -Iapp -o $@ $<
 
