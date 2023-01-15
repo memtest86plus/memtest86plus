@@ -50,6 +50,7 @@ static bool amd_sb_get_smb(void);
 static bool fch_zen_get_smb(void);
 static bool piix4_get_smb(void);
 static bool ich5_get_smb(void);
+static bool viapro_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
@@ -1251,7 +1252,8 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                     // viapro SMBus controller.
                 // case 0x3074: // 8233_0
                 // case 0x3147: // 8233A
-                // case 0x3177: // 8235
+                case 0x3177: // 8235
+			return viapro_get_smb();
                 // case 0x3227: // 8237
                 // case 0x3337: // 8237A
                 // case 0x3372: // 8237S
@@ -1346,6 +1348,24 @@ static bool ich5_get_smb(void)
     usleep(1000);
 
     return (smbusbase != 0);
+}
+
+// ----------------------
+// VIA SMBUS Controller
+// ----------------------
+// detection based on Linux/i2c-viapro
+static bool viapro_get_smb(void)
+{
+    uint16_t x = pci_config_read16(0, smbdev, smbfun, 0xD0);
+
+    if (!(x & 1)) {
+        return false;
+    }
+
+    smbusbase = x & 0xFFF0;
+    if (smbusbase == 0)
+        return false;
+    return true;
 }
 
 // --------------------
@@ -1568,7 +1588,7 @@ static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
     // Start transaction
     __outb(NVSMBCNT_BYTE_DATA | NVSMBCNT_READ, NVSMBCNT);
 
-    // Wait until transction complete
+    // Wait until transaction complete
     for (i = 500; i > 0; i--) {
         usleep(50);
         if (__inb(NVSMBCNT) == 0) {
