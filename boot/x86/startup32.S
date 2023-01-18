@@ -104,6 +104,7 @@ startup:
 	movl	%esi, boot_params_addr@GOTOFF(%ebx)
 
 	# ...and check if the processor supports long mode.
+	# TODO and NX
 
 	movl	$0x80000000, %eax	# check if function 0x80000001 is available
 	pushl	%ebx			# ebx is overwritten by cpuid
@@ -206,7 +207,7 @@ init_idt_descr:
 	jz	1f			# bail if not supported
 
 	movl	%cr4, %eax		# enable PAE
-	orl	$0x00000020, %eax
+	orb	$0x20, %al
 	movl	%eax, %cr4
 
 	leal	pdp@GOTOFF(%ebx), %eax	# set the page directory base address
@@ -219,7 +220,7 @@ init_idt_descr:
 
 	movl	$0xc0000080, %ecx	# enable long mode
 	rdmsr
-	orl	$0x00000100, %eax
+	orb	$0x01, %ah
 	wrmsr
 
 	leal	pml4@GOTOFF(%ebx), %eax # set the page directory base address
@@ -648,17 +649,17 @@ gdt_end:
 
 	.data
 
-	.macro	ptes64 start, count=64
-	.quad	\start + 0x0000000 + 0x83
-	.quad	\start + 0x0200000 + 0x83
-	.quad	\start + 0x0400000 + 0x83
-	.quad	\start + 0x0600000 + 0x83
-	.quad	\start + 0x0800000 + 0x83
-	.quad	\start + 0x0A00000 + 0x83
-	.quad	\start + 0x0C00000 + 0x83
-	.quad	\start + 0x0E00000 + 0x83
+	.macro	ptes64 start, flags, count=64
+	.quad	\start + 0x0000000 + \flags
+	.quad	\start + 0x0200000 + \flags
+	.quad	\start + 0x0400000 + \flags
+	.quad	\start + 0x0600000 + \flags
+	.quad	\start + 0x0800000 + \flags
+	.quad	\start + 0x0A00000 + \flags
+	.quad	\start + 0x0C00000 + \flags
+	.quad	\start + 0x0E00000 + \flags
 	.if \count-1
-	ptes64	"(\start+0x01000000)",\count-1
+	ptes64	"(\start+0x01000000)", \flags, \count-1
 	.endif
 	.endm
 
@@ -702,22 +703,22 @@ pdp:
 	.align	4096
 	.globl	pd0
 pd0:
-	ptes64	0x0000000000000000
+	ptes64	0x0000000000000000,0x0000000000000083
 
 	.align	4096
 	.globl	pd1
 pd1:
-	ptes64	0x0000000040000000
+	ptes64	0x0000000040000000,0x0000000000000083
 
 	.align	4096
 	.globl	pd2
 pd2:
-	ptes64	0x0000000080000000
+	ptes64	0x0000000080000000,0x0000000000000083
 
 	.align	4096
 	.globl	pd3
 pd3:
-	ptes64	0x00000000C0000000
+	ptes64	0x00000000C0000000,0x0000000000000083
 
 	.previous
 
