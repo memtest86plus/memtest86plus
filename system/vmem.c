@@ -125,13 +125,14 @@ bool map_window(uintptr_t start_page)
         return false;
     }
     if (cpuid_info.flags.lm == 0 && (start_page >= PAGE_C(64,GB))) {
-         // Fail, we want an address that is out of bounds
-         // for PAE and no long mode (ie. 32 bit CPU).
+        // Fail, we want an address that is out of bounds
+        // for PAE and no long mode (ie. 32 bit CPU).
         return false;
     }
     // Compute the page table entries.
+    uint64_t flags = cpuid_info.flags.nx ? UINT64_C(0x8000000000000083) : 0x83;
     for (uintptr_t i = 0; i < 512; i++) {
-        pd2[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + 0x83;
+        pd2[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + flags;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
     load_pdbr();
