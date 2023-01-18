@@ -71,14 +71,14 @@ startup32:
 	# Enable PAE.
 
 	movl	%cr4, %eax
-	orl	$0x20, %eax
+	orb	$0x20, %al
 	movl	%eax, %cr4
 
 	# Enable long mode.
 
 	movl	$0xc0000080, %ecx
 	rdmsr
-	orl	$0x00000100, %eax
+	orb	$0x01, %ah
 	wrmsr
 
 	# Enable paging and protection.
@@ -182,6 +182,13 @@ startup:
 	leaq	_stacks(%rip), %rsp
 	addq	%rax, %rsp
 
+	# Enable NX.
+
+	movl	$0xc0000080, %ecx
+	rdmsr
+	orb	$0x08, %ah
+	wrmsr
+
 	# Initialise the pml4 and pdp tables.
 
 	leaq	pml4(%rip), %rcx
@@ -274,8 +281,8 @@ flush:	movw	$KERNEL_DS, %ax
 	# Enable SSE.
 
 	movq	%cr0, %rax
-	andw	$0xfffb, %ax		# clear coprocessor emulation bit
-	orw	$0x0002, %ax		# set coprocessor monitoring bit
+	andb	$0xfb, %al		# clear coprocessor emulation bit
+	orb	$0x02, %al		# set coprocessor monitoring bit
 	mov	%rax, %cr0
 	movq	%cr4, %rax
 	orw	$0x0600, %ax		# set OSFXSR and OSXMMEXCPT
@@ -634,14 +641,14 @@ data32	lgdt	ap_gdt_descr - ap_trampoline
 	# Enable PAE.
 
 	movl	%cr4, %eax
-	orl	$0x20, %eax
+	orb	$0x20, %al
 	movl	%eax, %cr4
 
 	# Enable long mode.
 
 	movl	$0xc0000080, %ecx
 	rdmsr
-	orl	$0x00000100, %eax
+	orb	$0x01, %ah
 	wrmsr
 
 	# Enable paging and protection.
@@ -649,6 +656,13 @@ data32	lgdt	ap_gdt_descr - ap_trampoline
 	movl	%cr0, %eax
 	orl	$0x80000001, %eax
 	movl	%eax, %cr0
+
+	# Enable NX.
+
+	movl	$0xc0000080, %ecx
+	rdmsr
+	orb	$0x08, %ah
+	wrmsr
 
 	# Jump to the 64-bit entry point.
 ap_jump:
