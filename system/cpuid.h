@@ -100,7 +100,9 @@ typedef union {
         uint32_t            : 12;   // ECX feature flags, bit 20
         uint32_t    x2apic  : 1;
         uint32_t            : 10;   // ECX feature flags, bit 31
-        uint32_t            : 29;   // EDX extended feature flags, bit 0
+        uint32_t            : 19;   // EDX extended feature flags, bit 0
+        uint32_t    nx      : 1;
+        uint32_t            : 9;
         uint32_t    lm      : 1;
         uint32_t            : 2;    // EDX extended feature flags, bit 31
     };
