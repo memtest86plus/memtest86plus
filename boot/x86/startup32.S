@@ -104,6 +104,7 @@ startup:
 	movl	%esi, boot_params_addr@GOTOFF(%ebx)
 
 	# ...and check if the processor supports long mode.
+	# TODO and NX
 
 	movl	$0x80000000, %eax	# check if function 0x80000001 is available
 	pushl	%ebx			# ebx is overwritten by cpuid
@@ -206,7 +207,7 @@ init_idt_descr:
 	jz	1f			# bail if not supported
 
 	movl	%cr4, %eax		# enable PAE
-	orl	$0x00000020, %eax
+	orb	$0x20, %al
 	movl	%eax, %cr4
 
 	leal	pdp@GOTOFF(%ebx), %eax	# set the page directory base address
@@ -219,7 +220,7 @@ init_idt_descr:
 
 	movl	$0xc0000080, %ecx	# enable long mode
 	rdmsr
-	orl	$0x00000100, %eax
+	orb	$0x01, %ah
 	wrmsr
 
 	leal	pml4@GOTOFF(%ebx), %eax # set the page directory base address
