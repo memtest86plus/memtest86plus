@@ -71,14 +71,14 @@ startup32:
 	# Enable PAE.
 
 	movl	%cr4, %eax
-	orl	$0x20, %eax
+	orb	$0x20, %al
 	movl	%eax, %cr4
 
 	# Enable long mode.
 
 	movl	$0xc0000080, %ecx
 	rdmsr
-	orl	$0x00000100, %eax
+	orb	$0x01, %ah
 	wrmsr
 
 	# Enable paging and protection.
@@ -161,6 +161,13 @@ startup:
 	addq	$(BSP_STACK_SIZE - LOCALS_SIZE), %rax
 	leaq	_stacks(%rip), %rsp
 	addq	%rax, %rsp
+
+	# Enable NX.
+
+	movl	$0xc0000080, %ecx
+	rdmsr
+	orb	$0x08, %ah
+	wrmsr
 
 	# Initialise the pml4 and pdp tables.
 
@@ -255,8 +262,8 @@ flush:	movw	$KERNEL_DS, %ax
 	# Enable SSE.
 
 	movq	%cr0, %rax
-	andw	$0xfffb, %ax		# clear coprocessor emulation bit
-	orw	$0x0002, %ax		# set coprocessor monitoring bit
+	andb	$0xfb, %al		# clear coprocessor emulation bit
+	orb	$0x02, %al		# set coprocessor monitoring bit
 	mov	%rax, %cr0
 	movq	%cr4, %rax
 	orw	$0x0600, %ax		# set OSFXSR and OSXMMEXCPT
@@ -465,17 +472,17 @@ gdt_end:
 
 	.data
 
-	.macro	ptes64 start, count=64
-	.quad	\start + 0x0000000 + 0x83
-	.quad	\start + 0x0200000 + 0x83
-	.quad	\start + 0x0400000 + 0x83
-	.quad	\start + 0x0600000 + 0x83
-	.quad	\start + 0x0800000 + 0x83
-	.quad	\start + 0x0A00000 + 0x83
-	.quad	\start + 0x0C00000 + 0x83
-	.quad	\start + 0x0E00000 + 0x83
+	.macro	ptes64 start, flags, count=64
+	.quad	\start + 0x0000000 + \flags
+	.quad	\start + 0x0200000 + \flags
+	.quad	\start + 0x0400000 + \flags
+	.quad	\start + 0x0600000 + \flags
+	.quad	\start + 0x0800000 + \flags
+	.quad	\start + 0x0A00000 + \flags
+	.quad	\start + 0x0C00000 + \flags
+	.quad	\start + 0x0E00000 + \flags
 	.if \count-1
-	ptes64	"(\start+0x01000000)",\count-1
+	ptes64	"(\start+0x01000000)", \flags, \count-1
 	.endif
 	.endm
 
@@ -514,22 +521,22 @@ pdp:
 	.align	4096
 	.globl	pd0
 pd0:
-	ptes64	0x0000000000000000
+	ptes64	0x0000000000000000,0x0000000000000083
 
 	.align	4096
 	.globl	pd1
 pd1:
-	ptes64	0x0000000040000000
+	ptes64	0x0000000040000000,0x0000000000000083
 
 	.align	4096
 	.globl	pd2
 pd2:
-	ptes64	0x0000000080000000
+	ptes64	0x0000000080000000,0x8000000000000083
 
 	.align	4096
 	.globl	pd3
 pd3:
-	ptes64	0x00000000C0000000
+	ptes64	0x00000000C0000000,0x0000000000000083
 
 	.previous
 
@@ -567,14 +574,14 @@ data32	lgdt	ap_gdt_descr - ap_trampoline
 	# Enable PAE.
 
 	movl	%cr4, %eax
-	orl	$0x20, %eax
+	orb	$0x20, %al
 	movl	%eax, %cr4
 
 	# Enable long mode.
 
 	movl	$0xc0000080, %ecx
 	rdmsr
-	orl	$0x00000100, %eax
+	orb	$0x01, %ah
 	wrmsr
 
 	# Enable paging and protection.
@@ -582,6 +589,13 @@ data32	lgdt	ap_gdt_descr - ap_trampoline
 	movl	%cr0, %eax
 	orl	$0x80000001, %eax
 	movl	%eax, %cr0
+
+	# Enable NX.
+
+	movl	$0xc0000080, %ecx
+	rdmsr
+	orb	$0x08, %ah
+	wrmsr
 
 	# Jump to the 64-bit entry point.
 ap_jump:
