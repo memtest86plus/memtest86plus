@@ -42,7 +42,7 @@ static const rgb_value_t vga_pallete[16] = {
     { 255, 255, 255 }   // BOLD+WHITE
 };
 
-static vga_buffer_t *vga_buffer = (vga_buffer_t *)(0xb8000);
+static vga_buffer_t *vga_buffer = NULL;
 
 vga_buffer_t shadow_buffer;
 
@@ -64,7 +64,9 @@ static void vga_put_char(int row, int col, uint8_t ch, uint8_t attr)
     shadow_buffer[row][col].ch   = ch;
     shadow_buffer[row][col].attr = attr;
 
-    (*vga_buffer)[row][col].value = shadow_buffer[row][col].value;
+    if (vga_buffer) {
+        (*vga_buffer)[row][col].value = shadow_buffer[row][col].value;
+    }
 }
 
 static void lfb8_put_char(int row, int col, uint8_t ch, uint8_t attr)
@@ -239,6 +241,8 @@ void screen_init(void)
             uint32_t b = ((vga_pallete[i].b * b_max) / 255) << screen_info->blue_pos;
             lfb_pallete[i] = r | g | b;
         }
+    } else if (screen_info->orig_video_isVGA != VIDEO_TYPE_NONE) {
+        vga_buffer = (vga_buffer_t *)(0xb8000);
     }
 }
 

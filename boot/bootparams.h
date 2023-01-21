@@ -58,6 +58,7 @@ typedef struct {
 
 #define VIDEO_TYPE_VLFB             0x23    // VESA VGA in graphic mode
 #define VIDEO_TYPE_EFI              0x70    // EFI graphic mode
+#define VIDEO_TYPE_NONE             0xff    // no video display (added for Memtest86+)
 
 #define LFB_CAPABILITY_64BIT_BASE   (1 << 1)
 

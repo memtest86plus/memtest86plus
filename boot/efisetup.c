@@ -334,9 +334,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     efi_graphics_output_t *gop = find_gop(handles, handles_size);
     if (!gop) {
-#if DEBUG
-        print_string("GOP not found\n");
-#endif
+        print_string("No graphics display found\n");
         return EFI_NOT_FOUND;
     }
 
@@ -365,9 +363,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         efi_call_bs(free_pool, info);
     }
     if (best_mode == UINT32_MAX) {
-#if DEBUG
-        print_string("No suitable GOP screen resolution\n");
-#endif
+        print_string("No suitable screen resolution found\n");
         return EFI_NOT_FOUND;
     }
 
@@ -469,9 +465,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     status = efi_call_proto(gop, set_mode, best_mode);
     if (status != EFI_SUCCESS) {
-#if DEBUG
         print_string("Set GOP mode failed\n");
-#endif
         return status;
     }
 
@@ -501,6 +495,11 @@ static efi_status_t set_screen_info(boot_params_t *boot_params)
                              &handles_size, handles);
         if (status == EFI_SUCCESS) {
             status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size);
+        }
+        if (status == EFI_NOT_FOUND) {
+            // This may be a headless system. We can still output to a serial console.
+            boot_params->screen_info.orig_video_isVGA = VIDEO_TYPE_NONE;
+            status = EFI_SUCCESS;
         }
         efi_call_bs(free_pool, handles);
     }
