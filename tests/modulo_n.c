@@ -39,7 +39,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
-        if ((end - start) < (n - 1)) continue;  // we need at least n words for this test
+        if ((end - start) < (n - 1)) SKIP_RANGE(1)  // we need at least n words for this test
         end -= n;  // avoids pointer overflow when incrementing p
 
         testword_t *p  = start + offset;  // we assume each chunk has at least 'n' words, so this won't overflow
@@ -72,7 +72,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
-            if ((end - start) < (n - 1)) continue;  // we need at least n words for this test
+            if ((end - start) < (n - 1)) SKIP_RANGE(1)  // we need at least n words for this test
 
             int k = 0;
             testword_t *p  = start;
@@ -113,7 +113,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
-        if ((end - start) < (n - 1)) continue;  // we need at least n words for this test
+        if ((end - start) < (n - 1)) SKIP_RANGE(1)  // we need at least n words for this test
         end -= n;  // avoids pointer overflow when incrementing p
 
         testword_t *p  = start + offset;  // we assume each chunk has at least 'offset' words, so this won't overflow

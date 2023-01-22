@@ -25,6 +25,16 @@
  * enabled cores.
  */
 extern uint8_t chunk_index[MAX_CPUS];
+/**
+ * A mapping from a CPU core number to the index number of the memory chunk
+ * it operates on when performing a memory test in parallel across all the
+ * enabled cores in the current proximity domain.
+ */
+extern uint8_t chunk_index_in_proximity_domain[MAX_CPUS];
+/**
+ * An array where the count of used CPUs in the current proximity domain.
+ */
+extern uint8_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
  /*
   * The number of CPU cores being used for the current test. This is always
@@ -87,6 +97,7 @@ typedef struct {
     uintptr_t   pm_base_addr;
     testword_t  *start;
     testword_t  *end;
+    uint32_t    proximity_domain_idx;
 } vm_map_t;
 
 /**

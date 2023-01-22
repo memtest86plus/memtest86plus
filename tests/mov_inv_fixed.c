@@ -41,7 +41,8 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
     for (int i = 0; i < vm_map_size; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
-        if (end < start) continue;  // we need at least one word for this test
+        __asm__ volatile("nop");
+        if (end < start) SKIP_RANGE(1) // we need at least one word for this test
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -100,7 +101,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
         for (int j = 0; j < vm_map_size; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
-            if (end < start) continue;  // we need at least one word for this test
+            if (end < start) SKIP_RANGE(1) // we need at least one word for this test
 
             testword_t *p  = start;
             testword_t *pe = start;
@@ -136,7 +137,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
         for (int j = vm_map_size - 1; j >= 0; j--) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
-            if (end < start) continue;  // we need at least one word for this test
+            if (end < start) SKIP_RANGE(1) // we need at least one word for this test
 
             testword_t *p  = end;
             testword_t *ps = end;
@@ -166,6 +167,8 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 BAILOUT;
             } while (!at_start && --ps); // advance ps to next start point
         }
+
+        __asm__ volatile("nop");
     }
 
     return ticks;

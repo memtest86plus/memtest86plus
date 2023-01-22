@@ -99,6 +99,7 @@ bool            enable_sm          = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
 bool            enable_nontemporal = false;
+bool            enable_numa        = false;
 
 bool            pause_at_start     = true;
 
@@ -246,6 +247,8 @@ static void parse_option(const char *option, const char *params)
         enable_sm = false;
     } else if (strncmp(option, "nosmp", 6) == 0) {
         smp_enabled = false;
+    } else if (strncmp(option, "numa", 5) == 0) {
+        enable_numa = true;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;

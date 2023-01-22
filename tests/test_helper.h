@@ -49,6 +49,11 @@
 #define BAILOUT if (bail) return ticks
 
 /**
+ * A macro to skip the current range without disturbing waits on barriers and creating a deadlock.
+ */
+#define SKIP_RANGE(num_ticks) { if (my_cpu >= 0) { for (int iter = 0; iter < num_ticks; iter++) { do_tick(my_cpu); BAILOUT; } } continue; }
+
+/**
  * Returns value rounded down to the nearest multiple of align_size.
  */
 static inline uintptr_t round_down(uintptr_t value, size_t align_size)

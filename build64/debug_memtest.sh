@@ -70,6 +70,11 @@ while getopts ":hct:" option; do
 done
 
 Check() {
+    if [ "x$MACHINE" = "x" ] || [ "x$MEMSIZE" = "x" ]; then
+        echo "Please set MACHINE and MEMSIZE"
+        exit 1
+    fi
+
     # Check if QEMU and OVMF are installed
     if ! command -v qemu-system-x86_64 > /dev/null 2>&1; then
         echo "Qemu not installed"
@@ -135,6 +140,143 @@ Init() {
     QEMU_FLAGS+=" -hda fat:rw:hda-contents -net none"
     QEMU_FLAGS+=" -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd"
     QEMU_FLAGS+=" -drive if=pflash,format=raw,file=OVMF_VARS.fd"
+#   QEMU_FLAGS+=" -machine q35 -acpitable file=../ACPI/RS904A/hpet.dat:../ACPI/RS904A/srat_32c.dat:../ACPI/RS904A/apic_32c.dat:../ACPI/RS904A/slit.dat -smbios file=../SPD/dmidecode_rs904a2_dump.bin"
+#   QEMU_FLAGS+=" -machine q35 -acpitable file=../ACPI/RS904A/apic_32c.dat:../ACPI/RS904A/slit.dat -smbios file=../SPD/dmidecode_rs904a2_dump.bin"
+    QEMU_FLAGS+=" -machine q35" # q35,accel=kvm
+
+    if [ "x$MACHINE" = "x4S32CBulldozer" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu Opteron_G4" # -cpu host Opteron_G5
+        QEMU_FLAGS+=" -smp 32,sockets=4,cores=8,maxcpus=32"
+
+        MEMSIZE8=$((MEMSIZE / 8))
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m0,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m1,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m2,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m3,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m4,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m5,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m6,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE8}M,id=m7,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0-3"
+        QEMU_FLAGS+=" -numa node,nodeid=1,memdev=m1,cpus=4-7"
+        QEMU_FLAGS+=" -numa node,nodeid=2,memdev=m2,cpus=8-11"
+        QEMU_FLAGS+=" -numa node,nodeid=3,memdev=m3,cpus=12-15"
+        QEMU_FLAGS+=" -numa node,nodeid=4,memdev=m4,cpus=16-19"
+        QEMU_FLAGS+=" -numa node,nodeid=5,memdev=m5,cpus=20-23"
+        QEMU_FLAGS+=" -numa node,nodeid=6,memdev=m6,cpus=24-27"
+        QEMU_FLAGS+=" -numa node,nodeid=7,memdev=m7,cpus=28-31"
+
+        QEMU_FLAGS+=" -numa dist,src=0,dst=1,val=16"
+        QEMU_FLAGS+=" -numa dist,src=0,dst=2,val=16"
+        QEMU_FLAGS+=" -numa dist,src=0,dst=3,val=22"
+        QEMU_FLAGS+=" -numa dist,src=0,dst=4,val=16"
+        QEMU_FLAGS+=" -numa dist,src=0,dst=5,val=22"
+        QEMU_FLAGS+=" -numa dist,src=0,dst=6,val=16"
+        QEMU_FLAGS+=" -numa dist,src=0,dst=7,val=22"
+
+        QEMU_FLAGS+=" -numa dist,src=1,dst=0,val=16"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=2,val=16"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=3,val=22"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=4,val=22"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=5,val=16"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=6,val=22"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=7,val=16"
+
+        QEMU_FLAGS+=" -numa dist,src=2,dst=0,val=16"
+        QEMU_FLAGS+=" -numa dist,src=2,dst=1,val=16"
+        QEMU_FLAGS+=" -numa dist,src=2,dst=3,val=16"
+        QEMU_FLAGS+=" -numa dist,src=2,dst=4,val=16"
+        QEMU_FLAGS+=" -numa dist,src=2,dst=5,val=22"
+        QEMU_FLAGS+=" -numa dist,src=2,dst=6,val=16"
+        QEMU_FLAGS+=" -numa dist,src=2,dst=7,val=16"
+
+        QEMU_FLAGS+=" -numa dist,src=3,dst=0,val=22"
+        QEMU_FLAGS+=" -numa dist,src=3,dst=1,val=22"
+        QEMU_FLAGS+=" -numa dist,src=3,dst=2,val=16"
+        QEMU_FLAGS+=" -numa dist,src=3,dst=4,val=22"
+        QEMU_FLAGS+=" -numa dist,src=3,dst=5,val=16"
+        QEMU_FLAGS+=" -numa dist,src=3,dst=6,val=16"
+        QEMU_FLAGS+=" -numa dist,src=3,dst=7,val=16"
+
+        QEMU_FLAGS+=" -numa dist,src=4,dst=0,val=16"
+        QEMU_FLAGS+=" -numa dist,src=4,dst=1,val=22"
+        QEMU_FLAGS+=" -numa dist,src=4,dst=2,val=16"
+        QEMU_FLAGS+=" -numa dist,src=4,dst=3,val=22"
+        QEMU_FLAGS+=" -numa dist,src=4,dst=5,val=16"
+        QEMU_FLAGS+=" -numa dist,src=4,dst=6,val=16"
+        QEMU_FLAGS+=" -numa dist,src=4,dst=7,val=22"
+
+        QEMU_FLAGS+=" -numa dist,src=5,dst=0,val=22"
+        QEMU_FLAGS+=" -numa dist,src=5,dst=1,val=16"
+        QEMU_FLAGS+=" -numa dist,src=5,dst=2,val=22"
+        QEMU_FLAGS+=" -numa dist,src=5,dst=3,val=16"
+        QEMU_FLAGS+=" -numa dist,src=5,dst=4,val=16"
+        QEMU_FLAGS+=" -numa dist,src=5,dst=6,val=16"
+        QEMU_FLAGS+=" -numa dist,src=5,dst=7,val=22"
+
+        QEMU_FLAGS+=" -numa dist,src=6,dst=0,val=16"
+        QEMU_FLAGS+=" -numa dist,src=6,dst=1,val=22"
+        QEMU_FLAGS+=" -numa dist,src=6,dst=2,val=16"
+        QEMU_FLAGS+=" -numa dist,src=6,dst=3,val=16"
+        QEMU_FLAGS+=" -numa dist,src=6,dst=4,val=16"
+        QEMU_FLAGS+=" -numa dist,src=6,dst=5,val=16"
+        QEMU_FLAGS+=" -numa dist,src=6,dst=7,val=16"
+
+        QEMU_FLAGS+=" -numa dist,src=7,dst=0,val=22"
+        QEMU_FLAGS+=" -numa dist,src=7,dst=1,val=16"
+        QEMU_FLAGS+=" -numa dist,src=7,dst=2,val=16"
+        QEMU_FLAGS+=" -numa dist,src=7,dst=3,val=16"
+        QEMU_FLAGS+=" -numa dist,src=7,dst=4,val=22"
+        QEMU_FLAGS+=" -numa dist,src=7,dst=5,val=22"
+        QEMU_FLAGS+=" -numa dist,src=7,dst=6,val=16"
+
+#[02Ch 0044   8]                 Locality   0 : 0A 10 10 16 10 16 10 16
+#[034h 0052   8]                 Locality   1 : 10 0A 10 16 16 10 16 10
+#[03Ch 0060   8]                 Locality   2 : 10 10 0A 10 10 16 10 10
+#[044h 0068   8]                 Locality   3 : 16 16 10 0A 16 10 10 10
+#[04Ch 0076   8]                 Locality   4 : 10 16 10 16 0A 10 10 16
+#[054h 0084   8]                 Locality   5 : 16 10 16 10 10 0A 10 16
+#[05Ch 0092   8]                 Locality   6 : 10 16 10 10 10 10 0A 10
+#[064h 0100   8]                 Locality   7 : 16 10 10 10 16 16 10 0A
+
+    elif [ "x$MACHINE" = "x2S12CWestmere" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu Westmere-v2"
+        QEMU_FLAGS+=" -smp 12,sockets=2,cores=6,maxcpus=12"
+
+        MEMSIZE2=$((MEMSIZE / 2))
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE2}M,id=m0,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE2}M,id=m1,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0-5"
+        QEMU_FLAGS+=" -numa node,nodeid=1,memdev=m1,cpus=6-11"
+
+        QEMU_FLAGS+=" -numa dist,src=0,dst=1,val=20"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=0,val=20"
+
+    elif [ "x$MACHINE" = "x2S2CPenryn" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu Penryn-v1"
+        QEMU_FLAGS+=" -smp 2,sockets=2,cores=1,maxcpus=2"
+
+        MEMSIZE2=$((MEMSIZE / 2))
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE2}M,id=m0,prealloc=on"
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE2}M,id=m1,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0"
+        QEMU_FLAGS+=" -numa node,nodeid=1,memdev=m1,cpus=1"
+
+        QEMU_FLAGS+=" -numa dist,src=0,dst=1,val=21"
+        QEMU_FLAGS+=" -numa dist,src=1,dst=0,val=21"
+
+    elif [ "x$MACHINE" = "x1S1CPhenom" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu phenom-v1"
+        QEMU_FLAGS+=" -smp 1,sockets=1,cores=1,maxcpus=1"
+
+    fi
 
     # Define offsets for loading of symbol-table
     IMAGEBASE=0x200000

@@ -224,7 +224,7 @@ static void init_pm_map(const e820_entry_t e820_map[], int e820_entries)
 
 static void sort_pm_map(void)
 {
-    // Do an insertion sort on the pm_map. On an already sorted list this should be a O(1) algorithm.
+    // Do an insertion sort on the pm_map. On an already sorted list this should be a O(n) algorithm.
     for (int i = 0; i < pm_map_size; i++) {
         // Find where to insert the current element.
         int j = i - 1;
