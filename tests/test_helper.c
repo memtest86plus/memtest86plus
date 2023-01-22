@@ -40,15 +40,41 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         *start = vm_map[segment].start;
         *end   = vm_map[segment].end;
     } else {
-        uintptr_t segment_size = (vm_map[segment].end - vm_map[segment].start + 1) * sizeof(testword_t);
-        uintptr_t chunk_size   = round_down(segment_size / num_active_cpus, chunk_align);
+        if (enable_numa) {
+            uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(my_cpu);
 
-        // Calculate chunk boundaries.
-        *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * chunk_index[my_cpu]);
-        *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
+            // Is this CPU in the same proximity domain as the current segment ?
+            if (proximity_domain_idx == vm_map[segment].proximity_domain_idx) {
+                uintptr_t segment_size = (vm_map[segment].end - vm_map[segment].start + 1) * sizeof(testword_t);
+                uintptr_t chunk_size   = round_down(segment_size / used_cpus_in_proximity_domain[proximity_domain_idx], chunk_align);
 
-        if (*end > vm_map[segment].end) {
-            *end = vm_map[segment].end;
+                // Calculate chunk boundaries.
+                *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * chunk_index_in_proximity_domain[my_cpu]);
+                *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
+
+                __asm__ volatile("nop");
+
+                if (*end > vm_map[segment].end) {
+                    *end = vm_map[segment].end;
+                }
+            }
+            else {
+                // Nope.
+                *start = (testword_t *)1;
+                *end = (testword_t *)0;
+            }
+        }
+        else {
+            uintptr_t segment_size = (vm_map[segment].end - vm_map[segment].start + 1) * sizeof(testword_t);
+            uintptr_t chunk_size   = round_down(segment_size / num_active_cpus, chunk_align);
+
+            // Calculate chunk boundaries.
+            *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * chunk_index[my_cpu]);
+            *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
+
+            if (*end > vm_map[segment].end) {
+                *end = vm_map[segment].end;
+            }
         }
     }
 }

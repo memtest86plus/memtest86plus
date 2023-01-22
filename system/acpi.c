@@ -64,18 +64,6 @@ typedef struct {
     uint8_t     reserved[3];
 } rsdp_t;
 
-typedef struct {
-    char        signature[4];   // "RSDT" or "XSDT"
-    uint32_t    length;
-    uint8_t     revision;
-    uint8_t     checksum;
-    char        oem_id[6];
-    char        oem_table_id[8];
-    char        oem_revision[4];
-    char        creator_id[4];
-    char        creator_revision[4];
-} rsdt_header_t;
-
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -89,7 +77,7 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 const char *rsdp_source = "";
 
-acpi_t acpi_config = {0, 0, 0, 0, 0, 0, 0, false};
+acpi_t acpi_config = {0, 0, 0, 0, 0, 0, 0, 0, 0, false};
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -269,7 +257,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
 
 static bool parse_fadt(uintptr_t fadt_addr)
 {
-    // FADT is a very big & complex table and we only need a few data.
+    // FADT is a very big & complex table and we only need a few pieces of data.
     // We use byte offset instead of a complete struct.
 
     // FADT Header is identical to RSDP Header
@@ -287,7 +275,7 @@ static bool parse_fadt(uintptr_t fadt_addr)
         acpi_config.ver_min = *(uint8_t *)(fadt_addr+FADT_MINOR_REV_OFFSET) & 0xF;
     }
 
-    // Get Old PM Base Address (32bit IO)
+    // Get Old PM Base Address (32-bit IO)
     acpi_config.pm_addr  = *(uint32_t *)(fadt_addr+FADT_PM_TMR_BLK_OFFSET);
     acpi_config.pm_is_io = true;
 
@@ -341,4 +329,8 @@ void acpi_init(void)
     }
 
     acpi_config.hpet_addr = find_acpi_table(HPETSignature);
+
+    acpi_config.srat_addr = find_acpi_table(SRATSignature);
+
+    acpi_config.slit_addr = find_acpi_table(SLITSignature);
 }

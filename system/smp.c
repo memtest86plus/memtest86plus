@@ -37,8 +37,6 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define MAX_APIC_IDS                256
-
 #define APIC_REGS_SIZE              SIZE_C(4,KB)
 
 // APIC registers
@@ -80,26 +78,37 @@
 
 // MP config table entry types
 
-#define MP_PROCESSOR                0
-#define MP_BUS                      1
-#define MP_IOAPIC                   2
-#define MP_INTSRC                   3
-#define MP_LINTSRC                  4
+#define MP_PROCESSOR                   0
+#define MP_BUS                         1
+#define MP_IOAPIC                      2
+#define MP_INTSRC                      3
+#define MP_LINTSRC                     4
 
 // MP processor cpu_flag values
 
-#define CPU_ENABLED                 1
-#define CPU_BOOTPROCESSOR           2
+#define CPU_ENABLED                    1
+#define CPU_BOOTPROCESSOR              2
 
 // MADT entry types
 
-#define MADT_PROCESSOR              0
-#define MADT_LAPIC_ADDR             5
+#define MADT_PROCESSOR                 0
+#define MADT_LAPIC_ADDR                5
 
 // MADT processor flag values
 
-#define MADT_PF_ENABLED             0x1
-#define MADT_PF_ONLINE_CAPABLE      0x2
+#define MADT_PF_ENABLED                0x1
+#define MADT_PF_ONLINE_CAPABLE         0x2
+
+// SRAT entry types
+
+#define SRAT_PROCESSOR_APIC_AFFINITY   0
+#define SRAT_MEMORY_AFFINITY           1
+#define SRAT_PROCESSOR_X2APIC_AFFINITY 2
+
+// SRAT flag values
+#define SRAT_PAAF_ENABLED              1
+#define SRAT_MAF_ENABLED               1
+#define SRAT_PXAAF_ENABLED             1
 
 // Private memory heap used for AP trampoline and synchronisation objects
 
@@ -112,6 +121,12 @@
 //------------------------------------------------------------------------------
 
 typedef volatile uint32_t apic_register_t[4];
+
+typedef struct __attribute__((packed)) {
+    uint32_t proximity_domain_idx;
+    uint64_t start;
+    uint64_t end;
+} memory_affinity_t;
 
 typedef struct {
     uint32_t    signature;      // "_MP_"
@@ -180,16 +195,9 @@ typedef struct {
     uint8_t     dst_apic_lint;
 } mp_local_interrupt_entry_t;
 
+
 typedef struct {
-    char        signature[4];   // "APIC"
-    uint32_t    length;
-    uint8_t     revision;
-    uint8_t     checksum;
-    char        oem_id[6];
-    char        oem_table_id[8];
-    char        oem_revision[4];
-    char        creator_id[4];
-    char        creator_revision[4];
+    rsdt_header_t h;
     uint32_t    lapic_addr;
     uint32_t    flags;
 } madt_table_header_t;
@@ -214,25 +222,87 @@ typedef struct {
     uint64_t    lapic_addr;
 } madt_lapic_addr_entry_t;
 
+
+typedef struct {
+    rsdt_header_t h;
+    uint32_t    revision;
+    uint64_t    reserved;
+} srat_table_header_t;
+
+typedef struct {
+    uint8_t     type;
+    uint8_t     length;
+} srat_entry_header_t;
+
+// SRAT subtable type 00: Processor Local APIC/SAPIC Affinity.
+typedef struct __attribute__((packed)) {
+    uint8_t         type;
+    uint8_t         length;
+    uint8_t         proximity_domain_low;
+    uint8_t         apic_id;
+    uint32_t        flags;
+    struct {
+        uint32_t    local_sapic_eid       : 8;
+        uint32_t    proximity_domain_high : 24;
+    };
+    uint32_t        clock_domain;
+} srat_processor_lapic_affinity_entry_t;
+
+// SRAT subtable type 01: Memory Affinity.
+typedef struct __attribute__ ((packed)) {
+    uint8_t     type;
+    uint8_t     length;
+    uint32_t    proximity_domain;
+    uint16_t    reserved1;
+    uint64_t    base_address;
+    uint64_t    address_length;
+    uint32_t    reserved2;
+    uint32_t    flags;
+    uint64_t    reserved3;
+} srat_memory_affinity_entry_t;
+
+// SRAT subtable type 02: Processor Local x2APIC Affinity
+typedef struct __attribute__((packed)) {
+    uint8_t         type;
+    uint8_t         length;
+    uint16_t        reserved1;
+    uint32_t        proximity_domain;
+    uint32_t        apic_id;
+    uint32_t        flags;
+    uint32_t        clock_domain;
+    uint32_t        reserved2;
+} srat_processor_lx2apic_affinity_entry_t;
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
 
-static apic_register_t  *apic = NULL;
+static apic_register_t   *apic = NULL;
 
-static uint8_t          apic_id_to_cpu_num[MAX_APIC_IDS];
+static uint8_t           apic_id_to_cpu_num[MAX_APIC_IDS];
 
-static uint8_t          cpu_num_to_apic_id[MAX_CPUS];
+static uint8_t           apic_id_to_proximity_domain_idx[MAX_APIC_IDS];
 
-static uintptr_t        smp_heap_page = 0;
+static uint8_t           cpu_num_to_apic_id[MAX_CPUS];
 
-static uintptr_t        alloc_addr = 0;
+static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS];
+
+static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS];
+
+static uint8_t           cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+uint8_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+
+static uintptr_t         smp_heap_page = 0;
+
+static uintptr_t         alloc_addr = 0;
 
 //------------------------------------------------------------------------------
 // Variables
 //------------------------------------------------------------------------------
 
 int num_available_cpus = 1;  // There is always at least one CPU, the BSP
+int num_memory_affinity_ranges = 0;
+int num_proximity_domains = 0;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -384,10 +454,10 @@ static bool find_cpus_in_madt(void)
     madt_table_header_t *mpc = (madt_table_header_t *)map_region(acpi_config.madt_addr, sizeof(madt_table_header_t), true);
     if (mpc == NULL) return false;
 
-    mpc = (madt_table_header_t *)map_region(acpi_config.madt_addr, mpc->length, true);
+    mpc = (madt_table_header_t *)map_region(acpi_config.madt_addr, mpc->h.length, true);
     if (mpc == NULL) return false;
 
-    if (acpi_checksum(mpc, mpc->length) != 0) {
+    if (acpi_checksum(mpc, mpc->h.length) != 0) {
         return false;
     }
 
@@ -395,11 +465,14 @@ static bool find_cpus_in_madt(void)
 
     int found_cpus = 0;
 
-    uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(madt_table_header_t);
-    uint8_t *mpc_table_end = (uint8_t *)mpc + mpc->length;
+    uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(*mpc);
+    uint8_t *mpc_table_end = (uint8_t *)mpc + mpc->h.length;
     while (tab_entry_ptr < mpc_table_end) {
         madt_entry_header_t *entry_header = (madt_entry_header_t *)tab_entry_ptr;
         if (entry_header->type == MADT_PROCESSOR) {
+            if (entry_header->length != sizeof(madt_processor_entry_t)) {
+                return false;
+            }
             madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
                 if (num_available_cpus < MAX_CPUS) {
@@ -412,7 +485,10 @@ static bool find_cpus_in_madt(void)
                 found_cpus++;
             }
         }
-        if (entry_header->type == MADT_LAPIC_ADDR) {
+        else if (entry_header->type == MADT_LAPIC_ADDR) {
+            if (entry_header->length != sizeof(madt_lapic_addr_entry_t)) {
+                return false;
+            }
             madt_lapic_addr_entry_t *entry = (madt_lapic_addr_entry_t *)tab_entry_ptr;
             apic_addr = (uintptr_t)entry->lapic_addr;
         }
@@ -426,6 +502,189 @@ static bool find_cpus_in_madt(void)
     }
     return true;
 }
+
+static bool find_numa_nodes_in_srat(void)
+{
+    uint8_t * tab_entry_ptr;
+    // The caller will do fixups.
+    if (acpi_config.srat_addr == 0) {
+        return false;
+    }
+
+    srat_table_header_t * srat = (srat_table_header_t *)map_region(acpi_config.srat_addr, sizeof(rsdt_header_t), true);
+    if (srat == NULL) return false;
+
+    srat = (srat_table_header_t *)map_region(acpi_config.srat_addr, srat->h.length, true);
+    if (srat == NULL) return false;
+
+    if (acpi_checksum(srat, srat->h.length) != 0) {
+        return false;
+    }
+    // A table which contains fewer bytes than header + 1 processor local APIC entry + 1 memory affinity entry would be very weird.
+    if (srat->h.length < sizeof(*srat) + sizeof(srat_processor_lapic_affinity_entry_t) + sizeof(srat_memory_affinity_entry_t)) {
+        return false;
+    }
+
+    tab_entry_ptr = (uint8_t *)srat + sizeof(*srat);
+    uint8_t * srat_table_end = (uint8_t *)srat + srat->h.length;
+    // Pass 1: parse memory affinity entries and allocate proximity domains for each of them, while validating input a little bit.
+    while (tab_entry_ptr < srat_table_end) {
+        srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_lapic_affinity_entry_t)) {
+                return false;
+            }
+        }
+        else if (entry_header->type == SRAT_MEMORY_AFFINITY) {
+            if (entry_header->length != sizeof(srat_memory_affinity_entry_t)) {
+                return false;
+            }
+            srat_memory_affinity_entry_t *entry = (srat_memory_affinity_entry_t *)tab_entry_ptr;
+            if (entry->flags & SRAT_MAF_ENABLED) {
+                uint32_t proximity_domain = entry->proximity_domain;
+                uintptr_t start = entry->base_address;
+                uintptr_t end = entry->base_address + entry->address_length;
+                int found = -1;
+
+                if (start > end) {
+                    // We've found a wraparound, that's not good.
+                    return false;
+                }
+
+                // Allocate entry in proximity_domains, if necessary. Linear search for now.
+                for (int i = 0; i < num_proximity_domains; i++) {
+                    if (proximity_domains[i] == proximity_domain) {
+                        found = i;
+                        break;
+                    }
+                }
+                if (found == -1) {
+                    // Not found, allocate entry.
+                    if (num_proximity_domains < (int)(sizeof(proximity_domains) / sizeof(proximity_domains[0]))) {
+                        proximity_domains[num_proximity_domains] = proximity_domain;
+                        found = num_proximity_domains;
+                        num_proximity_domains++;
+                    }
+                    else {
+                        // TODO Display message ?
+                        return false;
+                    }
+                }
+
+                // Now that we have the index of the entry in proximity_domains in found, use it.
+                if (num_memory_affinity_ranges < (int)(sizeof(memory_affinity_ranges) / sizeof(memory_affinity_ranges[0]))) {
+                    memory_affinity_ranges[num_memory_affinity_ranges].proximity_domain_idx = (uint32_t)found;
+                    memory_affinity_ranges[num_memory_affinity_ranges].start = start;
+                    memory_affinity_ranges[num_memory_affinity_ranges].end = end;
+                    num_memory_affinity_ranges++;
+                }
+                else {
+                    // TODO Display message ?
+                    return false;
+                }
+            }
+        }
+        else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_lx2apic_affinity_entry_t)) {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+        tab_entry_ptr += entry_header->length;
+    }
+
+    tab_entry_ptr = (uint8_t *)srat + sizeof(*srat);
+    // Pass 2: parse processor APIC / x2APIC affinity entries.
+    while (tab_entry_ptr < srat_table_end) {
+        srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        uint32_t proximity_domain;
+        uint32_t apic_id;
+        if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
+            srat_processor_lapic_affinity_entry_t *entry = (srat_processor_lapic_affinity_entry_t *)tab_entry_ptr;
+            if (entry->flags & SRAT_PAAF_ENABLED) {
+                int found1;
+                proximity_domain = ((uint32_t)entry->proximity_domain_high) << 8 | entry->proximity_domain_low;
+                apic_id = (uint32_t)entry->apic_id;
+
+find_proximity_domain:
+                found1 = -1;
+                // Find entry in proximity_domains, if necessary. Linear search for now.
+                for (int i = 0; i < num_proximity_domains; i++) {
+                    if (proximity_domains[i] == proximity_domain) {
+                        found1 = i;
+                        break;
+                    }
+                }
+                if (found1 == -1) {
+                    // We've found an affinity entry whose proximity domain we don't know about.
+                    __asm__ volatile("nop");
+                    return false;
+                }
+
+                // Do we know about that APIC ID ?
+                int found2 = -1;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if ((uint32_t)cpu_num_to_apic_id[i] == apic_id) {
+                        found2 = i;
+                        break;
+                    }
+                }
+
+                if (found2 == -1) {
+                    // We've found an affinity entry whose APIC ID we don't know about.
+                    __asm__ volatile("nop");
+                    return false;
+                }
+
+                apic_id_to_proximity_domain_idx[apic_id] = (uint32_t)found1;
+            }
+        }
+        else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
+            srat_processor_lx2apic_affinity_entry_t *entry = (srat_processor_lx2apic_affinity_entry_t *)tab_entry_ptr;
+            if (entry->flags & SRAT_PXAAF_ENABLED) {
+                proximity_domain = entry->proximity_domain;
+                apic_id = entry->apic_id;
+                goto find_proximity_domain;
+            }
+        }
+        tab_entry_ptr += entry_header->length;
+    }
+
+    // TODO sort on proximity address, like in pm_map.
+
+    return true;
+}
+
+#if 0
+static bool parse_slit(uintptr_t slit_addr)
+{
+    // SLIT is a simple table.
+
+    // SLIT Header is identical to RSDP Header
+    rsdt_header_t *slit = (rsdt_header_t *)slit_addr;
+
+    // Validate SLIT
+    if (slit == NULL || acpi_checksum(slit, slit->length) != 0) {
+        return false;
+    }
+    // A SLIT shall always contain at least one byte beyond the header and the number of localities.
+    if (slit->length <= sizeof(*slit) + sizeof(uint64_t)) {
+        return false;
+    }
+    // 8 bytes for the number of localities, followed by (number of localities) ^ 2 bytes.
+    uint64_t localities = *(uint64_t *)((uint8_t *)slit + sizeof(*slit));
+    if (localities > MAX_APIC_IDS) {
+        return false;
+    }
+    if (slit->length != sizeof(*slit) + sizeof(uint64_t) + (localities * localities)) {
+        return false;
+    }
+
+    return true;
+}
+#endif
 
 static inline void send_ipi(int apic_id, int trigger, int level, int mode, uint8_t vector)
 {
@@ -521,15 +780,34 @@ static bool start_cpu(int cpu_num)
 
 void smp_init(bool smp_enable)
 {
-    for (int i = 0; i < MAX_APIC_IDS; i++) {
+    for (size_t i = 0; i < sizeof(apic_id_to_cpu_num) / sizeof(apic_id_to_cpu_num[0]); i++) {
         apic_id_to_cpu_num[i] = 0;
     }
+    for (size_t i = 0; i < sizeof(apic_id_to_proximity_domain_idx) / sizeof(apic_id_to_proximity_domain_idx[0]); i++) {
+        apic_id_to_proximity_domain_idx[i] = 0;
+    }
 
-    for (int i = 0; i < MAX_CPUS; i++) {
+    for (size_t i = 0; i < sizeof(cpu_num_to_apic_id) / sizeof(cpu_num_to_apic_id[0]); i++) {
         cpu_num_to_apic_id[i] = 0;
     }
 
+    for (size_t i = 0; i < sizeof(memory_affinity_ranges) / sizeof(memory_affinity_ranges[0]); i++) {
+        memory_affinity_ranges[i].proximity_domain_idx = UINT32_C(0xFFFFFFFF);
+        memory_affinity_ranges[i].start = 0;
+        memory_affinity_ranges[i].end = 0;
+    }
+
+    for (size_t i = 0; i < sizeof(cpus_in_proximity_domain) / sizeof(cpus_in_proximity_domain[0]); i++) {
+        cpus_in_proximity_domain[i] = 0;
+    }
+
+    for (size_t i = 0; i < sizeof(used_cpus_in_proximity_domain) / sizeof(used_cpus_in_proximity_domain[0]); i++) {
+        used_cpus_in_proximity_domain[i] = 0;
+    }
+
     num_available_cpus = 1;
+    num_memory_affinity_ranges = 0;
+    num_proximity_domains = 0;
 
     if (cpuid_info.flags.x2apic) {
         uint32_t msrl, msrh;
@@ -548,11 +826,34 @@ void smp_init(bool smp_enable)
 
     if (smp_enable) {
         (void)(find_cpus_in_madt() || find_cpus_in_floating_mp_struct());
-
     }
 
     for (int i = 0; i < num_available_cpus; i++) {
         apic_id_to_cpu_num[cpu_num_to_apic_id[i]] = i;
+    }
+
+    if (smp_enable) {
+        if (!find_numa_nodes_in_srat()) {
+            //enable_numa = false;
+            __asm__ volatile("nop");
+        }
+    }
+
+    for (int i = 0; i < num_available_cpus; i++) {
+        uint32_t proximity_domain_idx = apic_id_to_proximity_domain_idx[i];
+        cpus_in_proximity_domain[proximity_domain_idx]++;
+    }
+
+    // Create dummy entries when there's no (proper) memory affinity information.
+    if (num_memory_affinity_ranges == 0 || num_proximity_domains == 0) {
+        extern uintptr_t pm_limit_lower;
+        extern uintptr_t pm_limit_upper;
+        proximity_domains[0] = 0;
+        num_proximity_domains = 1;
+        memory_affinity_ranges[0].proximity_domain_idx = 0;
+        memory_affinity_ranges[0].start = pm_limit_lower << PAGE_SHIFT;
+        memory_affinity_ranges[0].end = pm_limit_upper << PAGE_SHIFT;
+        num_memory_affinity_ranges = 1;
     }
 
     // Allocate a page of low memory for AP trampoline and sync objects.
@@ -623,9 +924,78 @@ int smp_my_cpu_num(void)
     return num_available_cpus > 1 ? apic_id_to_cpu_num[my_apic_id()] : 0;
 }
 
+uint32_t smp_get_proximity_domain_idx(int cpu_num)
+{
+    return num_available_cpus > 1 ? apic_id_to_proximity_domain_idx[cpu_num_to_apic_id[cpu_num]] : 0;
+}
+
+int smp_narrow_to_proximity_domain(uintptr_t start, uintptr_t end, uint32_t * proximity_domain_idx, uintptr_t * new_start, uintptr_t * new_end)
+{
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        uint64_t range_start = memory_affinity_ranges[i].start;
+        uint64_t range_end = memory_affinity_ranges[i].end;
+
+        if (start >= range_start) {
+            if (start < range_end) {
+                if (end <= range_end) {
+                    // range_start start end range_end.
+                    // The given vm_map range is entirely within a single memory affinity range. Nothing to split.
+                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
+                    *new_start = start;
+                    *new_end = end;
+                    return 1;
+                }
+                else {
+                    // range_start start range_end end.
+                    // The given vm_map range needs to be shortened.
+                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
+                    *new_start = start;
+                    *new_end = range_end;
+                    return 1;
+                }
+            }
+            else {
+                // range_start range_end start end
+                // Do nothing, skip to next memory affinity range.
+            }
+        }
+        else {
+            if (end < range_start) {
+                // start end range_start range_end.
+                // Do nothing, skip to next memory affinity range.
+            }
+            else {
+                if (end <= range_end) {
+                    // start range_start end range_end.
+                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
+                    *new_start = start;
+                    *new_end = range_start;
+                    return 1;
+                }
+                else {
+                    // start range_start range_end end.
+                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
+                    *new_start = start;
+                    *new_end = range_start;
+                    return 1;
+                }
+            }
+        }
+    }
+    // If we come here, we haven't found a proximity domain which contains the given range. That shouldn't happen !
+    return 0;
+}
+
+/*void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end)
+{
+    *proximity_domain_idx = memory_affinity_ranges[idx].proximity_domain_idx;
+    *start = memory_affinity_ranges[idx].start;
+    *end = memory_affinity_ranges[idx].end;
+}*/
+
 barrier_t *smp_alloc_barrier(int num_threads)
 {
-    barrier_t *barrier = (barrier_t  *)(alloc_addr);
+    barrier_t *barrier = (barrier_t *)(alloc_addr);
     alloc_addr += sizeof(barrier_t);
     barrier_init(barrier, num_threads);
     return barrier;

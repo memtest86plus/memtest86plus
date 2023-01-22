@@ -69,6 +69,11 @@ while getopts ":hct:" option; do
 done
 
 Check() {
+    if [ "x$MACHINE" = "x" ] || [ "x$MEMSIZE" = "x" ]; then
+        echo "Please set MACHINE and MEMSIZE"
+        exit 1
+    fi
+
     # Check if QEMU and OVMF are installed
     if ! command -v qemu-system-i386 > /dev/null 2>&1; then
         echo "Qemu not installed"
@@ -133,6 +138,11 @@ Init() {
     QEMU_FLAGS+=" -hda fat:rw:hda-contents -net none"
     QEMU_FLAGS+=" -drive if=pflash,format=raw,readonly=on,file=OVMF32_CODE.fd"
     QEMU_FLAGS+=" -drive if=pflash,format=raw,file=OVMF32_VARS.fd"
+
+    if [ "x$MACHINE" = "x4S4CP3" ]; then
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu pentium3-v1"
+        QEMU_FLAGS+=" -smp 4,sockets=4,cores=1,maxcpus=4"
+    fi
 
     # Define offsets for loading of symbol-table
     IMAGEBASE=0x200000

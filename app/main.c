@@ -102,6 +102,7 @@ static int              test_stage = 0;
 // These are exposed in test.h.
 
 uint8_t     chunk_index[MAX_CPUS];
+uint8_t     chunk_index_in_proximity_domain[MAX_CPUS];
 
 int         num_active_cpus = 0;
 int         num_enabled_cpus = 1;
@@ -113,6 +114,7 @@ barrier_t   *run_barrier = NULL;
 spinlock_t  *error_mutex = NULL;
 
 vm_map_t    vm_map[MAX_MEM_SEGMENTS];
+uint32_t    proximity_domains[MAX_CPUS];
 int         vm_map_size = 0;
 
 int         pass_num = 0;
@@ -267,7 +269,13 @@ static void global_init(void)
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
-            chunk_index[i] = num_enabled_cpus;
+            if (enable_numa) {
+                uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
+                chunk_index_in_proximity_domain[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
+            }
+            else {
+                chunk_index[i] = num_enabled_cpus;
+            }
             num_enabled_cpus++;
         }
     }
@@ -299,7 +307,15 @@ static void global_init(void)
     if (acpi_config.rsdp_addr != 0) {
         trace(0, "ACPI RSDP (v%u.%u) found in %s at %0*x", acpi_config.ver_maj, acpi_config.ver_min, rsdp_source, 2*sizeof(uintptr_t), acpi_config.rsdp_addr);
         trace(0, "ACPI FADT found at %0*x", 2*sizeof(uintptr_t), acpi_config.fadt_addr);
+        //do_trace(0, "ACPI SRAT found at %0*x", 2*sizeof(uintptr_t), acpi_config.srat_addr);
+        //do_trace(0, "ACPI SLIT found at %0*x", 2*sizeof(uintptr_t), acpi_config.slit_addr);
     }
+    /*uint32_t idx;
+    uint64_t start;
+    uint64_t end;
+    get_memory_affinity_entry(0, &idx, &start, &end);
+    do_trace(0, "affin %i, %0*x - %0*x", idx, 2*sizeof(uintptr_t), start, 2*sizeof(uintptr_t), end);*/
+
     if (!load_addr_ok) {
         trace(0, "Cannot relocate program. Press any key to reboot...");
         while (get_key() == 0) { }
@@ -360,6 +376,7 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
     // Now initialise the virtual memory map with the intersection
     // of the window and the physical memory segments.
     for (int i = 0; i < pm_map_size; i++) {
+        // These are page numbers.
         uintptr_t seg_start = pm_map[i].start;
         uintptr_t seg_end   = pm_map[i].end;
         if (seg_start <= win_start) {
@@ -369,12 +386,52 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
             seg_end = win_end;
         }
         if (seg_start < seg_end && seg_start < win_end && seg_end > win_start) {
-            num_mapped_pages += seg_end - seg_start;
-            vm_map[vm_map_size].pm_base_addr = seg_start;
-            vm_map[vm_map_size].start        = first_word_mapping(seg_start);
-            vm_map[vm_map_size].end          = last_word_mapping(seg_end - 1, sizeof(testword_t));
-            vm_map_size++;
+            // We need to test part of that physical memory segment.
+            if (!enable_numa) {
+non_numa_vm_map_entry:
+                num_mapped_pages += seg_end - seg_start;
+                vm_map[vm_map_size].pm_base_addr = seg_start;
+                vm_map[vm_map_size].start        = first_word_mapping(seg_start);
+                vm_map[vm_map_size].end          = last_word_mapping(seg_end - 1, sizeof(testword_t));
+                vm_map_size++;
+            }
+            else {
+                // Now also pay attention to proximity domains, which are based on physical addresses.
+                uintptr_t orig_start = seg_start << PAGE_SHIFT;
+                uintptr_t orig_end = seg_end << PAGE_SHIFT;
+                uint32_t proximity_domain_idx;
+                uintptr_t new_start;
+                uintptr_t new_end;
+
+                while (1) {
+                    if (smp_narrow_to_proximity_domain(orig_start, orig_end, &proximity_domain_idx, &new_start, &new_end)) {
+                        // Create a new entry in the virtual memory map.
+                        num_mapped_pages += (new_end - new_start) >> PAGE_SHIFT;
+                        vm_map[vm_map_size].pm_base_addr = new_start >> PAGE_SHIFT;
+                        vm_map[vm_map_size].start        = first_word_mapping(new_start >> PAGE_SHIFT);
+                        vm_map[vm_map_size].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t));
+                        vm_map[vm_map_size].proximity_domain_idx = proximity_domain_idx;
+                        vm_map_size++;
+                        if (new_start != orig_start || new_end != orig_end) {
+                            // Proceed to the next part of the range.
+                            orig_start = new_end; // No shift here, we already have a physical address.
+                            orig_end = seg_end << PAGE_SHIFT;
+                        }
+                        else {
+                            // We're done with this range.
+                            break;
+                        }
+                    }
+                    else {
+                        // Could not match with proximity domain, fall back to default behaviour. This shouldn't happen !
+                        goto non_numa_vm_map_entry;
+                    }
+                }
+            }
         }
+    }
+    for (int i = 0; i < vm_map_size; i++) {
+        //do_trace(0, "vm %0*x - %0*x", 2*sizeof(uintptr_t), vm_map[i].start, 2*sizeof(uintptr_t), vm_map[i].end);
     }
 }
 
@@ -394,7 +451,7 @@ static void test_all_windows(int my_cpu)
         if (!dummy_run) {
             if (parallel_test) {
                 num_active_cpus = num_enabled_cpus;
-                if(display_mode == DISPLAY_MODE_NA) {
+                if (display_mode == DISPLAY_MODE_NA) {
                     display_all_active();
                 }
             } else {

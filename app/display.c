@@ -343,6 +343,14 @@ void display_start_test(void)
     display_test_description(test_list[test_num].description);
     test_bar_length = 0;
     test_ticks = 0;
+
+#if 1
+    uint64_t current_time = get_tsc();
+    int secs = (current_time - run_start_time) / (1000 * (uint64_t)clks_per_msec);
+    int mins  = secs / 60; secs %= 60;
+    int hours = mins / 60; mins %= 60;
+    do_trace(0, "T %i: %i:%02i:%02i", test_num, hours, mins, secs);
+#endif
 }
 
 void display_error_count(void)
@@ -494,21 +502,24 @@ void do_tick(int my_cpu)
 {
     int act_sec = 0;
     bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
+    //do_trace(my_cpu, "Run barrier wait begin at %s line %i", __FILE__, __LINE__);
     if (use_spin_wait) {
         barrier_spin_wait(run_barrier);
     } else {
         barrier_halt_wait(run_barrier);
     }
-
+    //do_trace(my_cpu, "Run barrier wait end at %s line %i", __FILE__, __LINE__);
     if (master_cpu == my_cpu) {
         check_input();
         error_update();
     }
+    //do_trace(my_cpu, "Run barrier wait begin at %s line %i", __FILE__, __LINE__);
     if (use_spin_wait) {
         barrier_spin_wait(run_barrier);
     } else {
         barrier_halt_wait(run_barrier);
     }
+    //do_trace(my_cpu, "Run barrier wait end at %s line %i", __FILE__, __LINE__);
 
     // Only the master CPU does the update.
     if (master_cpu != my_cpu) {

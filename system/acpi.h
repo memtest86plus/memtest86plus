@@ -23,15 +23,32 @@
  */
 
 typedef struct __attribute__ ((packed)) {
-    uint8_t     ver_maj;
-    uint8_t     ver_min;
     uintptr_t   rsdp_addr;
     uintptr_t   madt_addr;
     uintptr_t   fadt_addr;
     uintptr_t   hpet_addr;
+    uintptr_t   srat_addr;
+    uintptr_t   slit_addr;
     uintptr_t   pm_addr;
+    uint8_t     ver_maj;
+    uint8_t     ver_min;
     bool        pm_is_io;
 } acpi_t;
+
+/**
+ * A struct for the headers of most ACPI tables.
+ */
+typedef struct {
+    char        signature[4];   // "RSDT" or "XSDT"
+    uint32_t    length;
+    uint8_t     revision;
+    uint8_t     checksum;
+    char        oem_id[6];
+    char        oem_table_id[8];
+    char        oem_revision[4];
+    char        creator_id[4];
+    char        creator_revision[4];
+} rsdt_header_t;
 
 /**
  * The search step that located the ACPI RSDP (for debug).
