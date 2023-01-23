@@ -48,7 +48,7 @@ static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
 static bool nv_mcp_get_smb(void);
 static bool amd_sb_get_smb(void);
 static bool fch_zen_get_smb(void);
-static bool piix4_get_smb(void);
+static bool piix4_get_smb(uint8_t address);
 static bool ich5_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
@@ -1158,7 +1158,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 return ich5_get_smb();
             }
             if (did == 0x7113) { // 82371AB/EB/MB PIIX4
-                return piix4_get_smb();
+                return piix4_get_smb(PIIX4_SMB_BASE_ADR_DEFAULT);
             }
             // 0x719B 82440/82443MX PMC - PIIX4
             // 0x0F13 ValleyView SMBus Controller ?
@@ -1243,15 +1243,16 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                     // via SMBus controller.
                 // case 0x3050: // 82C596_3
                     // Try SMB base address = 0x90, then SMB base address = 0x80
-                    // viapro SMBus controller.
+                    // viapro SMBus controller, i.e. PIIX4 with a small quirk.
                 // case 0x3051: // 82C596B_3
-                // case 0x3057: // 82C686_4
+                case 0x3057: // 82C686_4
                 // case 0x8235: // 8231_4
                     // SMB base address = 0x90
-                    // viapro SMBus controller.
+                    // viapro SMBus controller, i.e. PIIX4.
+                    return piix4_get_smb(PIIX4_SMB_BASE_ADR_DEFAULT);
                 // case 0x3074: // 8233_0
                 // case 0x3147: // 8233A
-                // case 0x3177: // 8235
+                case 0x3177: // 8235
                 // case 0x3227: // 8237
                 // case 0x3337: // 8237A
                 // case 0x3372: // 8237S
@@ -1261,7 +1262,8 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 // case 0x8409: // VX855
                 // case 0x8410: // VX900
                     // SMB base address = 0xD0
-                    // viapro I2C controller.
+                    // viapro I2C controller, i.e. PIIX4 with a small quirk.
+                    return piix4_get_smb(PIIX4_SMB_BASE_ADR_VIAPRO);
                 default:
                     return false;
             }
@@ -1279,7 +1281,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
         case PCI_VID_ALI:
             switch(did)
             {
-                // case 0x1563: // ali1563 (M1563) SMBus controller
+                // case 0x1563: // ali1563 (M1563) SMBus controller, nearly compatible with PIIX4 according to Linux i2c-ali1563 driver.
                 // case 0x7101: // ali1535 (M1535) or ali15x3 (M1533/M1543) SMBus controllers
                 default:
                     return false;
@@ -1297,7 +1299,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 // case 0x0203: // CSB6
                 // case 0x0205: // HT1000SB
                 // case 0x0408: // HT1100LD
-                    return piix4_get_smb();
+                    return piix4_get_smb(PIIX4_SMB_BASE_ADR_DEFAULT);
                 default:
                     return false;
             }
@@ -1312,9 +1314,9 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
 // PIIX4 SMBUS Controller
 // ----------------------
 
-static bool piix4_get_smb(void)
+static bool piix4_get_smb(uint8_t address)
 {
-    uint16_t x = pci_config_read16(0, smbdev, smbfun, 0x90) & 0xFFF0;
+    uint16_t x = pci_config_read16(0, smbdev, smbfun, address) & 0xFFF0;
 
     if (x != 0) {
         smbusbase = x;
@@ -1361,7 +1363,7 @@ static bool amd_sb_get_smb(void)
 
     if ((smbus_id & 0xFFFF) == 0x4385 && rev_id <= 0x3D) {
         // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
-        return piix4_get_smb();
+        return piix4_get_smb(PIIX4_SMB_BASE_ADR_DEFAULT);
     } else if ((smbus_id & 0xFFFF) == 0x780B && rev_id == 0x42) {
         // Latest Pre-Zen APUs use the newer Zen PM registers
         return fch_zen_get_smb();
@@ -1568,7 +1570,7 @@ static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
     // Start transaction
     __outb(NVSMBCNT_BYTE_DATA | NVSMBCNT_READ, NVSMBCNT);
 
-    // Wait until transction complete
+    // Wait until transaction complete
     for (i = 500; i > 0; i--) {
         usleep(50);
         if (__inb(NVSMBCNT) == 0) {

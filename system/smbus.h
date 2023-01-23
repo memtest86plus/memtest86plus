@@ -85,6 +85,9 @@
 
 #define SPD_SKU_LEN         32
 
+#define PIIX4_SMB_BASE_ADR_DEFAULT  0x90
+#define PIIX4_SMB_BASE_ADR_VIAPRO   0xD0
+
 struct pci_smbus_controller {
     unsigned vendor;
     unsigned device;
