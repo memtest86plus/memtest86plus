@@ -1189,7 +1189,8 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
             {
                 // case 0x4353: // SB200
                 // case 0x4363: // SB300
-                // case 0x4372: // SB400
+                case 0x4372:    // SB400
+                    return piix4_get_smb(PIIX4_SMB_BASE_ADR_DEFAULT);
                 case 0x4385:    // SB600+
                     return amd_sb_get_smb();
                 default:
