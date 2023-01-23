@@ -12,6 +12,11 @@
 
 #include <stdint.h>
 
+#define PCI_VID_REG          0x00
+#define PCI_DID_REG          0x02
+#define PCI_SUB_VID_REG      0x2C
+#define PCI_SUB_DID_REG      0x2E
+
 /* Vendor IDs */
 #define PCI_VID_ATI          0x1002
 #define PCI_VID_AMD          0x1022
@@ -22,6 +27,7 @@
 #define PCI_VID_NVIDIA       0x10DE
 #define PCI_VID_VIA          0x1106
 #define PCI_VID_SERVERWORKS  0x1166
+#define PCI_VID_SUPERMICRO   0x15D9
 #define PCI_VID_HYGON        0x1D94
 #define PCI_VID_INTEL        0x8086
 

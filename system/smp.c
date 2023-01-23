@@ -21,6 +21,7 @@
 
 #include "cpuid.h"
 #include "heap.h"
+#include "hwquirks.h"
 #include "memrw32.h"
 #include "memsize.h"
 #include "msr.h"
@@ -537,6 +538,12 @@ void smp_init(bool smp_enable)
             // We don't currently support x2APIC mode.
             smp_enable = false;
         }
+    }
+
+    // Process SMP Quirks
+    if (quirk.type & QUIRK_TYPE_SMP) {
+        // quirk.process();
+        smp_enable = false;
     }
 
     if (smp_enable) {
