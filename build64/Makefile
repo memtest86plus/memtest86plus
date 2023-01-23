@@ -80,7 +80,7 @@ boot/startup.o: ../boot/startup64.S ../boot/boot.h
 	@mkdir -p boot
 	$(CC) -x assembler-with-cpp -c -I../boot -o $@ $<
 
-boot/%.o: ../boot/%.S ../boot/boot.h
+boot/%.o: ../boot/%.S ../boot/boot.h app/build_version.h
 	@mkdir -p boot
 	$(CC) -x assembler-with-cpp -c -I../boot -Iapp -o $@ $<
 
