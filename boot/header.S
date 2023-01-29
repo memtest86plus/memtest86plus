@@ -7,7 +7,7 @@
 // end of the boot sector), with the remainder of the header being provided by
 // setup.S.
 //
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2023 Martin Whitaker.
 //
 // Derived from Linux 5.6 arch/x86/boot/header.S:
 //
@@ -28,7 +28,6 @@
 # address well away from HIGH_LOAD_ADDR, to avoid overlap when relocating the code.
 
 #define	IMAGE_BASE	0x200000
-#define	BASE_OF_CODE	0x1000
 
 	.section ".header", "ax", @progbits
 	.code16
@@ -117,15 +116,15 @@ optional_header:
 	.byte	0x02				# MajorLinkerVersion
 	.byte	0x14				# MinorLinkerVersion
 
-	.long	_text_size			# SizeOfCode
-	.long	_sbat_size			# SizeOfInitializedData
+	.long	_virt_text_size			# SizeOfCode
+	.long	_virt_sbat_size			# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
-	.long	BASE_OF_CODE + 0x1e0		# AddressOfEntryPoint
+	.long	_virt_text_start + 0x1e0	# AddressOfEntryPoint
 
-	.long	BASE_OF_CODE			# BaseOfCode
+	.long	_virt_text_start		# BaseOfCode
 #ifndef __x86_64__
-	.long	_sbat_start			# BaseOfData
+	.long	_virt_sbat_start		# BaseOfData
 #endif
 
 extra_header_fields:
@@ -144,7 +143,7 @@ extra_header_fields:
 	.word	0				# MinorSubsystemVersion
 	.long	0				# Win32VersionValue
 
-	.long	BASE_OF_CODE + _img_end		# SizeOfImage
+	.long	_virt_img_size			# SizeOfImage
 	.long	end_of_headers			# SizeOfHeaders
 	.long	0				# CheckSum
 	.word	10				# Subsystem (EFI application)
@@ -173,8 +172,8 @@ extra_header_fields:
 	.long	0				# DataDirectory.Exception.Size
 	.long	0				# DataDirectory.Certs.VirtualAddress
 	.long	0				# DataDirectory.Certs.Size
-	.long	_reloc_start			# DataDirectory.BaseReloc.VirtualAddress
-	.long	_reloc_size			# DataDirectory.BaseReloc.Size
+	.long	_virt_reloc_start		# DataDirectory.BaseReloc.VirtualAddress
+	.long	_real_reloc_size		# DataDirectory.BaseReloc.Size
 
 	# Section table
 section_table:
@@ -182,10 +181,10 @@ section_table:
 	.byte	0
 	.byte	0
 	.byte	0
-	.long	_text_size			# VirtualSize
-	.long	BASE_OF_CODE			# VirtualAddress
-	.long	_text_size			# SizeOfRawData
-	.long	_text_start			# PointerToRawData
+	.long	_virt_text_size			# VirtualSize
+	.long	_virt_text_start		# VirtualAddress
+	.long	_file_text_size			# SizeOfRawData
+	.long	_file_text_start		# PointerToRawData
 	.long	0				# PointerToRelocations
 	.long	0				# PointerToLineNumbers
 	.word	0				# NumberOfRelocations
@@ -198,10 +197,10 @@ section_table:
 	.ascii	".reloc"
 	.byte	0
 	.byte	0
-	.long	_reloc_size			# VirtualSize
-	.long	_reloc_start			# VirtualAddress
-	.long	_reloc_size			# SizeOfRawData
-	.long	_reloc_start			# PointerToRawData
+	.long	_virt_reloc_size		# VirtualSize
+	.long	_virt_reloc_start		# VirtualAddress
+	.long	_file_reloc_size		# SizeOfRawData
+	.long	_file_reloc_start		# PointerToRawData
 	.long	0				# PointerToRelocations
 	.long	0				# PointerToLineNumbers
 	.word	0				# NumberOfRelocations
@@ -214,10 +213,10 @@ section_table:
 	.byte	0
 	.byte	0
 	.byte	0
-	.long	_sbat_size			# VirtualSize
-	.long	_sbat_start			# VirtualAddress
-	.long	_sbat_size			# SizeOfRawData
-	.long	_sbat_start			# PointerToRawData
+	.long	_virt_sbat_size			# VirtualSize
+	.long	_virt_sbat_start		# VirtualAddress
+	.long	_file_sbat_size			# SizeOfRawData
+	.long	_file_sbat_start		# PointerToRawData
 	.long	0				# PointerToRelocations
 	.long	0				# PointerToLineNumbers
 	.word	0				# NumberOfRelocations
