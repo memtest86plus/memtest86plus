@@ -23,7 +23,8 @@
 typedef enum {
     QUIRK_NONE,
     QUIRK_TUSL2,
-    QUIRK_ALI_ALADDIN_V
+    QUIRK_ALI_ALADDIN_V,
+    QUIRK_X10SDV_NOSMP
 } quirk_id_t;
 
 typedef struct {

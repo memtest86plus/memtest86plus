@@ -72,8 +72,8 @@ void quirks_init(void)
 {
     quirk.id        = QUIRK_NONE;
     quirk.type      = QUIRK_TYPE_NONE;
-    quirk.root_vid  = pci_config_read16(0, 0, 0, 0);
-    quirk.root_did  = pci_config_read16(0, 0, 0, 2);
+    quirk.root_vid  = pci_config_read16(0, 0, 0, PCI_VID_REG);
+    quirk.root_did  = pci_config_read16(0, 0, 0, PCI_DID_REG);
     quirk.process   = NULL;
 
     //  -------------------------
@@ -93,13 +93,26 @@ void quirks_init(void)
     // This motherboard has an ASB100 ASIC with a SMBUS Mux Integrated.
     // To access SPD later in the code, we need to configure the mux.
     // PS: Detection via DMI is unreliable, so using Root PCI Registers
-    if (quirk.root_vid == PCI_VID_INTEL && quirk.root_did == 0x1130) {  // Intel i815
-        if (pci_config_read16(0, 0, 0, 0x2C) == PCI_VID_ASUS) {         // ASUS
-            if (pci_config_read16(0, 0, 0, 0x2E) == 0x8027) {           // TUSL2-C
+    if (quirk.root_vid == PCI_VID_INTEL && quirk.root_did == 0x1130) {      // Intel i815
+        if (pci_config_read16(0, 0, 0, PCI_SUB_VID_REG) == PCI_VID_ASUS) {  // ASUS
+            if (pci_config_read16(0, 0, 0, PCI_SUB_DID_REG) == 0x8027) {    // TUSL2-C
                 quirk.id    = QUIRK_TUSL2;
                 quirk.type |= QUIRK_TYPE_SMBUS;
                 quirk.process = asus_tusl2_configure_mux;
             }
+        }
+    }
+
+    //  -------------------------------------------------
+    //  -- SuperMicro X10SDV Quirk (GitHub Issue #233) --
+    //  -------------------------------------------------
+    // Memtest86+ crashs on Super Micro X10SDV motherboard with SMP Enabled
+    // We were unable to find a solution so far, so disable SMP by default
+    if (quirk.root_vid == PCI_VID_INTEL && quirk.root_did == 0x6F00) {             // Broadwell-E (Xeon-D)
+        if (pci_config_read16(0, 0, 0, PCI_SUB_VID_REG) == PCI_VID_SUPERMICRO) {   // Super Micro
+                quirk.id    = QUIRK_X10SDV_NOSMP;
+                quirk.type |= QUIRK_TYPE_SMP;
+                quirk.process = NULL;
         }
     }
 }
