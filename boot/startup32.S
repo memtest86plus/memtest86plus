@@ -812,7 +812,7 @@ startup_stack_top:
 
 # Main stack area.
 
-	.section    "stacks", "aw", @progbits
+	.section    ".stacks", "aw", @nobits
 	.align  16
 
 	. = . + STACKS_SIZE
