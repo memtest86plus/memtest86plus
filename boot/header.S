@@ -243,7 +243,7 @@ boot_flag:
 	.org	512
 end_of_headers:
 
-.section ".reloc", "a", @progbits
+.section ".reloc"
 	.long	0					// Page RVA
 	.long	10					// Block Size (2*4+2)
 	.word	(IMAGE_REL_BASED_ABSOLUTE << 12) + 0	// reloc 0 -> 0
