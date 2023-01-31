@@ -96,15 +96,15 @@ coff_header:
 	.word	section_table - optional_header	# SizeOfOptionalHeader
 #ifdef __x86_64__
 	.word	IMAGE_FILE_DEBUG_STRIPPED	\
-		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
-		| IMAGE_FILE_LINE_NUMS_STRIPPED	\
-		| IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics
+	      | IMAGE_FILE_LOCAL_SYMS_STRIPPED	\
+	      | IMAGE_FILE_LINE_NUMS_STRIPPED	\
+	      | IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics
 #else
 	.word	IMAGE_FILE_32BIT_MACHINE	\
-		| IMAGE_FILE_DEBUG_STRIPPED	\
-		| IMAGE_FILE_LOCAL_SYMS_STRIPPED\
-		| IMAGE_FILE_LINE_NUMS_STRIPPED \
-		| IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics.
+	      | IMAGE_FILE_DEBUG_STRIPPED	\
+	      | IMAGE_FILE_LOCAL_SYMS_STRIPPED	\
+	      | IMAGE_FILE_LINE_NUMS_STRIPPED	\
+	      | IMAGE_FILE_EXECUTABLE_IMAGE	# Characteristics.
 #endif
 
 optional_header:
@@ -190,9 +190,9 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
-		| IMAGE_SCN_MEM_EXECUTE		\
-		| IMAGE_SCN_ALIGN_16BYTES	\
-		| IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
+	      | IMAGE_SCN_MEM_EXECUTE		\
+	      | IMAGE_SCN_ALIGN_16BYTES		\
+	      | IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
 
 	.ascii	".reloc"
 	.byte	0
@@ -206,8 +206,8 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
-		| IMAGE_SCN_ALIGN_4BYTES	\
-		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+	      | IMAGE_SCN_ALIGN_4BYTES		\
+	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 	.ascii	".sbat"
 	.byte	0
@@ -222,8 +222,8 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
-		| IMAGE_SCN_ALIGN_4096BYTES	\
-		| IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+	      | IMAGE_SCN_ALIGN_4096BYTES	\
+	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.
 
