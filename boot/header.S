@@ -191,7 +191,6 @@ section_table:
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
 	      | IMAGE_SCN_MEM_EXECUTE		\
-	      | IMAGE_SCN_ALIGN_16BYTES		\
 	      | IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
 
 	.ascii	".reloc"
@@ -206,7 +205,6 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
-	      | IMAGE_SCN_ALIGN_4BYTES		\
 	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 	.ascii	".sbat"
@@ -222,7 +220,6 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
-	      | IMAGE_SCN_ALIGN_4096BYTES	\
 	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 # Emulate the Linux boot header, to allow loading by intermediate boot loaders.
