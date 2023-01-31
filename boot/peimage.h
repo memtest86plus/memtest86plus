@@ -80,7 +80,7 @@
 #define IMAGE_SCN_MEM_NOT_PAGED              0x08000000  /* Section is not pageable.               */
 #define IMAGE_SCN_MEM_SHARED                 0x10000000  /* Section is shareable.                  */
 
-#define IMAGE_REL_AMD64_ABSOLUTE             0x0000
+#define IMAGE_REL_BASED_ABSOLUTE             0x0000
 
 /* COMDAT selection codes.  */
 
