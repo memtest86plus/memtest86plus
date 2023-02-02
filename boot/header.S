@@ -144,7 +144,7 @@ extra_header_fields:
 	.long	0				# Win32VersionValue
 
 	.long	_virt_img_size			# SizeOfImage
-	.long	end_of_headers			# SizeOfHeaders
+	.long	_file_head_size			# SizeOfHeaders
 	.long	0				# CheckSum
 	.word	10				# Subsystem (EFI application)
 	.word	0				# DllCharacteristics
@@ -241,7 +241,6 @@ boot_flag:
 	.word	0xAA55
 
 	.org	512
-end_of_headers:
 
 .section ".reloc"
 	.long	0					// Page RVA
