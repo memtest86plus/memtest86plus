@@ -1254,7 +1254,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 // case 0x3074: // 8233_0
                 // case 0x3147: // 8233A
                 case 0x3177: // 8235
-                // case 0x3227: // 8237
+                case 0x3227: // 8237
                 // case 0x3337: // 8237A
                 // case 0x3372: // 8237S
                 // case 0x3287: // 8251
