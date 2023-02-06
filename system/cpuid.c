@@ -128,6 +128,26 @@ void cpuid_init(void)
             );
         }
         break;
+      case 'C':
+        if (cpuid_info.vendor_id.str[5] == 'I') break; // Cyrix
+        // VIA / CentaurHauls
+        if (cpuid_info.max_xcpuid >= 0x80000005) {
+            cpuid(0x80000005, 0,
+                &reg[0],
+                &reg[1],
+                &cpuid_info.cache_info.raw[0],
+                &cpuid_info.cache_info.raw[1]
+            );
+        }
+        if (cpuid_info.max_xcpuid >= 0x80000006) {
+            cpuid(0x80000006, 0,
+                &reg[0],
+                &reg[1],
+                &cpuid_info.cache_info.raw[2],
+                &cpuid_info.cache_info.raw[3]
+            );
+        }
+        break;
       case 'G':
         // Intel Processors
         // No cpuid info to read.

@@ -47,7 +47,7 @@ int get_cpu_temperature(void)
     }
 
     // AMD CPU
-    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily > 0 && cpuid_info.version.extendedFamily < 8) {
+    else if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.extendedFamily > 0 && cpuid_info.version.extendedFamily < 8) {
 
         // Untested yet
         uint32_t rtcr = pci_config_read32(0, 24, 3, 0xA4);
@@ -67,6 +67,21 @@ int get_cpu_temperature(void)
         }
 
         return offset + 0.125f * (float)((tval >> 21) & 0x7FF);
+    }
+
+    // VIA/Centaur/Zhaoxin CPU
+    else if (cpuid_info.vendor_id.str[0] == 'C' && cpuid_info.vendor_id.str[1] == 'e' && (cpuid_info.version.family == 6 || cpuid_info.version.family == 7)) {
+        uint32_t msr_temp;
+        if (cpuid_info.version.family == 7 || cpuid_info.version.model == 0xF) {
+            msr_temp = 0x1423;  // Zhaoxin, Nano
+        } else if (cpuid_info.version.model == 0xA || cpuid_info.version.model == 0xD) {
+            msr_temp = 0x1169;  // C7 A/D
+        } else
+            return 0;
+
+        uint32_t msrl, msrh;
+        rdmsr(msr_temp, msrl, msrh);
+        return (int)(msrl & 0xffffff);
     }
 
     return 0;
