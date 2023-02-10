@@ -71,10 +71,16 @@ static void determine_cache_size()
         l3_cache *= 512;
         break;
       case 'C':
-        // Zhaoxin CPU only
-        if (cpuid_info.version.family != 7) {
+        if (cpuid_info.vendor_id.str[5] == 'I') break; // Cyrix
+        // VIA C3/C7/Nano
+        if (cpuid_info.version.family == 6) {
+            l1_cache = cpuid_info.cache_info.l1_d_size;
+            l2_cache = cpuid_info.cache_info.l2_size;
+            break;
+        } else if (cpuid_info.version.family != 7) {
             break;
         }
+        // Zhaoxin CPU only
         /* fall through */
       case 'G':
         // Intel Processors

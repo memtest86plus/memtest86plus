@@ -122,7 +122,7 @@ typedef union {
 } cpuid_brand_string_t;
 
 typedef union {
-    uint32_t        raw[12];
+    uint32_t        raw[4];
     struct {
         uint32_t                : 24;
         uint32_t    l1_i_size   : 8;
