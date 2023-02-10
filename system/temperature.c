@@ -70,16 +70,19 @@ int get_cpu_temperature(void)
     }
 
     // VIA/Centaur/Zhaoxin CPU
-    else if (cpuid_info.vendor_id.str[0] == 'C' && cpuid_info.vendor_id.str[1] == 'e' && (cpuid_info.version.family == 6 || cpuid_info.version.family == 7)) {
-        uint32_t msr_temp;
+    else if (cpuid_info.vendor_id.str[0] == 'C' && cpuid_info.vendor_id.str[1] == 'e'
+          && (cpuid_info.version.family == 6 || cpuid_info.version.family == 7)) {
+
+        uint32_t msrl, msrh, msr_temp;
+
         if (cpuid_info.version.family == 7 || cpuid_info.version.model == 0xF) {
             msr_temp = 0x1423;  // Zhaoxin, Nano
         } else if (cpuid_info.version.model == 0xA || cpuid_info.version.model == 0xD) {
             msr_temp = 0x1169;  // C7 A/D
-        } else
+        } else {
             return 0;
+        }
 
-        uint32_t msrl, msrh;
         rdmsr(msr_temp, msrl, msrh);
         return (int)(msrl & 0xffffff);
     }
