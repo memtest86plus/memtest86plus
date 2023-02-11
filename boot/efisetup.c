@@ -502,6 +502,10 @@ static efi_status_t set_screen_info(boot_params_t *boot_params)
             status = EFI_SUCCESS;
         }
         efi_call_bs(free_pool, handles);
+    } else if (status == EFI_NOT_FOUND) {
+        // This may be a headless system. We can still output to a serial console.
+        boot_params->screen_info.orig_video_isVGA = VIDEO_TYPE_NONE;
+        status = EFI_SUCCESS;
     }
 
     return status;
