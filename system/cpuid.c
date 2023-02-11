@@ -4,7 +4,7 @@
 //
 // Derived from memtest86+ cpuid.h
 
-
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "cpuid.h"
@@ -196,7 +196,8 @@ void cpuid_init(void)
         }
         break;
        case 'C':
-        // VIA / CentaurHauls
+        // Cyrix / VIA / CentaurHauls / Zhaoxin
+        cpuid_info.flags.htt = false;
         break;
        case 'G':
         if (cpuid_info.vendor_id.str[7] == 'T') break; // Transmeta
