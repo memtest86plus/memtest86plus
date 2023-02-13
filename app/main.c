@@ -251,6 +251,8 @@ static void global_init(void)
 
     error_init();
 
+    temperature_init();
+
     initial_config();
 
     clear_message_area();
