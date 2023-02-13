@@ -35,7 +35,7 @@ float cpu_temp_offset = 0;
 
 void temperature_init(void)
 {
-    // Process SMP Quirks
+    // Process temperature-related quirks
     if (quirk.type & QUIRK_TYPE_TEMP) {
         quirk.process();
     }
@@ -64,7 +64,7 @@ int get_cpu_temperature(void)
     // AMD CPU
     else if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF) { // Target only K8 & newer
 
-        if(cpuid_info.version.extendedFamily >= 8) {        // Target Zen µarch and newer. Use SNM to get temperature.
+        if(cpuid_info.version.extendedFamily >= 8) {        // Target Zen µarch and newer. Use SMN to get temperature.
 
             uint32_t tval = amd_smn_read(SMN_THM_TCON_CUR_TMP);
 

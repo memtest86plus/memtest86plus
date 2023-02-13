@@ -78,7 +78,7 @@ static void amd_k8_revfg_temp(void)
 
     // For Rev F & G, switch sensor if no temperature is reported
     if (!((rtcr >> 16) & 0xFF)) {
-        pci_config_write8(0, 24, 3, AMD_TEMP_REG_K8, 0x04);
+        pci_config_write8(0, 24, 3, AMD_TEMP_REG_K8, rtcr | 0x04);
     }
 
     // K8 Rev G Desktop requires an additional offset.
@@ -158,7 +158,7 @@ void quirks_init(void)
     if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
         && cpuid_info.version.extendedFamily == 0 && cpuid_info.version.extendedModel == 0) {   // Early K8
         if ((cpuid_info.version.model == 4 && cpuid_info.version.stepping == 0) ||              // SH-B0 ClawHammer (Athlon 64)
-            (cpuid_info.version.model == 5 && cpuid_info.version.stepping <= 1)) {              // SH-B0/B3 SledgeHmmer (Opteron)
+            (cpuid_info.version.model == 5 && cpuid_info.version.stepping <= 1)) {              // SH-B0/B3 SledgeHammer (Opteron)
                 quirk.id    = QUIRK_K8_BSTEP_NOTEMP;
                 quirk.type |= QUIRK_TYPE_TEMP;
                 quirk.process = disable_temp_reporting;
