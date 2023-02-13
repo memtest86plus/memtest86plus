@@ -30,6 +30,9 @@
 #define MSR_AMD64_NB_CFG                0xc001001f
 #define MSR_AMD64_COFVID_STATUS         0xc0010071
 
+#define MSR_VIA_TEMP_C7                 0x1169
+#define MSR_VIA_TEMP_NANO               0x1423
+
 #define rdmsr(msr, value1, value2)  \
     __asm__ __volatile__("rdmsr"    \
         : "=a" (value1),            \

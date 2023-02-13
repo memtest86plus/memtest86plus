@@ -8,7 +8,21 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2003-2023 Sam Demeulemeester.
  */
+
+#define AMD_TEMP_REG_K8     0xE4
+#define AMD_TEMP_REG_K10    0xA4
+
+/**
+ * Global CPU Temperature offset
+ */
+extern float cpu_temp_offset;
+
+/**
+ * Init temperature sensor and compute offsets if needed
+ */
+void temperature_init(void);
 
 /**
  * Returns the current temperature of the CPU. Returns 0 if

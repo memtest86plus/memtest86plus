@@ -19,12 +19,16 @@
 #define QUIRK_TYPE_SMBUS    (1 << 4)
 #define QUIRK_TYPE_TIMER    (1 << 5)
 #define QUIRK_TYPE_MEM_SIZE (1 << 6)
+#define QUIRK_TYPE_TEMP     (1 << 7)
 
 typedef enum {
     QUIRK_NONE,
     QUIRK_TUSL2,
     QUIRK_ALI_ALADDIN_V,
-    QUIRK_X10SDV_NOSMP
+    QUIRK_X10SDV_NOSMP,
+    QUIRK_K8_BSTEP_NOTEMP,
+    QUIRK_K8_REVFG_TEMP,
+    QUIRK_AMD_ERRATA_319
 } quirk_id_t;
 
 typedef struct {

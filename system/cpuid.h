@@ -29,7 +29,7 @@ typedef enum {
  */
 
 typedef union {
-    uint32_t        raw;
+    uint32_t        raw[2];
     struct {
         uint32_t    stepping        : 4;
         uint32_t    model           : 4;
@@ -39,6 +39,7 @@ typedef union {
         uint32_t    extendedModel   : 4;
         uint32_t    extendedFamily  : 8;
         uint32_t                    : 4;
+        uint32_t    extendedBrandID : 32; // AMD Only
     };
 } cpuid_version_t;
 

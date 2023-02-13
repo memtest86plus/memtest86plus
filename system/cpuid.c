@@ -36,7 +36,7 @@ void cpuid_init(void)
     // Get the processor family information & feature flags.
     if (cpuid_info.max_cpuid >= 1) {
         cpuid(0x1, 0,
-            &cpuid_info.version.raw,
+            &cpuid_info.version.raw[0],
             &cpuid_info.proc_info.raw,
             &cpuid_info.flags.raw[1],
             &cpuid_info.flags.raw[0]
@@ -65,8 +65,8 @@ void cpuid_init(void)
     if (cpuid_info.max_xcpuid >= 0x80000001) {
         cpuid(0x80000001, 0,
             &reg[0],
+            &cpuid_info.version.raw[1],
             &reg[1],
-            &reg[2],
             &cpuid_info.flags.raw[2]
         );
     }
