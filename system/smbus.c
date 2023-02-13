@@ -1204,7 +1204,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
                 // case 0x01B4: // nForce
                 case 0x0064:    // nForce 2
                 // case 0x0084: // nForce 2 Mobile
-                // case 0x00E4: // nForce 3
+                case 0x00E4:    // nForce 3
                 // case 0x0034: // MCP04
                 // case 0x0052: // nForce 4
                 case 0x0264:    // nForce 410/430 MCP
