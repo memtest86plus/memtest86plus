@@ -54,7 +54,7 @@ typedef union {
 } cpuid_proc_info_t;
 
 typedef union {
-    uint32_t        raw[4];
+    uint32_t        raw[3];
     struct {
         uint32_t    fpu     : 1;    // EDX feature flags, bit 0 */
         uint32_t    vme     : 1;
