@@ -33,9 +33,7 @@ float cpu_temp_offset = 0;
 // Public Functions
 //------------------------------------------------------------------------------
 
-int TjMax = 0;
-
-uint32_t regl, regh;
+static int TjMax = 0;
 
 void get_specific_TjMax(void)
 {
@@ -51,6 +49,8 @@ void get_specific_TjMax(void)
 
 void temperature_init(void)
 {
+    uint32_t regl, regh;
+
     // Process temperature-related quirks
     if (quirk.type & QUIRK_TYPE_TEMP) {
         quirk.process();
@@ -75,6 +75,8 @@ void temperature_init(void)
 
 int get_cpu_temperature(void)
 {
+    uint32_t regl, regh;
+
     // Intel CPU
     if (cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.max_cpuid >= 6 && (cpuid_info.dts_pmp & 1)) {
 
