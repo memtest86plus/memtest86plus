@@ -157,7 +157,7 @@ recognised:
       * 9600
       * 19200
       * 38400
-      * 54600
+      * 57600
       * 115200 (default if not specified or invalid)
       * 230400
 
