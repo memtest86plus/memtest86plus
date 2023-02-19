@@ -28,6 +28,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "pmem.h"
+#include "memctrl.h"
 #include "memsize.h"
 #include "pci.h"
 #include "screen.h"
@@ -253,6 +254,8 @@ static void global_init(void)
 
     temperature_init();
 
+    memctrl_init();
+
     initial_config();
 
     clear_message_area();
@@ -280,6 +283,7 @@ static void global_init(void)
         set_scroll_lock(true);
     } else if (enable_sm) {
         post_display_init();
+        printf(23,0,"CPUID : 0x%x", cpuid_info.version.raw[0]);
     }
 
     size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
