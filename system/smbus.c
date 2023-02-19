@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2022 Samuel Demeulemeester
+// Copyright (C) 2004-2023 Sam Demeulemeester
 
 #include "display.h"
 
@@ -53,6 +53,7 @@ static bool ich5_get_smb(void);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
+static uint8_t ali_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
@@ -1282,8 +1283,9 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
         case PCI_VID_ALI:
             switch(did)
             {
-                // case 0x1563: // ali1563 (M1563) SMBus controller, nearly compatible with PIIX4 according to Linux i2c-ali1563 driver.
-                // case 0x7101: // ali1535 (M1535) or ali15x3 (M1533/M1543) SMBus controllers
+                // case 0x7101: // ALi M1533/1535/1543
+                case 0x1563: // ALi M1563
+                    return piix4_get_smb(PIIX4_SMB_BASE_ADR_ALI1563);
                 default:
                     return false;
             }
@@ -1444,6 +1446,8 @@ static bool nv_mcp_get_smb(void)
 static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
     switch ((smbus_id >> 16) & 0xFFFF) {
+      case PCI_VID_ALI:
+        return ali_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       case PCI_VID_NVIDIA:
         return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       default:
@@ -1585,4 +1589,39 @@ static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
     }
 
     return __inb(NVSMBDAT(0));
+}
+
+static uint8_t ali_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
+{
+    int i;
+
+    smbus_adr += 0x50;
+
+    // Reset Status Register
+     __outb(0xFF, SMBHSTSTS);
+
+    // Set Slave ADR
+    __outb((smbus_adr << 1 | I2C_READ), SMBHSTADD);
+
+    __outb((__inb(SMBHSTCNT) & ~ALI_SMBHSTCNT_SIZEMASK) | (ALI_SMBHSTCNT_BYTE_DATA << 3), SMBHSTCNT);
+
+    // Set Command (SPD Byte to Read)
+    __outb(spd_adr, SMBHSTCMD);
+
+    // Start transaction
+    __outb(__inb(SMBHSTCNT) | SMBHSTCNT_START, SMBHSTCNT);
+
+    // Wait until transaction complete
+    for (i = 500; i > 0; i--) {
+        usleep(50);
+        if (!(__inb(SMBHSTSTS) & SMBHSTSTS_HOST_BUSY)) {
+            break;
+        }
+    }
+    // If timeout or Error Status, exit
+    if (i == 0 || __inb(SMBHSTSTS) & ALI_SMBHSTSTS_BAD) {
+        return 0xFF;
+    }
+
+    return __inb(SMBHSTDAT0);
 }

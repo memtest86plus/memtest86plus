@@ -7,7 +7,7 @@
  *
  * Provides functions for reading SPD via SMBUS
  *
- * Copyright (C) 2004-2022 Samuel Demeulemeester.
+ * Copyright (C) 2004-2023 Sam Demeulemeester.
  */
 
 #define I2C_WRITE   0
@@ -74,6 +74,17 @@
 #define NVSMBSTS_RES        0x20
 #define NVSMBSTS_STATUS     0x1f
 
+/* ALi-Specific constants */
+#define ALI_SMBHSTCNT_SIZEMASK  0x03
+#define ALI_SMBHSTSTS_BAD       0x1C
+
+#define ALI_SMBHSTCNT_QUICK     0x00
+#define ALI_SMBHSTCNT_BYTE      0x01
+#define ALI_SMBHSTCNT_BYTE_DATA 0x02
+#define ALI_SMBHSTCNT_WORD_DATA 0x03
+#define ALI_SMBHSTCNT_KILL      0x04
+#define ALI_SMBHSTCNT_BLOCK     0x05
+
 /** Rounding factors for timing computation
  *
  *  These factors are used as a configurable CEIL() function
@@ -87,6 +98,7 @@
 
 #define PIIX4_SMB_BASE_ADR_DEFAULT  0x90
 #define PIIX4_SMB_BASE_ADR_VIAPRO   0xD0
+#define PIIX4_SMB_BASE_ADR_ALI1563  0x80
 
 struct pci_smbus_controller {
     unsigned vendor;
