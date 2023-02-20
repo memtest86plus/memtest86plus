@@ -50,10 +50,12 @@ static bool amd_sb_get_smb(void);
 static bool fch_zen_get_smb(void);
 static bool piix4_get_smb(uint8_t address);
 static bool ich5_get_smb(void);
+static bool ali_get_smb(uint8_t address);
 static uint8_t ich5_process(void);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
-static uint8_t ali_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
+static uint8_t ali_m1563_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
+static uint8_t ali_m1543_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
@@ -1283,7 +1285,8 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
         case PCI_VID_ALI:
             switch(did)
             {
-                // case 0x7101: // ALi M1533/1535/1543
+                case 0x7101: // ALi M1533/1535/1543C
+                    return ali_get_smb(PIIX4_SMB_BASE_ADR_ALI1543);
                 case 0x1563: // ALi M1563
                     return piix4_get_smb(PIIX4_SMB_BASE_ADR_ALI1563);
                 default:
@@ -1439,6 +1442,35 @@ static bool nv_mcp_get_smb(void)
     return false;
 }
 
+// ---------------------------------------
+// ALi SMBUS Controller (M1533/1535/1543C)
+// ---------------------------------------
+
+static bool ali_get_smb(uint8_t address)
+{
+    // Enable SMB I/O Base Address Register Control (Reg0x5B[2] = 0)
+    uint16_t temp = pci_config_read8(0, smbdev, smbfun, 0x5B);
+    pci_config_write8(0, smbdev, smbfun, 0x5B, temp & ~0x06);
+
+    // Enable Response to I/O Access. (Reg0x04[0] = 1)
+    temp = pci_config_read8(0, smbdev, smbfun, 0x04);
+    pci_config_write8(0, smbdev, smbfun, 0x04, temp | 0x01);
+
+    // SMB Host Controller Interface Enable (Reg0xE0[0] = 1)
+    temp = pci_config_read8(0, smbdev, smbfun, 0xE0);
+    pci_config_write8(0, smbdev, smbfun, 0xE0, temp | 0x01);
+
+    // Read SMBase Register (usually 0xE800)
+    uint16_t x = pci_config_read16(0, smbdev, smbfun, address) & 0xFFF0;
+
+    if (x != 0) {
+        smbusbase = x;
+        return true;
+    }
+
+    return false;
+}
+
 // ------------------
 // get_spd() function
 // ------------------
@@ -1447,7 +1479,10 @@ static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
     switch ((smbus_id >> 16) & 0xFFFF) {
       case PCI_VID_ALI:
-        return ali_read_spd_byte(slot_idx, (uint8_t)spd_adr);
+        if ((smbus_id & 0xFFFF) == 0x7101)
+            return ali_m1543_read_spd_byte(slot_idx, (uint8_t)spd_adr);
+        else
+            return ali_m1563_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       case PCI_VID_NVIDIA:
         return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       default:
@@ -1591,7 +1626,7 @@ static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
     return __inb(NVSMBDAT(0));
 }
 
-static uint8_t ali_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
+static uint8_t ali_m1563_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
 {
     int i;
 
@@ -1624,4 +1659,39 @@ static uint8_t ali_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
     }
 
     return __inb(SMBHSTDAT0);
+}
+
+static uint8_t ali_m1543_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
+{
+    int i;
+
+    smbus_adr += 0x50;
+
+    // Reset Status Register
+     __outb(0xFF, SMBHSTSTS);
+
+    // Set Slave ADR
+    __outb((smbus_adr << 1 | I2C_READ), ALI_OLD_SMBHSTADD);
+
+    // Set Command (SPD Byte to Read)
+    __outb(spd_adr, ALI_OLD_SMBHSTCMD);
+
+    // Start transaction
+    __outb(ALI_OLD_SMBHSTCNT_BYTE_DATA, ALI_OLD_SMBHSTCNT);
+    __outb(0xFF, ALI_OLD_SMBHSTSTART);
+
+    // Wait until transaction complete
+    for (i = 500; i > 0; i--) {
+        usleep(50);
+        if (!(__inb(SMBHSTSTS) & ALI_OLD_SMBHSTSTS_BUSY)) {
+            break;
+        }
+    }
+
+    // If timeout or Error Status, exit
+    if (i == 0 || __inb(SMBHSTSTS) & ALI_OLD_SMBHSTSTS_BAD) {
+        return 0xFF;
+    }
+
+    return __inb(ALI_OLD_SMBHSTDAT0);
 }
