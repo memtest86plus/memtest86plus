@@ -44,7 +44,6 @@ typedef enum {
 } cpu_temp_t;
 
 static cpu_temp_t cpu_temp_type;
-static cpu_temp_t get_cpu_temp_type(void);
 
 static int TjMax = 0;
 
@@ -58,16 +57,6 @@ static void get_specific_TjMax(void)
     if (cpuid_info.version.raw[0] == 0x6E8) {
         TjMax = 100;
     }
-}
-
-void temperature_init(void)
-{
-    // Process temperature-related quirks
-    if (quirk.type & QUIRK_TYPE_TEMP) {
-        quirk.process();
-    }
-
-    cpu_temp_type = get_cpu_temp_type();
 }
 
 static cpu_temp_t get_cpu_temp_type(void)
@@ -118,6 +107,16 @@ static cpu_temp_t get_cpu_temp_type(void)
     return None;
 }
 
+void temperature_init(void)
+{
+    // Process temperature-related quirks
+    if (quirk.type & QUIRK_TYPE_TEMP) {
+        quirk.process();
+    }
+
+    cpu_temp_type = get_cpu_temp_type();
+}
+
 int get_cpu_temperature(void)
 {
     uint32_t regl, regh;
@@ -158,6 +157,9 @@ int get_cpu_temperature(void)
       case ViaC7:
         rdmsr(MSR_VIA_TEMP_C7, regl, regh);
         return (int)(regl & 0xffffff);
+
+      case None:
+        break;
     }
 
     return 0;
