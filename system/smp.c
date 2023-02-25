@@ -540,7 +540,7 @@ bool check_x2apic(void)
         rdmsr(MSR_IA32_APIC_BASE, reg[0], reg[1]);
 #endif
         if ((reg[0] & IA32_APIC_ENABLED) && (reg[0] & IA32_APIC_EXTENDED)) {
-            // x2APIC is still enabled. Give up.
+            // x2APIC is still enabled (or binary is 32 bit). Give up.
             return false;
         }
     }
