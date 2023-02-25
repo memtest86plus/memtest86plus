@@ -152,6 +152,25 @@ startup:
 
 	leaq	startup_stack_top(%rip), %rsp
 
+    # Disable x2APIC if supported & enabled
+
+    movl	$0x1, %eax
+    cpuid
+    notl	%ecx
+    andl	$0x200000, %ecx
+    jnz	nox2apic				# x2APIC supported?
+    movq	$0x1b, %rcx
+    rdmsr
+    notl	%eax
+    andl	$0xc00, %eax		# x2APIC enabled?
+    jnz	nox2apic
+    rdmsr
+    andl	$0xfffff3ff, %eax	# Disable xAPIC & x2APIC
+    wrmsr
+    orl	$0x800, %eax			# Enable xAPIC only
+    wrmsr
+nox2apic:
+
 	# Pick the correct stack.
 
 	xorq	%rax, %rax

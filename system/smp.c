@@ -515,6 +515,38 @@ static bool start_cpu(int cpu_num)
     return true;
 }
 
+bool check_x2apic(void)
+{
+    uint32_t reg[4];
+
+    if (cpuid_info.flags.x2apic) {
+        rdmsr(MSR_IA32_APIC_BASE, reg[0], reg[1]);
+#ifdef __x86_64__
+        if ((reg[0] & IA32_APIC_ENABLED) && (reg[0] & IA32_APIC_EXTENDED)) {
+            // x2APIC is pre-enabled by BIOS.
+            cpuid(0xb, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
+
+            // if BSP APIC ID is > 255 (should not happen outside a VM), give up.
+            if (reg[3] > 255) {
+                return false;
+            }
+
+            // Try to disable x2APIC and re-enable xAPIC.
+            rdmsr(MSR_IA32_APIC_BASE, reg[0], reg[1]);
+            wrmsr(MSR_IA32_APIC_BASE, reg[0] & ~(IA32_APIC_EXTENDED | IA32_APIC_ENABLED), reg[1]);
+            wrmsr(MSR_IA32_APIC_BASE, reg[0] | IA32_APIC_ENABLED, reg[1]);
+        }
+
+        rdmsr(MSR_IA32_APIC_BASE, reg[0], reg[1]);
+#endif
+        if ((reg[0] & IA32_APIC_ENABLED) && (reg[0] & IA32_APIC_EXTENDED)) {
+            // x2APIC is still enabled. Give up.
+            return false;
+        }
+    }
+    return true;
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -531,13 +563,8 @@ void smp_init(bool smp_enable)
 
     num_available_cpus = 1;
 
-    if (cpuid_info.flags.x2apic) {
-        uint32_t msrl, msrh;
-        rdmsr(MSR_IA32_APIC_BASE, msrl, msrh);
-        if ((msrl & IA32_APIC_ENABLED) && (msrl & IA32_APIC_EXTENDED)) {
-            // We don't currently support x2APIC mode.
-            smp_enable = false;
-        }
+    if(!check_x2apic()) {
+        smp_enable = false;
     }
 
     // Process SMP Quirks
