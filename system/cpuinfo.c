@@ -680,14 +680,14 @@ static void determine_cpu_model(void)
               case 2:
               case 3:
               case 7:
-                cpu_model = "Pentium";
+                cpu_model = "Intel Pentium";
                 if (l1_cache == 0) {
                     l1_cache = 8;
                 }
                 break;
               case 4:
               case 8:
-                cpu_model = "Pentium-MMX";
+                cpu_model = "Intel Pentium MMX";
                 if (l1_cache == 0) {
                     l1_cache = 16;
                 }
@@ -700,54 +700,54 @@ static void determine_cpu_model(void)
             switch (cpuid_info.version.model) {
               case 0:
               case 1:
-                cpu_model = "Pentium Pro";
+                cpu_model = "Intel Pentium Pro";
                 break;
               case 3:
               case 4:
-                cpu_model = "Pentium II";
+                cpu_model = "Intel Pentium II";
                 break;
               case 5:
                 if (l2_cache == 0) {
-                    cpu_model = "Celeron";
+                    cpu_model = "Intel Celeron";
                 } else {
-                    cpu_model = "Pentium II";
+                    cpu_model = "Intel Pentium II";
                 }
                 break;
               case 6:
                 if (l2_cache == 128) {
-                  cpu_model = "Celeron";
+                  cpu_model = "Intel Celeron";
                 } else {
-                  cpu_model = "Pentium II";
+                  cpu_model = "Intel Pentium II";
                 }
                 break;
               case 7:
               case 8:
               case 11:
                 if (l2_cache == 128) {
-                    cpu_model = "Celeron";
+                    cpu_model = "Intel Celeron";
                 } else {
-                    cpu_model = "Pentium III";
+                    cpu_model = "Intel Pentium III";
                 }
                 break;
               case 9:
                 if (l2_cache == 512) {
-                    cpu_model = "Celeron M (0.13)";
+                    cpu_model = "Intel Celeron M (0.13)";
                 } else {
-                    cpu_model = "Pentium M (0.13)";
+                    cpu_model = "Intel Pentium M (0.13)";
                 }
                 break;
               case 10:
-                cpu_model = "Pentium III Xeon";
+                cpu_model = "Intel Pentium III Xeon";
                 break;
               case 12:
                 l1_cache = 24;
-                cpu_model = "Atom (0.045)";
+                cpu_model = "Intel Atom (0.045)";
                 break;
               case 13:
                 if (l2_cache == 1024) {
-                    cpu_model = "Celeron M (0.09)";
+                    cpu_model = "Intel Celeron M (0.09)";
                 } else {
-                    cpu_model = "Pentium M (0.09)";
+                    cpu_model = "Intel Pentium M (0.09)";
                 }
                 break;
               case 14:
@@ -755,7 +755,7 @@ static void determine_cpu_model(void)
                 break;
               case 15:
                 if (l2_cache == 1024) {
-                    cpu_model = "Pentium E";
+                    cpu_model = "Intel Pentium E";
                 } else {
                     cpu_model = "Intel Core 2";
                 }
@@ -770,17 +770,17 @@ static void determine_cpu_model(void)
               case 1:
               case 2:
                 if (l2_cache == 128) {
-                    cpu_model = "Celeron";
+                    cpu_model = "Intel Celeron";
                 } else {
-                    cpu_model = "Pentium 4";
+                    cpu_model = "Intel Pentium 4";
                 }
                 break;
               case 3:
               case 4:
                 if (l2_cache == 256) {
-                    cpu_model = "Celeron (0.09)";
+                    cpu_model = "Intel Celeron (0.09)";
                 } else {
-                    cpu_model = "Pentium 4 (0.09)";
+                    cpu_model = "Intel Pentium 4 (0.09)";
                 }
                 break;
               case 6:
@@ -844,10 +844,10 @@ static void determine_cpu_model(void)
         // Unknown processor - make a guess at the family.
         switch (cpuid_info.version.family) {
           case 5:
-            cpu_model = "586";
+            cpu_model = "586-class CPU (unknown)";
             break;
           case 6:
-            cpu_model = "686";
+            cpu_model = "686-class CPU (unknown)";
             break;
           default:
             cpu_model = "Unidentified Processor";
