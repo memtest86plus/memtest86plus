@@ -632,9 +632,9 @@ static void determine_cpu_model(void)
         // Transmeta Processors - vendor_id starts with "GenuineTMx86"
         if (cpuid_info.vendor_id.str[7] == 'T' ) {
             if (cpuid_info.version.family == 5) {
-                cpu_model = "TM 5x00";
+                cpu_model = "Transmeta TM 5x00";
             } else if (cpuid_info.version.family == 15) {
-                cpu_model = "TM 8x00";
+                cpu_model = "Transmeta TM 8x00";
             }
             l1_cache = cpuid_info.cache_info.l1_i_size + cpuid_info.cache_info.l1_d_size;
             l2_cache = cpuid_info.cache_info.l2_size;
@@ -802,7 +802,7 @@ static void determine_cpu_model(void)
             // CentaurHauls
             switch (cpuid_info.version.family) {
               case 5:
-                cpu_model = "WinChip C6";
+                cpu_model = "IDT WinChip C6";
                 l1_cache = 32;
                 // WinChip 2/3 (models 8/9) have brand string
                 break;
