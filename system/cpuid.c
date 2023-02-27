@@ -24,8 +24,6 @@ void cpuid_init(void)
     uint32_t reg[4];
     char *p, *q;
 
-    return;
-
     // Get the max standard cpuid & vendor ID.
     cpuid(0x0, 0,
         &cpuid_info.max_cpuid,
