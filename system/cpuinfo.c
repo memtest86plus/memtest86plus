@@ -71,9 +71,17 @@ static void determine_cache_size()
         l3_cache *= 512;
         break;
       case 'C':
-        if (cpuid_info.vendor_id.str[5] == 'I') break; // Cyrix
-        // VIA C3/C7/Nano
-        if (cpuid_info.version.family == 6) {
+        if (cpuid_info.vendor_id.str[5] == 'I') {
+          // Cyrix
+          if (cpuid_info.version.family == 5 && cpuid_info.version.model == 4) {
+            // Media GXm, Geode GXm/GXLV/GX1
+            // Cache info in CPUID has a Cyrix-specific encoding so hardcode it
+            l1_cache = 16;
+          }
+          break;
+        }
+        // WinChip 2/3, VIA C3/C7/Nano
+        if (cpuid_info.version.family == 5 || cpuid_info.version.family == 6) {
             l1_cache = cpuid_info.cache_info.l1_d_size;
             l2_cache = cpuid_info.cache_info.l2_size;
             break;
@@ -83,6 +91,25 @@ static void determine_cache_size()
         // Zhaoxin CPU only
         /* fall through */
       case 'G':
+        if (cpuid_info.vendor_id.str[9] == 'N') {
+          // National Semiconductor
+          if (cpuid_info.version.family == 5) {
+            switch (cpuid_info.version.model) {
+              case 4:
+                // Geode GXm/GXLV/GX1
+                // Cache info in CPUID has a Cyrix-specific encoding so hardcode it
+                l1_cache = 16;
+                break;
+              case 5:
+                // Geode GX2
+                l1_cache = cpuid_info.cache_info.l1_d_size;
+                break;
+              default:
+                break;
+            }
+          }
+          break;
+        }
         // Intel Processors
         l1_cache = 0;
         l2_cache = 0;
@@ -605,9 +632,9 @@ static void determine_cpu_model(void)
         // Transmeta Processors - vendor_id starts with "GenuineTMx86"
         if (cpuid_info.vendor_id.str[7] == 'T' ) {
             if (cpuid_info.version.family == 5) {
-                cpu_model = "TM 5x00";
+                cpu_model = "Transmeta TM 5x00";
             } else if (cpuid_info.version.family == 15) {
-                cpu_model = "TM 8x00";
+                cpu_model = "Transmeta TM 8x00";
             }
             l1_cache = cpuid_info.cache_info.l1_i_size + cpuid_info.cache_info.l1_d_size;
             l2_cache = cpuid_info.cache_info.l2_size;
@@ -653,14 +680,14 @@ static void determine_cpu_model(void)
               case 2:
               case 3:
               case 7:
-                cpu_model = "Pentium";
+                cpu_model = "Intel Pentium";
                 if (l1_cache == 0) {
                     l1_cache = 8;
                 }
                 break;
               case 4:
               case 8:
-                cpu_model = "Pentium-MMX";
+                cpu_model = "Intel Pentium MMX";
                 if (l1_cache == 0) {
                     l1_cache = 16;
                 }
@@ -673,54 +700,54 @@ static void determine_cpu_model(void)
             switch (cpuid_info.version.model) {
               case 0:
               case 1:
-                cpu_model = "Pentium Pro";
+                cpu_model = "Intel Pentium Pro";
                 break;
               case 3:
               case 4:
-                cpu_model = "Pentium II";
+                cpu_model = "Intel Pentium II";
                 break;
               case 5:
                 if (l2_cache == 0) {
-                    cpu_model = "Celeron";
+                    cpu_model = "Intel Celeron";
                 } else {
-                    cpu_model = "Pentium II";
+                    cpu_model = "Intel Pentium II";
                 }
                 break;
               case 6:
                 if (l2_cache == 128) {
-                  cpu_model = "Celeron";
+                  cpu_model = "Intel Celeron";
                 } else {
-                  cpu_model = "Pentium II";
+                  cpu_model = "Intel Pentium II";
                 }
                 break;
               case 7:
               case 8:
               case 11:
                 if (l2_cache == 128) {
-                    cpu_model = "Celeron";
+                    cpu_model = "Intel Celeron";
                 } else {
-                    cpu_model = "Pentium III";
+                    cpu_model = "Intel Pentium III";
                 }
                 break;
               case 9:
                 if (l2_cache == 512) {
-                    cpu_model = "Celeron M (0.13)";
+                    cpu_model = "Intel Celeron M (0.13)";
                 } else {
-                    cpu_model = "Pentium M (0.13)";
+                    cpu_model = "Intel Pentium M (0.13)";
                 }
                 break;
               case 10:
-                cpu_model = "Pentium III Xeon";
+                cpu_model = "Intel Pentium III Xeon";
                 break;
               case 12:
                 l1_cache = 24;
-                cpu_model = "Atom (0.045)";
+                cpu_model = "Intel Atom (0.045)";
                 break;
               case 13:
                 if (l2_cache == 1024) {
-                    cpu_model = "Celeron M (0.09)";
+                    cpu_model = "Intel Celeron M (0.09)";
                 } else {
-                    cpu_model = "Pentium M (0.09)";
+                    cpu_model = "Intel Pentium M (0.09)";
                 }
                 break;
               case 14:
@@ -728,7 +755,7 @@ static void determine_cpu_model(void)
                 break;
               case 15:
                 if (l2_cache == 1024) {
-                    cpu_model = "Pentium E";
+                    cpu_model = "Intel Pentium E";
                 } else {
                     cpu_model = "Intel Core 2";
                 }
@@ -743,17 +770,17 @@ static void determine_cpu_model(void)
               case 1:
               case 2:
                 if (l2_cache == 128) {
-                    cpu_model = "Celeron";
+                    cpu_model = "Intel Celeron";
                 } else {
-                    cpu_model = "Pentium 4";
+                    cpu_model = "Intel Pentium 4";
                 }
                 break;
               case 3:
               case 4:
                 if (l2_cache == 256) {
-                    cpu_model = "Celeron (0.09)";
+                    cpu_model = "Intel Celeron (0.09)";
                 } else {
-                    cpu_model = "Pentium 4 (0.09)";
+                    cpu_model = "Intel Pentium 4 (0.09)";
                 }
                 break;
               case 6:
@@ -773,78 +800,40 @@ static void determine_cpu_model(void)
         // VIA/Cyrix/Centaur Processors with CPUID
         if (cpuid_info.vendor_id.str[1] == 'e' ) {
             // CentaurHauls
-            l1_cache = cpuid_info.cache_info.l1_i_size + cpuid_info.cache_info.l1_d_size;
-            l2_cache = cpuid_info.cache_info.l2_size >> 8;
             switch (cpuid_info.version.family) {
               case 5:
-                cpu_model = "Centaur 5x86";
+                cpu_model = "IDT WinChip C6";
+                l1_cache = 32;
+                // WinChip 2/3 (models 8/9) have brand string
                 break;
-              case 6: // VIA C3
-                switch (cpuid_info.version.model) {
-                  case 10:
-                    cpu_model = "VIA C7 (C5J)";
-                    l1_cache = 64;
-                    l2_cache = 128;
-                    break;
-                  case 13:
-                    cpu_model = "VIA C7 (C5R)";
-                    l1_cache = 64;
-                    l2_cache = 128;
-                    break;
-                  case 15:
-                    cpu_model = "VIA Isaiah (CN)";
-                    l1_cache = 64;
-                    l2_cache = 128;
-                    break;
-                  default:
-                    if (cpuid_info.version.stepping < 8) {
-                        cpu_model = "VIA C3 Samuel2";
-                    } else {
-                        cpu_model = "VIA C3 Eden";
-                    }
-                  break;
-                }
               default:
+                // All VIA/Centaur family values >= 6 have brand string
                 break;
             }
         } else {                /* CyrixInstead */
             switch (cpuid_info.version.family) {
-              case 5:
+              case 4:
                 switch (cpuid_info.version.model) {
-                  case 0:
-                    cpu_model = "Cyrix 6x86MX/MII";
+                  case 2:
+                    cpu_model = "Cyrix 5x86";
+                    l1_cache = 16;
                     break;
                   case 4:
-                    cpu_model = "Cyrix GXm";
+                    cpu_model = "Cyrix MediaGX/GXi";
+                    l1_cache = 16;
                     break;
                   default:
                     break;
                 }
                 break;
-              case 6: // VIA C3
-                switch (cpuid_info.version.model) {
-                  case 6:
-                    cpu_model = "Cyrix III";
-                    break;
-                  case 7:
-                    if (cpuid_info.version.stepping < 8) {
-                        cpu_model = "VIA C3 Samuel2";
-                    } else {
-                        cpu_model = "VIA C3 Ezra-T";
-                    }
-                    break;
-                  case 8:
-                    cpu_model = "VIA C3 Ezra-T";
-                    break;
-                  case 9:
-                    cpu_model = "VIA C3 Nehemiah";
-                    break;
-                  default:
-                    break;
-                }
-                // L1 = L2 = 64 KB from Cyrix III to Nehemiah
+              case 5:
+                cpu_model = "Cyrix 6x86/6x86L";
+                l1_cache = 16;
+                // Media GXm (model 4) has brand string
+                break;
+              case 6:
+                cpu_model = "Cyrix 6x86MX/MII";
                 l1_cache = 64;
-                l2_cache = 64;
                 break;
               default:
                 break;
@@ -855,10 +844,10 @@ static void determine_cpu_model(void)
         // Unknown processor - make a guess at the family.
         switch (cpuid_info.version.family) {
           case 5:
-            cpu_model = "586";
+            cpu_model = "586-class CPU (unknown)";
             break;
           case 6:
-            cpu_model = "686";
+            cpu_model = "686-class CPU (unknown)";
             break;
           default:
             cpu_model = "Unidentified Processor";
