@@ -34,12 +34,13 @@ void memctrl_init(void)
 
     switch(imc_type)
     {
+        case IMC_HSW:
+            get_imc_config_intel_hsw();
+            break;
         case IMC_SKL:
             get_imc_config_intel_skl();
             break;
         default:
             break;
     }
-
-
 }
