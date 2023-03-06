@@ -41,7 +41,8 @@ SYS_OBJS = system/acpi.o \
            system/vmem.o \
            system/xhci.o
 
-IMC_OBJS = system/mch/intel_skl.o
+IMC_OBJS = system/mch/intel_hsw.o \
+           system/mch/intel_skl.o
 
 LIB_OBJS = lib/barrier.o \
            lib/print.o \
