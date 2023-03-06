@@ -11,7 +11,7 @@
 #include "cpuinfo.h"
 
 #include "memctrl.h"
-#include "chipsets/chipsets.h"
+#include "mch/mch.h"
 
 imc_info_t imc_status;
 
