@@ -13,10 +13,12 @@
 
 void get_imc_config_intel_skl(void)
 {
-    imc_status.freq     = 1333;
-    imc_status.tCL      = 16;
-    imc_status.tCL_dec  = 16;
-    imc_status.tRCD     = 10;
-    imc_status.tRP      = 10;
-    imc_status.tRAS     = 10;
+    imc.type    = "DDR4";
+    imc.freq    = 1333;
+    imc.width   = 64;
+    imc.tCL     = 16;
+    imc.tCL_dec = 16;
+    imc.tRCD    = 10;
+    imc.tRP     = 10;
+    imc.tRAS    = 10;
 }
