@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 
+#include "config.h"
 #include "cpuinfo.h"
 
 #include "memctrl.h"
@@ -33,6 +34,10 @@ void memctrl_init(void)
     imc.tRAS    = 0;
 
     ecc_status.ecc_enabled = false;
+
+    if (!enable_mch_read) {
+        return;
+    }
 
     switch(imc_type)
     {
