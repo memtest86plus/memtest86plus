@@ -14,6 +14,8 @@
 
 typedef struct imc_infos {
     uint16_t    freq;
+    char        *type;
+    uint16_t    width;
     uint16_t    tCL;
     uint8_t     tCL_dec;
     uint16_t    tRCD;
@@ -41,7 +43,7 @@ typedef struct ecc_status {
  * Current DRAM configuration of the Integrated Memory Controller
  */
 
-extern imc_info_t imc_status;
+extern imc_info_t imc;
 
 /**
  * Current ECC Status of the Integrated Memory Controller

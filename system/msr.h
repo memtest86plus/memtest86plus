@@ -17,6 +17,7 @@
 #define MSR_IA32_PLATFORM_ID            0x17
 #define MSR_IA32_APIC_BASE              0x1b
 #define MSR_IA32_EBL_CR_POWERON         0x2a
+#define MSR_IA32_PLATFORM_INFO          0xce
 #define MSR_IA32_MCG_CTL                0x17b
 #define MSR_IA32_PERF_STATUS            0x198
 #define MSR_IA32_THERM_STATUS           0x19c

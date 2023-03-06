@@ -13,7 +13,7 @@
 #include "memctrl.h"
 #include "mch/mch.h"
 
-imc_info_t imc_status;
+imc_info_t imc;
 
 ecc_info_t ecc_status;
 
@@ -23,12 +23,14 @@ ecc_info_t ecc_status;
 
 void memctrl_init(void)
 {
-    imc_status.freq     = 0;
-    imc_status.tCL      = 0;
-    imc_status.tCL_dec  = 0;
-    imc_status.tRCD     = 0;
-    imc_status.tRP      = 0;
-    imc_status.tRAS     = 0;
+    imc.freq    = 0;
+    imc.type    = "UNDEF";
+    imc.width   = 0;
+    imc.tCL     = 0;
+    imc.tCL_dec = 0;
+    imc.tRCD    = 0;
+    imc.tRP     = 0;
+    imc.tRAS    = 0;
 
     ecc_status.ecc_enabled = false;
 
