@@ -41,7 +41,7 @@ SYS_OBJS = system/acpi.o \
            system/vmem.o \
            system/xhci.o
 
-IMC_OBJS = system/chipsets/intel_skl.o
+IMC_OBJS = system/mch/intel_skl.o
 
 LIB_OBJS = lib/barrier.o \
            lib/div64.o \
@@ -101,8 +101,8 @@ system/%.o: ../system/%.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/chipsets/%.o: ../system/chipsets/%.c
-	@mkdir -p system/chipsets
+system/mch/%.o: ../system/mch/%.c
+	@mkdir -p system/mch
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../lib/%.c
