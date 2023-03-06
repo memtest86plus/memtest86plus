@@ -97,6 +97,7 @@ bool            enable_trace       = false;
 
 bool            enable_sm          = true;
 bool            enable_bench       = true;
+bool            enable_mch_read    = true;
 
 bool            pause_at_start     = true;
 
@@ -209,6 +210,8 @@ static void parse_option(const char *option, const char *params)
         enable_big_status = false;
     } else if (strncmp(option, "noehci", 7) == 0) {
         usb_init_options |= USB_IGNORE_EHCI;
+    } else if (strncmp(option, "nomch", 6) == 0) {
+        enable_mch_read = false;
     } else if (strncmp(option, "nopause", 8) == 0) {
         pause_at_start = false;
     } else if (strncmp(option, "nosm", 5) == 0) {
