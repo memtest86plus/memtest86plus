@@ -12,7 +12,7 @@ endif
 CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
          -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector
 
-INC_DIRS = -I../boot -I../system -I../system/chipsets -I../lib -I../tests -I../app -Iapp
+INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app -Iapp
 
 SYS_OBJS = system/acpi.o \
            system/cpuid.o \
