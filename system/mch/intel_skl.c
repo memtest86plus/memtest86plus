@@ -9,7 +9,7 @@
 #include "cpuinfo.h"
 #include "memctrl.h"
 
-#include "chipsets.h"
+#include "mch.h"
 
 void get_imc_config_intel_skl(void)
 {
@@ -20,5 +20,3 @@ void get_imc_config_intel_skl(void)
     imc_status.tRP      = 10;
     imc_status.tRAS     = 10;
 }
-
-
