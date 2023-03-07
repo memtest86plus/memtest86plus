@@ -13,8 +13,8 @@
  */
 
 typedef struct imc_infos {
-    uint16_t    freq;
     char        *type;
+    uint16_t    freq;
     uint16_t    width;
     uint16_t    tCL;
     uint8_t     tCL_dec;
@@ -27,11 +27,11 @@ typedef enum {
     ECC_ERR_NONE,
     ECC_ERR_CORRECTED,
     ECC_ERR_UNCORRECTED
-} ecc_error_typo_t;
+} ecc_error_type_t;
 
-typedef struct ecc_status {
+typedef struct __attribute__((packed)) ecc_status {
     bool                ecc_enabled;
-    ecc_error_typo_t    err_type;
+    ecc_error_type_t    err_type;
     uint64_t            err_adr;
     uint32_t            err_col;
     uint32_t            err_row;
