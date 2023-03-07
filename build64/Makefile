@@ -41,8 +41,8 @@ SYS_OBJS = system/acpi.o \
            system/vmem.o \
            system/xhci.o
 
-IMC_OBJS = system/mch/intel_hsw.o \
-           system/mch/intel_skl.o
+IMC_SRC  = $(wildcard ../system/mch/*.c)
+IMC_OBJS = $(subst ../,,$(IMC_SRC:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
            lib/print.o \
