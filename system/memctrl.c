@@ -14,7 +14,7 @@
 #include "memctrl.h"
 #include "mch/mch.h"
 
-imc_info_t imc;
+imc_info_t imc = {"UNDEF", 0, 0, 0, 0, 0, 0, 0};
 
 ecc_info_t ecc_status;
 
@@ -24,15 +24,6 @@ ecc_info_t ecc_status;
 
 void memctrl_init(void)
 {
-    imc.freq    = 0;
-    imc.type    = "UNDEF";
-    imc.width   = 0;
-    imc.tCL     = 0;
-    imc.tCL_dec = 0;
-    imc.tRCD    = 0;
-    imc.tRP     = 0;
-    imc.tRAS    = 0;
-
     ecc_status.ecc_enabled = false;
 
     if (!enable_mch_read) {
