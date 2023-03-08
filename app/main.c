@@ -236,6 +236,8 @@ static void global_init(void)
 
     config_init();
 
+    memctrl_init();
+
     tty_init();
 
     smp_init(smp_enabled);
@@ -253,8 +255,6 @@ static void global_init(void)
     error_init();
 
     temperature_init();
-
-    memctrl_init();
 
     initial_config();
 
@@ -283,7 +283,7 @@ static void global_init(void)
         set_scroll_lock(true);
     } else if (enable_sm) {
         post_display_init();
-        printf(23,0,"CPUID : 0x%x", cpuid_info.version.raw[0]);
+        printf(23,0,"CPUID: 0x%x", cpuid_info.version.raw[0]);
     }
 
     size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
