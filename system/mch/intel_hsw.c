@@ -35,9 +35,7 @@ void get_imc_config_intel_hsw(void)
     if (!(mmio_reg & 0x1)) {
         pci_config_write32( 0, 0, 0, HSW_MMR_BASE_REG, mmio_reg | 1);
         mmio_reg = pci_config_read32(0, 0, 0, HSW_MMR_BASE_REG);
-        if (!(mmio_reg & 0x1)) {
-            return;
-        }
+        if (!(mmio_reg & 0x1)) return;
     }
     mmio_reg &= 0xFFFFC000;
 
@@ -55,7 +53,7 @@ void get_imc_config_intel_hsw(void)
     rdmsr(MSR_IA32_PLATFORM_INFO, reg0, reg1);
     cpu_ratio = (float)((reg0 >> 8) & 0xFF);
 
-    if (!cpu_ratio) { return; }
+    if (!cpu_ratio) return;
 
     // Compute DRAM Frequency
     imc.freq = ((clks_per_msec / 1000) / cpu_ratio) * dram_ratio * 2;
