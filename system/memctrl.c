@@ -36,6 +36,7 @@ void memctrl_init(void)
             get_imc_config_intel_hsw();
             break;
         case IMC_SKL:
+        case IMC_KBL:
             get_imc_config_intel_skl();
             break;
         default:
