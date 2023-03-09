@@ -1,4 +1,3 @@
-AS = as -64
 CC = gcc
 
 GIT = git
@@ -20,8 +19,8 @@ SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
            system/font.o \
-           system/hwctrl.o \
            system/heap.o \
+           system/hwctrl.o \
            system/hwquirks.o \
            system/keyboard.o \
            system/ohci.o \
@@ -132,29 +131,29 @@ memtest_shared: $(OBJS) ldscripts/memtest_shared.lds Makefile
 	$(LD) -shared -Bsymbolic -T ldscripts/memtest_shared.lds -o $@ $(OBJS)
 
 memtest_shared.bin: memtest_shared
-	objcopy -O binary $< memtest_shared.bin
+	objcopy -O binary $< $@
 
 memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o $@
 
 memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o $@
 
 memtest.mbr: memtest_shared.bin boot/mbr.o ldscripts/memtest_mbr.lds
-	$(LD) -T ldscripts/memtest_mbr.lds boot/mbr.o -b binary memtest_shared.bin -o memtest.mbr
+	$(LD) -T ldscripts/memtest_mbr.lds boot/mbr.o -b binary memtest_shared.bin -o $@
 
 floppy.img: memtest.bin
-	dd if=/dev/zero of=floppy.img bs=1474560 count=1
-	dd if=memtest.bin of=floppy.img bs=1474560 conv=notrunc
+	dd if=/dev/zero of=$@ bs=1474560 count=1
+	dd if=memtest.bin of=$@ bs=1474560 conv=notrunc
 
 esp.img: memtest.efi
 	@mkdir -p iso/EFI/BOOT
 	cp memtest.efi iso/EFI/BOOT/bootx64.efi
-	@rm -f esp.img
-	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
-	mcopy -s -i esp.img iso/EFI ::
+	@rm -f $@
+	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C $@ 4096
+	mcopy -s -i $@ iso/EFI ::
 
 memtest.iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
@@ -162,7 +161,7 @@ memtest.iso: memtest.mbr floppy.img esp.img
 	xorrisofs -pad -R -J -volid MT86PLUS_64 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
-		  -o ./memtest.iso /boot=./iso/boot /EFI=./iso/EFI
+		  -o ./$@ /boot=./iso/boot /EFI=./iso/EFI
 
 iso: memtest.iso
 
@@ -209,9 +208,9 @@ grub-esp.img: memtest.efi grub-bootx64.efi ../grub/${GRUB_CFG}-efi.cfg
 	cp ../grub/${GRUB_CFG}-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
 	cp $(GRUB_LIB_DIR)/x86_64-efi/*.mod grub-iso/EFI/BOOT/grub/x86_64-efi/
-	@rm -f grub-esp.img
-	/sbin/mkdosfs -n MT86P_ESP -F12 -C grub-esp.img 8192
-	mcopy -s -i grub-esp.img grub-iso/EFI ::
+	@rm -f $@
+	/sbin/mkdosfs -n MT86P_ESP -F12 -C $@ 8192
+	mcopy -s -i $@ grub-iso/EFI ::
 
 grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/${GRUB_CFG}-legacy.cfg grub-esp.img
 	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
@@ -225,6 +224,6 @@ grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/${GRUB_CFG}-legacy.cfg g
 		  -b /boot/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
 		  --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./grub-esp.img \
-		  -o ./grub-memtest.iso /boot=./grub-iso/boot /EFI=./grub-iso/EFI
+		  -o ./$@ /boot=./grub-iso/boot /EFI=./grub-iso/EFI
 
 grub-iso: grub-memtest.iso
