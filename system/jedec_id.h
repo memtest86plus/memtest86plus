@@ -478,7 +478,7 @@ static const struct spd_jedec_manufacturer jep106[] = {
 //  { 0x0353, "Primarion" },
 //  { 0x0354, "Picochip Designs Ltd" },
 //  { 0x0355, "Silverback Systems" },
-//  { 0x0356, "Jade Star Technologies" },
+    { 0x0356, "Jade Star" },
 //  { 0x0357, "Pijnenburg Securealink" },
     { 0x0358, "takeMS" }, // Ultron AG
 //  { 0x0359, "Cambridge Silicon Radio" },
@@ -882,7 +882,7 @@ static const struct spd_jedec_manufacturer jep106[] = {
 //  { 0x066E, "Certicom Corporation" },
 //  { 0x066F, "JSC ICC Milandr" },
 //  { 0x0670, "PhotoFast Global Inc" },
-//  { 0x0671, "InnoDisk Corporation" },
+    { 0x0671, "InnoDisk" },
 //  { 0x0672, "Muscle Power" },
 //  { 0x0673, "Energy Micro" },
 //  { 0x0674, "Innofidei" },
