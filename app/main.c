@@ -671,7 +671,8 @@ void main(void)
             if (error_count == 0) {
                 display_status("Pass   ");
                 display_big_status(true);
-                //display_notice("** Pass completed, no errors **");
+            } else {
+                display_big_status(false);
             }
         }
     }

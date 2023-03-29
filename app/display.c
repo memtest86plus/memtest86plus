@@ -399,7 +399,6 @@ void restore_big_status(void)
 
     restore_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
     big_status_displayed = false;
-    enable_big_status = false;
 }
 
 void check_input(void)
@@ -410,6 +409,7 @@ void check_input(void)
         return;
     } else if (big_status_displayed) {
         restore_big_status();
+        enable_big_status = false;
     }
 
     switch (input_key) {
