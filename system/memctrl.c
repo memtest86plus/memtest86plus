@@ -16,7 +16,7 @@
 
 imc_info_t imc = {"UNDEF", 0, 0, 0, 0, 0, 0, 0};
 
-ecc_info_t ecc_status;
+ecc_info_t ecc_status = {false, ECC_ERR_NONE, 0, 0, 0, 0, 0};
 
 // ---------------------
 // -- Public function --
@@ -32,6 +32,10 @@ void memctrl_init(void)
 
     switch(imc_type)
     {
+        case IMC_SNB:
+        case IMC_IVB:
+            get_imc_config_intel_snb();
+            break;
         case IMC_HSW:
             get_imc_config_intel_hsw();
             break;
@@ -41,5 +45,10 @@ void memctrl_init(void)
             break;
         default:
             break;
+    }
+
+    // Consistency check
+    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRCD == 0) {
+        imc.freq = 0;
     }
 }

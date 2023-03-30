@@ -3,6 +3,9 @@
 #ifndef _MCH_H_
 #define _MCH_H_
 
+/* Memory configuration Detection for Intel Sandy Bridge */
+void get_imc_config_intel_snb(void);
+
 /* Memory configuration Detection for Intel Haswell */
 void get_imc_config_intel_hsw(void);
 
