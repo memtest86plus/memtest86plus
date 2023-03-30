@@ -90,6 +90,13 @@ static void determine_cache_size()
         }
         // Zhaoxin CPU only
         /* fall through */
+      case 'V':
+        // Vortex86
+        if (cpuid_info.version.family < 6) {
+          // Only family 6 have cache info
+          break;
+        }
+        /* fall through */
       case 'G':
         if (cpuid_info.vendor_id.str[9] == 'N') {
           // National Semiconductor
@@ -840,6 +847,33 @@ static void determine_cpu_model(void)
             }
         }
         break;
+
+      case 'V':
+        // Vortex86 SoC
+        switch (cpuid_info.version.family) {
+          case 5:
+            switch (cpuid_info.version.model) {
+              case 2:
+                cpu_model = "Vortex86DX";
+                l1_cache = 16;
+                l2_cache = 256;
+                break;
+              case 8:
+                cpu_model = "Vortex86MX/DX2";
+                l1_cache = 16;
+                l2_cache = 256;
+                break;
+              default:
+                break;
+            }
+            break;
+
+          default:
+            // All Vortex86 family values >= 6 have brand string
+            break;
+        }
+        break;
+
       default:
         // Unknown processor - make a guess at the family.
         switch (cpuid_info.version.family) {
