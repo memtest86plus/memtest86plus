@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }} ${{ matrix.compiler }}
+    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.wordsize }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -21,6 +21,7 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         os: [ubuntu-20.04, ubuntu-22.04]
+        wordsize: [32, 64]
 
     steps:
       - uses: actions/checkout@v3
@@ -30,34 +31,10 @@ jobs:
       - name: Install Linux Dependencies
         run: sudo apt-get install build-essential gcc-multilib clang libc6-dev-i386-cross dosfstools mtools xorriso -y
 
-      - name: Make all build32
-        env:
-          C: ${{matrix.compiler}}
-        working-directory: ./build32
-        run: make -j 2 all
-
-      - name: Make clean build32
-        working-directory: ./build32
+      - name: Clean up
+        working-directory: ./build${{matrix.wordsize}}
         run: make clean
 
-      - name: Make all build64
-        env:
-          C: ${{matrix.compiler}}
-        working-directory: ./build64
-        run: make -j 2 all
-
-      - name: Make clean build64
-        working-directory: ./build64
-        run: make clean
-
-      - name: Make iso build32
-        env:
-          C: ${{matrix.compiler}}
-        working-directory: ./build32
-        run: make -j 2 iso
-
-      - name: Make iso build64
-        env:
-          C: ${{matrix.compiler}}
-        working-directory: ./build64
-        run: make -j 2 iso
+      - name: Build
+        working-directory: ./build${{matrix.wordsize}}
+        run: make -j 2 CC="${{matrix.compiler}}" iso
