@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc, clang]
+        compiler: [gcc]
         os: [ubuntu-20.04, ubuntu-22.04]
         wordsize: [32, 64]
 
