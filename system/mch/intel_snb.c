@@ -24,10 +24,10 @@
 
 void get_imc_config_intel_snb(void)
 {
-    uint32_t mmio_reg;
+    uint32_t mmio_reg, offset;
     uint32_t mch_cfg, reg0, reg1;
     float cpu_ratio, dram_ratio;
-    uintptr_t *ptr;
+    uint32_t *ptr;
 
     imc.type    = "DDR3";
     imc.tCL_dec = 0;
@@ -43,7 +43,7 @@ void get_imc_config_intel_snb(void)
     mmio_reg &= 0xFFFFC000;
 
     // Get DRAM Ratio
-    ptr = (uintptr_t*)((uintptr_t)mmio_reg + SNB_REG_MCH_CFG);
+    ptr = (uint32_t*)((uintptr_t)mmio_reg + SNB_REG_MCH_CFG);
     mch_cfg = *ptr & 0xFFFF;
 
     if ((mch_cfg >> 8) & 1) {
@@ -67,31 +67,30 @@ void get_imc_config_intel_snb(void)
     }
 
     // Get Main Memory Controller Register for both channels
-    ptr = (uintptr_t*)((uintptr_t)mmio_reg + SNB_REG_MAIN_CHAN0);
+    ptr = (uint32_t*)((uintptr_t)mmio_reg + SNB_REG_MAIN_CHAN0);
     reg0 = *ptr & 0xFFFF;
 
-    ptr = (uintptr_t*)((uintptr_t)mmio_reg + SNB_REG_MAIN_CHAN1);
+    ptr = (uint32_t*)((uintptr_t)mmio_reg + SNB_REG_MAIN_CHAN1);
     reg1 = *ptr & 0xFFFF;
 
     // Populate IMC width
     imc.width = (reg0 && reg1) ? 128 : 64;
 
-    // CAS Latency (tCAS)
-    ptr = (uintptr_t*)((uintptr_t)mmio_reg + SNB_REG_TIMING);
-    imc.tCL = (*ptr >> 8) & 0xF;
+    // Define offset (chan A or B used)
+    offset = reg0 ? 0x0 : 0x0400;
 
-    imc.tRCD = 8; imc.tRP = 7; imc.tRAS = 6;
-/*
+    // Get Main timing register
+    reg0 = *(uint32_t*)((uintptr_t)mmio_reg + offset + SNB_REG_TIMING);
+
+    // CAS Latency (tCAS)
+    imc.tCL = (reg0 >> 8) & 0xF;
+
     // RAS-To-CAS (tRCD)
-    imc.tRCD = *ptr & 0xF;
+    imc.tRCD = reg0 & 0xF;
 
     // RAS Precharge (tRP)
-    imc.tRP = (*ptr >> 4) & 0xF;
+    imc.tRP = (reg0 >> 4) & 0xF;
 
     // RAS Active to precharge (tRAS)
-    imc.tRAS = (*ptr >> 16) & 0xFF;
-*/
-    // DBG
-    printf(21,0, "%u-%u-%u-%u", imc.tCL, imc.tRCD, imc.tRP, imc.tRAS); sleep(5);
-
+    imc.tRAS = (reg0 >> 16) & 0xFF;
 }
