@@ -43,6 +43,7 @@
 #include "boot.h"
 #include "build_version.h"
 #include "peimage.h"
+#include "build_version.h"
 
 # The EFI loader loads the header at ImageBase, so we have to locate the main program
 # after that. This means we can't load the main program at HIGH_LOAD_ADDR. Pick a load
@@ -805,7 +806,7 @@ coff_header:
 #else
 	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
-	.word	3				# NumberOfSections
+	.word	4				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
@@ -833,7 +834,7 @@ optional_header:
 	.byte	0x14				# MinorLinkerVersion
 
 	.long	_virt_text_size			# SizeOfCode
-	.long	_virt_sbat_size			# SizeOfInitializedData
+	.long	_virt_osrel_size		# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
 	.long	_virt_text_start + 0x1e0	# AddressOfEntryPoint
@@ -939,6 +940,20 @@ section_table:
 	.long	IMAGE_SCN_MEM_READ		\
 	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
+	.ascii	".osrel"
+	.byte	0
+	.byte	0
+	.long	_virt_osrel_size		# VirtualSize
+	.long	_virt_osrel_start		# VirtualAddress
+	.long	_file_osrel_size		# SizeOfRawData
+	.long	_file_osrel_start		# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+
 # Pad to the declared size.
 	.org	(SETUP_SECS*512)
 
@@ -949,3 +964,10 @@ section_table:
 
 .section ".sbat", "a", @progbits
 .incbin "../boot/sbat.csv"
+
+.section ".osrel", "a", @progbits
+	.ascii "ID=memtest86plus\nNAME=\"memtest86+\"\nVERSION=\""
+	.ascii MT_VERSION
+	.ascii "."
+	.asciz GIT_HASH
+	.ascii "\""
