@@ -1,5 +1,6 @@
 AS = as -64
 CC = gcc
+OBJCOPY = objcopy
 
 GIT = git
 
@@ -132,7 +133,7 @@ memtest_shared: $(OBJS) ldscripts/memtest_shared.lds Makefile
 	$(LD) -shared -Bsymbolic -T ldscripts/memtest_shared.lds -o $@ $(OBJS)
 
 memtest_shared.bin: memtest_shared
-	objcopy -O binary $< memtest_shared.bin
+	$(OBJCOPY) -O binary $< memtest_shared.bin
 
 memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
