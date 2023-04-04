@@ -867,9 +867,13 @@ static void determine_cpu_model(void)
                 break;
             }
             break;
-
+          case 6:
+            // Other family 6 models have brand string
+            cpu_model = "Vortex86EX";
+            l1_cache = 16;
+            l2_cache = 128;
+            break;
           default:
-            // All Vortex86 family values >= 6 have brand string
             break;
         }
         break;
