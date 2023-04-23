@@ -493,6 +493,9 @@ static void determine_imc(void)
               case 0x9:
                 imc_type = IMC_KBL;         // Core 7/8/9th Gen (Kaby/Coffee/Comet Lake)
                 break;
+              case 0xB:
+                imc_type = IMC_ADL_N;       // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
+                break;
               default:
                 break;
             }

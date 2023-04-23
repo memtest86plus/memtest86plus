@@ -8,7 +8,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2004-2022 Sam Demeulemeester.
+ * Copyright (C) 2004-2023 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -47,6 +47,7 @@
 #define IMC_KBL_UY      0x3030  // Core 7/8/9th Gen (Kaby/Coffee/Comet/Amber Lake-U/Y)
 #define IMC_ICL         0x3040  // Core 10th Gen (IceLake-Y)
 #define IMC_TGL         0x3050  // Core 11th Gen (Tiger Lake-U)
+#define IMC_ADL_N       0x3061  // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
 
 #define IMC_BYT         0x4010  // Atom Bay Trail
 #define IMC_CDT         0x4020  // Atom Cedar Trail

@@ -99,6 +99,15 @@ static void amd_k8_revfg_temp(void)
     cpu_temp_offset = 21.0f;
 }
 
+static void adl_unlock_smbus(void)
+{
+    uint16_t x = pci_config_read16(0, 31, 4, 0x04);
+
+    if (!(x & 1)) {
+        pci_config_write16(0, 31, 4, 0x04, x | 1);
+    }
+}
+
 // ---------------------
 // -- Public function --
 // ---------------------
@@ -198,5 +207,14 @@ void quirks_init(void)
                 quirk.process = disable_temp_reporting;
             }
         }
+    }
+
+    //  --------------------------------------------------
+    //  -- SMBus unlock for ADL-N (and probably others) --
+    //  --------------------------------------------------
+    if (imc_type == IMC_ADL_N && pci_config_read16(0, 31, 4, 0x2) == 0x54A3) {     // ADL-N
+        quirk.id    = QUIRK_ADL_SMB_UNLOCK;
+        quirk.type |= QUIRK_TYPE_SMBUS;
+        quirk.process = adl_unlock_smbus;
     }
 }
