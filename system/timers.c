@@ -18,7 +18,6 @@
 
 #define PIT_TICKS_50mS      59659       // PIT clock is 1.193182MHz
 #define APIC_TICKS_50mS     178977      // APIC clock is 3.579545MHz
-#define BENCH_MIN_START_ADR 0x1000000   // 16MB
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -38,6 +37,9 @@ static void correct_tsc(void)
         rdtscl(start_time);
 
         counter = inl(acpi_config.pm_addr);
+
+        // Generate a dirty delay
+        for(volatile uint8_t i=0; i<100u; i++);
 
         // Make sure counter is incrementing
         if (inl(acpi_config.pm_addr) > counter) {
