@@ -103,11 +103,11 @@ bool            pause_at_start     = true;
 power_save_t    power_save         = POWER_SAVE_HIGH;
 
 bool            enable_tty         = false;
-int             tty_params_port    = SERIAL_PORT_0x3F8;
-int             tty_params_baud    = SERIAL_DEFAULT_BAUDRATE;
-int             tty_update_period  = 2;     // Update TTY every 2 seconds (default)
+uintptr_t       tty_address        = 0x3F8;     // Legacy IO or MMIO Address accepted
+int             tty_baud_rate      = 115200;
+int             tty_update_period  = 2;         // Update TTY every 2 seconds (default)
 
-bool            err_banner_redraw  = false; // Redraw banner on new errors (if previsouly removed)
+bool            err_banner_redraw  = false;     // Redraw banner on new errors
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -122,6 +122,18 @@ static void parse_serial_params(const char *params)
         return;
     }
 
+    // Check if console is MMIO and grab address
+    if (strncmp(params, "mmio,0x", 7) == 0) {
+        uint32_t mmio_adr = hexstr2int(params+7);
+
+        if (mmio_adr > 0xFFFF) {
+            tty_address = mmio_adr;
+        } else {
+            enable_tty = false;
+        }
+        return;
+    }
+
     // No TTY port passed, use default ttyS0
     if (strncmp(params, "ttyS", 5) == 0) {
         return;
@@ -129,7 +141,7 @@ static void parse_serial_params(const char *params)
 
     // Configure TTY port or use default
     if (params[4] >= '0' && params[4] <= '3') {
-        tty_params_port = params[4] - '0';
+        tty_address = serial_io_ports[params[4] - '0'];
     } else {
         return;
     }
@@ -144,27 +156,27 @@ static void parse_serial_params(const char *params)
         default:
             return;
         case '1':
-            tty_params_baud   = (params[7] == '9') ? 19200 : 115200;
+            tty_baud_rate   = (params[7] == '9') ? 19200 : 115200;
             tty_update_period = (params[7] == '9') ? 4 : 2;
             break;
         case '2':
-            tty_params_baud   = 230400;
+            tty_baud_rate   = 230400;
             tty_update_period = 2;
             break;
         case '3':
-            tty_params_baud   = 38400;
+            tty_baud_rate   = 38400;
             tty_update_period = 4;
             break;
         case '5':
-            tty_params_baud   = 57600;
+            tty_baud_rate   = 57600;
             tty_update_period = 3;
             break;
         case '7':
-            tty_params_baud   = 76800;
+            tty_baud_rate   = 76800;
             tty_update_period = 3;
             break;
         case '9':
-            tty_params_baud   = 9600;
+            tty_baud_rate   = 9600;
             tty_update_period = 5;
             break;
     }

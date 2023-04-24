@@ -7,10 +7,9 @@
  * display via Serial/UART.
  *
  *//*
- * Copyright (C) 2004-2022 Sam Demeulemeester.
+ * Copyright (C) 2004-2023 Sam Demeulemeester.
  */
 
-#define SERIAL_DEFAULT_BAUDRATE 115200
 #define SERIAL_DEFAULT_BITS     8
 #define SERIAL_DEFAULT_PARITY   0
 
@@ -19,7 +18,7 @@
 #define SERIAL_PORT_0x3E8   2
 #define SERIAL_PORT_0x2E8   3
 
-static const uint16_t serial_base_ports[] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
+static const uint16_t serial_io_ports[] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 
 struct serial_port {
     bool enable;
@@ -49,7 +48,8 @@ struct serial_port {
  * Definitions for the Base UART Registers
  */
 
-#define UART_REF_CLK 1843200
+#define UART_REF_CLK_IO     1843200
+#define UART_REF_CLK_MMIO   48000000
 
 #define UART_RX     0   /* In:  Receive buffer (DLAB=0) */
 #define UART_TX     0   /* Out: Transmit buffer (DLAB=0) */
@@ -102,6 +102,12 @@ struct serial_port {
 #define UART_IIR_THRI   0x02    /* Transmitter holding register empty */
 #define UART_IIR_RDI    0x04    /* Receiver data interrupt */
 #define UART_IIR_RLSI   0x06    /* Receiver line status interrupt */
+
+/*
+ * Definitions for the FIFO Control Register
+ */
+#define UART_FCR_ENA   0x01     /* FIFO Enable */
+#define UART_FCR_THR   0x20     /* FIFO Threshold */
 
 /*
  * Definitions for the Interrupt Enable Register

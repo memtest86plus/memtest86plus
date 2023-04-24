@@ -63,8 +63,8 @@ extern bool         pause_at_start;
 
 extern power_save_t power_save;
 
-extern int tty_params_port;
-extern int tty_params_baud;
+extern uintptr_t tty_address;
+extern int tty_baud_rate;
 extern int tty_update_period;
 
 extern bool err_banner_redraw;

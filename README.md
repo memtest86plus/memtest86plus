@@ -160,6 +160,8 @@ recognised:
       * 57600
       * 115200 (default if not specified or invalid)
       * 230400
+  * console=mmio,*x*
+    * activate MMIO UART console, where *x* is the MMIO Address (eg: 0xFEDC9000)
 
 ## Keyboard Selection
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2022 Sam Demeulemeester
+// Copyright (C) 2004-2023 Sam Demeulemeester
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -101,13 +101,21 @@ void tty_init(void)
     unsigned char lcr;
 
     console_serial.enable       = true;
-    console_serial.is_mmio      = false;
+    console_serial.base_addr    = tty_address;
+    console_serial.baudrate     = tty_baud_rate;
     console_serial.parity       = SERIAL_DEFAULT_PARITY;
     console_serial.bits         = SERIAL_DEFAULT_BITS;
-    console_serial.baudrate     = tty_params_baud;
-    console_serial.reg_width    = 1;
-    console_serial.refclk       = UART_REF_CLK;
-    console_serial.base_addr    = serial_base_ports[tty_params_port];
+
+    // UART MMIO Address is usually above TOLUD and never < 1MB
+    if (console_serial.base_addr > 0xFFFF) {
+        console_serial.is_mmio      = true;
+        console_serial.reg_width    = 4;
+        console_serial.refclk       = UART_REF_CLK_MMIO;
+    } else {
+        console_serial.is_mmio      = false;
+        console_serial.reg_width    = 1;
+        console_serial.refclk       = UART_REF_CLK_IO;
+    }
 
     /* read the Divisor Latch */
     uart_status = serial_read_reg(&console_serial, UART_LCR);
@@ -129,6 +137,12 @@ void tty_init(void)
     uart_status = serial_read_reg(&console_serial, UART_LSR);       /* COM? LSR */
     uart_status = serial_read_reg(&console_serial, UART_RX);        /* COM? RBR */
     serial_write_reg(&console_serial, UART_IER, 0x00);              /* Disable all interrupts */
+
+    /* In case of MMIO UART, set up FIFO Reg */
+    if (console_serial.is_mmio) {
+        serial_write_reg(&console_serial, UART_FCR, 0x00);
+        serial_write_reg(&console_serial, UART_FCR, (0xFF) & (UART_FCR_ENA | UART_FCR_THR));
+    }
 
     tty_clear_screen();
     tty_disable_cursor();
