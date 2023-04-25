@@ -1340,10 +1340,18 @@ static bool ich5_get_smb(void)
 {
     uint16_t x;
 
+    // Enable SMBus IO Space if disabled
+    x = pci_config_read16(0, smbdev, smbfun, 0x4);
+
+    if (!(x & 1)) {
+        pci_config_write16(0, smbdev, smbfun, 0x4, x | 1);
+    }
+
+    // Read Base Address
     x = pci_config_read16(0, smbdev, smbfun, 0x20);
     smbusbase = x & 0xFFF0;
 
-    // Enable I2C Bus
+    // Enable I2C Host Controller Interface if disabled
     uint8_t temp = pci_config_read8(0, smbdev, smbfun, 0x40);
     if ((temp & 4) == 0) {
         pci_config_write8(0, smbdev, smbfun, 0x40, temp | 0x04);
