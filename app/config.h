@@ -63,9 +63,12 @@ extern bool         pause_at_start;
 
 extern power_save_t power_save;
 
-extern uintptr_t tty_address;
-extern int tty_baud_rate;
-extern int tty_update_period;
+extern uintptr_t    tty_address;
+extern int          tty_baud_rate;
+extern int          tty_update_period;
+
+extern uint32_t     tty_mmio_ref_clk;
+extern int          tty_mmio_stride;
 
 extern bool err_banner_redraw;
 

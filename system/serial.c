@@ -109,8 +109,8 @@ void tty_init(void)
     // UART MMIO Address is usually above TOLUD and never < 1MB
     if (console_serial.base_addr > 0xFFFF) {
         console_serial.is_mmio      = true;
-        console_serial.reg_width    = 4;
-        console_serial.refclk       = UART_REF_CLK_MMIO;
+        console_serial.reg_width    = tty_mmio_stride;
+        console_serial.refclk       = tty_mmio_ref_clk;
     } else {
         console_serial.is_mmio      = false;
         console_serial.reg_width    = 1;

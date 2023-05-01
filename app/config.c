@@ -103,11 +103,14 @@ bool            pause_at_start     = true;
 power_save_t    power_save         = POWER_SAVE_HIGH;
 
 bool            enable_tty         = false;
-uintptr_t       tty_address        = 0x3F8;     // Legacy IO or MMIO Address accepted
+uintptr_t       tty_address        = 0x3F8;             // Legacy IO or MMIO Address accepted
 int             tty_baud_rate      = 115200;
-int             tty_update_period  = 2;         // Update TTY every 2 seconds (default)
+int             tty_update_period  = 2;                 // Update TTY every 2 seconds (default)
 
-bool            err_banner_redraw  = false;     // Redraw banner on new errors
+uint32_t        tty_mmio_ref_clk   = UART_REF_CLK_MMIO; // Reference clock for MMIO (in Hz)
+int             tty_mmio_stride    = 4;                 // Stride for MMIO (register width in bytes)
+
+bool            err_banner_redraw  = false;             // Redraw banner on new errors
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -122,10 +125,20 @@ static void parse_serial_params(const char *params)
         return;
     }
 
-    // Check if console is MMIO and grab address
+    // Check if console is MMIO and grab address and stride
+    uintptr_t mmio_adr = 0;
     if (strncmp(params, "mmio,0x", 7) == 0) {
-        uint32_t mmio_adr = hexstr2int(params+7);
+        mmio_adr = hexstr2int(params+7);
+        tty_mmio_stride = 1;
+    } else if (strncmp(params, "mmio16,0x", 9) == 0) {
+        mmio_adr = hexstr2int(params+9);
+        tty_mmio_stride = 2;
+    } else if (strncmp(params, "mmio32,0x", 9) == 0) {
+        mmio_adr = hexstr2int(params+9);
+        tty_mmio_stride = 4;
+    }
 
+    if(strncmp(params, "mmio", 4) == 0) {
         if (mmio_adr > 0xFFFF) {
             tty_address = mmio_adr;
         } else {
