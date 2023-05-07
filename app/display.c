@@ -351,6 +351,11 @@ void display_temperature(void)
 
     clear_screen_region(1, 18, 1, 22);
     printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8);
+
+    // Display DDR5 temperatures.
+    // TODO: Reading temperature from SPD5 involes I2C IO operations, which
+    // may introduce unnecessary delay in the main thread.
+    print_ddr5_temperature();
 }
 
 void display_big_status(bool pass)

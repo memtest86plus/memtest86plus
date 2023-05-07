@@ -13,7 +13,12 @@
 #define I2C_WRITE   0
 #define I2C_READ    1
 
+/* SPD5 Hub I2C Legacy Mode Device Configuration */
 #define SPD5_MR11 11
+/* SPD5 Hub TS Current Sensed Temperature - Low Byte */
+#define SPD5_MR49 49
+/* SPD5 Hub TS Current Sensed Temperature - Low Byte */
+#define SPD5_MR50 50
 
 /* i801 Hosts Addresses */
 #define SMBHSTSTS   smbusbase
@@ -155,5 +160,10 @@ extern ram_info ram;
  */
 
 void print_smbus_startup_info(void);
+
+/**
+ * Print DDR5 temperatures. No-op if not DDR5.
+ */
+void print_ddr5_temperature(void);
 
 #endif // SMBUS_H

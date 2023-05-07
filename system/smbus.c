@@ -28,6 +28,14 @@ static uint16_t extra_initial_sleep_for_smb_transaction = 0;
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
 
+struct spd5_temp {
+    // Is current slot has DDR5 memory with a temperature sensor.
+    bool found;
+    // Maximum observed DIMM temperature.
+    int16_t max_temp;
+};
+static struct spd5_temp spd5_temps[MAX_SPD_SLOT] = {0};
+
 // Functions Prototypes
 static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len);
 
@@ -52,6 +60,7 @@ static bool piix4_get_smb(uint8_t address);
 static bool ich5_get_smb(void);
 static bool ali_get_smb(uint8_t address);
 static uint8_t ich5_process(void);
+static uint8_t ich5_read_byte(uint8_t smbus_adr, uint16_t adr);
 static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 static uint8_t ali_m1563_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
@@ -60,6 +69,73 @@ static uint8_t ali_m1543_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
     return bcd - 6 * (bcd >> 4);
+}
+
+// Returns integer part of parsed SPD5118 temperature in degree Celsius.
+static int16_t parse_spd5118_temperature(uint8_t high, uint8_t low) {
+    // Per JEDEC 300-5B standard (v1.5) SPD5 5118 Hub present on DDR5 modules
+    // store temperature values in range from -256.0C to 255.75C with 0.25C
+    // precision in two bytes (low, high) with the following bits layout:
+    //
+    // ----------+------+------+------+------+-----+------+------+------+
+    //      bit: |   7  |   6  |   5  |   4  |  3  |   2  |   1  |   0  |
+    // ----------+------+------+------+------+-----+------+------+------+
+    // high byte | RSVD | RSVD | RSVD | Sign | 128 |  64  |  32  |  16  |
+    //  low byte |   8  |   4  |   2  |   1  | 0.5 | 0.25 | RSVD | RSVD |
+    // ----------+------+------+------+------+-----+------+------+------+
+    //
+    // This is essentially 11-bit two-completent signed integer, e.g.
+    //   high=0b00000001 low=0b00001000 is 16.50 C
+    //   high=0b00000000 low=0b00001100 is  0.75 C
+    //   high=0b00000000 low=0b00000000 is  0.00 C
+    //   high=0b00011111 low=0b11111100 is -0.25 C
+    //   high=0b00011111 low=0b11111000 is -0.50 C
+
+    // Read 11-bit of two-complement value from high/low bytes into 16-bit
+    // variable.
+    int16_t temp4 = ((high & 0b11111) << 6) | ((low >> 2) & 0b111111);
+    // Extend sign from bit 11 to make it 16-bit signed integer.
+    temp4 = (temp4 << 4) >> 4;
+    // Return truncated value to integer as we displaying temperature without
+    // decimal points.
+    return temp4 * 0.25f;
+}
+
+static int16_t get_spd5118_temperature(uint8_t spdidx)
+{
+    uint8_t high = ich5_read_byte(spdidx, SPD5_MR50);
+    uint8_t low = ich5_read_byte(spdidx, SPD5_MR49);
+    return parse_spd5118_temperature(high, low);
+}
+
+void print_ddr5_temperature(void)
+{
+    // Displaying on the same lines as initial SPD information.
+    // TODO: Need to find a better place for this data.
+    // Those lines will overlap with error strings when errors will be found,
+    // or long SPD information may overlap with the temperature output.
+    int line = LINE_SPD;
+    for (uint8_t spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
+        if (spd5_temps[spdidx].found) {
+             int16_t temp = get_spd5118_temperature(spdidx);
+
+             if (spd5_temps[spdidx].max_temp < temp) {
+                 spd5_temps[spdidx].max_temp = temp;
+             }
+             int16_t max_temp = spd5_temps[spdidx].max_temp;
+
+             // SPD5 temperature value has theoretical range
+             // from -256C to 255C, but realistically it's -40C to 125C.
+             // Typical width is 7 characters, e.g. "34/45 C", negative values
+             // and values with absolute values larger than 99 use extra positions.
+             int width = 7 + (temp < 0 ? 1 : 0) + (max_temp < 0 ? 1 : 0) +
+                 temp / 100 + max_temp / 100;
+             clear_screen_region(line, 80 - width, line, 80);
+             printf(line, 80 - width, "%2i/%2i%cC", temp, max_temp, 0xF8);
+
+             line++;
+        }
+    }
 }
 
 void print_smbus_startup_info(void)
@@ -90,6 +166,10 @@ void print_smbus_startup_info(void)
                     continue;
                 case 0x12: // DDR5
                     parse_spd_ddr5(&curspd, spdidx);
+                    // TODO: DDR5 SPD5 Hub may not have temperature sensors,
+                    // which can be checked by reading MR5[1].
+                    spd5_temps[spdidx].found = true;
+                    spd5_temps[spdidx].max_temp = get_spd5118_temperature(spdidx);
                     break;
                 case 0x0C: // DDR4
                     parse_spd_ddr4(&curspd, spdidx);
@@ -1495,6 +1575,21 @@ static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
         return nf_read_spd_byte(slot_idx, (uint8_t)spd_adr);
       default:
         return ich5_read_spd_byte(slot_idx, spd_adr);
+    }
+}
+
+static uint8_t ich5_read_byte(uint8_t smbus_adr, uint16_t adr)
+{
+    smbus_adr += 0x50;
+
+    __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
+    __outb(adr, SMBHSTCMD);
+    __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+
+    if (ich5_process() == 0) {
+        return __inb(SMBHSTDAT0);
+    } else {
+        return 0xFF;
     }
 }
 
