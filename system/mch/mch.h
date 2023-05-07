@@ -3,6 +3,9 @@
 #ifndef _MCH_H_
 #define _MCH_H_
 
+/* Memory configuration Detection for AMD K17 (Zen/Zen2) */
+void get_imc_config_amd_k17(void);
+
 /* Memory configuration Detection for Intel Sandy Bridge */
 void get_imc_config_intel_snb(void);
 

@@ -30,21 +30,23 @@ void memctrl_init(void)
         return;
     }
 
-    switch(imc_type)
-    {
-        case IMC_SNB:
-        case IMC_IVB:
-            get_imc_config_intel_snb();
-            break;
-        case IMC_HSW:
-            get_imc_config_intel_hsw();
-            break;
-        case IMC_SKL:
-        case IMC_KBL:
-            get_imc_config_intel_skl();
-            break;
-        default:
-            break;
+    switch(imc_type) {
+      case IMC_K17:
+        get_imc_config_amd_k17();
+        break;
+      case IMC_SNB:
+      case IMC_IVB:
+        get_imc_config_intel_snb();
+        break;
+      case IMC_HSW:
+         get_imc_config_intel_hsw();
+         break;
+      case IMC_SKL:
+      case IMC_KBL:
+         get_imc_config_intel_skl();
+         break;
+      default:
+         break;
     }
 
     // Consistency check
