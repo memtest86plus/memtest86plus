@@ -15,6 +15,7 @@
 
 #include <stdint.h>
 
+#include "amd_smn.h"
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwquirks.h"
