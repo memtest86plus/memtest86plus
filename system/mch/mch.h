@@ -15,4 +15,7 @@ void get_imc_config_intel_hsw(void);
 /* Memory configuration Detection for Intel Skylake */
 void get_imc_config_intel_skl(void);
 
+/* Memory configuration Detection for Intel Alder Lake */
+void get_imc_config_intel_adl(void);
+
 #endif /* _MCH_H_ */
