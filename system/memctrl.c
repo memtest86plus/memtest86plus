@@ -39,14 +39,18 @@ void memctrl_init(void)
         get_imc_config_intel_snb();
         break;
       case IMC_HSW:
-         get_imc_config_intel_hsw();
-         break;
+        get_imc_config_intel_hsw();
+        break;
       case IMC_SKL:
       case IMC_KBL:
-         get_imc_config_intel_skl();
-         break;
+        get_imc_config_intel_skl();
+        break;
+      case IMC_RPL:
+      case IMC_ADL:
+        get_imc_config_intel_adl();
+        break;
       default:
-         break;
+        break;
     }
 
     // Consistency check
