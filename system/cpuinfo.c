@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2004-2023 Sam Demeulemeester
 //
 // Derived from an extract of memtest86+ init.c:
 //
 // MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
 // ------------------------------------------------
 // init.c - MemTest-86  Version 3.6
 //
@@ -332,9 +331,9 @@ static void determine_imc(void)
             if (cpuid_info.version.extendedModel == 5) {
                 imc_type = IMC_K19_CZN; // AMD Cezanne APU (Model 0x50-5F - Family 19h)
             } else if (cpuid_info.version.extendedModel >= 6) {
-                imc_type = IMC_K19_RPL; // Zen4 (Family 19h)
+                imc_type = IMC_K19_RPL; // Zen4 (Family 19h - Raphael AM5)
             } else {
-                imc_type = IMC_K19;     // Zen3 (Family 19h)
+                imc_type = IMC_K19_VRM; // Zen3 (Family 19h - Vermeer AM4)
             }
           default:
             break;

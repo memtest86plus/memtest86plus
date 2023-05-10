@@ -32,8 +32,9 @@ void memctrl_init(void)
 
     switch(imc_type) {
       case IMC_K17:
-      case IMC_K19:
-        get_imc_config_amd_k17();
+      case IMC_K19_VRM:
+      case IMC_K19_RPL:
+        get_imc_config_amd_zen();
         break;
       case IMC_SNB:
       case IMC_IVB:
