@@ -3,7 +3,7 @@
 //
 // ------------------------
 //
-// Platform-specific code for AMD K17 CPUs (Zen/Zen2)
+// Platform-specific code for AMD K17 CPUs (Zen/Zen2/Zen3)
 //
 
 #include "amd_smn.h"
