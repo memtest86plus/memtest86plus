@@ -12,7 +12,7 @@
 #include "pci.h"
 #include "vmem.h"
 
-#include "mch.h"
+#include "imc.h"
 
 #define ICL_MMR_BASE_REG_LOW    0x48
 #define ICL_MMR_BASE_REG_HIGH   0x4C

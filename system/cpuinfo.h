@@ -71,11 +71,6 @@
 extern const char *cpu_model;
 
 /**
- * A number identifying the integrated memory controller type.
- */
-extern uint16_t imc_type;
-
-/**
  * The size of the L1 cache in KB.
  */
 extern int l1_cache;

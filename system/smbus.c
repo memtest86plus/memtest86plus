@@ -10,6 +10,7 @@
 #include "string.h"
 
 #include "cpuinfo.h"
+#include "memctrl.h"
 #include "smbus.h"
 #include "smbios.h"
 #include "jedec_id.h"
@@ -1407,7 +1408,7 @@ static bool fch_zen_get_smb(void)
     pm_reg |= __inb(AMD_DATA_IO_PORT);
 
     // Special case for AMD Family 19h & Extended Model > 4 (get smb address in memory)
-    if ((imc_type == IMC_K19_CZN || imc_type == IMC_K19_RPL) && pm_reg == 0xFFFF) {
+    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_RPL) && pm_reg == 0xFFFF) {
         smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
         return true;
     }
