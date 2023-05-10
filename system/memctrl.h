@@ -12,7 +12,8 @@
  * Copyright (C) 2004-2023 Sam Demeulemeester.
  */
 
-typedef struct imc_infos {
+typedef struct __attribute__((packed)) imc_infos {
+    uint16_t    family;
     char        *type;
     uint16_t    freq;
     uint16_t    width;

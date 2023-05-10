@@ -12,9 +12,9 @@
 #include "cpuinfo.h"
 
 #include "memctrl.h"
-#include "mch/mch.h"
+#include "imc/imc.h"
 
-imc_info_t imc = {"UNDEF", 0, 0, 0, 0, 0, 0, 0};
+imc_info_t imc = {0, "UNDEF", 0, 0, 0, 0, 0, 0, 0};
 
 ecc_info_t ecc_status = {false, ECC_ERR_NONE, 0, 0, 0, 0, 0};
 
@@ -30,7 +30,7 @@ void memctrl_init(void)
         return;
     }
 
-    switch(imc_type) {
+    switch(imc.family) {
       case IMC_K17:
       case IMC_K19_VRM:
       case IMC_K19_RPL:

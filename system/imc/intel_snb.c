@@ -11,7 +11,7 @@
 #include "msr.h"
 #include "pci.h"
 
-#include "mch.h"
+#include "imc.h"
 
 #define SNB_MMR_BASE_REG    0x48
 #define SNB_REG_MAIN_CHAN0  0x5004

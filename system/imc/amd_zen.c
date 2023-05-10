@@ -6,13 +6,12 @@
 // Platform-specific code for AMD Zen CPUs
 //
 
-#include "amd_smn.h"
 #include "cpuinfo.h"
 #include "memctrl.h"
 #include "msr.h"
 #include "pci.h"
 
-#include "mch.h"
+#include "imc.h"
 
 #define AMD_SMN_UMC_BAR             0x050000
 #define AMD_SMN_UMC_CHB_OFFSET      0x100000
@@ -38,7 +37,7 @@ void get_imc_config_amd_zen(void)
 
     // Get DRAM Frequency
     smn_reg = amd_smn_read(AMD_SMN_UMC_DRAM_CONFIG + offset);
-    if (imc_type >= IMC_K19_RPL) {
+    if (imc.family >= IMC_K19_RPL) {
         imc.type = "DDR5";
         imc.freq = smn_reg & 0xFFFF;
         if ((smn_reg >> 18) & 1) imc.freq *= 2; // GearDown

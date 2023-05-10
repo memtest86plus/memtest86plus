@@ -41,8 +41,8 @@ SYS_OBJS = system/acpi.o \
            system/vmem.o \
            system/xhci.o
 
-MCH_SRCS = $(wildcard ../system/mch/*.c)
-MCH_OBJS = $(subst ../,,$(MCH_SRCS:.c=.o))
+IMC_SRCS = $(wildcard ../system/imc/*.c)
+IMC_OBJS = $(subst ../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
            lib/print.o \
@@ -68,13 +68,13 @@ APP_OBJS = app/badram.o \
            app/interrupt.o \
            app/main.o
 
-OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(MCH_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
 all: memtest.bin memtest.efi
 
 -include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
--include $(subst .o,.d,$(MCH_OBJS))
+-include $(subst .o,.d,$(IMC_OBJS))
 -include $(subst .o,.d,$(LIB_OBJS))
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
@@ -101,8 +101,8 @@ system/%.o: ../system/%.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/mch/%.o: ../system/mch/%.c
-	@mkdir -p system/mch
+system/imc/%.o: ../system/imc/%.c
+	@mkdir -p system/imc
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../lib/%.c
