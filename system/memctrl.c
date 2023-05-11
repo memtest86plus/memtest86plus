@@ -14,7 +14,7 @@
 #include "memctrl.h"
 #include "imc/imc.h"
 
-imc_info_t imc = {0, "UNDEF", 0, 0, 0, 0, 0, 0, 0};
+imc_info_t imc = {"UNDEF", 0, 0, 0, 0, 0, 0, 0, 0};
 
 ecc_info_t ecc_status = {false, ECC_ERR_NONE, 0, 0, 0, 0, 0};
 
