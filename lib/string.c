@@ -9,6 +9,7 @@
 // By Chris Brady
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "string.h"
 
@@ -91,4 +92,19 @@ char *itoa(int num, char *str)
     reverse(str);
 
     return str;
+}
+
+uint32_t hexstr2int(const char *hexstr) {
+    uint32_t ival = 0;
+    while (*hexstr) {
+        uint8_t b = *hexstr++;
+
+        if (b >= '0' && b <= '9') b = b - '0';
+        else if (b >= 'a' && b <='f') b = b - 'a' + 10;
+        else if (b >= 'A' && b <='F') b = b - 'A' + 10;
+        else return 0;
+
+        ival = (ival << 4) | (b & 0xF);
+    }
+    return ival;
 }

@@ -162,6 +162,12 @@ recognised:
       * 57600
       * 115200 (default if not specified or invalid)
       * 230400
+  * console=*x*,*y*
+    * activate MMIO UART console, where *x* is the MMIO stride (reg. width)
+      * mmio   = 8-bit MMIO
+      * mmio16 = 16-bit MMIO
+      * mmio32 = 32-bit MMIO
+    * and *y* is the MMIO address in hex. with `0x` prefix (eg: 0xFEDC9000)
 
 ## Keyboard Selection
 

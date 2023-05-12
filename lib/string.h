@@ -96,4 +96,11 @@ char *strstr(const char *haystack, const char *needle);
 
 char *itoa(int num, char *str);
 
+/**
+ * Convert a hex string to the corresponding 32-bit uint value.
+ * returns 0 if a non-hex char is found (not 0-9/a-f/A-F).
+ */
+
+uint32_t hexstr2int(const char *hexstr);
+
 #endif // STRING_H
