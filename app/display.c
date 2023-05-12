@@ -264,9 +264,13 @@ void post_display_init(void)
     print_smbus_startup_info();
 
     if (imc.freq) {
-        // Try to get RAM information from IMC (TODO)
+        // Try to get RAM information from IMC
         display_spec_mode("IMC: ");
-        display_spec_ddr(imc.freq, imc.type, imc.tCL, imc.tCL_dec, imc.tRCD, imc.tRP, imc.tRAS);
+        if (imc.type[3] == '5') {
+            display_spec_ddr5(imc.freq, imc.type, imc.tCL, imc.tCL_dec, imc.tRCD, imc.tRP, imc.tRAS);
+        } else {
+            display_spec_ddr(imc.freq, imc.type, imc.tCL, imc.tCL_dec, imc.tRCD, imc.tRP, imc.tRAS);
+        }
         display_mode = DISPLAY_MODE_IMC;
     } else if (ram.freq > 0 && ram.tCL > 0) {
         // If not available, grab max memory specs from SPD

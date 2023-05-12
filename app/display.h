@@ -102,6 +102,10 @@ typedef enum {
 #define display_spec_mode(mode) \
     prints(8,0, mode);
 
+#define display_spec_ddr5(freq, type, cl, cl_dec, rcd, rp, ras) \
+    printf(8,5, "%s-%u / CAS %u%s-%u-%u-%u", \
+                type, freq, cl, cl_dec?".5":"", rcd, rp, ras);
+
 #define display_spec_ddr(freq, type, cl, cl_dec, rcd, rp, ras) \
     printf(8,5, "%uMHz (%s-%u) CAS %u%s-%u-%u-%u", \
                 freq / 2, type, freq, cl, cl_dec?".5":"", rcd, rp, ras);
