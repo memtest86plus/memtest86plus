@@ -10,6 +10,7 @@
 #include "hwctrl.h"
 #include "io.h"
 #include "keyboard.h"
+#include "memctrl.h"
 #include "serial.h"
 #include "pmem.h"
 #include "smbios.h"
@@ -262,10 +263,14 @@ void post_display_init(void)
     print_smbios_startup_info();
     print_smbus_startup_info();
 
-    if (false) {
-        // Try to get RAM information from IMC (TODO)
+    if (imc.freq) {
+        // Try to get RAM information from IMC
         display_spec_mode("IMC: ");
-        display_spec_ddr(ram.freq, ram.type, ram.tCL, ram.tCL_dec, ram.tRCD, ram.tRP, ram.tRAS);
+        if (imc.type[3] == '5') {
+            display_spec_ddr5(imc.freq, imc.type, imc.tCL, imc.tCL_dec, imc.tRCD, imc.tRP, imc.tRAS);
+        } else {
+            display_spec_ddr(imc.freq, imc.type, imc.tCL, imc.tCL_dec, imc.tRCD, imc.tRP, imc.tRAS);
+        }
         display_mode = DISPLAY_MODE_IMC;
     } else if (ram.freq > 0 && ram.tCL > 0) {
         // If not available, grab max memory specs from SPD

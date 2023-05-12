@@ -60,19 +60,15 @@
 #define IMC_K16         0x8050  // Kabini & related (Family 16h)
 #define IMC_K17         0x8060  // Zen & Zen2 (Family 17h)
 #define IMC_K18         0x8070  // Hygon (Family 18h)
-#define IMC_K19         0x8080  // Zen3 (Family 19h)
+#define IMC_K19_VRM     0x8080  // Zen3 (Family 19h - Vermeer)
 #define IMC_K19_CZN     0x8081  // Cezanne APU
-#define IMC_K19_RPL     0x8091  // Zen4 (Family 19h)
+
+#define IMC_K19_RPL     0x8100  // Zen4 (Family 19h - Raphael (AM5))
 
 /**
  * A string identifying the CPU make and model.
  */
 extern const char *cpu_model;
-
-/**
- * A number identifying the integrated memory controller type.
- */
-extern uint16_t imc_type;
 
 /**
  * The size of the L1 cache in KB.

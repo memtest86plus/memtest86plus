@@ -28,6 +28,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "pmem.h"
+#include "memctrl.h"
 #include "memsize.h"
 #include "pci.h"
 #include "screen.h"
@@ -234,6 +235,8 @@ static void global_init(void)
     badram_init();
 
     config_init();
+
+    memctrl_init();
 
     tty_init();
 

@@ -14,6 +14,10 @@
 #define AMD_TEMP_REG_K8     0xE4
 #define AMD_TEMP_REG_K10    0xA4
 
+// Temp Registers on AMD ZEN System Management Network
+#define SMN_SMUIO_THM               0x00059800
+#define SMN_THM_TCON_CUR_TMP        (SMN_SMUIO_THM + 0x00)
+
 /**
  * Global CPU Temperature offset
  */

@@ -25,6 +25,7 @@ SYS_OBJS = system/acpi.o \
            system/hwquirks.o \
            system/keyboard.o \
            system/ohci.o \
+           system/memctrl.o \
            system/pci.o \
            system/pmem.o \
            system/reloc.o \
@@ -39,6 +40,9 @@ SYS_OBJS = system/acpi.o \
            system/usbhcd.o \
            system/vmem.o \
            system/xhci.o
+
+IMC_SRCS = $(wildcard ../system/imc/*.c)
+IMC_OBJS = $(subst ../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
            lib/print.o \
@@ -64,12 +68,13 @@ APP_OBJS = app/badram.o \
            app/interrupt.o \
            app/main.o
 
-OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
 all: memtest.bin memtest.efi
 
 -include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
+-include $(subst .o,.d,$(IMC_OBJS))
 -include $(subst .o,.d,$(LIB_OBJS))
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
@@ -94,6 +99,10 @@ system/reloc.o: ../system/reloc64.c
 
 system/%.o: ../system/%.c
 	@mkdir -p system
+	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+system/imc/%.o: ../system/imc/%.c
+	@mkdir -p system/imc
 	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../lib/%.c

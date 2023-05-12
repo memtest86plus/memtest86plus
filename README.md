@@ -133,6 +133,8 @@ recognised:
     * disables the big PASS/FAIL pop-up status display
   * nosm
     * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
+  * nomch
+    * disables memory controller configuration polling
   * nopause
     * skips the pause for configuration at startup
   * keyboard=*type*

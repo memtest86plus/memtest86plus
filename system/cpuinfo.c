@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2004-2023 Sam Demeulemeester
 //
 // Derived from an extract of memtest86+ init.c:
 //
 // MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
 // ------------------------------------------------
 // init.c - MemTest-86  Version 3.6
 //
@@ -24,6 +23,7 @@
 #include "config.h"
 #include "pmem.h"
 #include "vmem.h"
+#include "memctrl.h"
 #include "memsize.h"
 #include "hwquirks.h"
 
@@ -40,8 +40,6 @@
 //------------------------------------------------------------------------------
 
 const char  *cpu_model = NULL;
-
-uint16_t    imc_type = 0;
 
 int         l1_cache = 0;
 int         l2_cache = 0;
@@ -304,37 +302,37 @@ static void determine_imc(void)
         switch (cpuid_info.version.extendedFamily)
         {
           case 0x0:
-            imc_type = IMC_K8;  // Old K8
+            imc.family = IMC_K8;  // Old K8
             break;
           case 0x1:
           case 0x2:
-            imc_type = IMC_K10; // K10 (Family 10h & 11h)
+            imc.family = IMC_K10; // K10 (Family 10h & 11h)
             break;
           case 0x3:
-            imc_type = IMC_K12; // A-Series APU (Family 12h)
+            imc.family = IMC_K12; // A-Series APU (Family 12h)
             break;
           case 0x5:
-            imc_type = IMC_K14; // C- / E- / Z- Series APU (Family 14h)
+            imc.family = IMC_K14; // C- / E- / Z- Series APU (Family 14h)
             break;
           case 0x6:
-            imc_type = IMC_K15; // FX Series (Family 15h)
+            imc.family = IMC_K15; // FX Series (Family 15h)
             break;
           case 0x7:
-            imc_type = IMC_K16; // Kabini & related (Family 16h)
+            imc.family = IMC_K16; // Kabini & related (Family 16h)
             break;
           case 0x8:
-            imc_type = IMC_K17; // Zen & Zen2 (Family 17h)
+            imc.family = IMC_K17; // Zen & Zen2 (Family 17h)
             break;
           case 0x9:
-            imc_type = IMC_K18; // Hygon (Family 18h)
+            imc.family = IMC_K18; // Hygon (Family 18h)
             break;
           case 0xA:
             if (cpuid_info.version.extendedModel == 5) {
-                imc_type = IMC_K19_CZN; // AMD Cezanne APU (Model 0x50-5F - Family 19h)
+                imc.family = IMC_K19_CZN; // AMD Cezanne APU (Model 0x50-5F - Family 19h)
             } else if (cpuid_info.version.extendedModel >= 6) {
-                imc_type = IMC_K19_RPL; // Zen4 (Family 19h)
+                imc.family = IMC_K19_RPL; // Zen4 (Family 19h - Raphael AM5)
             } else {
-                imc_type = IMC_K19;     // Zen3 (Family 19h)
+                imc.family = IMC_K19_VRM; // Zen3 (Family 19h - Vermeer AM4)
             }
           default:
             break;
@@ -349,16 +347,16 @@ static void determine_imc(void)
           case 0x5:
             switch (cpuid_info.version.extendedModel) {
               case 2:
-                imc_type = IMC_NHM;         // Core i3/i5 1st Gen 45 nm (Nehalem/Bloomfield)
+                imc.family = IMC_NHM;         // Core i3/i5 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
               case 3:
-                no_temperature = true;      // Atom Clover Trail
+                no_temperature = true;        // Atom Clover Trail
                 break;
               case 4:
-                imc_type = IMC_HSW_ULT;     // Core 4th Gen (Haswell-ULT)
+                imc.family = IMC_HSW_ULT;     // Core 4th Gen (Haswell-ULT)
                 break;
               case 5:
-                imc_type = IMC_SKL_SP;      // Skylake/Cascade Lake/Cooper Lake (Server)
+                imc.family = IMC_SKL_SP;      // Skylake/Cascade Lake/Cooper Lake (Server)
                 break;
               default:
                 break;
@@ -368,17 +366,17 @@ static void determine_imc(void)
           case 0x6:
             switch (cpuid_info.version.extendedModel) {
               case 3:
-                imc_type = IMC_CDT;         // Atom Cedar Trail
+                imc.family = IMC_CDT;         // Atom Cedar Trail
                 no_temperature = true;
                 break;
               case 4:
-                imc_type = IMC_HSW;         // Core 4th Gen (Haswell w/ GT3e)
+                imc.family = IMC_HSW;         // Core 4th Gen (Haswell w/ GT3e)
                 break;
               case 5:
-                imc_type = IMC_BDW_DE;      // Broadwell-DE (Server)
+                imc.family = IMC_BDW_DE;      // Broadwell-DE (Server)
                 break;
               case 6:
-                imc_type = IMC_CNL;         // Cannon Lake
+                imc.family = IMC_CNL;         // Cannon Lake
                 break;
               default:
                 break;
@@ -388,19 +386,19 @@ static void determine_imc(void)
           case 0x7:
             switch (cpuid_info.version.extendedModel) {
               case 0x3:
-                imc_type = IMC_BYT;         // Atom Bay Trail
+                imc.family = IMC_BYT;         // Atom Bay Trail
                 break;
               case 0x4:
-                imc_type = IMC_BDW;         // Core 5th Gen (Broadwell)
+                imc.family = IMC_BDW;         // Core 5th Gen (Broadwell)
                 break;
               case 0x9:
-                imc_type = IMC_ADL;         // Core 12th Gen (Alder Lake-P)
+                imc.family = IMC_ADL;         // Core 12th Gen (Alder Lake-P)
                 break;
               case 0xA:
-                imc_type = IMC_RKL;         // Core 11th Gen (Rocket Lake)
+                imc.family = IMC_RKL;         // Core 11th Gen (Rocket Lake)
                 break;
               case 0xB:
-                imc_type = IMC_RPL;         // Core 13th Gen (Raptor Lake)
+                imc.family = IMC_RPL;         // Core 13th Gen (Raptor Lake)
                 break;
               default:
                 break;
@@ -410,19 +408,19 @@ static void determine_imc(void)
           case 0xA:
             switch (cpuid_info.version.extendedModel) {
               case 0x1:
-                imc_type = IMC_NHM_E;       // Core i7 1st Gen 45 nm (NHME)
+                imc.family = IMC_NHM_E;       // Core i7 1st Gen 45 nm (NHME)
                 break;
               case 0x2:
-                imc_type = IMC_SNB;         // Core 2nd Gen (Sandy Bridge)
+                imc.family = IMC_SNB;         // Core 2nd Gen (Sandy Bridge)
                 break;
               case 0x3:
-                imc_type = IMC_IVB;         // Core 3rd Gen (Ivy Bridge)
+                imc.family = IMC_IVB;         // Core 3rd Gen (Ivy Bridge)
                 break;
               case 0x6:
-                imc_type = IMC_ICL_SP;      // Ice Lake-SP/DE (Server)
+                imc.family = IMC_ICL_SP;      // Ice Lake-SP/DE (Server)
                 break;
               case 0x9:
-                imc_type = IMC_ADL;         // Core 12th Gen (Alder Lake-S)
+                imc.family = IMC_ADL;         // Core 12th Gen (Alder Lake-S)
                 break;
               default:
                 break;
@@ -433,18 +431,18 @@ static void determine_imc(void)
             switch (cpuid_info.version.extendedModel) {
               case 0x1:
                 if (cpuid_info.version.stepping > 9) {
-                    imc_type = 0x0008;       // Atom PineView
+                    imc.family = 0x0008;       // Atom PineView
                 }
                 no_temperature = true;
                 break;
               case 0x2:
-                imc_type = IMC_WMR;         // Core i7 1st Gen 32 nm (Westmere)
+                imc.family = IMC_WMR;         // Core i7 1st Gen 32 nm (Westmere)
                 break;
               case 0x3:
-                imc_type = IMC_HSW;         // Core 4th Gen (Haswell)
+                imc.family = IMC_HSW;         // Core 4th Gen (Haswell)
                 break;
               case 0x8:
-                imc_type = IMC_TGL;         // Core 11th Gen (Tiger Lake-U)
+                imc.family = IMC_TGL;         // Core 11th Gen (Tiger Lake-U)
                 break;
               default:
                 break;
@@ -454,13 +452,13 @@ static void determine_imc(void)
           case 0xD:
             switch (cpuid_info.version.extendedModel) {
               case 0x2:
-                imc_type = IMC_SNB_E;       // Core 2nd Gen (Sandy Bridge-E)
+                imc.family = IMC_SNB_E;       // Core 2nd Gen (Sandy Bridge-E)
                 break;
               case 0x7:
-                imc_type = IMC_ICL;         // Core 10th Gen (IceLake-Y)
+                imc.family = IMC_ICL;         // Core 10th Gen (IceLake-Y)
                 break;
               case 0x8:
-                imc_type = IMC_TGL;         // Core 11th Gen (Tiger Lake-Y)
+                imc.family = IMC_TGL;         // Core 11th Gen (Tiger Lake-Y)
                 break;
               default:
                 break;
@@ -470,31 +468,31 @@ static void determine_imc(void)
           case 0xE:
             switch (cpuid_info.version.extendedModel) {
               case 0x1:
-                imc_type = IMC_NHM;         // Core i7 1st Gen 45 nm (Nehalem/Bloomfield)
+                imc.family = IMC_NHM;         // Core i7 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
               case 0x2:
-                imc_type = IMC_SNB_E;       // Core 2nd Gen (Sandy Bridge-E)
+                imc.family = IMC_SNB_E;       // Core 2nd Gen (Sandy Bridge-E)
                 break;
               case 0x3:
-                imc_type = IMC_IVB_E;       // Core 3rd Gen (Ivy Bridge-E)
+                imc.family = IMC_IVB_E;       // Core 3rd Gen (Ivy Bridge-E)
                 break;
               case 0x4:
-                imc_type = IMC_SKL_UY;      // Core 6th Gen (Sky Lake-U/Y)
+                imc.family = IMC_SKL_UY;      // Core 6th Gen (Sky Lake-U/Y)
                 break;
               case 0x5:
-                imc_type = IMC_SKL;         // Core 6th Gen (Sky Lake-S/H/E)
+                imc.family = IMC_SKL;         // Core 6th Gen (Sky Lake-S/H/E)
                 break;
               case 0x7:
-                imc_type = IMC_ICL;         // Core 10th Gen (IceLake-U)
+                imc.family = IMC_ICL;         // Core 10th Gen (IceLake-U)
                 break;
               case 0x8:
-                imc_type = IMC_KBL_UY;      // Core 7/8/9th Gen (Kaby/Coffee/Comet/Amber Lake-U/Y)
+                imc.family = IMC_KBL_UY;      // Core 7/8/9th Gen (Kaby/Coffee/Comet/Amber Lake-U/Y)
                 break;
               case 0x9:
-                imc_type = IMC_KBL;         // Core 7/8/9th Gen (Kaby/Coffee/Comet Lake)
+                imc.family = IMC_KBL;         // Core 7/8/9th Gen (Kaby/Coffee/Comet Lake)
                 break;
               case 0xB:
-                imc_type = IMC_ADL_N;       // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
+                imc.family = IMC_ADL_N;       // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
                 break;
               default:
                 break;
@@ -504,13 +502,13 @@ static void determine_imc(void)
           case 0xF:
             switch (cpuid_info.version.extendedModel) {
               case 0x3:
-                imc_type = IMC_HSW_E;       // Core 3rd Gen (Haswell-E)
+                imc.family = IMC_HSW_E;       // Core 3rd Gen (Haswell-E)
                 break;
               case 0x4:
-                imc_type = IMC_BDW_E;       // Broadwell-E (Server)
+                imc.family = IMC_BDW_E;       // Broadwell-E (Server)
                 break;
               case 0x8:
-                imc_type = IMC_SPR;         // Sapphire Rapids (Server)
+                imc.family = IMC_SPR;         // Sapphire Rapids (Server)
                 break;
               default:
                 break;
@@ -813,7 +811,7 @@ static void determine_cpu_model(void)
                 // All VIA/Centaur family values >= 6 have brand string
                 break;
             }
-        } else {                /* CyrixInstead */
+        } else {     // CyrixInstead
             switch (cpuid_info.version.family) {
               case 4:
                 switch (cpuid_info.version.model) {
