@@ -6,18 +6,6 @@
 // Platform-specific code for AMD Zen CPUs
 //
 
-#include "error.h"
-
-#include "config.h"
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-
-#include "imc.h"
-
-#include "display.h" // DEBUG
-
 #define AMD_SMN_UMC_BAR             0x050000
 #define AMD_SMN_UMC_CHB_OFFSET      0x100000
 #define AMD_SMN_UMC_DRAM_ECC_CTRL   AMD_SMN_UMC_BAR + 0x14C
@@ -40,7 +28,7 @@
 #define ECC_RD_EN (1 << 10)
 #define ECC_WR_EN (1 << 0)
 
-void get_imc_config_amd_zen(void)
+static /*__attribute__((noinline))*/ void get_imc_config_amd_zen(void)
 {
     uint32_t smn_reg, offset;
     uint32_t reg_cha, reg_chb;
@@ -136,7 +124,7 @@ void get_imc_config_amd_zen(void)
 #endif
 }
 
-void poll_ecc_amd_zen(bool report)
+static /*__attribute__((noinline)) */ void poll_ecc_amd_zen(bool report)
 {
     uint8_t umc = 0, umc_max = 0;
     uint32_t regh, regl;

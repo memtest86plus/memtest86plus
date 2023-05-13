@@ -7,14 +7,6 @@
 // Arrow-Lake (ARL) CPUs
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-#include "vmem.h"
-
-#include "imc.h"
-
 #define MTL_MMR_BASE_REG_LOW    0x48
 #define MTL_MMR_BASE_REG_HIGH   0x4C
 
@@ -33,7 +25,7 @@
 
 #define MTL_MMR_PTGRAM_REG      0x13D98
 
-void get_imc_config_intel_mtl(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_mtl(void)
 {
     uint64_t mmio_reg;
     uint32_t cha, chb, offset;

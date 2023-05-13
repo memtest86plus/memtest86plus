@@ -6,14 +6,6 @@
 // Platform-specific code for Intel Skylake CPUs (SKL)
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-#include "vmem.h"
-
-#include "imc.h"
-
 #define SKL_MMR_BASE_REG_LOW    0x48
 #define SKL_MMR_BASE_REG_HIGH   0x4C
 #define SKL_MMR_TIMINGS         0x4000
@@ -28,7 +20,7 @@
 #define SKL_MMR_BASE_MASK       0x7FFFFF8000
 #define SKL_MMR_MAD_IN_USE_MASK 0x003F003F
 
-void get_imc_config_intel_skl(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_skl(void)
 {
     uint64_t mmio_reg;
     uint32_t reg0, reg1, offset;
