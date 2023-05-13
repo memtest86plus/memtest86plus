@@ -13,12 +13,12 @@
 
 #include <larchintrin.h>
 
-#include "../imc.h"
+#include "imc/loongarch/imc.h"
 
 #define MC_CONF_ADDRESS   0x800000000FF00000ULL
 #define CHIP_CONF_ADDRESS 0x800000001FE00000ULL
 
-void read_imc_sequence(void)
+static void read_imc_sequence(void)
 {
     imc.tCL     = (uint16_t)read8((uint8_t *)(MC_CONF_ADDRESS + 0x1060));
     imc.tCL_dec = 0;
@@ -27,7 +27,7 @@ void read_imc_sequence(void)
     imc.tRAS    = (uint16_t)read8((uint8_t *)(MC_CONF_ADDRESS + 0x1040));
 }
 
-bool read_imc_info(uint8_t node_num, uint8_t max_mc, bool route_flag)
+static bool read_imc_info(uint8_t node_num, uint8_t max_mc, bool route_flag)
 {
     uint64_t fun_val;
     uint8_t  i, j;
@@ -119,16 +119,15 @@ bool read_imc_info(uint8_t node_num, uint8_t max_mc, bool route_flag)
     return ret;
 }
 
-void get_imc_config_loongson_ddr4(void)
+static void /*__attribute__((noinline))*/ get_imc_config_loongson_ddr4(void)
 {
     uint32_t val;
     uint16_t refc, loopc, div, div_mode, ref_clk;
-    uint8_t  max_mc, node_num, ddr_rate_factor;
+    uint8_t  max_mc, node_num;
     bool route_flag;
 
     imc.type  = "DDR4";
     node_num  = 1;
-    ddr_rate_factor = 4;
 
     if (strstr(cpuid_info.brand_id.str, "3C") ||
         (strstr(cpuid_info.brand_id.str, "3B6000") &&
@@ -151,7 +150,6 @@ void get_imc_config_loongson_ddr4(void)
                 strstr(cpuid_info.brand_id.str, "3B6000M")) {
         route_flag = false;
         max_mc     = 1;
-        ddr_rate_factor = 2;
     } else {
         route_flag = false;
         max_mc     = 0;
@@ -166,7 +164,7 @@ void get_imc_config_loongson_ddr4(void)
         div_mode = 0x1 << ((val >> 4) & 0x3);
         refc     = (val >> 8) & 0x1f;
         ref_clk  = (uint16_t)(((__cpucfg(0x4) * (__cpucfg(0x5) & 0xFFFF)) / ((__cpucfg(0x5) >> 16) & 0xFFFF)) / 1000000);
-        imc.freq = (ref_clk * loopc / refc / div / div_mode) * ddr_rate_factor;
+        imc.freq = (ref_clk * loopc / refc / div / div_mode) * 4;
     } else {
         imc.freq = 0;
     }
