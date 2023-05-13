@@ -8,11 +8,24 @@
 
 #include <stdbool.h>
 
-#include "config.h"
-#include "cpuinfo.h"
+#include "error.h"
 
+#include "config.h"
+
+#include "cpuinfo.h"
 #include "memctrl.h"
-#include "imc/imc.h"
+#include "msr.h"
+#include "pci.h"
+#include "vmem.h"
+
+#include "imc/x86/imc.h"
+#include "imc/x86/amd_zen.h"
+#include "imc/x86/intel_snb.h"
+#include "imc/x86/intel_hsw.h"
+#include "imc/x86/intel_skl.h"
+#include "imc/x86/intel_icl.h"
+#include "imc/x86/intel_adl.h"
+#include "imc/x86/intel_mtl.h"
 
 #include "display.h"
 
