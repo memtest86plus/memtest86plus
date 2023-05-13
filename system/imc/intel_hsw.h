@@ -6,13 +6,6 @@
 // Platform-specific code for Intel Haswell CPUs (HSW)
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-
-#include "imc.h"
-
 #define HSW_MMR_BASE_REG    0x48
 #define HSW_REG_MAIN_CHAN0  0x5004
 #define HSW_REG_MAIN_CHAN1  0x5008
@@ -20,7 +13,7 @@
 #define HSW_REG_TIMING_CAS  0x4014
 #define HSW_REG_TIMING_RCD  0x4000
 
-void get_imc_config_intel_hsw(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_hsw(void)
 {
     uint32_t mmio_reg, mch_cfg, offset;
     uint32_t reg0, reg1;
