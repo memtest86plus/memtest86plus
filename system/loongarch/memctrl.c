@@ -14,6 +14,7 @@
 
 #include "memctrl.h"
 #include "imc/imc.h"
+#include "imc/loongson/loongson_la.h"
 
 #include "display.h"
 

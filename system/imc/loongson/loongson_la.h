@@ -18,7 +18,7 @@
 #define MC_CONF_ADDRESS   0x800000000FF00000ULL
 #define CHIP_CONF_ADDRESS 0x800000001FE00000ULL
 
-void read_imc_sequence(void)
+static void read_imc_sequence(void)
 {
     imc.tCL     = (uint16_t)read8((uint8_t *)(MC_CONF_ADDRESS + 0x1060));
     imc.tCL_dec = 0;
@@ -27,7 +27,7 @@ void read_imc_sequence(void)
     imc.tRAS    = (uint16_t)read8((uint8_t *)(MC_CONF_ADDRESS + 0x1040));
 }
 
-bool read_imc_info(uint8_t node_num, uint8_t max_mc, bool route_flag)
+static bool read_imc_info(uint8_t node_num, uint8_t max_mc, bool route_flag)
 {
     uint64_t fun_val;
     uint8_t  i, j;
@@ -119,7 +119,7 @@ bool read_imc_info(uint8_t node_num, uint8_t max_mc, bool route_flag)
     return ret;
 }
 
-void get_imc_config_loongson_ddr4(void)
+static void /*__attribute__((noinline))*/ get_imc_config_loongson_ddr4(void)
 {
     uint32_t val;
     uint16_t refc, loopc, div, div_mode, ref_clk;
