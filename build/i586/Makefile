@@ -56,9 +56,6 @@ SYS_OBJS = system/acpi.o \
            system/x86/temperature.o \
            system/x86/vmem.o
 
-IMC_SRCS = $(wildcard ../../system/imc/x86/*.c)
-IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
-
 LIB_OBJS = lib/barrier.o \
            lib/div64.o \
            lib/print.o \
@@ -84,7 +81,7 @@ APP_OBJS = app/badram.o \
            app/main.o \
            app/x86/interrupt.o
 
-OBJS = boot/x86/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/x86/startup.o boot/efisetup.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
 all: mt86plus
 
@@ -98,7 +95,6 @@ debug: check memtest.debug mt86plus
 
 -include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
--include $(subst .o,.d,$(IMC_OBJS))
 -include $(subst .o,.d,$(LIB_OBJS))
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
@@ -135,10 +131,6 @@ system/jedec_id.o: system/jedec_id.h
 
 system/%.o: ../../system/%.c system/jedec_id.h
 	@mkdir -p system
-	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
-
-system/imc/x86/%.o: ../../system/imc/x86/%.c
-	@mkdir -p system/imc/x86
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/x86/%.o: ../../system/x86/%.c
