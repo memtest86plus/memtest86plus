@@ -54,9 +54,6 @@ SYS_OBJS = system/acpi.o \
            system/loongarch/temperature.o \
            system/loongarch/vmem.o
 
-IMC_SRCS = $(wildcard ../../system/imc/loongson/*.c)
-IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
-
 LIB_OBJS = lib/barrier.o \
            lib/print.o \
            lib/read.o \
@@ -81,7 +78,7 @@ APP_OBJS = app/badram.o \
            app/main.o \
            app/loongarch/interrupt.o
 
-OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
 all: memtest.efi
 
@@ -95,7 +92,6 @@ debug: check memtest.debug memtestloongarch.efi
 
 -include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
--include $(subst .o,.d,$(IMC_OBJS))
 -include $(subst .o,.d,$(LIB_OBJS))
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
@@ -129,10 +125,6 @@ system/%.o: ../../system/%.c
 system/loongarch/%.o: ../../system/loongarch/%.c
 	@mkdir -p system/loongarch/
 	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
-
-system/imc/loongson/%.o: ../../system/imc/loongson/%.c
-	@mkdir -p system/imc/loongson/
-	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../../lib/%.c
 	@mkdir -p lib

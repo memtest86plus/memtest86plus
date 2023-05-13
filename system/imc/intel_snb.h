@@ -6,20 +6,13 @@
 // Platform-specific code for Intel Sandy Bridge CPUs (SNB)
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-
-#include "imc.h"
-
 #define SNB_MMR_BASE_REG    0x48
 #define SNB_REG_MAIN_CHAN0  0x5004
 #define SNB_REG_MAIN_CHAN1  0x5008
 #define SNB_REG_MCH_CFG     0x5E04
 #define SNB_REG_TIMING      0x4000
 
-void get_imc_config_intel_snb(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_snb(void)
 {
     uint32_t mmio_reg, offset;
     uint32_t mch_cfg, reg0, reg1;
