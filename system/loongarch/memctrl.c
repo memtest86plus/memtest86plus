@@ -13,7 +13,8 @@
 #include "cpuinfo.h"
 
 #include "memctrl.h"
-#include "imc/imc.h"
+#include "imc/loongson/imc.h"
+#include "imc/loongson/loongson_la.h"
 
 #include "display.h"
 

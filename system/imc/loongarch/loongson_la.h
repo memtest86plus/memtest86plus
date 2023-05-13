@@ -123,12 +123,11 @@ static void /*__attribute__((noinline))*/ get_imc_config_loongson_ddr4(void)
 {
     uint32_t val;
     uint16_t refc, loopc, div, div_mode, ref_clk;
-    uint8_t  max_mc, node_num, ddr_rate_factor;
+    uint8_t  max_mc, node_num;
     bool route_flag;
 
     imc.type  = "DDR4";
     node_num  = 1;
-    ddr_rate_factor = 4;
 
     if (strstr(cpuid_info.brand_id.str, "3C") ||
         (strstr(cpuid_info.brand_id.str, "3B6000") &&
@@ -151,7 +150,6 @@ static void /*__attribute__((noinline))*/ get_imc_config_loongson_ddr4(void)
                 strstr(cpuid_info.brand_id.str, "3B6000M")) {
         route_flag = false;
         max_mc     = 1;
-        ddr_rate_factor = 2;
     } else {
         route_flag = false;
         max_mc     = 0;
@@ -166,7 +164,7 @@ static void /*__attribute__((noinline))*/ get_imc_config_loongson_ddr4(void)
         div_mode = 0x1 << ((val >> 4) & 0x3);
         refc     = (val >> 8) & 0x1f;
         ref_clk  = (uint16_t)(((__cpucfg(0x4) * (__cpucfg(0x5) & 0xFFFF)) / ((__cpucfg(0x5) >> 16) & 0xFFFF)) / 1000000);
-        imc.freq = (ref_clk * loopc / refc / div / div_mode) * ddr_rate_factor;
+        imc.freq = (ref_clk * loopc / refc / div / div_mode) * 4;
     } else {
         imc.freq = 0;
     }
