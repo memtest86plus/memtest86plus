@@ -25,8 +25,10 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define HLT_OPCODE  0xf4
-#define JE_OPCODE   0x74
+#define HLT_OPCODE      0xf4
+#define JE_OPCODE       0x74
+#define RDMSR_OPCODE    0x320f
+#define WRMSR_OPCODE    0x300f
 
 #ifdef __x86_64__
 #define REG_PREFIX  "r"
@@ -149,6 +151,28 @@ void interrupt(struct trap_regs *trap_regs)
         parity_error();
         return;
 #endif
+    }
+
+    // Catch GPF following a RDMSR instruction (usually from a non-existent msr)
+    // and allow the program to continue. A cleaner way to do this would be to
+    // use an exception table similar to the linux kernel, but it's probably
+    // overkill for Memtest86+. Set a return value of 0 and leave a small mark
+    // on top-right corner to indicate something went wrong at some point.
+    if (trap_regs->vect == 13) {
+        uint16_t *pc = (uint16_t *)trap_regs->ip;
+        if (pc[0] == RDMSR_OPCODE) {
+            uintptr_t *return_addr;
+            if (cpuid_info.flags.lm == 1) {
+                return_addr = (uintptr_t *)(trap_regs->sp - 40);
+            } else {
+                return_addr = (uintptr_t *)(trap_regs->sp - 12);
+            }
+            *return_addr += 2;
+            trap_regs->ax = 0;
+            trap_regs->dx = 0;
+            printc(0, SCREEN_WIDTH - 1, '*');
+            return;
+        }
     }
 
     spin_lock(error_mutex);
