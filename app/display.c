@@ -343,7 +343,6 @@ void display_temperature(void)
     if (actual_cpu_temp == 0) {
         if (max_cpu_temp == 0) {
             enable_temperature = false;
-            no_temperature = true;
         }
         return;
     }

@@ -840,8 +840,6 @@ void config_init(void)
         cpu_state[i] = CPU_STATE_ENABLED;
     }
 
-    enable_temperature &= !no_temperature;
-
     power_save = POWER_SAVE_HIGH;
 
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
@@ -877,9 +875,9 @@ void config_menu(bool initial)
             if (!smp_enabled)  set_foreground_colour(BOLD+BLACK);
             prints(POP_R+7,  POP_LI, "<F5>  CPU selection");
             if (!smp_enabled)  set_foreground_colour(WHITE);
-            if (no_temperature) set_foreground_colour(BOLD+BLACK);
+            //if (no_temperature) set_foreground_colour(BOLD+BLACK);
             printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
-            if (no_temperature) set_foreground_colour(WHITE);
+            //if (no_temperature) set_foreground_colour(WHITE);
             printf(POP_R+9,  POP_LI, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
             prints(POP_R+10, POP_LI, "<F10> Exit menu");
         } else {
@@ -918,9 +916,7 @@ void config_menu(bool initial)
             break;
           case '6':
             if (initial) {
-                if (!no_temperature) {
-                    enable_temperature = !enable_temperature;
-                }
+                enable_temperature = !enable_temperature;
             }
             break;
           case '7':

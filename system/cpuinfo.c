@@ -50,8 +50,6 @@ uint32_t    l2_cache_speed  = 0;
 uint32_t    l3_cache_speed  = 0;
 uint32_t    ram_speed = 0;
 
-bool        no_temperature = false;
-
 uint32_t    clks_per_msec = 0;
 
 //------------------------------------------------------------------------------
@@ -350,7 +348,8 @@ static void determine_imc(void)
                 imc.family = IMC_NHM;         // Core i3/i5 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
               case 3:
-                no_temperature = true;        // Atom Clover Trail
+                imc.family = IMC_CLT;
+                enable_temperature = false;   // Atom Clover Trail
                 break;
               case 4:
                 imc.family = IMC_HSW_ULT;     // Core 4th Gen (Haswell-ULT)
@@ -365,9 +364,13 @@ static void determine_imc(void)
 
           case 0x6:
             switch (cpuid_info.version.extendedModel) {
+              case 2:
+                imc.family = IMC_TNC;         // Atom Tunnel Creek / Lincroft
+                enable_temperature = false;
+                break;
               case 3:
                 imc.family = IMC_CDT;         // Atom Cedar Trail
-                no_temperature = true;
+                enable_temperature = false;
                 break;
               case 4:
                 imc.family = IMC_HSW;         // Core 4th Gen (Haswell w/ GT3e)
@@ -431,9 +434,11 @@ static void determine_imc(void)
             switch (cpuid_info.version.extendedModel) {
               case 0x1:
                 if (cpuid_info.version.stepping > 9) {
-                    imc.family = 0x0008;       // Atom PineView
+                    imc.family = IMC_PNV;     // Atom PineView
+                } else {
+                    imc.family = IMC_SLT;     // Atom Silverthorne / Diamondvile
                 }
-                no_temperature = true;
+                enable_temperature = false;
                 break;
               case 0x2:
                 imc.family = IMC_WMR;         // Core i7 1st Gen 32 nm (Westmere)

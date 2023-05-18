@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
 // Copyright (C) 2004-2023 Sam Demeulemeester.
-//
-// Derived from an extract of memtest86+ init.c:
-//
-// MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
-// ------------------------------------------------
-// init.c - MemTest-86  Version 3.6
-//
-// Released under version 2 of the Gnu Public License.
-// By Chris Brady
 
 #include <stdint.h>
 
+#include "config.h"
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwquirks.h"
+#include "memctrl.h"
 #include "msr.h"
 #include "pci.h"
 
@@ -41,8 +32,17 @@ void get_specific_TjMax(void)
     // table according to their CPUID, PCI Root DID/VID or PNS.
     // Trying to read the MSR 0x1A2 on some of them trigger a reboot.
 
-    // Yonah C0 Step (Pentium/Core Duo T2000 & Celeron M 200/400)
     if (cpuid_info.version.raw[0] == 0x6E8) {
+        // Yonah C0 Step (Pentium/Core Duo T2000 & Celeron M 200/400)
+        TjMax = 100;
+    } else if (imc.family == IMC_SLT || imc.family == IMC_CLT || imc.family == IMC_TNC) {
+        // Atom Silverthorne / Diamondvile
+        // Atom Clover Trail/Cloverview
+        // Atom Tunnel Creek / Lincroft
+        TjMax = 90;
+    } else if (imc.family == IMC_CDT || imc.family == IMC_PNV) {
+        // Atom Silverthorne / Diamondvile
+        // Atom Cedar Trail/Cedarview
         TjMax = 100;
     }
 }
@@ -50,6 +50,10 @@ void get_specific_TjMax(void)
 void temperature_init(void)
 {
     uint32_t regl, regh;
+
+    if (!enable_temperature) {
+        return;
+    }
 
     // Process temperature-related quirks
     if (quirk.type & QUIRK_TYPE_TEMP) {

@@ -50,7 +50,11 @@
 #define IMC_ADL_N       0x3061  // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
 
 #define IMC_BYT         0x4010  // Atom Bay Trail
-#define IMC_CDT         0x4020  // Atom Cedar Trail
+#define IMC_SLT         0x4020  // Atom Silverthorne / Diamondville
+#define IMC_PNV         0x4030  // Atom Pineview
+#define IMC_CLT         0x4040  // Atom Clover Trail / Cloverview
+#define IMC_CDT         0x4050  // Atom Cedar Trail / Cedarview
+#define IMC_TNC         0x4060  // Atom Tunnel Creek / Lincroft
 
 #define IMC_K8          0x8000  // Old K8
 #define IMC_K10         0x8010  // K10 (Family 10h & 11h)
@@ -104,11 +108,6 @@ extern uint32_t l3_cache_speed;
  * The bandwidth of the RAM
  */
 extern uint32_t ram_speed;
-
-/**
- * A flag indicating that we can't read the core temperature on this CPU.
- */
-extern bool no_temperature;
 
 /**
  * The TSC clock speed in kHz. Assumed to be the nominal CPU clock speed.
