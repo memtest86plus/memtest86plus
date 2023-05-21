@@ -28,6 +28,7 @@
 #include "display.h"
 
 #include "badram.h"
+#include "memsize.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -38,9 +39,9 @@
 
 // DEFAULT_MASK covers a uintptr_t, since that is the testing granularity.
 #ifdef __x86_64__
-#define DEFAULT_MASK (UINTPTR_MAX << 3)
+#define DEFAULT_MASK (UINT64_MAX << 3)
 #else
-#define DEFAULT_MASK (UINTPTR_MAX << 2)
+#define DEFAULT_MASK (UINT64_MAX << 2)
 #endif
 
 //------------------------------------------------------------------------------
@@ -48,8 +49,8 @@
 //------------------------------------------------------------------------------
 
 typedef struct {
-    uintptr_t   addr;
-    uintptr_t   mask;
+    uint64_t   addr;
+    uint64_t   mask;
 } pattern_t;
 
 //------------------------------------------------------------------------------
@@ -70,7 +71,7 @@ static int          num_patterns = 0;
 /*
  * Combine two addr/mask pairs to one addr/mask pair.
  */
-static void combine(uintptr_t addr1, uintptr_t mask1, uintptr_t addr2, uintptr_t mask2, uintptr_t *addr, uintptr_t *mask)
+static void combine(uint64_t addr1, uint64_t mask1, uint64_t addr2, uint64_t mask2, uint64_t *addr, uint64_t *mask)
 {
     *mask = COMBINE_MASK(addr1, mask1, addr2, mask2);
 
@@ -81,10 +82,10 @@ static void combine(uintptr_t addr1, uintptr_t mask1, uintptr_t addr2, uintptr_t
 /*
  * Count the number of addresses covered with a mask.
  */
-static uintptr_t addresses(uintptr_t mask)
+static uint64_t addresses(uint64_t mask)
 {
-    uintptr_t ctr = 1;
-    int i = 8*sizeof(uintptr_t);
+    uint64_t ctr = 1;
+    int i = 8*sizeof(uint64_t);
     while (i-- > 0) {
         if (! (mask & 1)) {
             ctr += ctr;
@@ -98,10 +99,10 @@ static uintptr_t addresses(uintptr_t mask)
  * Count how many more addresses would be covered by addr1/mask1 when combined
  * with addr2/mask2.
  */
-static uintptr_t combi_cost(uintptr_t addr1, uintptr_t mask1, uintptr_t addr2, uintptr_t mask2)
+static uint64_t combi_cost(uint64_t addr1, uint64_t mask1, uint64_t addr2, uint64_t mask2)
 {
-    uintptr_t cost1 = addresses(mask1);
-    uintptr_t tmp, mask;
+    uint64_t cost1 = addresses(mask1);
+    uint64_t tmp, mask;
     combine(addr1, mask1, addr2, mask2, &tmp, &mask);
     return addresses(mask) - cost1;
 }
@@ -130,13 +131,13 @@ static int cheapest_pair()
     // This is guaranteed to be overwritten with >= 0 as long as num_patterns > 1
     int merge_idx = -1;
 
-    uintptr_t min_cost = UINTPTR_MAX;
+    uint64_t min_cost = UINT64_MAX;
     for (int i = 0; i < num_patterns - 1; i++) {
-        uintptr_t tmp_cost = combi_cost(
-                patterns[i].addr,
-                patterns[i].mask,
-                patterns[i+1].addr,
-                patterns[i+1].mask
+        uint64_t tmp_cost = combi_cost(
+            patterns[i].addr,
+            patterns[i].mask,
+            patterns[i+1].addr,
+            patterns[i+1].mask
         );
         if (tmp_cost <= min_cost) {
             min_cost = tmp_cost;
@@ -227,11 +228,11 @@ void badram_init(void)
     }
 }
 
-bool badram_insert(uintptr_t addr)
+bool badram_insert(testword_t page, testword_t offset)
 {
     pattern_t pattern = {
-            .addr = addr,
-            .mask = DEFAULT_MASK
+        .addr = ((uint64_t)page << PAGE_SHIFT) + offset,
+        .mask = DEFAULT_MASK
     };
 
     // If covered by existing entry we return immediately
@@ -277,14 +278,14 @@ void badram_display(void)
             display_scrolled_message(col, ",");
             col++;
         }
-        int text_width = 2 * (TESTWORD_DIGITS + 2) + 1;
+        int text_width = 2 * (16 + 2) + 1;
         if (col > (SCREEN_WIDTH - text_width)) {
             scroll();
             col = 7;
         }
-        display_scrolled_message(col, "0x%0*x,0x%0*x",
-                                 TESTWORD_DIGITS, patterns[i].addr,
-                                 TESTWORD_DIGITS, patterns[i].mask);
+        display_scrolled_message(col, "0x%08x%08x,0x%08x%08x",
+                                 (uintptr_t)(patterns[i].addr >> 32), (uintptr_t)(patterns[i].addr & 0xFFFFFFFFU),
+                                 (uintptr_t)(patterns[i].mask >> 32), (uintptr_t)(patterns[i].mask & 0xFFFFFFFFU));
         col += text_width;
     }
 }

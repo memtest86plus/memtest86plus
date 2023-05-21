@@ -77,14 +77,11 @@ uint64_t                error_count = 0;
 // Private Functions
 //------------------------------------------------------------------------------
 
-static bool update_error_info(uintptr_t addr, testword_t xor)
+static bool update_error_info(testword_t page, testword_t offset, uintptr_t addr, testword_t xor)
 {
     bool update_stats = false;
 
     // Update address range.
-
-    testword_t page   = page_of((void *)addr);
-    testword_t offset = addr & 0xFFF;
 
     if (error_info.min_addr.page > page) {
         error_info.min_addr.page   = page;
@@ -163,12 +160,15 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     testword_t xor = good ^ bad;
 
     bool new_stats = false;
+    testword_t page   = page_of((void *)addr);
+    testword_t offset = addr & (PAGE_SIZE - 1);
+
     switch (type) {
       case ADDR_ERROR:
-        new_stats = update_error_info(addr, 0);
+        new_stats = update_error_info(page, offset, addr, 0);
         break;
       case DATA_ERROR:
-        new_stats = update_error_info(addr, xor);
+        new_stats = update_error_info(page, offset, addr, xor);
         break;
       case NEW_MODE:
         new_stats = (error_count > 0);
@@ -180,7 +180,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
 
     bool new_badram = false;
     if (error_mode == ERROR_MODE_BADRAM && use_for_badram) {
-        new_badram = badram_insert(addr);
+        new_badram = badram_insert(page, offset);
     }
 
     if (new_address) {
@@ -267,9 +267,6 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
             check_input();
             scroll();
 
-            uintptr_t page   = page_of((void *)addr);
-            uintptr_t offset = addr & 0xFFF;
-
             set_foreground_colour(YELLOW);
             display_scrolled_message(0, " %2i   %4i   %2i   %09x%03x (%kB)",
                                      smp_my_cpu_num(), pass_num, test_num, page, offset, page << 2);
@@ -313,7 +310,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
 void error_init(void)
 {
     error_info.min_addr.page    = UINTPTR_MAX;
-    error_info.min_addr.offset  = 0xfff;
+    error_info.min_addr.offset  = PAGE_SIZE - 1;
     error_info.max_addr.page    = 0;
     error_info.max_addr.offset  = 0;
     error_info.bad_bits         = 0;

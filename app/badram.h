@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "test.h"
+
 /**
  * Initialises the pattern array.
  */
@@ -22,7 +24,7 @@ void badram_init(void);
  * Inserts a single faulty address into the pattern array. Returns
  * true iff the array was changed.
  */
-bool badram_insert(uintptr_t addr);
+bool badram_insert(testword_t page, testword_t offset);
 
 /**
  * Displays the pattern array in the scrollable display region in the
