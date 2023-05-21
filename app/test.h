@@ -47,19 +47,33 @@ extern barrier_t *run_barrier;
  */
 extern spinlock_t *error_mutex;
 
+#ifdef __x86_64__
 /**
  * The word width (in bits) used for memory testing.
  */
-#ifdef __x86_64__
-#define TESTWORD_WIDTH  64
-#else
-#define TESTWORD_WIDTH  32
-#endif
-
+#define TESTWORD_WIDTH       64
 /**
  * The number of hex digits needed to display a memory test word.
  */
-#define TESTWORD_DIGITS (TESTWORD_WIDTH / 4)
+#define TESTWORD_DIGITS      16
+/**
+ * The string representation of TESTWORDS_DIGITS
+ */
+#define TESTWORD_DIGITS_STR "16"
+#else
+/**
+ * The word width (in bits) used for memory testing.
+ */
+#define TESTWORD_WIDTH      32
+/**
+ * The number of hex digits needed to display a memory test word.
+ */
+#define TESTWORD_DIGITS      8
+/**
+ * The string representation of TESTWORDS_DIGITS
+ */
+#define TESTWORD_DIGITS_STR "8"
+#endif
 
 /**
  * The word type used for memory testing.
