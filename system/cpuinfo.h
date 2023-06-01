@@ -66,8 +66,13 @@
 #define IMC_K18         0x8070  // Hygon (Family 18h)
 #define IMC_K19_VRM     0x8080  // Zen3 (Family 19h - Vermeer)
 #define IMC_K19_CZN     0x8081  // Cezanne APU
+#define IMC_K19_CHL     0x8090  // Zen3 Chagall TR
 
-#define IMC_K19_RPL     0x8100  // Zen4 (Family 19h - Raphael (AM5))
+#define IMC_K19_RBT     0x8100  // Zen3+ (Rembrandt)
+#define IMC_K19_RPL     0x8110  // Zen4 (Raphael)
+#define IMC_K19_PHX     0x8120  // Zen4 (Phoenix)
+#define IMC_K19_STK     0x81A0  // Zen4 (Storm Peak)
+#define IMC_K19_GRG     0x8150  // Zen5 (Granite Ridge)
 
 /**
  * A string identifying the CPU make and model.

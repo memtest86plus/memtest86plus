@@ -37,7 +37,7 @@ void get_imc_config_amd_zen(void)
 
     // Get DRAM Frequency
     smn_reg = amd_smn_read(AMD_SMN_UMC_DRAM_CONFIG + offset);
-    if (imc.family >= IMC_K19_RPL) {
+    if (imc.family >= IMC_K19_RBT) {
         imc.type = "DDR5";
         imc.freq = smn_reg & 0xFFFF;
         if ((smn_reg >> 18) & 1) imc.freq *= 2; // GearDown

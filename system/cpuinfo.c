@@ -332,13 +332,33 @@ static void determine_imc(void)
             imc.family = IMC_K18; // Hygon (Family 18h)
             break;
           case 0xA:
-            if (cpuid_info.version.extendedModel == 5) {
-                imc.family = IMC_K19_CZN; // AMD Cezanne APU (Model 0x50-5F - Family 19h)
-            } else if (cpuid_info.version.extendedModel >= 6) {
-                imc.family = IMC_K19_RPL; // Zen4 (Family 19h - Raphael AM5)
-            } else {
+            switch(cpuid_info.version.extendedModel) {
+              case 0:
+                imc.family = IMC_K19_CHL; // Zen3 (Threadripper - Chagall sWRX8)
+                break;
+              case 1:
+                imc.family = IMC_K19_STK; // Zen4 (Threadripper - Storm Peak TR5)
+                break;
+              case 2:
                 imc.family = IMC_K19_VRM; // Zen3 (Family 19h - Vermeer AM4)
+                break;
+              case 4:
+                imc.family = IMC_K19_RBT; // Zen3+ (Family 19h - Rembrandt FP7 & AM5 FTV)
+                break;
+              case 5:
+                imc.family = IMC_K19_CZN; // Zen3 APU (Family 19h - Cezanne FP6)
+                break;
+              case 6:
+                imc.family = IMC_K19_RPL; // Zen4 (Family 19h - Raphael AM5)
+                break;
+              case 7:
+                imc.family = IMC_K19_PHX; // Zen4 (Family 19h - Phoenix FP7/FP8)
+                break;
             }
+            break;
+          case 0xB:
+            imc.family = IMC_K19_GRG; // Zen5 APU (Family 19h - Granite Ridge)
+            break;
           default:
             break;
         }
