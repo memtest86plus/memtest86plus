@@ -103,7 +103,7 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
 #ifdef __x86_64__
 static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_table)
 {
-    efi64_config_table_t *config_tables = (efi64_config_table_t *)map_region(system_table->config_tables,
+    efi64_config_table_t *config_tables = (efi64_config_table_t *)map_region(0, system_table->config_tables,
                                                                              system_table->num_config_tables * sizeof(efi64_config_table_t),
                                                                              true);
     if (config_tables == NULL) return NULL;
@@ -123,7 +123,7 @@ static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_tabl
 #else
 static rsdp_t *find_rsdp_in_efi32_system_table(efi32_system_table_t *system_table)
 {
-    efi32_config_table_t *config_tables = (efi32_config_table_t *)map_region(system_table->config_tables,
+    efi32_config_table_t *config_tables = (efi32_config_table_t *)map_region(0, system_table->config_tables,
                                                                              system_table->num_config_tables * sizeof(efi32_config_table_t),
                                                                              true);
     if (config_tables == NULL) return NULL;
@@ -153,7 +153,7 @@ static uintptr_t find_rsdp(void)
 #ifdef __x86_64__
     if (efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
-        system_table_addr = map_region(system_table_addr, sizeof(efi64_system_table_t), true);
+        system_table_addr = map_region(0, system_table_addr, sizeof(efi64_system_table_t), true);
         if (system_table_addr != 0) {
             rp = find_rsdp_in_efi64_system_table((efi64_system_table_t *)system_table_addr);
             if (rp) rsdp_source = "EFI64 system table";
@@ -161,7 +161,7 @@ static uintptr_t find_rsdp(void)
     }
 #else
     if (efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
-        uintptr_t system_table_addr = map_region(efi_info->sys_tab, sizeof(efi32_system_table_t), true);
+        uintptr_t system_table_addr = map_region(0, efi_info->sys_tab, sizeof(efi32_system_table_t), true);
         if (system_table_addr != 0) {
             rp = find_rsdp_in_efi32_system_table((efi32_system_table_t *)system_table_addr);
             if (rp) rsdp_source = "EFI32 system table";
@@ -201,7 +201,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
     }
 
     if (rp->revision >= 2) {
-        rt = (rsdt_header_t *)map_region(rp->xsdt_addr, sizeof(rsdt_header_t), true);
+        rt = (rsdt_header_t *)map_region(0, rp->xsdt_addr, sizeof(rsdt_header_t), true);
         if (rt == NULL) {
             return 0;
         }
@@ -209,7 +209,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
         if (*(uint32_t *)rt != XSDTSignature) {
             return 0;
         }
-        rt = (rsdt_header_t *)map_region(rp->xsdt_addr, rt->length, true);
+        rt = (rsdt_header_t *)map_region(0, rp->xsdt_addr, rt->length, true);
         if (rt == NULL || acpi_checksum(rt, rt->length) != 0) {
             return 0;
         }
@@ -219,14 +219,14 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
 
         while (tab_ptr < tab_end) {
             uintptr_t addr = *tab_ptr++;  // read the next table entry
-            uint32_t *ptr = (uint32_t *)map_region(addr, sizeof(uint32_t), true);
+            uint32_t *ptr = (uint32_t *)map_region(0, addr, sizeof(uint32_t), true);
 
             if (ptr && *ptr == table_signature) {
                 return addr;
             }
         }
     } else {
-        rt = (rsdt_header_t *)map_region(rp->rsdt_addr, sizeof(rsdt_header_t), true);
+        rt = (rsdt_header_t *)map_region(0, rp->rsdt_addr, sizeof(rsdt_header_t), true);
         if (rt == NULL) {
             return 0;
         }
@@ -234,7 +234,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
         if (*(uint32_t *)rt != RSDTSignature) {
             return 0;
         }
-        rt = (rsdt_header_t *)map_region(rp->rsdt_addr, rt->length, true);
+        rt = (rsdt_header_t *)map_region(0, rp->rsdt_addr, rt->length, true);
         if (rt == NULL || acpi_checksum(rt, rt->length) != 0) {
             return 0;
         }
@@ -244,7 +244,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
 
         while (tab_ptr < tab_end) {
             uintptr_t addr = *tab_ptr++;  // read the next table entry
-            uint32_t *ptr = (uint32_t *)map_region(addr, sizeof(uint32_t), true);
+            uint32_t *ptr = (uint32_t *)map_region(0, addr, sizeof(uint32_t), true);
 
             if (ptr && *ptr == table_signature) {
                 return addr;
@@ -284,7 +284,7 @@ static bool parse_fadt(uintptr_t fadt_addr)
 
     // Get APIC Timer Address
     if (fadt->length > FADT_X_PM_TMR_BLK_OFFSET) {
-        rt = (acpi_gen_addr_struct *)map_region(fadt_addr+FADT_X_PM_TMR_BLK_OFFSET, sizeof(acpi_gen_addr_struct), true);
+        rt = (acpi_gen_addr_struct *)map_region(0, fadt_addr+FADT_X_PM_TMR_BLK_OFFSET, sizeof(acpi_gen_addr_struct), true);
 
         acpi_config.pm_is_io = (rt->address_space == 1) ? true : false;
 

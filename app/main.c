@@ -210,7 +210,7 @@ static void global_init(void)
 
     // Nothing before this should access the boot parameters, in case they are located above 4GB.
     // This is the first region we map, so it is guaranteed not to fail.
-    boot_params_addr = map_region(boot_params_addr, sizeof(boot_params_t), true);
+    boot_params_addr = map_region(0, boot_params_addr, sizeof(boot_params_t), true);
 
     hwctrl_init();
 
@@ -530,7 +530,7 @@ static void test_all_windows(int my_cpu)
                 ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
             }
         } else {
-            if (!map_window(vm_map[0].pm_base_addr)) {
+            if (!map_window(my_cpu, vm_map[0].pm_base_addr)) {
                 // Either there is no PAE or we are at the PAE limit.
                 break;
             }

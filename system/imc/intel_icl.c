@@ -52,7 +52,7 @@ void get_imc_config_intel_icl(void)
     if (mmio_reg >= (1ULL << 32)) return;    // MMIO is outside reachable range
 #endif
 
-    uintptr_t mchbar_addr = map_region(mmio_reg, ICL_MMR_WINDOW_RANGE, false);
+    uintptr_t mchbar_addr = map_region(0, mmio_reg, ICL_MMR_WINDOW_RANGE, false);
 
     imc.type = "DDR4";
 

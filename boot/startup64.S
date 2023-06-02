@@ -171,8 +171,17 @@ startup:
 
 	# Initialise the pml4 and pdp tables.
 
+	call	smp_my_cpu_num
+	mov	%eax, %edi
+	call	smp_get_proximity_domain_idx
+	cdqe
+	shl	$0xC, %eax
+	mov	%rax, %rbx
+
 	leaq	pml4(%rip), %rcx
+	addq	%rbx, %rcx
 	leaq	pdp(%rip), %rdx
+	addq	%rax, %rdx
 	movq	%rdx, %rax
 	addq	$0x3, %rax
 	movq	%rax, 0(%rcx)
@@ -183,6 +192,7 @@ startup:
 	addq	$0x3, %rax
 	movq	%rax, 8(%rdx)
 	leaq	pd2(%rip), %rax
+	addq	%rbx, %rax
 	addq	$0x3, %rax
 	movq	%rax, 16(%rdx)
 	leaq	pd3(%rip), %rax
@@ -501,12 +511,291 @@ gdt_end:
 pml4:
 	.quad	0			# filled in at run time
 
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+
 # Page Directory Pointer Table:
 # 4 Entries, pointing to the Page Directory Tables.
 
 	.align	4096
 	.globl	pdp
 pdp:
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+	.quad	0			# filled in at run time
+
+	.align	4096
 	.quad	0			# filled in at run time
 	.quad	0			# filled in at run time
 	.quad	0			# filled in at run time
@@ -531,6 +820,68 @@ pd1:
 	.align	4096
 	.globl	pd2
 pd2:
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
+	ptes64	0x0000000080000000,0x8000000000000083
+
 	ptes64	0x0000000080000000,0x8000000000000083
 
 	.align	4096

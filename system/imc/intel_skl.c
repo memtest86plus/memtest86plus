@@ -50,7 +50,7 @@ void get_imc_config_intel_skl(void)
     if (mmio_reg >= (1ULL << 32)) return;    // MMIO is outside reachable range
 #endif
 
-    uintptr_t mchbar_addr = map_region(mmio_reg, SKL_MMR_WINDOW_RANGE, false);
+    uintptr_t mchbar_addr = map_region(0, mmio_reg, SKL_MMR_WINDOW_RANGE, false);
 
     // Get DRAM Ratio
     ptr = (uintptr_t*)(mchbar_addr + SKL_MMR_DRAM_CLOCK);

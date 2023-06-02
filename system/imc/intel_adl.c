@@ -56,7 +56,7 @@ void get_imc_config_intel_adl(void)
     if (mmio_reg >= (1ULL << 32)) return;    // MMIO is outside reachable range (> 32bit)
 #endif
 
-    uintptr_t mchbar_addr = map_region(mmio_reg, ADL_MMR_WINDOW_RANGE, false);
+    uintptr_t mchbar_addr = map_region(0, mmio_reg, ADL_MMR_WINDOW_RANGE, false);
 
     // Get channel configuration & IMC width
     cha = *(uintptr_t*)(mchbar_addr + ADL_MMR_CH0_DIMM_REG);

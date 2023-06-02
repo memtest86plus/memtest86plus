@@ -45,7 +45,7 @@ static char *get_tstruct_string(struct tstruct_header *header, uint16_t maxlen, 
 #ifdef __x86_64__
 static smbiosv2_t *find_smbiosv2_in_efi64_system_table(efi64_system_table_t *system_table)
 {
-    efi64_config_table_t *config_tables = (efi64_config_table_t *) map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi64_config_table_t), true);
+    efi64_config_table_t *config_tables = (efi64_config_table_t *) map_region(0, system_table->config_tables, system_table->num_config_tables * sizeof(efi64_config_table_t), true);
     if (config_tables == NULL) return NULL;
 
     uintptr_t table_addr = 0;
@@ -60,7 +60,7 @@ static smbiosv2_t *find_smbiosv2_in_efi64_system_table(efi64_system_table_t *sys
 
 static smbiosv2_t *find_smbiosv2_in_efi32_system_table(efi32_system_table_t *system_table)
 {
-    efi32_config_table_t *config_tables = (efi32_config_table_t *) map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi32_config_table_t), true);
+    efi32_config_table_t *config_tables = (efi32_config_table_t *) map_region(0, system_table->config_tables, system_table->num_config_tables * sizeof(efi32_config_table_t), true);
     if (config_tables == NULL) return NULL;
 
     uintptr_t table_addr = 0;
@@ -82,8 +82,8 @@ static uintptr_t find_smbiosv2_adr(void)
     if (efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
         // EFI32
         if (rp == NULL && efi_info->loader_signature == EFI32_LOADER_SIGNATURE) {
-            uintptr_t system_table_addr = map_region(efi_info->sys_tab, sizeof(efi32_system_table_t), true);
-            system_table_addr = map_region(system_table_addr, sizeof(efi32_system_table_t), true);
+            uintptr_t system_table_addr = map_region(0, efi_info->sys_tab, sizeof(efi32_system_table_t), true);
+            system_table_addr = map_region(0, system_table_addr, sizeof(efi32_system_table_t), true);
             if (system_table_addr != 0) {
                 rp = find_smbiosv2_in_efi32_system_table((efi32_system_table_t *) system_table_addr);
                 return (uintptr_t) rp;
@@ -95,7 +95,7 @@ static uintptr_t find_smbiosv2_adr(void)
         // EFI64
         if (rp == NULL && efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
             uintptr_t system_table_addr = (uintptr_t) efi_info->sys_tab_hi << 32 | (uintptr_t) efi_info->sys_tab;
-            system_table_addr = map_region(system_table_addr, sizeof(efi64_system_table_t), true);
+            system_table_addr = map_region(0, system_table_addr, sizeof(efi64_system_table_t), true);
             if (system_table_addr != 0) {
                 rp = find_smbiosv2_in_efi64_system_table((efi64_system_table_t *) system_table_addr);
                 return (uintptr_t) rp;

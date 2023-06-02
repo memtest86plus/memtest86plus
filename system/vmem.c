@@ -18,6 +18,7 @@
 #include "cpuid.h"
 
 #include "vmem.h"
+#include "smp.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -49,13 +50,20 @@ static uintptr_t    mapped_window = 2;
 // Private Functions
 //------------------------------------------------------------------------------
 
-static void load_pdbr()
+#ifdef __x86_64__
+#define PAGE_TABLE_OFFSET (512 * smp_get_proximity_domain_idx(my_cpu))
+#else
+#define PAGE_TABLE_OFFSET (0)
+#endif
+
+
+static void load_pdbr(uint32_t offset)
 {
     void *page_table;
     if (cpuid_info.flags.lm == 1) {
-        page_table = pml4;
+        page_table = pml4 + offset;
     } else {
-        page_table = pdp;
+        page_table = pdp + offset;
     }
 
     __asm__ __volatile__(
@@ -74,7 +82,7 @@ static void load_pdbr()
 // Public Functions
 //------------------------------------------------------------------------------
 
-uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
+uintptr_t map_region(int my_cpu, uintptr_t base_addr, size_t size, bool only_for_startup)
 {
     uintptr_t last_addr = base_addr + size - 1;
     // Check if the requested region is permanently mapped. If it is only needed during startup,
@@ -103,12 +111,12 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
         pd3[device_pages_used++] = (curr_phys_page++ << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
-    load_pdbr();
+    load_pdbr(PAGE_TABLE_OFFSET);
     // Return the mapped address.
     return VM_REGION_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
-bool map_window(uintptr_t start_page)
+bool map_window(int my_cpu, uintptr_t start_page)
 {
     uintptr_t window = start_page >> (30 - PAGE_SHIFT);
 
@@ -131,11 +139,13 @@ bool map_window(uintptr_t start_page)
     }
     // Compute the page table entries.
     uint64_t flags = cpuid_info.flags.nx ? UINT64_C(0x8000000000000083) : 0x83;
+    uint32_t offset = PAGE_TABLE_OFFSET;
+    uint64_t * pd2_ = pd2 + offset;
     for (uintptr_t i = 0; i < 512; i++) {
-        pd2[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + flags;
+        pd2_[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + flags;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
-    load_pdbr();
+    load_pdbr(offset);
 
     mapped_window = window;
     return true;

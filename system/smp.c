@@ -279,18 +279,18 @@ typedef struct __attribute__((packed)) {
 
 static apic_register_t   *apic = NULL;
 
-static uint8_t           apic_id_to_cpu_num[MAX_APIC_IDS];
+static uint8_t           apic_id_to_cpu_num[MAX_APIC_IDS] = { 0 };
 
-static uint8_t           apic_id_to_proximity_domain_idx[MAX_APIC_IDS];
+static uint8_t           apic_id_to_proximity_domain_idx[MAX_APIC_IDS] = { 0 };
 
-static uint8_t           cpu_num_to_apic_id[MAX_CPUS];
+static uint8_t           cpu_num_to_apic_id[MAX_CPUS] = { 0 };
 
-static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS];
+static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS] = { 0 };
 
-static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS];
+static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS] = { 0 };
 
-static uint8_t           cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
-uint8_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+static uint8_t           cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS] = { 0 };
+uint8_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS] = { 0 };
 
 static uintptr_t         smp_heap_page = 0;
 
@@ -342,17 +342,17 @@ static floating_pointer_struct_t *scan_for_floating_ptr_struct(uintptr_t addr, i
 
 static bool read_mp_config_table(uintptr_t addr)
 {
-    mp_config_table_header_t *mpc = (mp_config_table_header_t *)map_region(addr, sizeof(mp_config_table_header_t), true);
+    mp_config_table_header_t *mpc = (mp_config_table_header_t *)map_region(0, addr, sizeof(mp_config_table_header_t), true);
     if (mpc == NULL) return false;
 
-    mpc = (mp_config_table_header_t *)map_region(addr, mpc->length, true);
+    mpc = (mp_config_table_header_t *)map_region(0, addr, mpc->length, true);
     if (mpc == NULL) return false;
 
     if (mpc->signature != MPCSignature || acpi_checksum(mpc, mpc->length) != 0) {
         return false;
     }
 
-    apic = (volatile apic_register_t *)map_region(mpc->lapic_addr, APIC_REGS_SIZE, false);
+    apic = (volatile apic_register_t *)map_region(0, mpc->lapic_addr, APIC_REGS_SIZE, false);
     if (apic == NULL) return false;
 
     uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(mp_config_table_header_t);
@@ -426,7 +426,7 @@ static bool find_cpus_in_floating_mp_struct(void)
 
     if (fp->feature[0] > 0 && fp->feature[0] <= 7) {
         // This is a default config, so plug in the numbers.
-        apic = (volatile apic_register_t *)map_region(0xFEE00000, APIC_REGS_SIZE, false);
+        apic = (volatile apic_register_t *)map_region(0, 0xFEE00000, APIC_REGS_SIZE, false);
         if (apic == NULL) return false;
         cpu_num_to_apic_id[0] = 0;
         cpu_num_to_apic_id[1] = 1;
@@ -451,10 +451,10 @@ static bool find_cpus_in_madt(void)
         return false;
     }
 
-    madt_table_header_t *mpc = (madt_table_header_t *)map_region(acpi_config.madt_addr, sizeof(madt_table_header_t), true);
+    madt_table_header_t *mpc = (madt_table_header_t *)map_region(0, acpi_config.madt_addr, sizeof(madt_table_header_t), true);
     if (mpc == NULL) return false;
 
-    mpc = (madt_table_header_t *)map_region(acpi_config.madt_addr, mpc->h.length, true);
+    mpc = (madt_table_header_t *)map_region(0, acpi_config.madt_addr, mpc->h.length, true);
     if (mpc == NULL) return false;
 
     if (acpi_checksum(mpc, mpc->h.length) != 0) {
@@ -495,7 +495,7 @@ static bool find_cpus_in_madt(void)
         tab_entry_ptr += entry_header->length;
     }
 
-    apic = (volatile apic_register_t *)map_region(apic_addr, APIC_REGS_SIZE, false);
+    apic = (volatile apic_register_t *)map_region(0, apic_addr, APIC_REGS_SIZE, false);
     if (apic == NULL) {
         num_available_cpus = 1;
         return false;
@@ -511,10 +511,10 @@ static bool find_numa_nodes_in_srat(void)
         return false;
     }
 
-    srat_table_header_t * srat = (srat_table_header_t *)map_region(acpi_config.srat_addr, sizeof(rsdt_header_t), true);
+    srat_table_header_t * srat = (srat_table_header_t *)map_region(0, acpi_config.srat_addr, sizeof(rsdt_header_t), true);
     if (srat == NULL) return false;
 
-    srat = (srat_table_header_t *)map_region(acpi_config.srat_addr, srat->h.length, true);
+    srat = (srat_table_header_t *)map_region(0, acpi_config.srat_addr, srat->h.length, true);
     if (srat == NULL) return false;
 
     if (acpi_checksum(srat, srat->h.length) != 0) {

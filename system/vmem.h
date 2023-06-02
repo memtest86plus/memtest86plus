@@ -48,7 +48,7 @@
  * \returns
  * On success, the mapped address in virtual memory, On failure, 0.
  */
-uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
+uintptr_t map_region(int my_cpu, uintptr_t base_addr, size_t size, bool only_for_startup);
 
 /**
  * Maps a \ref VM_WINDOW_SIZE region of physical memory into the upper 2GB of
@@ -61,7 +61,7 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
  * \returns
  * On success, true. On failure, false.
  */
-bool map_window(uintptr_t start_page);
+bool map_window(int my_cpu, uintptr_t start_page);
 
 /**
  * Returns a virtual memory pointer to the first word of the specified physical

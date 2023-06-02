@@ -1038,7 +1038,7 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     if (scratchpad_paddr == 0) {
         goto no_keyboards_found;
     }
-    uintptr_t scratchpad_vaddr = map_region(scratchpad_paddr, scratchpad_size, true);
+    uintptr_t scratchpad_vaddr = map_region(0, scratchpad_paddr, scratchpad_size, true);
     if (scratchpad_vaddr == 0) {
         goto no_keyboards_found;
     }
@@ -1054,7 +1054,7 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     if (device_context_index_paddr == 0) {
         goto no_keyboards_found;
     }
-    uintptr_t device_context_index_vaddr = map_region(device_context_index_paddr, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, true);
+    uintptr_t device_context_index_vaddr = map_region(0, device_context_index_paddr, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, true);
     if (device_context_index_vaddr == 0) {
         goto no_keyboards_found;
     }

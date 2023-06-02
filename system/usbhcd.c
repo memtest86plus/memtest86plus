@@ -458,7 +458,7 @@ static void reset_usb_controller(hci_info_t *hci)
             hci->type = NOT_HCI;  // mark this controller as unusable
             return;
         }
-        base_addr = map_region(base_addr, mmio_size, false);
+        base_addr = map_region(0, base_addr, mmio_size, false);
         if (base_addr == 0) {
             print_usb_info(" Failed to map device into virtual memory");
             hci->type = NOT_HCI;  // mark this controller as unusable
