@@ -123,7 +123,7 @@ system/%.o: ../system/%.c
 
 system/imc/%.o: ../system/imc/%.c
 	@mkdir -p system/imc
-	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../lib/%.c
 	@mkdir -p lib

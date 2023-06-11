@@ -15,6 +15,10 @@ memtest_shared_debug.lds
 # Binaries
 memtest_shared
 memtest_shared.bin
+memtest.debug
+OVMF.fd
+OVMF_CODE.fd
+OVMF_VARS.fd
 *.bin
 *.efi
 *.img
