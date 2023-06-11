@@ -11,7 +11,6 @@ else
 endif
 
 ifeq ($(DEBUG), 1)
-<<<<<<< HEAD
   CFLAGS+=-ggdb3 -DDEBUG_GDB
   OPT_SMALL=-Og
   OPT_FAST=-Og
