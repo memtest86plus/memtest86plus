@@ -54,7 +54,6 @@ void *memmove(void *dest, const void *src, size_t n);
  * value c.
  * void *memset(void *s, int c, size_t n);
  */
-
 #ifndef DEBUG_GDB
     #define memset(s, c, n) __builtin_memset((s), (c), (n))
 #else

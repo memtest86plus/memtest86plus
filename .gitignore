@@ -16,15 +16,11 @@ memtest_shared_debug.lds
 memtest_shared
 memtest_shared.bin
 memtest.debug
-OVMF.fd
-OVMF_CODE.fd
-OVMF_VARS.fd
 *.bin
 *.efi
 *.img
 *.iso
 *.mbr
-*.debug
 
 # Directories
 grub-iso

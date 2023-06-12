@@ -10,6 +10,9 @@ else
   GIT_AVAILABLE = true
 endif
 
+CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
+         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector
+
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
   OPT_SMALL=-Og
@@ -20,9 +23,6 @@ else
   OPT_FAST=-O3
   MS_LDS=ldscripts/memtest_shared.lds
 endif
-
-CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector
 
 INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app -Iapp
 
@@ -131,7 +131,7 @@ lib/%.o: ../lib/%.c
 
 tests/%.o: ../tests/%.c
 	@mkdir -p tests
-	$(CC) -c $(CFLAGS) -O3 $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 app/%.o: ../app/%.c app/build_version.h
 	@mkdir -p app
