@@ -15,12 +15,12 @@ memtest_shared_debug.lds
 # Binaries
 memtest_shared
 memtest_shared.bin
-memtest.debug
 *.bin
 *.efi
 *.img
 *.iso
 *.mbr
+*.debug
 
 # Directories
 grub-iso
