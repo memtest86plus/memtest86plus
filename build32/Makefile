@@ -13,6 +13,17 @@ endif
 CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m32 -march=i586 -fpic -fno-builtin \
          -ffreestanding -fomit-frame-pointer -fno-stack-protector
 
+ifeq ($(DEBUG), 1)
+  CFLAGS+=-ggdb3 -DDEBUG_GDB
+  OPT_SMALL=-Og
+  OPT_FAST=-Og
+  MS_LDS=memtest_shared_debug.lds
+else
+  OPT_SMALL=-Os
+  OPT_FAST=-O3
+  MS_LDS=ldscripts/memtest_shared.lds
+endif
+
 INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app -Iapp
 
 SYS_OBJS = system/acpi.o \
@@ -74,6 +85,14 @@ OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_
 
 all: memtest.bin memtest.efi
 
+check:
+	@if [ -z ${DEBUG} ]; then\
+		echo "Macro DEBUG is not defined. Run debug_memtest.sh to invoke debug target";\
+		exit 1;\
+	fi
+
+debug: check memtest.debug memtest.efi
+
 -include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
 -include $(subst .o,.d,$(IMC_OBJS))
@@ -93,31 +112,31 @@ boot/%.o: ../boot/%.S ../boot/boot.h app/build_version.h
 
 boot/efisetup.o: ../boot/efisetup.c
 	@mkdir -p boot
-	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/reloc.o: ../system/reloc32.c
 	@mkdir -p system
-	$(CC) -c $(CFLAGS) -fno-strict-aliasing -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) -fno-strict-aliasing $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/%.o: ../system/%.c
 	@mkdir -p system
-	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/imc/%.o: ../system/imc/%.c
 	@mkdir -p system/imc
-	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../lib/%.c
 	@mkdir -p lib
-	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 tests/%.o: ../tests/%.c
 	@mkdir -p tests
-	$(CC) -c $(CFLAGS) -O3 $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 app/%.o: ../app/%.c app/build_version.h
 	@mkdir -p app
-	$(CC) -c $(CFLAGS) -Os $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 app/build_version.h: FORCE
 	@mkdir -p app
@@ -138,12 +157,17 @@ FORCE:
 # Link it statically once so I know I don't have undefined symbols and
 # then link it dynamically so I have full relocation information.
 
-memtest_shared: $(OBJS) ldscripts/memtest_shared.lds Makefile
-	$(LD) --warn-constructors --warn-common -static -T ldscripts/memtest_shared.lds -o $@ $(OBJS) && \
-	$(LD) -shared -Bsymbolic -T ldscripts/memtest_shared.lds -o $@ $(OBJS)
+memtest_shared: $(OBJS) $(MS_LDS) Makefile
+	$(LD) --warn-constructors --warn-common -static -T $(MS_LDS) -o $@ $(OBJS) && \
+	$(LD) -shared -Bsymbolic -T $(MS_LDS) -o $@ $(OBJS)
 
 memtest_shared.bin: memtest_shared
 	$(OBJCOPY) -O binary $< memtest_shared.bin
+
+memtest.debug: memtest_shared
+	objcopy --only-keep-debug memtest_shared memtest.debug
+	strip -R .eh_frame memtest_shared
+	strip -R .comment memtest_shared
 
 memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
