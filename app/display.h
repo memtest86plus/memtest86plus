@@ -226,6 +226,9 @@ typedef enum {
 #define trace(my_cpu, ...) \
     if (enable_trace) do_trace(my_cpu, __VA_ARGS__)
 
+#define display_msr_failed_flag() \
+    printc(0, SCREEN_WIDTH - 1, '*');
+
 extern int scroll_message_row;
 
 extern display_mode_t display_mode;

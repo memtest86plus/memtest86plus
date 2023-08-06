@@ -25,8 +25,26 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define HLT_OPCODE  0xf4
-#define JE_OPCODE   0x74
+#define INT_DIVBY0     0
+#define INT_RSV        1
+#define INT_NMI        2
+#define INT_BRKPOINT   3
+#define INT_OVERFLOW   4
+#define INT_BOUND      5
+#define INT_UNDEFOP    6
+#define INT_DEVNA      7
+#define INT_DOUBLEFLT  8
+#define INT_FPUSEGOVR  9
+#define INT_INVDTSS    10
+#define INT_SEGFLT     11
+#define INT_STKSEGFLT  12
+#define INT_GPF        13
+#define INT_PAGEFLT    14
+
+#define OPCODE_HLT      0xF4
+#define OPCODE_JE       0x74
+#define OPCODE_RDMSR    0x320F
+#define OPCODE_WRMSR    0x300F
 
 #ifdef __x86_64__
 #define REG_PREFIX  "r"
@@ -105,7 +123,7 @@ void interrupt(struct trap_regs *trap_regs)
 {
     // Get the page fault address.
     uintptr_t address = 0;
-    if (trap_regs->vect == 14) {
+    if (trap_regs->vect == INT_PAGEFLT) {
 #ifdef __x86_64__
         __asm__(
             "movq %%cr2, %0"
@@ -119,9 +137,9 @@ void interrupt(struct trap_regs *trap_regs)
 #endif
     }
 
-    if (trap_regs->vect == 2) {
+    if (trap_regs->vect == INT_NMI) {
         uint8_t *pc = (uint8_t *)trap_regs->ip;
-        if (pc[-1] == HLT_OPCODE) {
+        if (pc[-1] == OPCODE_HLT) {
             // Assume this is a barrier wakeup signal sent via IPI.
             return;
         }
@@ -131,14 +149,14 @@ void interrupt(struct trap_regs *trap_regs)
         // must have completed if another core has reached the point of sending the wakeup
         // signals, so we should find the HLT opcode either at pc[0] or at pc[2]. If we find
         // it, adjust the interrupt return address to point to the following instruction.
-        if (pc[0] == HLT_OPCODE || (pc[0] == JE_OPCODE && pc[2] == HLT_OPCODE)) {
+        if (pc[0] == OPCODE_HLT || (pc[0] == OPCODE_JE && pc[2] == OPCODE_HLT)) {
             uintptr_t *return_addr;
             if (cpuid_info.flags.lm == 1) {
                 return_addr = (uintptr_t *)(trap_regs->sp - 40);
             } else {
                 return_addr = (uintptr_t *)(trap_regs->sp - 12);
             }
-            if (pc[2] == HLT_OPCODE) {
+            if (pc[2] == OPCODE_HLT) {
                 *return_addr += 3;
             } else {
                 *return_addr += 1;
@@ -149,6 +167,28 @@ void interrupt(struct trap_regs *trap_regs)
         parity_error();
         return;
 #endif
+    }
+
+    // Catch GPF following a RDMSR instruction (usually from a non-existent msr)
+    // and allow the program to continue. A cleaner way to do this would be to
+    // use an exception table similar to the linux kernel, but it's probably
+    // overkill for Memtest86+. Set a return value of 0 and leave a small mark
+    // on top-right corner to indicate something went wrong at some point.
+    if (trap_regs->vect == INT_GPF) {
+        uint16_t *pc = (uint16_t *)trap_regs->ip;
+        if (pc[0] == OPCODE_RDMSR) {
+            uintptr_t *return_addr;
+            if (cpuid_info.flags.lm == 1) {
+                return_addr = (uintptr_t *)(trap_regs->sp - 40);
+            } else {
+                return_addr = (uintptr_t *)(trap_regs->sp - 12);
+            }
+            *return_addr += 2;
+            trap_regs->ax = 0;
+            trap_regs->dx = 0;
+            display_msr_failed_flag();
+            return;
+        }
     }
 
     spin_lock(error_mutex);
