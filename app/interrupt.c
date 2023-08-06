@@ -41,10 +41,10 @@
 #define INT_GPF        13
 #define INT_PAGEFLT    14
 
-#define HLT_OPCODE      0xF4
-#define JE_OPCODE       0x74
-#define RDMSR_OPCODE    0x320F
-#define WRMSR_OPCODE    0x300F
+#define OPCODE_HLT      0xF4
+#define OPCODE_JE       0x74
+#define OPCODE_RDMSR    0x320F
+#define OPCODE_WRMSR    0x300F
 
 #ifdef __x86_64__
 #define REG_PREFIX  "r"
@@ -139,7 +139,7 @@ void interrupt(struct trap_regs *trap_regs)
 
     if (trap_regs->vect == INT_NMI) {
         uint8_t *pc = (uint8_t *)trap_regs->ip;
-        if (pc[-1] == HLT_OPCODE) {
+        if (pc[-1] == OPCODE_HLT) {
             // Assume this is a barrier wakeup signal sent via IPI.
             return;
         }
@@ -149,14 +149,14 @@ void interrupt(struct trap_regs *trap_regs)
         // must have completed if another core has reached the point of sending the wakeup
         // signals, so we should find the HLT opcode either at pc[0] or at pc[2]. If we find
         // it, adjust the interrupt return address to point to the following instruction.
-        if (pc[0] == HLT_OPCODE || (pc[0] == JE_OPCODE && pc[2] == HLT_OPCODE)) {
+        if (pc[0] == OPCODE_HLT || (pc[0] == OPCODE_JE && pc[2] == OPCODE_HLT)) {
             uintptr_t *return_addr;
             if (cpuid_info.flags.lm == 1) {
                 return_addr = (uintptr_t *)(trap_regs->sp - 40);
             } else {
                 return_addr = (uintptr_t *)(trap_regs->sp - 12);
             }
-            if (pc[2] == HLT_OPCODE) {
+            if (pc[2] == OPCODE_HLT) {
                 *return_addr += 3;
             } else {
                 *return_addr += 1;
@@ -176,7 +176,7 @@ void interrupt(struct trap_regs *trap_regs)
     // on top-right corner to indicate something went wrong at some point.
     if (trap_regs->vect == INT_GPF) {
         uint16_t *pc = (uint16_t *)trap_regs->ip;
-        if (pc[0] == RDMSR_OPCODE) {
+        if (pc[0] == OPCODE_RDMSR) {
             uintptr_t *return_addr;
             if (cpuid_info.flags.lm == 1) {
                 return_addr = (uintptr_t *)(trap_regs->sp - 40);
