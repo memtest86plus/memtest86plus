@@ -25,10 +25,26 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define HLT_OPCODE      0xf4
+#define INT_DIVBY0     0
+#define INT_RSV        1
+#define INT_NMI        2
+#define INT_BRKPOINT   3
+#define INT_OVERFLOW   4
+#define INT_BOUND      5
+#define INT_UNDEFOP    6
+#define INT_DEVNA      7
+#define INT_DOUBLEFLT  8
+#define INT_FPUSEGOVR  9
+#define INT_INVDTSS    10
+#define INT_SEGFLT     11
+#define INT_STKSEGFLT  12
+#define INT_GPF        13
+#define INT_PAGEFLT    14
+
+#define HLT_OPCODE      0xF4
 #define JE_OPCODE       0x74
-#define RDMSR_OPCODE    0x320f
-#define WRMSR_OPCODE    0x300f
+#define RDMSR_OPCODE    0x320F
+#define WRMSR_OPCODE    0x300F
 
 #ifdef __x86_64__
 #define REG_PREFIX  "r"
@@ -107,7 +123,7 @@ void interrupt(struct trap_regs *trap_regs)
 {
     // Get the page fault address.
     uintptr_t address = 0;
-    if (trap_regs->vect == 14) {
+    if (trap_regs->vect == INT_PAGEFLT) {
 #ifdef __x86_64__
         __asm__(
             "movq %%cr2, %0"
@@ -121,7 +137,7 @@ void interrupt(struct trap_regs *trap_regs)
 #endif
     }
 
-    if (trap_regs->vect == 2) {
+    if (trap_regs->vect == INT_NMI) {
         uint8_t *pc = (uint8_t *)trap_regs->ip;
         if (pc[-1] == HLT_OPCODE) {
             // Assume this is a barrier wakeup signal sent via IPI.
@@ -158,7 +174,7 @@ void interrupt(struct trap_regs *trap_regs)
     // use an exception table similar to the linux kernel, but it's probably
     // overkill for Memtest86+. Set a return value of 0 and leave a small mark
     // on top-right corner to indicate something went wrong at some point.
-    if (trap_regs->vect == 13) {
+    if (trap_regs->vect == INT_GPF) {
         uint16_t *pc = (uint16_t *)trap_regs->ip;
         if (pc[0] == RDMSR_OPCODE) {
             uintptr_t *return_addr;
