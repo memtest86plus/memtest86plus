@@ -170,7 +170,7 @@ void interrupt(struct trap_regs *trap_regs)
             *return_addr += 2;
             trap_regs->ax = 0;
             trap_regs->dx = 0;
-            printc(0, SCREEN_WIDTH - 1, '*');
+            display_msr_failed_flag();
             return;
         }
     }
