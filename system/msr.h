@@ -8,6 +8,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2020-2023 Sam Demeulemeester.
  */
 
 #define MSR_PLATFORM_INFO               0xce
@@ -30,6 +31,10 @@
 
 #define MSR_AMD64_NB_CFG                0xc001001f
 #define MSR_AMD64_COFVID_STATUS         0xc0010071
+#define MSR_AMD64_UMC_MCA_CTRL          0xc00020f0
+#define MSR_AMD64_UMC_MCA_STATUS        0xc00020f1
+#define MSR_AMD64_UMC_MCA_ADDR          0xc00020f2
+#define MSR_AMD64_HW_CONF               0xc0010015
 
 #define MSR_VIA_TEMP_C7                 0x1169
 #define MSR_VIA_TEMP_NANO               0x1423
