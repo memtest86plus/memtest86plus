@@ -82,7 +82,7 @@ static void determine_cache_size()
             l2_cache = cpuid_info.cache_info.l2_size;
             if (cpuid_info.version.family == 6 && (cpuid_info.version.model == 7 || cpuid_info.version.model == 8)) {
                 // Samuel 2/Ezra/Ezra-T
-                l2_cache >>= 8;
+                l2_cache = 64;
             }
             break;
         } else if (cpuid_info.version.family != 7) {
