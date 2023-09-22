@@ -677,6 +677,13 @@ void main(void)
             } else {
                 display_big_status(false);
             }
+            if (single_pass) {
+                display_status("Done   ");
+                if (enable_tty){
+                    tty_full_redraw();
+                }
+                reboot();
+            }
         }
     }
 }
