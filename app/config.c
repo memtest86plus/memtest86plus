@@ -117,6 +117,16 @@ bool            err_banner_redraw  = false;             // Redraw banner on new 
 // Private Functions
 //------------------------------------------------------------------------------
 
+static void configure_tests_from_bitmask(uint32_t test_set)
+{
+    if ((test_set & ALL_TESTS_MASK) != 0) {
+        for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
+            test_list[i].enabled = ((test_set & 0x1) == 0x1);
+            test_set = test_set >> 1;
+        }
+    }
+}
+        
 static void parse_serial_params(const char *params)
 {
     enable_tty = true;
@@ -262,6 +272,13 @@ static void parse_option(const char *option, const char *params)
             usb_init_options |= USB_EXTRA_RESET;
         } else if (strncmp(params, "3", 2) == 0) {
             usb_init_options |= USB_2_STEP_INIT|USB_EXTRA_RESET;
+        }
+    } else if (strncmp(option, "tests", 6) == 0) {
+        if (strncmp(params, "0x", 2) == 0) {
+            uint32_t tests = hexstr2int(params+2);
+            if ((tests & ALL_TESTS_MASK) != 0) {
+                configure_tests_from_bitmask(tests);
+            }
         }
     }
 }

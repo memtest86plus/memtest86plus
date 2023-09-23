@@ -168,6 +168,9 @@ recognised:
       * mmio16 = 16-bit MMIO
       * mmio32 = 32-bit MMIO
     * and *y* is the MMIO address in hex. with `0x` prefix (eg: 0xFEDC9000)
+  * tests=*list*
+    * where *list* is a hex bitmask of the tests to perform with `0x` prefix (eg: 0x7FB)
+      * each bit number corresponds to the test number (eg: bit 0 is test 0 and bit 10 is test 10)
 
 ## Keyboard Selection
 

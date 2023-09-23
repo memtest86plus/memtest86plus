@@ -15,6 +15,7 @@
 #include "config.h"
 
 #define NUM_TEST_PATTERNS   11
+#define ALL_TESTS_MASK      ((1 << NUM_TEST_PATTERNS) - 1)
 
 typedef struct {
     bool            enabled;
