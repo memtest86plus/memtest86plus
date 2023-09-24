@@ -32,6 +32,8 @@
 #define AMD_UMC_ERROR_CECC_BIT      (1 << 14)
 #define AMD_UMC_ERROR_UECC_BIT      (1 << 13)
 #define AMD_UMC_ERR_CNT_EN          (1 << 15)
+#define AMD_MCG_CTL_2_BANKS         (1 << 16) | (1 << 15)
+#define AMD_MCG_CTL_4_BANKS         (1 << 18) | (1 << 17) | (1 << 16) | (1 << 15)
 #define AMD_MCA_STATUS_WR_ENABLE    (1 << 18)
 
 #define ECC_RD_EN (1 << 10)
@@ -96,16 +98,19 @@ void get_imc_config_amd_zen(void)
 
         // Number of UMC to init
         uint8_t umc = 0, umc_max = 0;
+        uint32_t umc_banks_bits = 0;
 
         if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL) {
             umc_max = 4;
+            umc_banks_bits = AMD_MCG_CTL_4_BANKS;
         } else {
             umc_max = 2;
+            umc_banks_bits = AMD_MCG_CTL_2_BANKS;
         }
 
         // Enable ECC reporting
         rdmsr(MSR_IA32_MCG_CTL, regl, regh);
-        wrmsr(MSR_IA32_MCG_CTL, regl | 0x18000, regh); // DBG: X86::MSR::MCG_CTL[16:15] ?
+        wrmsr(MSR_IA32_MCG_CTL, regl | umc_banks_bits, regh);
 
         rdmsr(MSR_AMD64_HW_CONF, regl, regh);
         wrmsr(MSR_AMD64_HW_CONF, regl | AMD_MCA_STATUS_WR_ENABLE, regh); // // Enable Write to MCA STATUS Register
@@ -121,11 +126,13 @@ void get_imc_config_amd_zen(void)
 
         smn_reg = amd_smn_read(AMD_SMN_UMC_ECC_ERR_CNT_SEL + AMD_SMN_UMC_CHB_OFFSET);
         amd_smn_write(AMD_SMN_UMC_ECC_ERR_CNT_SEL + AMD_SMN_UMC_CHB_OFFSET, smn_reg | AMD_UMC_ERR_CNT_EN); // Enable CH1 Error CNT
+
+        poll_ecc_amd_zen(false); // Clear ECC registers
     }
 #endif
 }
 
-void poll_ecc_amd_zen(void)
+void poll_ecc_amd_zen(bool report)
 {
     uint8_t umc = 0, umc_max = 0;
     uint32_t regh, regl;
@@ -176,7 +183,9 @@ void poll_ecc_amd_zen(void)
             if (!ecc_status.count) ecc_status.count++;
 
             // Report error
-            ecc_error();
+            if (report) {
+                ecc_error();
+            }
 
             // Clear Error
             rdmsr(MSR_AMD64_UMC_MCA_STATUS + (AMD_UMC_OFFSET * umc), regl, regh);

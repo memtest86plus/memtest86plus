@@ -78,7 +78,7 @@ void memctrl_poll_ecc(void)
       case IMC_K19_VRM:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
-        poll_ecc_amd_zen();
+        poll_ecc_amd_zen(true);
         break;
       default:
         break;

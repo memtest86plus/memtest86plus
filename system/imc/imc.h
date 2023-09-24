@@ -30,6 +30,6 @@ void get_imc_config_intel_adl(void);
  */
 
 /* ECC Polling Code for AMD Zen CPUs */
-void poll_ecc_amd_zen(void);
+void poll_ecc_amd_zen(bool report);
 
 #endif /* _IMC_H_ */
