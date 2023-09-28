@@ -112,6 +112,21 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     testword_t prsg_state;
 
     int ticks = 0;
+    int simd = 0;
+#if defined(__i386__) || defined(__x86_64__)
+    if (cpuid_info.flags.mmx) {
+        simd++;
+        if (cpuid_info.flags.sse) {
+            simd++;
+            if (cpuid_info.flags.sse2) {
+                simd++;
+                if (cpuid_info.flags.avx) {
+                    simd++;
+                }
+            }
+        }
+    }
+#endif
 
     switch (test) {
         // Address test, walking ones.
@@ -140,11 +155,11 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         testword_t pattern2 = ~pattern1;
 
         BARRIER;
-        ticks += test_mov_inv_fixed(my_cpu, iterations, pattern1, pattern2);
+        ticks += test_mov_inv_fixed(my_cpu, iterations, pattern1, pattern2, 0);
         BAILOUT;
 
         BARRIER;
-        ticks += test_mov_inv_fixed(my_cpu, iterations, pattern2, pattern1);
+        ticks += test_mov_inv_fixed(my_cpu, iterations, pattern2, pattern1, 0);
         BAILOUT;
       } break;
 
@@ -159,11 +174,11 @@ int run_test(int my_cpu, int test, int stage, int iterations)
             testword_t pattern2 = ~pattern1;
 
             BARRIER;
-            ticks += test_mov_inv_fixed(my_cpu, iterations, pattern1, pattern2);
+            ticks += test_mov_inv_fixed(my_cpu, iterations, pattern1, pattern2, 0);
             BAILOUT;
 
             BARRIER;
-            ticks += test_mov_inv_fixed(my_cpu, iterations, pattern2, pattern1);
+            ticks += test_mov_inv_fixed(my_cpu, iterations, pattern2, pattern1, 0);
             BAILOUT;
 
             pattern1 >>= 1;
@@ -171,6 +186,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
       } break;
 
         // Moving inversions, fixed random pattern.
+        // SIMD variants after rep stos[lq] variant.
       case 5:
         if (cpuid_info.flags.rdtsc) {
             prsg_state = get_tsc();
@@ -179,15 +195,19 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
         prsg_state *= 0x12345678;
 
-        for (int i = 0; i < iterations; i++) {
-            prsg_state = prsg(prsg_state);
+        {
+            for (int j = 0; j <= simd; j++) {
+                for (int i = 0; i < iterations; i++) {
+                    prsg_state = prsg(prsg_state);
 
-            testword_t pattern1 = prsg_state;
-            testword_t pattern2 = ~pattern1;
+                    testword_t pattern1 = prsg_state;
+                    testword_t pattern2 = ~pattern1;
 
-            BARRIER;
-            ticks += test_mov_inv_fixed(my_cpu, 2, pattern1, pattern2);
-            BAILOUT;
+                    BARRIER;
+                    ticks += test_mov_inv_fixed(my_cpu, 2, pattern1, pattern2, j);
+                    BAILOUT;
+                }
+            }
         }
         break;
 
@@ -206,7 +226,11 @@ int run_test(int my_cpu, int test, int stage, int iterations)
 
         // Block move.
       case 7:
-        ticks += test_block_move(my_cpu, iterations);
+        {
+            for (int j = 0; j <= simd; j++) {
+                ticks += test_block_move(my_cpu, iterations, simd);
+            }
+        }
         BAILOUT;
         break;
 

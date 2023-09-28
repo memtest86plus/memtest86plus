@@ -607,6 +607,40 @@ void main(void)
     }
 #endif
 
+#if defined(__i386__) || defined(__x86_64__)
+    // Enable SSE and AVX, if available.
+    if (cpuid_info.flags.sse) {
+        uintptr_t temp;
+        __asm__ __volatile__(
+            "mov    %%cr0, %0\n"
+            "andb   $0xfb, %b0\n"        // clear coprocessor emulation bit
+            "orb    $0x02, %b0\n"        // set coprocessor monitoring bit
+            "mov    %0, %%cr0\n"
+            "mov    %%cr4, %0\n"
+            "orb    $0x06, %h0"          // set OSFXSR and OSXMMEXCPT
+            : "=a" (temp)
+        );
+        if (cpuid_info.flags.xsave && cpuid_info.flags.avx) {
+            __asm__ __volatile__(
+                "bts    $18,%k0\n"       // set OSXSAVE bit
+                "mov    %0, %%cr4\n"
+                "xor    %%" REG_PREFIX "cx, %%" REG_PREFIX "cx\n"
+                "xgetbv\n"               // Load XCR0 register
+                "orb    $0x07, %%al\n"   // Set AVX, SSE, X87 bits
+                "xsetbv"                 // Save back to XCR0
+                : "=a" (temp) : "a" (temp)
+                : REG_PREFIX "cx", REG_PREFIX "dx"
+            );
+        }
+        else {
+            __asm__ __volatile__(
+                "mov %0, %%cr4"
+                : : "a" (temp)
+            );
+        }
+    }
+#endif
+
     // Due to the need to relocate ourselves in the middle of tests, the following
     // code cannot be written in the natural way as a set of nested loops. So we
     // have a single loop and use global state variables to allow us to restart
