@@ -258,18 +258,6 @@ flush:	movw	$KERNEL_DS, %ax
 
 	finit
 
-#if 0
-	# Enable SSE.
-
-	movq	%cr0, %rax
-	andb	$0xfb, %al		# clear coprocessor emulation bit
-	orb	$0x02, %al		# set coprocessor monitoring bit
-	mov	%rax, %cr0
-	movq	%cr4, %rax
-	orw	$0x0600, %ax		# set OSFXSR and OSXMMEXCPT
-	movq	%rax, %cr4
-#endif
-
 	# Call the dynamic linker to fix up the addresses in the GOT.
 
 	call	reloc

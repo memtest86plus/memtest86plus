@@ -52,11 +52,9 @@
 #define OPCODE_WRMSR    0x300F
 
 #ifdef __x86_64__
-#define REG_PREFIX  "r"
 #define REG_DIGITS  "16"
 #define ADR_DIGITS  "12"
 #else
-#define REG_PREFIX  "e"
 #define REG_DIGITS  "8"
 #define ADR_DIGITS  "8"
 #endif

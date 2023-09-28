@@ -56,7 +56,7 @@ typedef union {
 typedef union {
     uint32_t        raw[3];
     struct {
-        uint32_t    fpu     : 1;    // EDX feature flags, bit 0 */
+        uint32_t    fpu     : 1;    // EDX feature flags, bit 0
         uint32_t    vme     : 1;
         uint32_t    de      : 1;
         uint32_t    pse     : 1;
@@ -88,6 +88,7 @@ typedef union {
         uint32_t    tm      : 1;
         uint32_t    bit30   : 1;
         uint32_t    pbe     : 1;    // EDX feature flags, bit 31
+
         uint32_t    sse3    : 1;    // ECX feature flags, bit 0
         uint32_t    mulq    : 1;
         uint32_t    bit2    : 1;
@@ -99,7 +100,12 @@ typedef union {
         uint32_t    tm2     : 1;
         uint32_t            : 12;   // ECX feature flags, bit 20
         uint32_t    x2apic  : 1;
-        uint32_t            : 10;   // ECX feature flags, bit 31
+        uint32_t            : 4;    // ECX feature flags, bit 22
+        uint32_t    xsave   : 1;
+        uint32_t    osxsave : 1;
+        uint32_t    avx     : 1;
+        uint32_t            : 3;    // ECX feature flags, bit 31
+
         uint32_t            : 19;   // EDX extended feature flags, bit 0
         uint32_t    nx      : 1;
         uint32_t            : 9;
