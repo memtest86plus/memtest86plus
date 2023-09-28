@@ -28,12 +28,12 @@
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_block_move(int my_cpu, int iterations)
+int test_block_move(int my_cpu, int iterations, int simd)
 {
     int ticks = 0;
 
     if (my_cpu == master_cpu) {
-        display_test_pattern_name("block move");
+        display_test_pattern_names("block move", simd);
     }
 
     // Initialize memory with the initial pattern.

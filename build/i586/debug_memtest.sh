@@ -134,6 +134,44 @@ Init() {
     QEMU_FLAGS+=" -drive if=pflash,format=raw,readonly=on,file=OVMF32_CODE.fd"
     QEMU_FLAGS+=" -drive if=pflash,format=raw,file=OVMF32_VARS.fd"
 
+    if [ "x$MACHINE" = "x4S4CN270" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu n270-v1"
+        QEMU_FLAGS+=" -smp 4,sockets=4,cores=1,maxcpus=4"
+
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE}M,id=m0,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0-3"
+
+    elif [ "x$MACHINE" = "x4S4CP3" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu pentium3-v1"
+        QEMU_FLAGS+=" -smp 4,sockets=4,cores=1,maxcpus=4"
+
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE}M,id=m0,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0-3"
+
+    elif [ "x$MACHINE" = "x1S6CBroadwell" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu Broadwell-v4"
+        QEMU_FLAGS+=" -smp 6,sockets=1,cores=6,maxcpus=6"
+
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE}M,id=m0,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0-5"
+
+    elif [ "x$MACHINE" = "x1S1CAthlon" ]; then
+
+        QEMU_FLAGS+=" -m ${MEMSIZE}M -cpu athlon-v1"
+        QEMU_FLAGS+=" -smp 1,sockets=1,cores=1,maxcpus=1"
+
+        QEMU_FLAGS+=" -object memory-backend-ram,size=${MEMSIZE}M,id=m0,prealloc=on"
+
+        QEMU_FLAGS+=" -numa node,nodeid=0,memdev=m0,cpus=0"
+
+    fi
+
     # Define offsets for loading of symbol-table
     IMAGEBASE=0x200000
     BASEOFCODE=0x1000
