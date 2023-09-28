@@ -363,6 +363,15 @@ void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_
     common_err(DATA_ERROR, (uintptr_t)addr, good, bad, use_for_badram);
 }
 
+void data_error_wide(testword_t *addr, testword_t * good, testword_t * bad, unsigned int width, bool use_for_badram)
+{
+    for (unsigned int i = 0; i < width; i++, addr++) {
+        if (*good != *bad) {
+            common_err(DATA_ERROR, (uintptr_t)addr, *good, *bad, use_for_badram);
+        }
+    }
+}
+
 void ecc_error()
 {
     common_err(CECC_ERROR, ecc_status.addr, 0, 0, false);
