@@ -40,6 +40,11 @@
 #define INT_STKSEGFLT  12
 #define INT_GPF        13
 #define INT_PAGEFLT    14
+#define INT_RESERVED1  15
+#define INT_X87FPE     16
+#define INT_ALIGNCHK   17
+#define INT_MCHCHK     18
+#define INT_SIMDFPE    19
 
 #define OPCODE_HLT      0xF4
 #define OPCODE_JE       0x74
@@ -123,19 +128,20 @@ void interrupt(struct trap_regs *trap_regs)
 {
     // Get the page fault address.
     uintptr_t address = 0;
+    uintptr_t cr0;
+    uintptr_t cr3;
+    uintptr_t cr4;
     if (trap_regs->vect == INT_PAGEFLT) {
-#ifdef __x86_64__
         __asm__(
-            "movq %%cr2, %0"
+            "mov %%cr2, %0"
             :"=r" (address)
         );
-#else
-        __asm__(
-            "movl %%cr2, %0"
-            :"=r" (address)
-        );
-#endif
     }
+
+    __asm__(
+        "mov %%cr0, %0; mov %%cr3, %1; mov %%cr4, %2"
+        : "=r" (cr0), "=r" (cr3), "=r" (cr4)
+    );
 
     if (trap_regs->vect == INT_NMI) {
         uint8_t *pc = (uint8_t *)trap_regs->ip;
@@ -221,6 +227,10 @@ void interrupt(struct trap_regs *trap_regs)
     display_pinned_message(8, 25, REG_PREFIX "bp: %0" REG_DIGITS "x", (uintptr_t)trap_regs->bp);
     display_pinned_message(9, 25, REG_PREFIX "sp: %0" REG_DIGITS "x", (uintptr_t)trap_regs->sp);
 
+    display_pinned_message(10, 0, " CR0: %0" REG_DIGITS "x", cr0);
+    display_pinned_message(11, 0, " CR3: %0" REG_DIGITS "x", cr3);
+    display_pinned_message(11, 25, "CR4: %0" REG_DIGITS "x", cr4);
+
     display_pinned_message(0, 50, "Stack:");
     for (int i = 0; i < 12; i++) {
         uintptr_t addr = trap_regs->sp + sizeof(reg_t)*(11 - i);
@@ -228,10 +238,10 @@ void interrupt(struct trap_regs *trap_regs)
         display_pinned_message(1 + i, 50, "%0" ADR_DIGITS "x %0" REG_DIGITS "x", addr, (uintptr_t)data);
     }
 
-    display_pinned_message(11, 0, "CS:IP:");
+    display_pinned_message(13, 0, "CS:IP:");
     uint8_t *pp = (uint8_t *)((uintptr_t)trap_regs->ip);
     for (int i = 0; i < 12; i++) {
-        display_pinned_message(11, 7 + 3*i, "%02x", (uintptr_t)pp[i]);
+        display_pinned_message(13, 7 + 3*i, "%02x", (uintptr_t)pp[i]);
     }
 
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
