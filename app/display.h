@@ -172,6 +172,12 @@ typedef enum {
         prints(5, 39, str); \
     }
 
+#define display_test_pattern_names(str, step) \
+    { \
+        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
+        printf(5, 39, "%s - %i", str, step); \
+    }
+
 #define display_test_pattern_value(pattern) \
     { \
         clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
