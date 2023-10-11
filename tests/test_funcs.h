@@ -17,7 +17,7 @@
 
 int test_addr_walk1(int my_cpu);
 
-int test_own_addr1(int my_cpu);
+int test_own_addr1(int my_cpu, int stage);
 
 int test_own_addr2(int my_cpu, int stage);
 

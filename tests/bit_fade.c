@@ -24,11 +24,13 @@
 #include "test_funcs.h"
 #include "test_helper.h"
 
+#define HAND_OPTIMISED  1   // Use hand-optimised assembler code for performance.
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
-static int pattern_fill(int my_cpu, testword_t pattern)
+static int pattern_fill_check(int my_cpu, testword_t pattern, bool check)
 {
     int ticks = 0;
 
@@ -57,9 +59,43 @@ static int pattern_fill(int my_cpu, testword_t pattern)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                write_word(p, pattern);
-            } while (p++ < pe); // test before increment in case pointer overflows
+            if (!check) {
+#if HAND_OPTIMISED
+#ifdef __x86_64__
+                uint64_t length = pe - p + 1;
+                __asm__  __volatile__ ("\t"
+                    "rep    \n\t"
+                    "stosq  \n\t"
+                    :
+                    : "c" (length), "D" (p), "a" (pattern)
+                    :
+                );
+                p = pe;
+#else
+                uint32_t length = pe - p + 1;
+                __asm__  __volatile__ ("\t"
+                    "rep    \n\t"
+                    "stosl  \n\t"
+                    :
+                    : "c" (length), "D" (p), "a" (pattern)
+                    :
+                );
+                p = pe;
+#endif
+#else
+                do {
+                    write_word(p, pattern);
+                } while (p++ < pe); // test before increment in case pointer overflows
+#endif
+            }
+            else {
+                do {
+                    testword_t actual = read_word(p);
+                    if (unlikely(actual != pattern)) {
+                        data_error(p, pattern, actual, true);
+                    }
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
@@ -70,7 +106,7 @@ static int pattern_fill(int my_cpu, testword_t pattern)
     return ticks;
 }
 
-static int pattern_check(int my_cpu, testword_t pattern)
+/*static int pattern_check(int my_cpu, testword_t pattern)
 {
     int ticks = 0;
 
@@ -107,7 +143,7 @@ static int pattern_check(int my_cpu, testword_t pattern)
     }
 
     return ticks;
-}
+}*/
 
 static int fade_delay(int my_cpu, int sleep_secs)
 {
@@ -143,9 +179,13 @@ int test_bit_fade(int my_cpu, int stage, int sleep_secs)
 
     int ticks = 0;
 
+    testword_t pattern = stage < 3 ? all_zero : all_ones;
+
+    stage %= 3;
+
     switch (stage) {
       case 0:
-        ticks = pattern_fill(my_cpu, all_zero);
+        ticks = pattern_fill_check(my_cpu, pattern, false);
         break;
       case 1:
         // Only sleep once.
@@ -154,19 +194,7 @@ int test_bit_fade(int my_cpu, int stage, int sleep_secs)
         }
         break;
       case 2:
-        ticks = pattern_check(my_cpu, all_zero);
-        break;
-      case 3:
-        ticks = pattern_fill(my_cpu, all_ones);
-        break;
-      case 4:
-        // Only sleep once.
-        if (stage != last_stage) {
-            ticks = fade_delay(my_cpu, sleep_secs);
-        }
-        break;
-      case 5:
-        ticks = pattern_check(my_cpu, all_ones);
+        ticks = pattern_fill_check(my_cpu, pattern, true);
         break;
       default:
         break;
