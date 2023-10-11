@@ -28,7 +28,7 @@
 // Private Functions
 //------------------------------------------------------------------------------
 
-static int pattern_fill(int my_cpu, testword_t offset)
+static int __attribute__((noclone)) pattern_fill_check(int my_cpu, testword_t offset, bool check)
 {
     int ticks = 0;
 
@@ -58,9 +58,20 @@ static int pattern_fill(int my_cpu, testword_t offset)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                write_word(p, (testword_t)p + offset);
-            } while (p++ < pe); // test before increment in case pointer overflows
+            if (!check) {
+                do {
+                    write_word(p, (testword_t)p + offset);
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
+            else {
+                do {
+                    testword_t expect = (testword_t)p + offset;
+                    testword_t actual = read_word(p);
+                    if (unlikely(actual != expect)) {
+                        data_error(p, expect, actual, true);
+                    }
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
@@ -71,7 +82,7 @@ static int pattern_fill(int my_cpu, testword_t offset)
     return ticks;
 }
 
-static int pattern_check(int my_cpu, testword_t offset)
+/*static int pattern_check(int my_cpu, testword_t offset)
 {
     int ticks = 0;
 
@@ -110,18 +121,17 @@ static int pattern_check(int my_cpu, testword_t offset)
     }
 
     return ticks;
-}
+}*/
 
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
-int test_own_addr1(int my_cpu)
+int test_own_addr1(int my_cpu, int stage)
 {
     int ticks = 0;
 
-    ticks += pattern_fill(my_cpu, 0);
-    ticks += pattern_check(my_cpu, 0);
+    ticks += pattern_fill_check(my_cpu, 0, !!stage);
 
     return ticks;
 }
@@ -143,16 +153,7 @@ int test_own_addr2(int my_cpu, int stage)
     offset /= VM_WINDOW_SIZE;
 #endif
 
-    switch (stage) {
-      case 0:
-        ticks = pattern_fill(my_cpu, offset);
-        break;
-      case 1:
-        ticks = pattern_check(my_cpu, offset);
-        break;
-      default:
-        break;
-    }
+    ticks = pattern_fill_check(my_cpu, offset, !!stage);
 
     return ticks;
 }
