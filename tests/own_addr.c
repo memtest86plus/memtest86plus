@@ -29,7 +29,7 @@
 // Private Functions
 //------------------------------------------------------------------------------
 
-static int pattern_fill(int my_cpu, testword_t offset)
+static int __attribute__((noclone)) own_addr_pattern_fill_check(int my_cpu, testword_t offset, bool fill)
 {
     int ticks = 0;
 
@@ -59,55 +59,26 @@ static int pattern_fill(int my_cpu, testword_t offset)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                write_word(p, (testword_t)p + offset);
-            } while (p++ < pe); // test before increment in case pointer overflows
+            if (fill) {
+                do {
+                    write_word(p, (testword_t)p + offset);
+                } while (p++ < pe); // test before increment in case pointer overflows
+            } else {
+                do {
+                    testword_t expect = (testword_t)p + offset;
+                    testword_t actual = read_word(p);
+                    if (unlikely(actual != expect)) {
+                        data_error(p, expect, actual, true);
+                    }
+                } while (p++ < pe); // test before increment in case pointer overflows
+            }
             do_tick(my_cpu);
             BAILOUT;
         } while (!at_end && ++pe); // advance pe to next start point
     }
 
-    flush_caches(my_cpu);
-
-    return ticks;
-}
-
-static int pattern_check(int my_cpu, testword_t offset)
-{
-    int ticks = 0;
-
-    // Check each address has its own address.
-    for (int i = 0; i < vm_map_size; i++) {
-        testword_t *start = vm_map[i].start;
-        testword_t *end   = vm_map[i].end;
-
-        testword_t *p  = start;
-        testword_t *pe = start;
-
-        bool at_end = false;
-        do {
-            // take care to avoid pointer overflow
-            if ((end - pe) >= SPIN_SIZE) {
-                pe += SPIN_SIZE - 1;
-            } else {
-                at_end = true;
-                pe = end;
-            }
-            ticks++;
-            if (my_cpu < 0) {
-                continue;
-            }
-            test_addr[my_cpu] = (uintptr_t)p;
-            do {
-                testword_t expect = (testword_t)p + offset;
-                testword_t actual = read_word(p);
-                if (unlikely(actual != expect)) {
-                    data_error(p, expect, actual, true);
-                }
-            } while (p++ < pe); // test before increment in case pointer overflows
-            do_tick(my_cpu);
-            BAILOUT;
-        } while (!at_end && ++pe); // advance pe to next start point
+    if (fill) {
+        flush_caches(my_cpu);
     }
 
     return ticks;
@@ -121,8 +92,8 @@ int test_own_addr1(int my_cpu)
 {
     int ticks = 0;
 
-    ticks += pattern_fill(my_cpu, 0);
-    ticks += pattern_check(my_cpu, 0);
+    ticks += own_addr_pattern_fill_check(my_cpu, 0, true);
+    ticks += own_addr_pattern_fill_check(my_cpu, 0, false);
 
     return ticks;
 }
@@ -144,16 +115,7 @@ int test_own_addr2(int my_cpu, int stage)
     offset /= VM_WINDOW_SIZE;
 #endif
 
-    switch (stage) {
-      case 0:
-        ticks = pattern_fill(my_cpu, offset);
-        break;
-      case 1:
-        ticks = pattern_check(my_cpu, offset);
-        break;
-      default:
-        break;
-    }
+    ticks = own_addr_pattern_fill_check(my_cpu, offset, stage == 0);
 
     return ticks;
 }
