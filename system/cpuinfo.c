@@ -456,6 +456,9 @@ static void determine_imc(void)
               case 0x9:
                 imc.family = IMC_ADL;         // Core 12th Gen (Alder Lake-S)
                 break;
+              case 0xA:
+                imc.family = IMC_MTL;         // Core 14th Gen (Meteor Lake)
+                break;
               default:
                 break;
             }

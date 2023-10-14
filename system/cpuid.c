@@ -238,6 +238,7 @@ core_type_t get_ap_hybrid_type(void)
     switch ((eax >> 24) & 0xFF) {
         case CPU_PCORE_ID:
             return CORE_PCORE;
+        // MTL LP-Cores are handled as E-Cores
         case CPU_ECORE_ID:
             return CORE_ECORE;
         default:
