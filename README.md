@@ -427,12 +427,12 @@ inversions. The moving inversion tests work as follows:
      1. check that the pattern has not changed
      2. write the pattern's complement
      3. increment the address
-     4. repeat 2.i to 2.iii
+     4. repeat 2.1 to 2.3
   3. Starting at the highest address
      1. check that the pattern has not changed
      2. write the pattern's complement
      3. decrement the address
-     4. repeat 3.i - 3.iii
+     4. repeat 3.1 to 3.3
 
 This algorithm is a good approximation of an ideal memory test but there are
 some limitations. Most high density chips today store data 4 to 16 bits wide.
@@ -452,12 +452,12 @@ caching or buffering. The algorithm works as follows:
   1. For starting offsets of 0 - 19 do
      1. write every 20th location with a pattern
      2. write all other locations with the pattern's complement
-     3. repeat 1.ii one or more times
+     3. repeat 1.2 one or more times
      4. check every 20th location for the pattern
 
 This algorithm accomplishes nearly the same level of adjacency testing as
 moving inversions but is not affected by caching or buffering. Since separate
-write passes (1.i, 1.ii) and the read pass (1.iv) are done for all of memory we
+write passes (1.1, 1.2) and the read pass (1.4) are done for all of memory we
 can be assured that all of the buffers and cache have been flushed between
 passes. The selection of 20 as the stride size was somewhat arbitrary. Larger
 strides may be more effective but would take longer to execute. The choice of
