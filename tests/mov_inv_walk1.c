@@ -32,9 +32,10 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
     int ticks = 0;
 
     testword_t pattern = (testword_t)1 << offset;
+    pattern = inverse ? ~pattern : pattern;
 
     if (my_cpu == master_cpu) {
-        display_test_pattern_value(inverse ? ~pattern : pattern);
+        display_test_pattern_value(pattern);
     }
 
     // Initialize memory with the initial pattern.
@@ -61,7 +62,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
             }
             test_addr[my_cpu] = (uintptr_t)p;
             do {
-                write_word(p, inverse ? ~pattern : pattern);
+                write_word(p, pattern);
                 pattern = pattern << 1 | pattern >> (TESTWORD_WIDTH - 1);  // rotate left
             } while (p++ < pe); // test before increment in case pointer overflows
             do_tick(my_cpu);
@@ -73,6 +74,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
     // Test from bottom up and then from the top down.
     for (int i = 0; i < iterations; i++) {
         pattern = (testword_t)1 << offset;
+        pattern = inverse ? ~pattern : pattern;
 
         flush_caches(my_cpu);
 
@@ -99,7 +101,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
                 }
                 test_addr[my_cpu] = (uintptr_t)p;
                 do {
-                    testword_t expect = inverse ? ~pattern : pattern;
+                    testword_t expect = pattern;
                     testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);
@@ -111,6 +113,8 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
                 BAILOUT;
             } while (!at_end && ++pe); // advance pe to next start point
         }
+
+        pattern = ~pattern;
 
         flush_caches(my_cpu);
 
@@ -138,7 +142,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
                 test_addr[my_cpu] = (uintptr_t)ps;
                 do {
                     pattern = pattern >> 1 | pattern << (TESTWORD_WIDTH - 1);  // rotate right
-                    testword_t expect = inverse ? pattern : ~pattern;
+                    testword_t expect = pattern;
                     testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
                         data_error(p, expect, actual, true);
