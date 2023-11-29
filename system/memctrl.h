@@ -27,17 +27,17 @@ typedef struct __attribute__((packed)) imc_infos {
 typedef enum {
     ECC_ERR_NONE,
     ECC_ERR_CORRECTED,
-    ECC_ERR_UNCORRECTED
+    ECC_ERR_UNCORRECTED,
+    ERR_UNKNOWN
 } ecc_error_type_t;
 
 typedef struct __attribute__((packed)) ecc_status {
     bool                ecc_enabled;
-    ecc_error_type_t    err_type;
-    uint64_t            err_adr;
-    uint32_t            err_col;
-    uint32_t            err_row;
-    uint32_t            err_rank;
-    uint32_t            err_bank;
+    ecc_error_type_t    type;
+    uint64_t            addr;
+    uint32_t            count;
+    uint16_t            core;
+    uint8_t             channel;
 } ecc_info_t;
 
 /**
@@ -53,5 +53,7 @@ extern imc_info_t imc;
 extern ecc_info_t ecc_status;
 
 void memctrl_init(void);
+
+void memctrl_poll_ecc(void);
 
 #endif // MEMCTRL_H

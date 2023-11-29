@@ -99,6 +99,8 @@ bool            enable_sm          = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
 
+bool            enable_ecc_polling = false;
+
 bool            pause_at_start     = true;
 
 power_save_t    power_save         = POWER_SAVE_HIGH;

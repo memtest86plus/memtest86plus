@@ -14,9 +14,11 @@
 #include "memctrl.h"
 #include "imc/imc.h"
 
+#include "display.h"
+
 imc_info_t imc = {"UNDEF", 0, 0, 0, 0, 0, 0, 0, 0};
 
-ecc_info_t ecc_status = {false, ECC_ERR_NONE, 0, 0, 0, 0, 0};
+ecc_info_t ecc_status = {false, ECC_ERR_NONE, 0, 0, 0, 0};
 
 // ---------------------
 // -- Public function --
@@ -62,5 +64,23 @@ void memctrl_init(void)
     // Consistency check
     if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRCD == 0) {
         imc.freq = 0;
+    }
+}
+
+void memctrl_poll_ecc(void)
+{
+    if (!ecc_status.ecc_enabled) {
+        return;
+    }
+
+    switch(imc.family) {
+      case IMC_K17:
+      case IMC_K19_VRM:
+      case IMC_K19_RPL:
+      case IMC_K19_RBT:
+        poll_ecc_amd_zen(true);
+        break;
+      default:
+        break;
     }
 }

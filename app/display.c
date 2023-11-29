@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
-// Copyright (C) 2004-2022 Sam Demeulemeester.
+// Copyright (C) 2004-2023 Sam Demeulemeester.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -118,6 +118,10 @@ void display_init(void)
     prints(7, 0, "CPU:                      SMP: N/A        | Time:           Status: Init.");
     prints(8, 0, "Using:                                    | Pass:           Errors:");
 //  prints(9, 0, "--------------------------------------------------------------------------------");
+
+    if (ecc_status.ecc_enabled) {
+        prints(8, 57, "Err:        ECC:");
+    }
 
     for (int i = 0;i < 80; i++) {
         print_char(6, i, 0xc4);
@@ -293,11 +297,20 @@ void display_start_run(void)
         clear_message_area();
     }
 
-    clear_screen_region(7, 49, 7, 57);                  // run time
-    clear_screen_region(8, 49, 8, 57);                  // pass number
-    clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
+    clear_screen_region(7, 49, 7, 57);                      // run time
+
+    if (ecc_status.ecc_enabled) {
+        clear_screen_region(8, 49, 8, 53);                  // pass number
+        clear_screen_region(8, 61, 8, 68);                  // error count
+        clear_screen_region(8, 74, 8, SCREEN_WIDTH - 1);    // ecc error count
+    } else {
+        clear_screen_region(8, 49, 8, 59);                  // pass number
+        clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
+    }
+
     display_pass_count(0);
-    display_error_count(0);
+    error_count = 0;
+    display_error_count();
     if (clks_per_msec > 0) {
         // If we've measured the CPU speed, we know the TSC is available.
         run_start_time = get_tsc();
@@ -330,6 +343,15 @@ void display_start_test(void)
     display_test_description(test_list[test_num].description);
     test_bar_length = 0;
     test_ticks = 0;
+}
+
+void display_error_count(void)
+{
+    if (ecc_status.ecc_enabled) {
+        display_err_count_with_ecc(error_count, error_count_cecc);
+    } else {
+        display_err_count_without_ecc(error_count);
+    }
 }
 
 void display_temperature(void)
@@ -477,6 +499,7 @@ void do_tick(int my_cpu)
     } else {
         barrier_halt_wait(run_barrier);
     }
+
     if (master_cpu == my_cpu) {
         check_input();
         error_update();
@@ -551,6 +574,9 @@ void do_tick(int my_cpu)
             display_big_status(false);
         }
 
+        // Check ECC Errors
+        memctrl_poll_ecc();
+
         // Update temperature
         display_temperature();
 
@@ -561,6 +587,7 @@ void do_tick(int my_cpu)
                 tty_partial_redraw();
             }
         }
+
         timed_update_done = true;
     }
 
