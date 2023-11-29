@@ -56,7 +56,7 @@
 #define ADR_DIGITS  "8"
 #endif
 
-static const char *codes[] = {
+static const char codes[][13] = {
     "Divide by 0",
     "Debug",
     "NMI",

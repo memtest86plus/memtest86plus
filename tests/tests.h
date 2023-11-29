@@ -18,11 +18,11 @@
 
 typedef struct {
     bool            enabled;
-    cpu_mode_t      cpu_mode;
+    uint8_t         cpu_mode;
     int             stages;
     int             iterations;
     int             errors;
-    char            *description;
+    char            description[40];
 } test_pattern_t;
 
 extern test_pattern_t test_list[NUM_TEST_PATTERNS];

@@ -10,12 +10,12 @@
 #define JEP106_CNT \
     sizeof(jep106)/sizeof(jep106[0])
 
-struct spd_jedec_manufacturer {
+struct __attribute__((packed)) spd_jedec_manufacturer {
     uint16_t jedec_code;
     char *name;
 };
 
-static const struct spd_jedec_manufacturer jep106[] = {
+static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
     { 0x0001, "AMD" },
 //  { 0x0002, "AMI" },
 //  { 0x0003, "Fairchild" },
