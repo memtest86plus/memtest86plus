@@ -8,9 +8,10 @@
  * display.
  *
  *//*
- * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2020-2024 Martin Whitaker.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /**
@@ -56,6 +57,11 @@ extern vga_buffer_t shadow_buffer;
  * Has no effect on background colours.
  */
 #define BOLD        8
+
+/*
+ * Return true if the 'rotate' option is present on the boot command line.
+ */
+bool check_for_rotate_option(uintptr_t cmd_line_addr, int cmd_line_size);
 
 /**
  * Initialise the display interface.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from Linux 5.6 arch/x86/boot/compressed/eboot.c and extracts
 // from drivers/firmware/efi/libstub:
@@ -13,6 +13,7 @@
 #include "efi.h"
 
 #include "memsize.h"
+#include "screen.h"
 
 #include "string.h"
 
@@ -328,7 +329,7 @@ static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_siz
     return first_gop;
 }
 
-static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size)
+static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size, bool rotate)
 {
     efi_status_t status;
 
@@ -353,11 +354,20 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
             continue;
         }
 
-        if (info->h_resolution >= MIN_H_RESOLUTION
-         && info->v_resolution >= MIN_V_RESOLUTION
-         && info->h_resolution < best_info.h_resolution) {
-            best_mode = mode_num;
-            best_info = *info;
+        if (rotate) {
+            if (info->v_resolution >= MIN_H_RESOLUTION
+             && info->h_resolution >= MIN_V_RESOLUTION
+             && info->v_resolution < best_info.v_resolution) {
+                best_mode = mode_num;
+                best_info = *info;
+            }
+        } else {
+            if (info->h_resolution >= MIN_H_RESOLUTION
+             && info->v_resolution >= MIN_V_RESOLUTION
+             && info->h_resolution < best_info.h_resolution) {
+                best_mode = mode_num;
+                best_info = *info;
+            }
         }
 
         efi_call_bs(free_pool, info);
@@ -494,7 +504,8 @@ static efi_status_t set_screen_info(boot_params_t *boot_params)
         status = efi_call_bs(locate_handle, EFI_LOCATE_BY_PROTOCOL, &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, NULL,
                              &handles_size, handles);
         if (status == EFI_SUCCESS) {
-            status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size);
+            bool rotate = check_for_rotate_option(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
+            status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size, rotate);
         }
         if (status == EFI_NOT_FOUND) {
             // This may be a headless system. We can still output to a serial console.
