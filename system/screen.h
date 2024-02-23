@@ -59,9 +59,13 @@ extern vga_buffer_t shadow_buffer;
 #define BOLD        8
 
 /*
- * Return true if the 'rotate' option is present on the boot command line.
+ * Scans the given command line for screen options. If screen.mode
+ * is found, returns the width and height (in pixels) in w and h
+ * or 0 and 0 for the special case of "bios", otherwise leaves
+ * them unchanged. If screen.rhs-up or screen.lhs-up is found,
+ * returns true in rotate, otherwise returns false.
  */
-bool check_for_rotate_option(uintptr_t cmd_line_addr, int cmd_line_size);
+void get_screen_options(uint32_t cmd_line_ptr, uint32_t cmd_line_size, uint32_t *w, uint32_t *h, bool *rotate);
 
 /**
  * Initialise the display interface.

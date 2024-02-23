@@ -329,7 +329,8 @@ static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_siz
     return first_gop;
 }
 
-static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size, bool rotate)
+static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size,
+                                             uint32_t pref_h_resolution, uint32_t pref_v_resolution, bool rotate)
 {
     efi_status_t status;
 
@@ -341,36 +342,46 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     efi_gop_mode_t *mode = efi_table_attr(gop, mode);
 
+    bool use_current_mode = (pref_h_resolution == 0) && (pref_v_resolution == 0);
+
     efi_gop_mode_info_t best_info;
     best_info.h_resolution = UINT32_MAX;
     best_info.v_resolution = UINT32_MAX;
 
     uint32_t best_mode = UINT32_MAX;
-    for (uint32_t mode_num = 0; mode_num < mode->max_mode; mode_num++) {
-        efi_gop_mode_info_t *info;
-        uintn_t              info_size;
-        status = efi_call_proto(gop, query_mode, mode_num, &info_size, &info);
-        if (status != EFI_SUCCESS) {
-            continue;
-        }
-
-        if (rotate) {
-            if (info->v_resolution >= MIN_H_RESOLUTION
-             && info->h_resolution >= MIN_V_RESOLUTION
-             && info->v_resolution < best_info.v_resolution) {
+    if (use_current_mode) {
+        best_mode = mode->mode;
+        best_info = *mode->info;
+    } else {
+        for (uint32_t mode_num = 0; mode_num < mode->max_mode; mode_num++) {
+            efi_gop_mode_info_t *info;
+            uintn_t              info_size;
+            status = efi_call_proto(gop, query_mode, mode_num, &info_size, &info);
+            if (status != EFI_SUCCESS) {
+                continue;
+            }
+            if ((info->h_resolution == pref_h_resolution) && (info->v_resolution == pref_v_resolution)) {
                 best_mode = mode_num;
                 best_info = *info;
+                break;
             }
-        } else {
-            if (info->h_resolution >= MIN_H_RESOLUTION
-             && info->v_resolution >= MIN_V_RESOLUTION
-             && info->h_resolution < best_info.h_resolution) {
-                best_mode = mode_num;
-                best_info = *info;
+            if (rotate) {
+                if (info->v_resolution >= MIN_H_RESOLUTION
+                 && info->h_resolution >= MIN_V_RESOLUTION
+                 && info->v_resolution < best_info.v_resolution) {
+                    best_mode = mode_num;
+                    best_info = *info;
+                }
+            } else {
+                if (info->h_resolution >= MIN_H_RESOLUTION
+                 && info->v_resolution >= MIN_V_RESOLUTION
+                 && info->h_resolution < best_info.h_resolution) {
+                    best_mode = mode_num;
+                    best_info = *info;
+                }
             }
+            efi_call_bs(free_pool, info);
         }
-
-        efi_call_bs(free_pool, info);
     }
     if (best_mode == UINT32_MAX) {
         print_string("No suitable screen resolution found\n");
@@ -473,10 +484,12 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     wait_for_key();
 #endif
 
-    status = efi_call_proto(gop, set_mode, best_mode);
-    if (status != EFI_SUCCESS) {
-        print_string("Set GOP mode failed\n");
-        return status;
+    if (!use_current_mode) {
+        status = efi_call_proto(gop, set_mode, best_mode);
+        if (status != EFI_SUCCESS) {
+            print_string("Set GOP mode failed\n");
+            return status;
+        }
     }
 
 #if DEBUG
@@ -504,8 +517,11 @@ static efi_status_t set_screen_info(boot_params_t *boot_params)
         status = efi_call_bs(locate_handle, EFI_LOCATE_BY_PROTOCOL, &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, NULL,
                              &handles_size, handles);
         if (status == EFI_SUCCESS) {
-            bool rotate = check_for_rotate_option(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
-            status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size, rotate);
+            uint32_t pref_w = UINT32_MAX;
+            uint32_t pref_h = UINT32_MAX;
+            bool rotate = false;
+            get_screen_options(boot_params->cmd_line_ptr, boot_params->cmd_line_size, &pref_w, &pref_h, &rotate);
+            status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size, pref_w, pref_h, rotate);
         }
         if (status == EFI_NOT_FOUND) {
             // This may be a headless system. We can still output to a serial console.

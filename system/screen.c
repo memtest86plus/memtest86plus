@@ -15,6 +15,16 @@
 #include "screen.h"
 
 //------------------------------------------------------------------------------
+// Private Types
+//------------------------------------------------------------------------------
+
+typedef enum  __attribute__ ((packed)) {
+    LFB_TOP_UP  = 0,
+    LFB_RHS_UP  = 1,
+    LFB_LHS_UP  = 2
+} lfb_rotate_t;
+
+//------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
 
@@ -52,15 +62,94 @@ static int lfb_bytes_per_pixel = 0;
 
 static uintptr_t lfb_base;
 static uintptr_t lfb_stride;
-static bool      lfb_rotate;
 
 static uint32_t lfb_pallete[16];
 
+static lfb_rotate_t lfb_rotate = LFB_TOP_UP;
+
 static uint8_t current_attr = WHITE | BLUE << 4;
+
+static bool cmd_line_parsed = false;
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+static void parse_option(const char *option, int option_length, uint32_t *w, uint32_t *h)
+{
+    if ((option_length < 8) || (strncmp(option, "screen.", 7) != 0))
+        return;
+
+    option_length -= 7;
+    option += 7;
+    if ((option_length == 6) && (strncmp(option, "rhs-up", 6) == 0)) {
+        lfb_rotate = LFB_RHS_UP;
+        return;
+    }
+    if ((option_length == 6) && (strncmp(option, "lhs-up", 6) == 0)) {
+        lfb_rotate = LFB_LHS_UP;
+        return;
+    }
+    if ((option_length >= 6) && (strncmp(option, "mode=", 5) == 0)) {
+        option_length -= 5;
+        option += 5;
+        if ((option_length == 4) && (strncmp(option, "bios", 4) == 0)) {
+            *w = 0;
+            *h = 0;
+            return;
+        }
+        int w_value = 0;
+        while ((option_length > 0) && (*option >= '0') && (*option <= '9')) {
+            w_value = w_value * 10 + (*option - '0');
+            option_length--;
+            option++;
+        }
+        if ((option_length < 2) || (*option != 'x')) return;
+        option_length--;
+        option++;
+        int h_value = 0;
+        while ((option_length > 0) && (*option >= '0') && (*option <= '9')) {
+            h_value = h_value * 10 + (*option - '0');
+            option_length--;
+            option++;
+        }
+        if (option_length != 0) return;
+        if (w) *w = w_value;
+        if (h) *h = h_value;
+        return;
+    }
+}
+
+static void parse_cmd_line(uintptr_t cmd_line_addr, uint32_t cmd_line_size, uint32_t *w, uint32_t *h)
+{
+    if (cmd_line_parsed)
+        return;
+
+    cmd_line_parsed = true;
+
+    if (cmd_line_addr != 0) {
+        if (cmd_line_size == 0) cmd_line_size = 255;
+
+        const char *cmd_line = (const char *)cmd_line_addr;
+        const char *option = cmd_line;
+        int option_length = 0;
+        for (uint32_t i = 0; i < cmd_line_size; i++) {
+            switch (cmd_line[i]) {
+              case '\0':
+                parse_option(option, option_length, w, h);
+                return;
+              case ' ':
+                parse_option(option, option_length, w, h);
+                option = &cmd_line[i+1];
+                option_length = 0;
+                break;
+              default:
+                option_length++;
+                break;
+            }
+        }
+    }
+}
 
 static void vga_put_char(int row, int col, uint8_t ch, uint8_t attr)
 {
@@ -69,6 +158,18 @@ static void vga_put_char(int row, int col, uint8_t ch, uint8_t attr)
 
     if (vga_buffer) {
         (*vga_buffer)[row][col].value = shadow_buffer[row][col].value;
+    }
+}
+
+static int lfb_offset(int row, int col, int x, int y, int bpp)
+{
+    switch (lfb_rotate) {
+      case LFB_RHS_UP:
+        return (col * FONT_WIDTH  + x) * lfb_stride + ((SCREEN_HEIGHT - row) * FONT_HEIGHT - y - 1) * bpp;
+      case LFB_LHS_UP:
+        return ((SCREEN_WIDTH - col) * FONT_WIDTH - x - 1) * lfb_stride + (row * FONT_HEIGHT + y) * bpp;
+      default:
+        return 0;
     }
 }
 
@@ -84,9 +185,7 @@ static void lfb8_put_char(int row, int col, uint8_t ch, uint8_t attr)
         for (int y = 0; y < FONT_HEIGHT; y++) {
             uint8_t font_row = font_data[ch][y];
             for (int x = 0; x < FONT_WIDTH; x++) {
-                uint8_t *pixel = (uint8_t *)lfb_base
-                               + (col * FONT_WIDTH + x) * lfb_stride
-                               + (SCREEN_HEIGHT - row) * FONT_HEIGHT - y - 1;
+                uint8_t *pixel = (uint8_t *)lfb_base + lfb_offset(row, col, x, y, 1);
                 *pixel = font_row & 0x80 ? fg_colour : bg_colour;
                 font_row <<= 1;
             }
@@ -116,9 +215,7 @@ static void lfb16_put_char(int row, int col, uint8_t ch, uint8_t attr)
         for (int y = 0; y < FONT_HEIGHT; y++) {
             uint8_t font_row = font_data[ch][y];
             for (int x = 0; x < FONT_WIDTH; x++) {
-                uint16_t *pixel = (uint16_t *)lfb_base
-                                + (col * FONT_WIDTH + x) * lfb_stride
-                                + (SCREEN_HEIGHT - row) * FONT_HEIGHT - y - 1;
+                uint16_t *pixel = (uint16_t *)lfb_base + lfb_offset(row, col, x, y, 1);
                 *pixel = font_row & 0x80 ? fg_colour : bg_colour;
                 font_row <<= 1;
             }
@@ -148,9 +245,7 @@ static void lfb24_put_char(int row, int col, uint8_t ch, uint8_t attr)
         for (int y = 0; y < FONT_HEIGHT; y++) {
             uint8_t font_row = font_data[ch][y];
             for (int x = 0; x < FONT_WIDTH; x++) {
-                uint8_t *pixel = (uint8_t *)lfb_base
-                               + (col * FONT_WIDTH + x) * lfb_stride
-                               + ((SCREEN_HEIGHT - row) * FONT_HEIGHT - y - 1) * 3;
+                uint8_t *pixel = (uint8_t *)lfb_base + lfb_offset(row, col, x, y, 3);
                 uint32_t colour = font_row & 0x80 ? fg_colour : bg_colour;
                 pixel[0] = colour & 0xff; colour >>= 8;
                 pixel[1] = colour & 0xff; colour >>= 8;
@@ -186,9 +281,7 @@ static void lfb32_put_char(int row, int col, uint8_t ch, uint8_t attr)
         for (int y = 0; y < FONT_HEIGHT; y++) {
             uint8_t font_row = font_data[ch][y];
             for (int x = 0; x < FONT_WIDTH; x++) {
-                uint32_t *pixel = (uint32_t *)lfb_base
-                                + (col * FONT_WIDTH + x) * lfb_stride
-                                + (SCREEN_HEIGHT - row) * FONT_HEIGHT - y - 1;
+                uint32_t *pixel = (uint32_t *)lfb_base + lfb_offset(row, col, x, y, 1);
                 *pixel = font_row & 0x80 ? fg_colour : bg_colour;
                 font_row <<= 1;
             }
@@ -213,43 +306,21 @@ static void put_value(int row, int col, uint16_t value)
     put_char(row, col, value % 256, value / 256);
 }
 
-static bool option_is_rotate(const char *option, int option_length)
-{
-    return (option_length == 6) && (strncmp(option, "rotate", 6) == 0);
-}
-
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
-bool check_for_rotate_option(uintptr_t cmd_line_addr, int cmd_line_size)
+void get_screen_options(uint32_t cmd_line_ptr, uint32_t cmd_line_size, uint32_t *w, uint32_t *h, bool *rotate)
 {
-    if (cmd_line_addr != 0) {
-        if (cmd_line_size == 0) cmd_line_size = 255;
-        const char *cmd_line = (const char *)cmd_line_addr;
-        const char *option = cmd_line;
-        int option_length = 0;
-        for (int i = 0; i < cmd_line_size; i++) {
-            switch (cmd_line[i]) {
-              case '\0':
-                return option_is_rotate(option, option_length);
-              case ' ':
-                if (option_is_rotate(option, option_length)) return true;
-                option = &cmd_line[i+1];
-                option_length = 0;
-                break;
-              default:
-                option_length++;
-                break;
-            }
-        }
-    }
-    return false;
+    parse_cmd_line(cmd_line_ptr, cmd_line_size, w, h);
+    *rotate = (lfb_rotate != LFB_TOP_UP);
 }
 
 void screen_init(void)
 {
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
+
+    parse_cmd_line(boot_params->cmd_line_ptr, boot_params->cmd_line_size, NULL, NULL);
 
     const screen_info_t *screen_info = &boot_params->screen_info;
 
@@ -306,7 +377,6 @@ void screen_init(void)
             line += lfb_stride / sizeof(uint32_t);
         }
 
-        lfb_rotate = check_for_rotate_option(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
         if (lfb_rotate) {
             int excess_width = lfb_width - (SCREEN_HEIGHT * FONT_HEIGHT);
             if (excess_width > 0) {
