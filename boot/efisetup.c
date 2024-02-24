@@ -344,6 +344,17 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     bool use_current_mode = (pref_h_resolution == 0) && (pref_v_resolution == 0);
 
+#if DEBUG
+    print_string("Requested size : ");
+    print_dec(pref_h_resolution);
+    print_string(" x ");
+    print_dec(pref_v_resolution);
+    if (rotate) {
+        print_string(" rotated");
+    }
+    print_string("\n");
+#endif
+
     efi_gop_mode_info_t best_info;
     best_info.h_resolution = UINT32_MAX;
     best_info.v_resolution = UINT32_MAX;
