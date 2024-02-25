@@ -16,8 +16,6 @@
 
 #include "string.h"
 
-#define DEBUG 0
-
 //------------------------------------------------------------------------------
 // Constants
 //------------------------------------------------------------------------------
@@ -41,6 +39,8 @@ static uint32_t pref_h_resolution;
 static uint32_t pref_v_resolution;
 
 static bool rotate;
+
+static bool debug;
 
 //------------------------------------------------------------------------------
 // Macro Functions
@@ -96,7 +96,6 @@ static void print_string(char *str)
     }
 }
 
-#if DEBUG
 static void print_dec(unsigned value)
 {
     char buffer[16];
@@ -172,7 +171,6 @@ static void test_frame_buffer(screen_info_t *si)
         lfb_row += si->lfb_linelength;
     }
 }
-#endif
 
 static int get_cmd_line_length(efi_loaded_image_t *image)
 {
@@ -198,6 +196,11 @@ static void get_cmd_line(efi_loaded_image_t *image, int num_chars, char *buffer)
 
 static void parse_option(const char *option, int option_length)
 {
+    if ((option_length == 8) && (strncmp(option, "efidebug", 8) == 0)) {
+        debug = true;
+        return;
+    }
+
     if ((option_length < 8) || (strncmp(option, "screen.", 7) != 0))
         return;
 
@@ -378,11 +381,11 @@ static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_siz
             continue;
         }
 
-#if DEBUG
-        print_string("Found GOP with ");
-        print_dec(mode->max_mode);
-        print_string(" modes\n");
-#endif
+        if (debug) {
+            print_string("Found GOP with ");
+            print_dec(mode->max_mode);
+            print_string(" modes\n");
+        }
 
         // Systems that use the UEFI Console Splitter may provide multiple GOP
         // devices, not all of which are backed by real hardware. The workaround
@@ -392,9 +395,9 @@ static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_siz
         void *con_out = NULL;
         status = efi_call_bs(handle_protocol, handle, &EFI_CONSOLE_OUT_DEVICE_GUID, &con_out);
         if (status == EFI_SUCCESS) {
-#if DEBUG
-            print_string("This GOP implements the ConOut protocol\n");
-#endif
+            if (debug) {
+                print_string("This GOP implements the ConOut protocol\n");
+            }
             return gop;
         }
 
@@ -420,16 +423,20 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     bool use_current_mode = (pref_h_resolution == 0) && (pref_v_resolution == 0);
 
-#if DEBUG
-    print_string("Requested size : ");
-    print_dec(pref_h_resolution);
-    print_string(" x ");
-    print_dec(pref_v_resolution);
-    if (rotate) {
-        print_string(" rotated");
+    if (debug) {
+        print_string("Requested size : ");
+        if ((pref_h_resolution == UINT32_MAX) && (pref_v_resolution == UINT32_MAX)) {
+            print_string("auto");
+        } else {
+            print_dec(pref_h_resolution);
+            print_string(" x ");
+            print_dec(pref_v_resolution);
+        }
+        if (rotate) {
+            print_string(" rotated");
+        }
+        print_string("\n");
     }
-    print_string("\n");
-#endif
 
     efi_gop_mode_info_t best_info;
     best_info.h_resolution = UINT32_MAX;
@@ -491,9 +498,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     switch (best_info.pixel_format) {
       case PIXEL_RGB_RESERVED_8BIT_PER_COLOR:
-#if DEBUG
-        print_string("RGB32 mode\n");
-#endif
+        if (debug) {
+            print_string("RGB32 mode\n");
+        }
         si->lfb_depth       = 32;
         si->lfb_linelength  = best_info.pixels_per_scan_line * 4;
         si->red_size        = 8;
@@ -506,9 +513,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->rsvd_pos        = 24;
         break;
       case PIXEL_BGR_RESERVED_8BIT_PER_COLOR:
-#if DEBUG
-        print_string("BGR32 mode\n");
-#endif
+        if (debug) {
+            print_string("BGR32 mode\n");
+        }
         si->lfb_depth       = 32;
         si->lfb_linelength  = best_info.pixels_per_scan_line * 4;
         si->red_size        = 8;
@@ -521,9 +528,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->rsvd_pos        = 24;
         break;
       case PIXEL_BIT_MASK:
-#if DEBUG
-        print_string("Bit mask mode\n");
-#endif
+        if (debug) {
+            print_string("Bit mask mode\n");
+        }
         get_bit_range(best_info.pixel_info.red_mask,   &si->red_pos,   &si->red_size);
         get_bit_range(best_info.pixel_info.green_mask, &si->green_pos, &si->green_size);
         get_bit_range(best_info.pixel_info.blue_mask,  &si->blue_pos,  &si->blue_size);
@@ -532,9 +539,9 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         si->lfb_linelength  = (best_info.pixels_per_scan_line * si->lfb_depth) / 8;
         break;
       default:
-#if DEBUG
-        print_string("Unsupported mode\n");
-#endif
+        if (debug) {
+            print_string("Unsupported mode\n");
+        }
         si->lfb_depth       = 4;
         si->lfb_linelength  = si->lfb_width / 2;
         si->red_size        = 0;
@@ -549,27 +556,27 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     }
     si->lfb_size = si->lfb_linelength * si->lfb_height;
 
-#if DEBUG
-    print_string("FB base   : ");
-    print_hex((uintptr_t)lfb_base);
-    print_string("\n");
-    print_string("FB size   : ");
-    print_dec(si->lfb_width);
-    print_string(" x ");
-    print_dec(si->lfb_height);
-    print_string("\n");
-    print_string("FB format :");
-    print_string(" R"); print_dec(si->red_size);
-    print_string(" G"); print_dec(si->green_size);
-    print_string(" B"); print_dec(si->blue_size);
-    print_string(" A"); print_dec(si->rsvd_size);
-    print_string("\n");
-    print_string("FB stride : ");
-    print_dec(si->lfb_linelength);
-    print_string("\n");
-    print_string("Press any key to continue...\n");
-    wait_for_key();
-#endif
+    if (debug) {
+        print_string("FB base   : ");
+        print_hex((uintptr_t)lfb_base);
+        print_string("\n");
+        print_string("FB size   : ");
+        print_dec(si->lfb_width);
+        print_string(" x ");
+        print_dec(si->lfb_height);
+        print_string("\n");
+        print_string("FB format :");
+        print_string(" R"); print_dec(si->red_size);
+        print_string(" G"); print_dec(si->green_size);
+        print_string(" B"); print_dec(si->blue_size);
+        print_string(" A"); print_dec(si->rsvd_size);
+        print_string("\n");
+        print_string("FB stride : ");
+        print_dec(si->lfb_linelength);
+        print_string("\n");
+        print_string("Press any key to continue...\n");
+        wait_for_key();
+    }
 
     if (!use_current_mode) {
         status = efi_call_proto(gop, set_mode, best_mode);
@@ -579,11 +586,11 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         }
     }
 
-#if DEBUG
-    test_frame_buffer(si);
-    print_string("Press any key to continue...\n");
-    wait_for_key();
-#endif
+    if (debug) {
+        test_frame_buffer(si);
+        print_string("Press any key to continue...\n");
+        wait_for_key();
+    }
 
     return EFI_SUCCESS;
 }
