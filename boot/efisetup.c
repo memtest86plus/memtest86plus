@@ -153,22 +153,22 @@ static void test_frame_buffer(screen_info_t *si)
 #endif
 
     uint8_t *lfb_row = (uint8_t *)lfb_base;
-    for (int y = 0; y < 8; y++) {
+    for (int y = 0; y < 4; y++) {
         for (int x = 0; x < si->lfb_width; x++) {
             for (int b = 0; b < pixel_size; b++) {
                 lfb_row[x * pixel_size + b] = pixel_value.byte[b];
             }
         }
-        lfb_row += si->lfb_linelength;
+        lfb_row += si->lfb_linelength * 2;
     }
     lfb_row += (si->lfb_height - 16) * si->lfb_linelength;
-    for (int y = 0; y < 8; y++) {
+    for (int y = 0; y < 4; y++) {
         for (int x = 0; x < si->lfb_width; x++) {
             for (int b = 0; b < pixel_size; b++) {
                 lfb_row[x * pixel_size + b] = pixel_value.byte[b];
             }
         }
-        lfb_row += si->lfb_linelength;
+        lfb_row += si->lfb_linelength * 2;
     }
 }
 
