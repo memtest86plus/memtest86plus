@@ -11,7 +11,6 @@
  * Copyright (C) 2020-2024 Martin Whitaker.
  */
 
-#include <stdbool.h>
 #include <stdint.h>
 
 /**
@@ -57,15 +56,6 @@ extern vga_buffer_t shadow_buffer;
  * Has no effect on background colours.
  */
 #define BOLD        8
-
-/*
- * Scans the given command line for screen options. If screen.mode
- * is found, returns the width and height (in pixels) in w and h
- * or 0 and 0 for the special case of "bios", otherwise leaves
- * them unchanged. If screen.rhs-up or screen.lhs-up is found,
- * returns true in rotate, otherwise returns false.
- */
-void get_screen_options(uint32_t cmd_line_ptr, uint32_t cmd_line_size, uint32_t *w, uint32_t *h, bool *rotate);
 
 /**
  * Initialise the display interface.

@@ -13,7 +13,6 @@
 #include "efi.h"
 
 #include "memsize.h"
-#include "screen.h"
 
 #include "string.h"
 
@@ -37,6 +36,11 @@ static efi_guid_t EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID   = { 0x9042a9de, 0x23dc, 0x
 static efi_guid_t EFI_LOADED_IMAGE_PROTOCOL_GUID      = { 0x5b1b31a1, 0x9562, 0x11d2, {0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b} };
 
 static efi_system_table_t *sys_table = NULL;
+
+static uint32_t pref_h_resolution;
+static uint32_t pref_v_resolution;
+
+static bool rotate;
 
 //------------------------------------------------------------------------------
 // Macro Functions
@@ -192,6 +196,79 @@ static void get_cmd_line(efi_loaded_image_t *image, int num_chars, char *buffer)
     buffer[num_chars] = '\0';
 }
 
+static void parse_option(const char *option, int option_length)
+{
+    if ((option_length < 8) || (strncmp(option, "screen.", 7) != 0))
+        return;
+
+    option_length -= 7;
+    option += 7;
+    if ((option_length == 6) && (strncmp(option, "rhs-up", 6) == 0)) {
+        rotate = true;
+        return;
+    }
+    if ((option_length == 6) && (strncmp(option, "lhs-up", 6) == 0)) {
+        rotate = true;
+        return;
+    }
+    if ((option_length >= 6) && (strncmp(option, "mode=", 5) == 0)) {
+        option_length -= 5;
+        option += 5;
+        if ((option_length == 4) && (strncmp(option, "bios", 4) == 0)) {
+            pref_h_resolution = 0;
+            pref_v_resolution = 0;
+            return;
+        }
+        int h_value = 0;
+        while ((option_length > 0) && (*option >= '0') && (*option <= '9')) {
+            h_value = h_value * 10 + (*option - '0');
+            option_length--;
+            option++;
+        }
+        if ((option_length < 2) || (*option != 'x')) return;
+        option_length--;
+        option++;
+        int v_value = 0;
+        while ((option_length > 0) && (*option >= '0') && (*option <= '9')) {
+            v_value = v_value * 10 + (*option - '0');
+            option_length--;
+            option++;
+        }
+        if (option_length != 0) return;
+        pref_h_resolution = h_value;
+        pref_v_resolution = v_value;
+        return;
+    }
+}
+
+static void parse_cmd_line(uintptr_t cmd_line_addr, int cmd_line_size)
+{
+    pref_h_resolution = UINT32_MAX;
+    pref_v_resolution = UINT32_MAX;
+    rotate = false;
+
+    if (cmd_line_addr != 0) {
+        const char *cmd_line = (const char *)cmd_line_addr;
+        const char *option = cmd_line;
+        int option_length = 0;
+        for (int i = 0; i < cmd_line_size; i++) {
+            switch (cmd_line[i]) {
+              case '\0':
+                parse_option(option, option_length);
+                return;
+              case ' ':
+                parse_option(option, option_length);
+                option = &cmd_line[i+1];
+                option_length = 0;
+                break;
+              default:
+                option_length++;
+                break;
+            }
+        }
+    }
+}
+
 static efi_status_t alloc_memory(void **ptr, size_t size, efi_phys_addr_t max_addr)
 {
     efi_status_t status;
@@ -329,8 +406,7 @@ static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_siz
     return first_gop;
 }
 
-static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size,
-                                             uint32_t pref_h_resolution, uint32_t pref_v_resolution, bool rotate)
+static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size)
 {
     efi_status_t status;
 
@@ -528,11 +604,7 @@ static efi_status_t set_screen_info(boot_params_t *boot_params)
         status = efi_call_bs(locate_handle, EFI_LOCATE_BY_PROTOCOL, &EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID, NULL,
                              &handles_size, handles);
         if (status == EFI_SUCCESS) {
-            uint32_t pref_w = UINT32_MAX;
-            uint32_t pref_h = UINT32_MAX;
-            bool rotate = false;
-            get_screen_options(boot_params->cmd_line_ptr, boot_params->cmd_line_size, &pref_w, &pref_h, &rotate);
-            status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size, pref_w, pref_h, rotate);
+            status = set_screen_info_from_gop(&boot_params->screen_info, handles, handles_size);
         }
         if (status == EFI_NOT_FOUND) {
             // This may be a headless system. We can still output to a serial console.
@@ -696,6 +768,8 @@ boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg,
     }
 
     boot_params->code32_start = (uintptr_t)startup32;
+
+    parse_cmd_line(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
 
     status = set_screen_info(boot_params);
     if (status != EFI_SUCCESS) {

@@ -69,13 +69,11 @@ static lfb_rotate_t lfb_rotate = LFB_TOP_UP;
 
 static uint8_t current_attr = WHITE | BLUE << 4;
 
-static bool cmd_line_parsed = false;
-
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
-static void parse_option(const char *option, int option_length, uint32_t *w, uint32_t *h)
+static void parse_option(const char *option, int option_length)
 {
     if ((option_length < 8) || (strncmp(option, "screen.", 7) != 0))
         return;
@@ -90,43 +88,10 @@ static void parse_option(const char *option, int option_length, uint32_t *w, uin
         lfb_rotate = LFB_LHS_UP;
         return;
     }
-    if ((option_length >= 6) && (strncmp(option, "mode=", 5) == 0)) {
-        option_length -= 5;
-        option += 5;
-        if ((option_length == 4) && (strncmp(option, "bios", 4) == 0)) {
-            *w = 0;
-            *h = 0;
-            return;
-        }
-        int w_value = 0;
-        while ((option_length > 0) && (*option >= '0') && (*option <= '9')) {
-            w_value = w_value * 10 + (*option - '0');
-            option_length--;
-            option++;
-        }
-        if ((option_length < 2) || (*option != 'x')) return;
-        option_length--;
-        option++;
-        int h_value = 0;
-        while ((option_length > 0) && (*option >= '0') && (*option <= '9')) {
-            h_value = h_value * 10 + (*option - '0');
-            option_length--;
-            option++;
-        }
-        if (option_length != 0) return;
-        if (w) *w = w_value;
-        if (h) *h = h_value;
-        return;
-    }
 }
 
-static void parse_cmd_line(uintptr_t cmd_line_addr, uint32_t cmd_line_size, uint32_t *w, uint32_t *h)
+static void parse_cmd_line(uintptr_t cmd_line_addr, uint32_t cmd_line_size)
 {
-    if (cmd_line_parsed)
-        return;
-
-    cmd_line_parsed = true;
-
     if (cmd_line_addr != 0) {
         if (cmd_line_size == 0) cmd_line_size = 255;
 
@@ -136,10 +101,10 @@ static void parse_cmd_line(uintptr_t cmd_line_addr, uint32_t cmd_line_size, uint
         for (uint32_t i = 0; i < cmd_line_size; i++) {
             switch (cmd_line[i]) {
               case '\0':
-                parse_option(option, option_length, w, h);
+                parse_option(option, option_length);
                 return;
               case ' ':
-                parse_option(option, option_length, w, h);
+                parse_option(option, option_length);
                 option = &cmd_line[i+1];
                 option_length = 0;
                 break;
@@ -310,17 +275,11 @@ static void put_value(int row, int col, uint16_t value)
 // Public Functions
 //------------------------------------------------------------------------------
 
-void get_screen_options(uint32_t cmd_line_ptr, uint32_t cmd_line_size, uint32_t *w, uint32_t *h, bool *rotate)
-{
-    parse_cmd_line(cmd_line_ptr, cmd_line_size, w, h);
-    *rotate = (lfb_rotate != LFB_TOP_UP);
-}
-
 void screen_init(void)
 {
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 
-    parse_cmd_line(boot_params->cmd_line_ptr, boot_params->cmd_line_size, NULL, NULL);
+    parse_cmd_line(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
 
     const screen_info_t *screen_info = &boot_params->screen_info;
 
