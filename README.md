@@ -143,7 +143,7 @@ recognised:
       * usb
       * both
   * screen.mode=*w*x*h* (EFI framebuffer only)
-    * where *w*x*h* is the preferred screen reolution (e.g. 1024x768)
+    * where *w*x*h* is the preferred screen resolution (e.g. 1024x768)
   * screen.mode=bios (EFI framebuffer only)
     * uses the default screen resolution set by the UEFI BIOS
   * screen.rhs-up (graphics mode only)
