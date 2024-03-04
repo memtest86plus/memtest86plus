@@ -142,6 +142,16 @@ recognised:
       * legacy
       * usb
       * both
+  * screen.mode=*w*x*h* (EFI framebuffer only)
+    * where *w*x*h* is the preferred screen resolution (e.g. 1024x768)
+  * screen.mode=bios (EFI framebuffer only)
+    * uses the default screen resolution set by the UEFI BIOS
+  * screen.rhs-up (graphics mode only)
+    * rotates the display clockwise by 90 degrees
+  * screen.lhs-up (graphics mode only)
+    * rotates the display anti-clockwiseby 90 degrees
+  * efidebug
+    * displays information about the EFI framebuffer
   * usbdebug
     * pauses after probing for USB keyboards
   * usbinit=*mode*
@@ -199,6 +209,29 @@ workarounds provided by the "usbinit" boot option.
 **NOTE**: Hot-plugging is not currently supported by the Memtest86+ USB
 drivers. When using these, your USB keyboard should be plugged in before
 running Memtest86+ and should remain plugged in throughout the test.
+
+## Display Rotation
+
+Some 2-in-1 machines use an LCD panel which is natively a portrait mode
+display but is mounted on its side when attached to the keyboard. When
+using the display in graphics mode, Memtest86+ can rotate its display
+to match. Add either the "screen.rhs-up" or the "screen.lhs-up" option
+on the boot command line, depending on the orientation of the LCD panel.
+When using the display in text mode, it is expected that the BIOS will
+take care of this automatically.
+
+## Screen Resolution
+
+When booted in legacy mode, Memtest86+ will use the screen resolution that
+has been set by the BIOS or by the intermediate bootloader. When booted in
+UEFI mode, Memtest86+ will normally select the smallest available screen
+resolution that encompasses its 640x400 pixel display. Some BIOSs return
+incorrect information about the available display modes, so you can
+override this by adding the "screen.mode=" option on the boot command
+line.
+
+Note that when using display rotation, the specified screen resolution is
+for the unrotated display.
 
 ## Operation
 
