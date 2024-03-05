@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from memtest86+ patn.c:
 //
@@ -268,8 +268,8 @@ void badram_display(void)
     check_input();
 
     clear_message_area();
-    display_pinned_message(0, 0, "BadRAM Patterns");
-    display_pinned_message(1, 0, "---------------");
+    display_pinned_message(0, 0, "BadRAM Patterns (excludes test 0 and test 7)");
+    display_pinned_message(1, 0, "--------------------------------------------");
     scroll();
     display_scrolled_message(0, "badram=");
     int col = 7;

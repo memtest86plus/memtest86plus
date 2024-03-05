@@ -358,6 +358,11 @@ number of practical reasons. As a result, handcrafting patterns from the
 output in address printing mode may, in exceptional cases, yield better
 results.
 
+**NOTE** As mentioned in the individual test descriptions, the walking-ones
+address test (test 0) and the block move test (test 7) do not contribute to
+the BadRAM patterns as these tests do not allow the exact address of the
+fault to be determined.
+
 ## Trouble-shooting Memory Errors
 
 Please be aware that not all errors reported by Memtest86+ are due to bad
