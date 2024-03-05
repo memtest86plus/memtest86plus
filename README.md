@@ -149,7 +149,7 @@ recognised:
   * screen.rhs-up (graphics mode only)
     * rotates the display clockwise by 90 degrees
   * screen.lhs-up (graphics mode only)
-    * rotates the display anti-clockwiseby 90 degrees
+    * rotates the display anti-clockwise by 90 degrees
   * efidebug
     * displays information about the EFI framebuffer
   * usbdebug
