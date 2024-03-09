@@ -118,6 +118,7 @@ uintptr_t       tty_address        = 0x3F8;             // Legacy IO or MMIO Add
 int             tty_baud_rate      = 115200;
 int             tty_update_period  = 2;                 // Update TTY every 2 seconds (default)
 bool            tty_new_line       = false;
+bool            tty_usb            = false;
 
 uint32_t        tty_mmio_ref_clk   = UART_REF_CLK_MMIO; // Reference clock for MMIO (in Hz)
 int             tty_mmio_stride    = 4;                 // Stride for MMIO (register width in bytes)
@@ -148,6 +149,9 @@ static void parse_serial_params(const char *params)
             enable_tty = false;
         }
         return;
+    }
+    if (strncmp(params, "usb", 3) == 0) {
+        tty_usb = true;
     }
 
     // Check if console is MMIO and grab address and stride

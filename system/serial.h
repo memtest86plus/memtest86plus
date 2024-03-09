@@ -24,6 +24,7 @@ struct serial_port {
     bool enable;
     bool is_mmio;
     bool is_pl011;
+    bool is_usb;
     int parity;
     int bits;
     int baudrate;
