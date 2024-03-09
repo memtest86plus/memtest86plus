@@ -696,6 +696,28 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return (wait_for_ep_transfer_event(ws, ep->device_id, 1, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
+static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+                             const void *buffer, size_t length)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    ep_tr_t *ep_tr = (ep_tr_t *)ep->driver_data;
+
+    int ep_id = 2 * ep->endpoint_num + (ep->endpoint_num == 0 ? 1 : 0);
+
+    xhci_trb_t event;
+
+    if (setup_pkt) {
+        issue_setup_stage_trb(ep_tr, setup_pkt);
+        issue_data_stage_trb(ep_tr, buffer, XHCI_TRB_DIR_OUT, length);
+        issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_IN);
+    } else {
+        issue_normal_trb(ep_tr, buffer, XHCI_TRB_DIR_OUT, length);
+    }
+    ring_device_doorbell(ws->db_regs, ep->device_id, ep_id);
+    return (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+}
+
 static bool reset_root_hub_port(const usb_hcd_t *hcd, int port_num)
 {
     const workspace_t *ws = (const workspace_t *)hcd->ws;
@@ -1209,7 +1231,8 @@ static const hcd_methods_t methods = {
     .configure_bulk_ep   = NULL,
     .bulk_transfer       = bulk_transfer,
     .reset_bulk_ep       = reset_bulk_ep,
-    .scan_for_msd        = scan_for_msd
+    .scan_for_msd        = scan_for_msd,
+    .out_data_request    = out_data_request,
 };
 
 //------------------------------------------------------------------------------
