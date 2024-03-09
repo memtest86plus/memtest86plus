@@ -509,6 +509,27 @@ static bool check_for_usb_msd(const usb_hcd_t *hcd, const usb_ep_t *ep0, usb_spe
     } else {
         print_usb_info(" USB drive found on port %i", port_num);
     }
+}
+
+#define CH341_REQ_SERIAL_INIT 0xA1
+#define CH341_REQ_WRITE_REG   0x9A
+
+static bool configure_ch341(const usb_hcd_t *hcd, const usb_ep_t *ep0)
+{
+    usb_setup_pkt_t setup_pkt;
+
+    // Set up serial line
+    build_setup_packet(&setup_pkt, USB_REQ_TO_DEVICE | USB_REQ_VENDOR, CH341_REQ_SERIAL_INIT, 0, 0, 0);
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
+    // div/prescale F3 07 gives 923077 baud, set bit 7 for non-buffered
+    build_setup_packet(&setup_pkt, USB_REQ_TO_DEVICE | USB_REQ_VENDOR, CH341_REQ_WRITE_REG, 0x1312, 0xf387, 0);
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
     return true;
 }
 
@@ -1052,7 +1073,11 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                    device->vendor_id, device->product_id, device->device_major, device->device_minor);
 #endif
 
-    device_type = DEV_UNKNOWN;
+    if (device->vendor_id == 0x1a86 && device->product_id == 0x7523) {
+        device_type = DEV_SERIAL_CH341;
+    } else {
+        device_type = DEV_UNKNOWN;
+    }
 
     // Fetch the descriptors for the first configuration into the data transfer buffer. In theory a keyboard device
     // may have more than one configuration and may only support the boot protocol in another configuration, but
@@ -1114,6 +1139,14 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
 
                 print_usb_info(" Keyboard %04x:%04x found on port %i interface %i endpoint %i",
                                (uintptr_t)vendor_id, (uintptr_t)product_id,
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+
+            } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CH341) {
+                if (!configure_ch341(hcd, &ep0)) break;
+                print_hcd = hcd;
+                print_ep = kbd;
+
+                print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i",
                                port_num, kbd->interface_num, kbd->endpoint_num);
             }
 

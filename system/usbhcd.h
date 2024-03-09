@@ -45,6 +45,7 @@ typedef enum {
     DEV_UNKNOWN,
     DEV_KEYBOARD,
     DEV_SERIAL,
+    DEV_SERIAL_CH341,
 } usb_device_type_t;
 
 /**
