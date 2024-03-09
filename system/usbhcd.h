@@ -128,6 +128,7 @@ typedef struct {
     bool    (*bulk_transfer)        (usb_hcd_r, const usb_ep_t *, void *, size_t, bool);
     bool    (*reset_bulk_ep)        (usb_hcd_r, const usb_ep_t *, int);
     bool    (*scan_for_msd)         (usb_hcd_r);
+    bool    (*out_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
 } hcd_methods_t;
 
 /**
@@ -406,5 +407,10 @@ bool usb_hcd_available(void);
  * Used by reports.c when the user requests a report save.
  */
 bool usb_scan_for_msd(void);
+
+/**
+ * Prints a string to the USB-serial adapter discovered by find_usb_keyboards.
+ */
+bool usb_serial_print(const char *str);
 
 #endif // USBHCD_H

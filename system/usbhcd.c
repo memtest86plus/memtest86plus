@@ -81,7 +81,8 @@ static const hcd_methods_t methods = {
     .configure_bulk_ep   = NULL,
     .bulk_transfer       = NULL,
     .reset_bulk_ep       = NULL,
-    .scan_for_msd        = NULL
+    .scan_for_msd        = NULL,
+    .out_data_request    = NULL,
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.
@@ -110,6 +111,8 @@ static usb_msd_t usb_msd_info;
 // Index into hcd_list of the controller hosting the MSD. Stored as an index because
 // a cached usb_hcd_t pointer would go stale on relocation (see the note in reloc64.c).
 static int usb_msd_hcd_idx = -1;
+static const usb_hcd_t *print_hcd = NULL;
+static usb_ep_t *print_ep = NULL;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -1289,4 +1292,25 @@ bool usb_scan_for_msd(void)
     }
     usb_runtime_scan = false;
     return usb_mass_storage_found;
+}
+
+bool usb_serial_print(const char *str)
+{
+    const char *packet = str;
+
+    // OUT data method not implemented for all controller types yet
+    if (!print_hcd || !print_hcd->methods->out_data_request)
+        return false;
+
+    while (*packet != '\0') {
+        int i;
+
+        for (i = 0; packet[i] != '\0' && i < print_ep->max_packet_size; i++)
+            ;
+        if (!print_hcd->methods->out_data_request(print_hcd, print_ep, NULL, packet, i)) {
+            return false;
+        }
+        packet = &packet[i];
+    }
+    return true;
 }
