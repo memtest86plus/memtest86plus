@@ -800,6 +800,39 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
     return true;
 }
 
+
+static bool configure_bulk_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
+                                         int tt_think_time, uintptr_t tr_addr, size_t a_size)
+{
+    xhci_trb_t event;
+
+    // Calculate the endpoint ID. This is used both to select an endpoint context and as a doorbell target.
+    int ep_id = 2 * ep->endpoint_num;  // EP <N> OUT
+
+    // The input context has already been initialised, so we just need to change the values used by the
+    // CONFIGURE_ENDPOINT command before issuing the command.
+
+    xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
+    ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(ep_id);
+
+    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
+    slot_context->params1           = ep_id << 27 | hub_flag << 26 | (slot_context->params1 & 0x00ffffff);
+    slot_context->num_ports         = num_ports;
+    slot_context->params2           = ep->device_speed == USB_SPEED_HIGH ? tt_think_time : 0;
+
+    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * ws->context_size);
+    ep_context->params1             = 0;
+    ep_context->params2             = XHCI_EP_BULK_OUT << 3 | 3 << 1; // EP Type | CErr
+    ep_context->max_burst_size      = 0;
+    ep_context->max_packet_size     = ep->max_packet_size;
+    ep_context->tr_dequeue_ptr      = tr_addr | 1;
+    ep_context->average_trb_length  = a_size;
+
+    enqueue_xhci_command(ws, XHCI_TRB_CONFIGURE_ENDPOINT | ep->device_id << 24, ws->input_context_addr, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    return (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+}
+
 static bool configure_interrupt_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
                                          int tt_think_time, uintptr_t tr_addr, size_t rpt_size)
 {
@@ -849,7 +882,10 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
 
     // Fill in the lookup tables in the workspace.
     ws->kbd_slot_id[kbd_idx] = ep->device_id;
-    ws->kbd_ep_id  [kbd_idx] = 2 * ep->endpoint_num + 1;  // EP <N> IN
+    ws->kbd_ep_id  [kbd_idx] = 2 * ep->endpoint_num + (IS_EP_INT(ep) ? 1 : 0); // assume OUT if not interrupt ...
+
+    if (!IS_EP_INT(ep))
+        return configure_bulk_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), ep->max_packet_size);
 
     // Configure the controller.
     return configure_interrupt_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), sizeof(hid_kbd_rpt_t));
