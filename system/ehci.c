@@ -881,6 +881,9 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
             hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
+            if (!IS_EP_INT(kbd))
+                continue;
+
             build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
             build_ehci_qhd(kbd_qhd, kbd_qtd, kbd, true);
 
