@@ -152,7 +152,7 @@ static void parse_serial_params(const char *params)
     }
 
     // No TTY port passed, use default ttyS0
-    if (strncmp(params, "ttyS", 5) == 0) {
+    if (strncmp(params, "ttyS", 4) != 0) {
         return;
     }
 
