@@ -684,6 +684,9 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
+        if (!IS_EP_INT(kbd))
+            continue;
+
         ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
         ehci_qtd_t *kbd_qtd = &ws->qtd[3 + kbd_idx];
 
