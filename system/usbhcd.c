@@ -68,6 +68,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = NULL,
     .get_data_request    = NULL,
+    .out_data_request    = NULL,
     .poll_keyboards      = NULL
 };
 
@@ -87,6 +88,9 @@ static int num_hcd = 0;
 
 static int print_row = 0;
 static int print_col = 0;
+
+static const usb_hcd_t *print_hcd = NULL;
+static usb_ep_t *print_ep = NULL;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -945,4 +949,25 @@ uint8_t get_usb_keycode(void)
         }
     }
     return 0;
+}
+
+bool usb_serial_print(const char *str)
+{
+    const char *packet = str;
+
+    // OUT data method not implemented for all controller types yet
+    if (!print_hcd || !print_hcd->methods->out_data_request)
+        return false;
+
+    while (*packet != '\0') {
+        int i;
+
+        for (i = 0; packet[i] != '\0' && i < print_ep->max_packet_size; i++)
+            ;
+        if (!print_hcd->methods->out_data_request(print_hcd, print_ep, NULL, packet, i)) {
+            return false;
+        }
+        packet = &packet[i];
+    }
+    return true;
 }

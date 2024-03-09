@@ -121,6 +121,7 @@ typedef struct {
     bool    (*configure_kbd_ep)     (usb_hcd_r, const usb_ep_t *, int);
     bool    (*setup_request)        (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *);
     bool    (*get_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
+    bool    (*out_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
     void    (*poll_keyboards)       (usb_hcd_r);
 } hcd_methods_t;
 
@@ -338,5 +339,10 @@ void find_usb_keyboards(bool pause_if_none);
  * Used internally by keyboard.c.
  */
 uint8_t get_usb_keycode(void);
+
+/**
+ * Prints a string to the USB-serial adapter discovered by find_usb_keyboards.
+ */
+bool usb_serial_print(const char *str);
 
 #endif // USBHCD_H
