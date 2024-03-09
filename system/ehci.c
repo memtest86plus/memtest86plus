@@ -437,6 +437,24 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return do_async_transfer(ws, 3);
 }
 
+// FIXME
+static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+                             const void *buffer, size_t length)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    if (setup_pkt) {
+        build_ehci_qtd(&ws->qtd[0], &ws->qtd[2], EHCI_QTD_PID_SETUP, EHCI_QTD_DT(0), setup_pkt, sizeof(usb_setup_pkt_t));
+        build_ehci_qtd(&ws->qtd[1], &ws->qtd[2], EHCI_QTD_PID_IN,    EHCI_QTD_DT(1), NULL, 0);
+        build_ehci_qtd(&ws->qtd[2], &ws->qtd[2], EHCI_QTD_PID_OUT,   EHCI_QTD_DT(1), buffer, length);
+    } else {
+        // what DT ?
+        build_ehci_qtd(&ws->qtd[0], &ws->qtd[0], EHCI_QTD_PID_OUT,   EHCI_QTD_DT(1), buffer, length);
+    }
+    build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
+    return do_async_transfer(ws, 3);
+}
+
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -479,6 +497,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
+    .out_data_request    = out_data_request,
     .poll_keyboards      = poll_keyboards
 };
 
