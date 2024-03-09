@@ -39,6 +39,15 @@
 #define HCD_KC_BUFFER_SIZE      8  // keycodes
 
 /**
+ * Device types that we recognize
+ */
+typedef enum {
+    DEV_UNKNOWN,
+    DEV_KEYBOARD,
+    DEV_SERIAL,
+} usb_device_type_t;
+
+/**
  * A USB device speed (used internally by the various HCI drivers).
  */
 typedef enum  __attribute__ ((packed)) {
@@ -62,6 +71,8 @@ typedef struct __attribute__ ((packed)) {
     uint8_t         reserved;
 } usb_ep_t;
 
+#define IS_EP_INT(ep) ((ep)->interval != 0)
+#define IS_EP_KEYBOARD(ep) ((ep)->reserved == (uint8_t) DEV_KEYBOARD)
 /**
  * A USB parent device descriptor (used internally by the various HCI drivers).
  */

@@ -216,7 +216,8 @@ static int get_configuration_descriptors(const usb_hcd_t *hcd, const usb_ep_t *e
 }
 
 static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int desc_length, usb_ep_t keyboards[],
-                                               int max_keyboards, int *num_keyboards)
+                                               int max_keyboards, int *num_keyboards,
+                                               usb_device_type_t *device_type)
 {
     usb_ep_t *kbd = NULL;
     const uint8_t *curr_ptr = desc_buffer + sizeof(usb_config_desc_t);
@@ -239,6 +240,10 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
                 sleep(1);
             }
             if (ifc->class == 3 && ifc->subclass == 1 && ifc->protocol == 1) {
+                *device_type = DEV_KEYBOARD;
+            }
+
+            if (*device_type != DEV_UNKNOWN) {
                 kbd = &keyboards[*num_keyboards];
                 kbd->interface_num = ifc->interface_num;
             } else {
@@ -251,12 +256,25 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
                                (uintptr_t)endpoint->address, (uintptr_t)endpoint->attributes);
                 sleep(1);
             }
-            if (kbd && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
+            if (!kbd) {
+                // next
+            } else if (*device_type == DEV_KEYBOARD && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
+                // register first endpoint that is IN and interrupt
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
                 kbd->interval        = endpoint->interval;
+                kbd->reserved        = (uint8_t) *device_type;
                 kbd = NULL;
 
+                *num_keyboards += 1;
+            } else if (*device_type >= DEV_SERIAL && !(endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x2) {
+                // register first endpoint that is OUT and bulk
+                kbd->endpoint_num    = endpoint->address & 0xf;
+                kbd->max_packet_size = endpoint->max_packet_size;
+                kbd->interval        = 0; // not interrupt endpoint
+                kbd->reserved        = (uint8_t) *device_type;
+
+                kbd = NULL;
                 *num_keyboards += 1;
             }
         }
@@ -741,6 +759,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                                  usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {
     bool keyboard_found = false;
+    usb_device_type_t device_type;
 
     // Set the USB device address. If successful, this also fills in the descriptor for the default control endpoint
     // (ep0) and leaves the device descriptor in the data transfer buffer.
@@ -750,6 +769,13 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     }
     usb_device_desc_t *device = (usb_device_desc_t *)hcd->ws->data_buffer;
     bool is_hub = (device->class == USB_CLASS_HUB);
+
+#if 0
+    print_usb_info("device %04x:%04x bcdDevice %02x.%02x",
+                   device->vendor_id, device->product_id, device->device_major, device->device_minor);
+#endif
+
+    device_type = DEV_UNKNOWN;
 
     // Fetch the descriptors for the first configuration into the data transfer buffer. In theory a keyboard device
     // may have more than one configuration and may only support the boot protocol in another configuration, but
@@ -784,7 +810,8 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         int old_num_keyboards = *num_keyboards;
         int new_num_keyboards = *num_keyboards;
         get_keyboard_info_from_descriptors(hcd->ws->data_buffer, hcd->ws->data_length,
-                                           keyboards, max_keyboards, &new_num_keyboards);
+                                           keyboards, max_keyboards, &new_num_keyboards,
+                                           &device_type);
         if (new_num_keyboards == old_num_keyboards) {
             return false;
         }
@@ -803,10 +830,12 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                     return false;
                 }
             }
-            if (!configure_keyboard(hcd, &ep0, kbd->interface_num)) break;
+            if (IS_EP_KEYBOARD(kbd)) {
+                if (!configure_keyboard(hcd, &ep0, kbd->interface_num)) break;
 
-            print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
-                           port_num, kbd->interface_num, kbd->endpoint_num);
+                print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+            }
 
             keyboard_found = true;
             *num_keyboards += 1;
