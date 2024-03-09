@@ -879,6 +879,39 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
     return true;
 }
 
+
+static bool configure_bulk_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
+                                         int tt_think_time, uintptr_t tr_addr, size_t a_size)
+{
+    xhci_trb_t event;
+
+    // Calculate the endpoint ID. This is used both to select an endpoint context and as a doorbell target.
+    int ep_id = 2 * ep->endpoint_num;  // EP <N> OUT
+
+    // The input context has already been initialised, so we just need to change the values used by the
+    // CONFIGURE_ENDPOINT command before issuing the command.
+
+    xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
+    ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(ep_id);
+
+    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
+    slot_context->params1           = ep_id << 27 | hub_flag << 26 | (slot_context->params1 & 0x00ffffff);
+    slot_context->num_ports         = num_ports;
+    slot_context->params2           = ep->device_speed == USB_SPEED_HIGH ? tt_think_time : 0;
+
+    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * ws->context_size);
+    ep_context->params1             = 0;
+    ep_context->params2             = XHCI_EP_BULK_OUT << 3 | 3 << 1; // EP Type | CErr
+    ep_context->max_burst_size      = 0;
+    ep_context->max_packet_size     = ep->max_packet_size;
+    ep_context->tr_dequeue_ptr      = tr_addr | 1;
+    ep_context->average_trb_length  = a_size;
+
+    enqueue_xhci_command(ws, XHCI_TRB_CONFIGURE_ENDPOINT | ep->device_id << 24, ws->input_context_addr, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    return (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+}
+
 static bool configure_interrupt_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
                                          int tt_think_time, uintptr_t tr_addr, size_t rpt_size)
 {
@@ -928,7 +961,10 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
 
     // Fill in the lookup tables in the workspace.
     ws->kbd_slot_id[kbd_idx] = ep->device_id;
-    ws->kbd_ep_id  [kbd_idx] = 2 * ep->endpoint_num + 1;  // EP <N> IN
+    ws->kbd_ep_id  [kbd_idx] = 2 * ep->endpoint_num + (IS_EP_INT(ep) ? 1 : 0); // assume OUT if not interrupt ...
+
+    if (!IS_EP_INT(ep))
+        return configure_bulk_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), ep->max_packet_size);
 
     // Request whole packets, as some devices send packets longer than the
     // boot protocol report (a shorter request would cause a babble error).
@@ -945,57 +981,6 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
     return configure_interrupt_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), sizeof(hid_kbd_rpt_t));
 }
 
-static bool configure_bulk_endpoint(workspace_t *ws, const usb_ep_t *ep, int ep_id, bool is_out)
-{
-    xhci_trb_t event;
-
-    int xhci_ep_type = is_out ? XHCI_EP_BULK_OUT : XHCI_EP_BULK_IN;
-
-    // Allocate a transfer ring for this endpoint.
-    uintptr_t tr_addr = heap_alloc(HEAP_TYPE_LM_1, sizeof(ep_tr_t), 64);
-    if (tr_addr == 0) return false;
-
-    ep_tr_t *ep_tr = (ep_tr_t *)tr_addr;
-    memset((void *)ep_tr, 0, sizeof(ep_tr_t));
-    ep_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
-
-    xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
-    ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(ep_id);
-
-    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
-    int current_max_ep_id = slot_context->params1 >> 27;
-    if (ep_id > current_max_ep_id) {
-        slot_context->params1 = (slot_context->params1 & 0x07ffffff) | (ep_id << 27);
-    }
-
-    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * ws->context_size);
-    ep_context->params1             = 0;
-    ep_context->params2             = xhci_ep_type << 3 | 3 << 1; // EP Type | CErr
-    ep_context->interval            = 0;
-    ep_context->max_burst_size      = 0;
-    ep_context->max_packet_size     = ep->max_packet_size;
-    ep_context->tr_dequeue_ptr      = tr_addr | 1;
-    ep_context->average_trb_length  = ep->max_packet_size;
-    ep_context->max_esit_payload_l  = 0;
-    ep_context->max_esit_payload_h  = 0;
-
-    enqueue_xhci_command(ws, XHCI_TRB_CONFIGURE_ENDPOINT | ep->device_id << 24, ws->input_context_addr, 0);
-    ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
-        return false;
-    }
-
-    // Store the transfer ring address in the data_buffer so the caller can retrieve it.
-    *(uintptr_t *)ws->base_ws.data_buffer = tr_addr;
-
-    return true;
-}
-
-static bool configure_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id, bool is_out)
-{
-    workspace_t *ws = (workspace_t *)hcd->ws;
-    return configure_bulk_endpoint(ws, ep, ep_id, is_out);
-}
 
 static bool bulk_transfer(const usb_hcd_t *hcd, const usb_ep_t *ep, void *buffer, size_t length, bool is_out)
 {
@@ -1216,7 +1201,7 @@ static const hcd_methods_t methods = {
     .get_data_request    = get_data_request,
     .poll_keyboards      = poll_keyboards,
     .rearm_keyboards     = rearm_keyboards,
-    .configure_bulk_ep   = configure_bulk_ep,
+    .configure_bulk_ep   = NULL,
     .bulk_transfer       = bulk_transfer,
     .reset_bulk_ep       = reset_bulk_ep,
     .scan_for_msd        = scan_for_msd
