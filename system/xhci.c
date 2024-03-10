@@ -1187,6 +1187,9 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     // Initialise the interrupt TRB ring for each keyboard interface.
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
+        usb_ep_t *ep = &keyboards[kbd_idx];
+        ep->driver_data = (uintptr_t)kbd_tr;
+
         kbd_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
