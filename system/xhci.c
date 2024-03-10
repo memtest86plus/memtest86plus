@@ -342,6 +342,9 @@ typedef struct {
 
     // Keyboard endpoint ID lookup table
     uint8_t             kbd_ep_id   [MAX_KEYBOARDS];
+
+    // Keyboard endpoint data lookup table
+    uintptr_t           kbd_ep      [MAX_KEYBOARDS];
 } workspace_t  __attribute__ ((aligned (64)));
 
 //------------------------------------------------------------------------------
@@ -883,6 +886,7 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
     // Fill in the lookup tables in the workspace.
     ws->kbd_slot_id[kbd_idx] = ep->device_id;
     ws->kbd_ep_id  [kbd_idx] = 2 * ep->endpoint_num + (IS_EP_INT(ep) ? 1 : 0); // assume OUT if not interrupt ...
+    ws->kbd_ep     [kbd_idx] = (uintptr_t) ep; // for looking up events
 
     if (!IS_EP_INT(ep))
         return configure_bulk_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), ep->max_packet_size);
@@ -912,6 +916,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 
         int kbd_idx = identify_keyboard(ws, event_slot_id(&event), event_ep_id(&event));
         if (kbd_idx < 0) continue;
+        if (!IS_EP_KEYBOARD((usb_ep_t *)(ws->kbd_ep[kbd_idx]))) continue;
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
