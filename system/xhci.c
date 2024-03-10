@@ -1228,6 +1228,9 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
         kbd_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
 
+        if (!IS_EP_KEYBOARD(ep))
+            continue;
+
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
         issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));
         ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
