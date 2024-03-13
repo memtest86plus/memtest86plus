@@ -6,7 +6,6 @@
 // MemTest86+ V5 Specific code (GPL V2.0)
 // By Samuel DEMEULEMEESTER, sdemeule@memtest.org
 // http://www.canardpc.com - http://www.memtest.org
-// Thanks to Passmark for calculate_chunk() and various comments !
 // ----------------------------------------------------
 // test.c - MemTest-86  Version 3.4
 //

@@ -343,6 +343,14 @@ void display_start_test(void)
     display_test_description(test_list[test_num].description);
     test_bar_length = 0;
     test_ticks = 0;
+
+#if 0
+    uint64_t current_time = get_tsc();
+    int secs = (current_time - run_start_time) / (1000 * (uint64_t)clks_per_msec);
+    int mins  = secs / 60; secs %= 60;
+    int hours = mins / 60; mins %= 60;
+    do_trace(0, "T %i: %i:%02i:%02i", test_num, hours, mins, secs);
+#endif
 }
 
 void display_error_count(void)

@@ -8,6 +8,7 @@
 #include "pci.h"
 #include "unistd.h"
 #include "string.h"
+#include "macros.h"
 
 #include "cpuinfo.h"
 #include "memctrl.h"
@@ -1158,7 +1159,7 @@ static bool find_smb_controller(uint16_t vid, uint16_t did)
     {
         case PCI_VID_INTEL:
         {
-            if (find_in_did_array(did, intel_ich5_dids, sizeof(intel_ich5_dids) / sizeof(intel_ich5_dids[0]))) {
+            if (find_in_did_array(did, intel_ich5_dids, ARRAY_SIZE(intel_ich5_dids))) {
                 return ich5_get_smb();
             }
             if (did == 0x7113) { // 82371AB/EB/MB PIIX4
