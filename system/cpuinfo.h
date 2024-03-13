@@ -120,6 +120,11 @@ extern uint32_t ram_speed;
 extern uint32_t clks_per_msec;
 
 /**
+ * Number of loops required for 1us delay. Not very accurate but close enough.
+ */
+extern uint32_t loops_per_usec;
+
+/**
  * Determines the CPU info and stores it in the exported variables.
  */
 void cpuinfo_init(void);
