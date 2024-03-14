@@ -335,6 +335,29 @@ static bool configure_ch341(const usb_hcd_t *hcd, const usb_ep_t *ep0)
     return true;
 }
 
+#define CP210X_IFC_ENABLE       0x00
+#define CP210X_SET_BAUDRATE     0x1E
+#define CP210X_UART_ENABLE      0x0001
+#define CP210X_UART_DISABLE     0x0000
+
+static bool configure_cp210x(const usb_hcd_t *hcd, const usb_ep_t *ep0, int interface_num)
+{
+    usb_setup_pkt_t setup_pkt;
+
+    build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_VENDOR, CP210X_IFC_ENABLE, CP210X_UART_ENABLE, interface_num, 0);
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
+    const uint32_t baud_le = 921600; // really 923076 on CP2104, CP2105, CP2110
+    build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_VENDOR, CP210X_SET_BAUDRATE, 0, interface_num, 4);
+    if (!hcd->methods->out_data_request(hcd, ep0, &setup_pkt, &baud_le, 4)) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_devices,
                            usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {
@@ -803,6 +826,8 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
 
     if (device->vendor_id == 0x1a86 && device->product_id == 0x7523) {
         device_type = DEV_SERIAL_CH341;
+    } else if (device->vendor_id == 0x10c4) {
+        device_type = DEV_SERIAL_CP210X;
     } else {
         device_type = DEV_UNKNOWN;
     }
@@ -872,6 +897,14 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                 print_ep = kbd;
 
                 print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+
+            } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CP210X) {
+                if (!configure_cp210x(hcd, &ep0, kbd->interface_num)) break;
+                print_hcd = hcd;
+                print_ep = kbd;
+
+                print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i",
                                port_num, kbd->interface_num, kbd->endpoint_num);
             }
 
