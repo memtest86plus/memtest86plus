@@ -358,6 +358,53 @@ static bool configure_cp210x(const usb_hcd_t *hcd, const usb_ep_t *ep0, int inte
     return true;
 }
 
+#define pl2303_vendor_read(value) do { \
+    build_setup_packet(&setup_pkt, 0xc0, 0x01, value, 0, 1); \
+    if (!hcd->methods->get_data_request(hcd, ep0, &setup_pkt, &buf1, 1)) { \
+        return false; \
+    } \
+  } while (0)
+
+#define pl2303_vendor_write(value, index) do { \
+    build_setup_packet(&setup_pkt, 0x40, 0x01, value, index, 0); \
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) { \
+        return false; \
+    } \
+  } while (0)
+
+static bool configure_pl2303(const usb_hcd_t *hcd, const usb_ep_t *ep0)
+{
+    usb_setup_pkt_t setup_pkt;
+    uint8_t buf1;
+
+    // Magic sequence
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_write(0x0404, 0);
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_read(0x8383);
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_write(0x0404, 1);
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_read(0x8383);
+    pl2303_vendor_write(0, 1);
+    pl2303_vendor_write(1, 0);
+
+    // For non-legacy variants
+    pl2303_vendor_write(2, 0x44);
+    pl2303_vendor_write(8, 0);
+    pl2303_vendor_write(9, 0);
+
+    // 921600 baud, 1 stop bit, parity none, 8 bits
+    uint8_t setline[7] = {0, 0x10, 0x0e, 0, 0, 0, 8};
+
+    build_setup_packet(&setup_pkt, 0x21, 0x20, 0, 0, 7);
+    if (!hcd->methods->out_data_request(hcd, ep0, &setup_pkt, setline, 7)) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_devices,
                            usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {
@@ -828,6 +875,8 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         device_type = DEV_SERIAL_CH341;
     } else if (device->vendor_id == 0x10c4) {
         device_type = DEV_SERIAL_CP210X;
+    } else if (device->vendor_id == 0x067b) {
+        device_type = DEV_SERIAL_PL2303;
     } else {
         device_type = DEV_UNKNOWN;
     }
@@ -905,6 +954,14 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                 print_ep = kbd;
 
                 print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+
+            } else if (kbd->reserved == (uint8_t) DEV_SERIAL_PL2303) {
+                if (!configure_pl2303(hcd, &ep0)) break;
+                print_hcd = hcd;
+                print_ep = kbd;
+
+                print_usb_info(" PL2303 serial adapter found on port %i interface %i endpoint %i",
                                port_num, kbd->interface_num, kbd->endpoint_num);
             }
 
