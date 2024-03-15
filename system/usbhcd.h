@@ -47,6 +47,7 @@ typedef enum {
     DEV_SERIAL,
     DEV_SERIAL_CH341,
     DEV_SERIAL_CP210X,
+    DEV_SERIAL_PL2303,
 } usb_device_type_t;
 
 /**
