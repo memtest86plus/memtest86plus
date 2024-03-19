@@ -12,6 +12,7 @@ SECTIONS {
 		*(.data)
 		_end = . ;
 	}
+	.shstrtab : { *(.shstrtab) }
 	/DISCARD/ : { *(*) }
 
 	_sys_size = (_end - _start + 15) >> 4;
