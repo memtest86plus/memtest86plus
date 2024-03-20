@@ -89,8 +89,9 @@ static int num_hcd = 0;
 static int print_row = 0;
 static int print_col = 0;
 
-static const usb_hcd_t *print_hcd = NULL;
-static usb_ep_t *print_ep = NULL;
+static usb_ep_t uninit_ep;
+static usb_ep_t *print_ep = &uninit_ep;
+static const usb_hcd_t *print_hcd = &hcd_list[0];
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -1079,8 +1080,11 @@ bool usb_serial_print(const char *str)
 {
     const char *packet = str;
 
+    if (print_ep == &uninit_ep)
+        return false;
+
     // OUT data method not implemented for all controller types yet
-    if (!print_hcd || !print_hcd->methods->out_data_request)
+    if (!print_hcd->methods->out_data_request)
         return false;
 
     while (*packet != '\0') {
