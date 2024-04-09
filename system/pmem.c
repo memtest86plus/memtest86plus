@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from memtest86+ memsize.c
 //
@@ -225,23 +225,14 @@ static void init_pm_map(const e820_entry_t e820_map[], int e820_entries)
 static void sort_pm_map(void)
 {
     // Do an insertion sort on the pm_map. On an already sorted list this should be a O(n) algorithm.
-    for (int i = 0; i < pm_map_size; i++) {
-        // Find where to insert the current element.
-        int j = i - 1;
-        while (j >= 0) {
-            if (pm_map[i].start > pm_map[j].start) {
-                j++;
-                break;
-            }
+    for (int i = 1; i < pm_map_size; i++) {
+        pm_map_t candidate = pm_map[i];
+        int j = i;
+        while ((j > 0) && (pm_map[j-1].start > candidate.start)) {
+            pm_map[j] = pm_map[j-1];
             j--;
         }
-        // Insert the current element.
-        if (i != j) {
-            pm_map_t temp;
-            temp = pm_map[i];
-            memmove(&pm_map[j], &pm_map[j+1], (i - j) * sizeof(temp));
-            pm_map[j] = temp;
-        }
+        pm_map[j] = candidate;
     }
 }
 
