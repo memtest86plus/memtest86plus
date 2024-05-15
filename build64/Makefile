@@ -77,6 +77,7 @@ TST_OBJS = tests/addr_walk1.o \
 
 APP_OBJS = app/badram.o \
            app/config.o \
+           app/sound.o \
            app/display.o \
            app/error.o \
            app/interrupt.o \
