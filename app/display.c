@@ -27,6 +27,8 @@
 
 #include "tests.h"
 
+#include "sound.h"
+
 #include "display.h"
 
 //------------------------------------------------------------------------------
@@ -393,6 +395,8 @@ void display_big_status(bool pass)
         return;
     }
 
+    sound_beep(pass);
+
     save_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
 
     set_background_colour(BLACK);
@@ -572,6 +576,7 @@ void do_tick(int my_cpu)
     if (update_spinner) {
         spin_idx = (spin_idx + 1) % NUM_SPIN_STATES;
         display_spinner(spin_state[spin_idx]);
+        sound_tick_task();
     }
 
     // This only tick one time per second
