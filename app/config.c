@@ -99,6 +99,7 @@ bool            enable_sm          = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
 bool            enable_numa        = false;
+bool            enable_sound       = false;
 
 bool            enable_ecc_polling = false;
 
@@ -262,6 +263,8 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "high", 5) == 0) {
             power_save = POWER_SAVE_HIGH;
         }
+    } else if (strncmp(option, "sound", 6) == 0) {
+        enable_sound = true;
     } else if (strncmp(option, "trace", 6) == 0) {
         enable_trace = true;
     } else if (strncmp(option, "usbdebug", 9) == 0) {
