@@ -228,7 +228,7 @@ GRUB_LIB_DIR ?= /usr/lib/grub
 
 GRUB_MKIMAGE := $(shell command -v grub2-mkimage || command -v grub-mkimage)
 
-GRUB_MODULES = iso9660 fat part_msdos all_video font gfxterm gfxmenu \
+GRUB_MODULES = iso9660 fat part_msdos part_gpt all_video font gfxterm gfxmenu \
                boot chain configfile echo ls
 
 grub-eltorito.img:
