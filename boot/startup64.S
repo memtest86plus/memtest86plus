@@ -465,18 +465,37 @@ gdt_end:
 
 	.data
 
-	.macro	ptes64 start, count=64
-	.quad	\start + 0x0000000 + 0x83
-	.quad	\start + 0x0200000 + 0x83
-	.quad	\start + 0x0400000 + 0x83
-	.quad	\start + 0x0600000 + 0x83
-	.quad	\start + 0x0800000 + 0x83
-	.quad	\start + 0x0A00000 + 0x83
-	.quad	\start + 0x0C00000 + 0x83
-	.quad	\start + 0x0E00000 + 0x83
-	.if \count-1
-	ptes64	"(\start+0x01000000)",\count-1
-	.endif
+	.macro	ptes8 start, flags
+	.quad	\start + 0x00000000 + \flags
+	.quad	\start + 0x00200000 + \flags
+	.quad	\start + 0x00400000 + \flags
+	.quad	\start + 0x00600000 + \flags
+	.quad	\start + 0x00800000 + \flags
+	.quad	\start + 0x00A00000 + \flags
+	.quad	\start + 0x00C00000 + \flags
+	.quad	\start + 0x00E00000 + \flags
+	.endm
+
+	.macro	ptes64 start, flags
+	ptes8	\start + 0x00000000, \flags
+	ptes8	\start + 0x01000000, \flags
+	ptes8	\start + 0x02000000, \flags
+	ptes8	\start + 0x03000000, \flags
+	ptes8	\start + 0x04000000, \flags
+	ptes8	\start + 0x05000000, \flags
+	ptes8	\start + 0x06000000, \flags
+	ptes8	\start + 0x07000000, \flags
+	.endm
+
+	.macro	ptes512 start, flags
+	ptes64	\start + 0x00000000, \flags
+	ptes64	\start + 0x08000000, \flags
+	ptes64	\start + 0x10000000, \flags
+	ptes64	\start + 0x18000000, \flags
+	ptes64	\start + 0x20000000, \flags
+	ptes64	\start + 0x28000000, \flags
+	ptes64	\start + 0x30000000, \flags
+	ptes64	\start + 0x38000000, \flags
 	.endm
 
 	.macro	maxdepth depth=1
@@ -514,22 +533,22 @@ pdp:
 	.align	4096
 	.globl	pd0
 pd0:
-	ptes64	0x0000000000000000
+	ptes512	0x0000000000000000, 0x0000000000000083
 
 	.align	4096
 	.globl	pd1
 pd1:
-	ptes64	0x0000000040000000
+	ptes512	0x0000000040000000, 0x0000000000000083
 
 	.align	4096
 	.globl	pd2
 pd2:
-	ptes64	0x0000000080000000
+	ptes512	0x0000000080000000, 0x0000000000000083
 
 	.align	4096
 	.globl	pd3
 pd3:
-	ptes64	0x00000000C0000000
+	ptes512	0x00000000C0000000, 0x0000000000000083
 
 	.previous
 
