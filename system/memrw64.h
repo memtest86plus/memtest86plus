@@ -21,12 +21,21 @@
 static inline uint64_t read64(const volatile uint64_t *ptr)
 {
     uint64_t val;
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__(
         "movq %1, %0"
         : "=r" (val)
         : "m" (*ptr)
         : "memory"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__(
+        "ld.d %0, %1"
+        : "=r" (val)
+        : "m" (*ptr)
+        : "memory"
+    );
+#endif
     return val;
 }
 
@@ -35,6 +44,7 @@ static inline uint64_t read64(const volatile uint64_t *ptr)
  */
 static inline void write64(const volatile uint64_t *ptr, uint64_t val)
 {
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__(
         "movq %1, %0"
         :
@@ -42,6 +52,15 @@ static inline void write64(const volatile uint64_t *ptr, uint64_t val)
           "r" (val)
         : "memory"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__(
+        "st.d %1, %0"
+        :
+        : "m" (*ptr),
+          "r" (val)
+        : "memory"
+    );
+#endif
 }
 
 /**
@@ -50,6 +69,7 @@ static inline void write64(const volatile uint64_t *ptr, uint64_t val)
  */
 static inline void flush64(const volatile uint64_t *ptr, uint64_t val)
 {
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__(
         "movl %1, %0\n"
         "movl %0, %1"
@@ -58,6 +78,16 @@ static inline void flush64(const volatile uint64_t *ptr, uint64_t val)
           "r" (val)
         : "memory"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__(
+        "st.d %1, %0\n"
+        "ld.d %1, %0"
+        :
+        : "m" (*ptr),
+          "r" (val)
+        : "memory"
+    );
+#endif
 }
 
 #endif // MEMRW64_H
