@@ -209,6 +209,7 @@ void cpuid_init(void);
  */
 core_type_t get_ap_hybrid_type(void);
 
+#if defined(__i386__) || defined(__x86_64__)
 /**
  * Executes the cpuid instruction.
  */
@@ -225,5 +226,6 @@ static inline void cpuid(uint32_t op, uint32_t count, uint32_t *eax, uint32_t *e
           "2"  (*ecx)
     );
 }
+#endif
 
 #endif // CPUID_H
