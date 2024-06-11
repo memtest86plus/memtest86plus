@@ -12,8 +12,9 @@
  */
 
 #include <stdint.h>
+#include "boot.h"
 
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
 #define NATIVE_MSB              UINT64_C(0x8000000000000000)
 #else
 #define NATIVE_MSB              0x80000000
@@ -71,7 +72,7 @@
 
 #define efiapi __attribute__((ms_abi))
 
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
 typedef uint64_t        uintn_t;
 #else
 typedef uint32_t        uintn_t;

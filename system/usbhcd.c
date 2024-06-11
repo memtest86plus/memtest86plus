@@ -7,6 +7,7 @@
 #include "screen.h"
 #include "usb.h"
 #include "vmem.h"
+#include "boot.h"
 
 #include "ehci.h"
 #include "ohci.h"
@@ -424,7 +425,7 @@ static void reset_usb_controller(hci_info_t *hci)
     uintptr_t mmio_size = pci_config_read32(bus, dev, func, bar);
     pci_config_write32(bus, dev, func, bar, base_addr);
     bool in_io_space = base_addr & 0x1;
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
     if (!in_io_space && (base_addr & 0x4)) {
         base_addr += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
         pci_config_write32(bus, dev, func, bar + 4, 0xffffffff);

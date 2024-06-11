@@ -16,10 +16,12 @@
 
 #include "test.h"
 
+#include "boot.h"
+
 /**
  * Test word atomic read and write functions.
  */
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
 #include "memrw64.h"
 #define read_word   read64
 #define write_word  write64
@@ -74,7 +76,7 @@ static inline uintptr_t round_up(uintptr_t value, size_t align_size)
 static inline testword_t prsg(testword_t state)
 {
     // This uses the algorithms described at https://en.wikipedia.org/wiki/Xorshift
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
     state ^= state << 13;
     state ^= state >> 7;
     state ^= state << 17;

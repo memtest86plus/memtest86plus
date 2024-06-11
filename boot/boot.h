@@ -58,6 +58,12 @@
 #define E820_TYPE	16		/* offsetof(e820_entry.type) */
 #define E820_ENTRY_SIZE 20		/* sizeof(e820_entry) */
 
+/* Define the 64bit and 32bit macro */
+
+#if defined(__x86_64__)
+#define CONFIG_64BIT
+#endif
+
 #ifndef __ASSEMBLY__
 
 #include <stdint.h>

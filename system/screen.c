@@ -306,7 +306,7 @@ void screen_init(void)
         }
 
         lfb_base = screen_info->lfb_base;
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
         if (LFB_CAPABILITY_64BIT_BASE & screen_info->capabilities) {
             lfb_base |= (uintptr_t)screen_info->ext_lfb_base << 32;
         }
