@@ -60,7 +60,7 @@
 
 /* Define the 64bit and 32bit macro */
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__loongarch_lp64)
 #define CONFIG_64BIT
 #endif
 
