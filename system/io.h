@@ -20,6 +20,7 @@
  * (original contained no copyright statement)
  */
 
+#if defined(__x86_64) || defined(__i386__)
 #ifdef SLOW_IO_BY_JUMPING
 #define __SLOW_DOWN_IO __asm__ __volatile__("jmp 1f\n1:\tjmp 1f\n1:")
 #else
@@ -117,6 +118,105 @@ __OUTS(l)
 ((__builtin_constant_p((port)) && (port) < 256) ? \
     __inlc(port) : \
     __inl(port))
+
+#elif defined(__loongarch_lp64)
+
+#define LOONGSON_IO_PROT_BASE 0x0efdfc000000
+
+static __inline uint8_t __inb (int port)
+{
+    unsigned char val;
+
+    __asm__ __volatile__ (
+        "li.d $t0, 0x28\n\t"
+        "csrwr $t0, 0x0\n\t"
+        "ld.b %0, %1, 0 \n\t"
+        "csrwr $t0, 0x0\n\t"
+        : "=r" (val)
+        : "r" (LOONGSON_IO_PROT_BASE + port)
+        : "$t0"
+    );
+    return val;
+}
+
+static __inline uint16_t __inw (int port)
+{
+    unsigned short val;
+
+    __asm__ __volatile__ (
+        "li.d $t0, 0x28\n\t"
+        "csrwr $t0, 0x0\n\t"
+        "ld.h %0, %1, 0 \n\t"
+        "csrwr $t0, 0x0\n\t"
+        : "=r" (val)
+        : "r" (LOONGSON_IO_PROT_BASE + port)
+        : "$t0"
+    );
+    return val;
+}
+
+static __inline uint32_t __inl (int port)
+{
+    unsigned int val;
+
+    __asm__ __volatile__ (
+        "li.d $t0, 0x28\n\t"
+        "csrwr $t0, 0x0\n\t"
+        "ld.w %0, %1, 0 \n\t"
+        "csrwr $t0, 0x0\n\t"
+        : "=r" (val)
+        : "r" (LOONGSON_IO_PROT_BASE + port)
+        : "$t0"
+    );
+    return val;
+}
+
+static __inline void __outb (uint8_t val, int port)
+{
+    __asm__ __volatile__ (
+        "li.d $t0, 0x28\n\t"
+        "csrwr $t0, 0x0\n\t"
+        "st.b %z0, %1, 0 \n\t"
+        "csrwr $t0, 0x0\n\t"
+        :
+        : "Jr" (val), "r" (LOONGSON_IO_PROT_BASE + port)
+        : "$t0"
+    );
+}
+
+static __inline void __outw (uint16_t val, int port)
+{
+    __asm__ __volatile__ (
+        "li.d $t0, 0x28\n\t"
+        "csrwr $t0, 0x0\n\t"
+        "st.h %z0, %1, 0 \n\t"
+        "csrwr $t0, 0x0\n\t"
+        :
+        : "Jr" (val), "r" (LOONGSON_IO_PROT_BASE + port)
+        : "$t0"
+    );
+}
+
+static __inline void __outl (uint32_t val, int port)
+{
+    __asm__ __volatile__ (
+        "li.d $t0, 0x28\n\t"
+        "csrwr $t0, 0x0\n\t"
+        "st.w %z0, %1, 0 \n\t"
+        "csrwr $t0, 0x0\n\t"
+        :
+        : "Jr" (val), "r" (LOONGSON_IO_PROT_BASE + port)
+        : "$t0"
+    );
+}
+
+#define outb(val,port) __outb(val,port)
+#define inb(port) __inb(port)
+#define outw(val,port) __outw(val,port)
+#define inw(port) __inw(port)
+#define outl(val,port) __outl(val,port)
+#define inl(port) __inl(port)
+#endif
 
 static __inline unsigned char
 inb_p (unsigned short int __port)
