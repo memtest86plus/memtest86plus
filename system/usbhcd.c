@@ -8,6 +8,7 @@
 #include "usb.h"
 #include "vmem.h"
 #include "boot.h"
+#include "hwquirks.h"
 
 #include "ehci.h"
 #include "ohci.h"
@@ -837,6 +838,10 @@ void find_usb_keyboards(bool pause_if_none)
     print_usb_info("Scanning for USB keyboards...");
 
     hci_info_t hci_list[MAX_HCI];
+
+    if ((quirk.type & QUIRK_TYPE_USB) && (quirk.process != NULL)) {
+        quirk.process();
+    }
 
     int num_hci = find_usb_controllers(hci_list);
 
