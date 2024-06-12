@@ -434,6 +434,9 @@ static void reset_usb_controller(hci_info_t *hci)
     } else {
         mmio_size += (uintptr_t)0xffffffff << 32;
     }
+#if defined(__loongarch_lp64)
+    base_addr |= (0xEULL << 40); // LoongArch64 64-bit PCI MMIO perfix
+#endif
 #endif
     base_addr &= ~(uintptr_t)0xf;
     mmio_size &= ~(uintptr_t)0xf;
