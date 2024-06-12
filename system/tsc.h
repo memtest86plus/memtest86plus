@@ -28,6 +28,7 @@
 /**
  * Reads and returns the timestamp counter value.
  */
+#if defined(__i386__) || defined(__x86_64__)
 static inline uint64_t get_tsc(void)
 {
     uint32_t    tl;
@@ -36,5 +37,19 @@ static inline uint64_t get_tsc(void)
     rdtsc(tl, th);
     return (uint64_t)th << 32 | (uint64_t)tl;
 }
+#else
+static inline uint64_t get_tsc(void)
+{
+  uint64_t val = 0;
+
+  __asm__ __volatile__(
+    "csrrd %0, 0x201\n\t"
+    : "=r"(val)
+    :
+    );
+
+  return val;
+}
+#endif
 
 #endif // TSC_H
