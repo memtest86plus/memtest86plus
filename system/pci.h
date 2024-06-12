@@ -18,6 +18,7 @@
 #define PCI_SUB_DID_REG      0x2E
 
 /* Vendor IDs */
+#define PCI_VID_LOONGSON     0x0014
 #define PCI_VID_ATI          0x1002
 #define PCI_VID_AMD          0x1022
 #define PCI_VID_SIS          0x1039
