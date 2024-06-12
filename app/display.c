@@ -17,6 +17,7 @@
 #include "smbus.h"
 #include "temperature.h"
 #include "tsc.h"
+#include "spd.h"
 
 #include "barrier.h"
 #include "spinlock.h"
