@@ -798,6 +798,10 @@ fail:
     print_string("efi_setup() failed\n");
 
     while (1) {
+#if defined(__x86_64) || defined(__i386__)
         __asm__("hlt");
+#elif defined(__loongarch_lp64)
+        __asm__("idle 0");
+#endif
     }
 }
