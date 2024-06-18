@@ -166,7 +166,7 @@ static void run_at(uintptr_t addr, int my_cpu)
     }
     LONG_BARRIER;
 
-#ifndef __x86_64__
+#ifdef __i386__
     // The 32-bit startup code needs to know where it is located.
     __asm__ __volatile__("movl %0, %%edi" : : "r" (new_start_addr));
 #endif
