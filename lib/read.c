@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ lib.c:
 //
@@ -136,5 +136,5 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
         }
     }
 
-    return shift < 0 ? value >> shift : value << shift;
+    return shift < 0 ? value >> -shift : value << shift;
 }
