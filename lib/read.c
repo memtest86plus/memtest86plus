@@ -130,7 +130,7 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
     for (int i = (base == 16) ? 2 : 0; i < n; i++) {
         value *= base;
         if (buffer[i] >= 'a') {
-            value += buffer[i] - 'a';
+            value += buffer[i] - 'a' + 10;
         } else {
             value += buffer[i] - '0';
         }
