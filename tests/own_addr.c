@@ -17,6 +17,8 @@
 
 #include "vmem.h"
 
+#include "boot.h"
+
 #include "display.h"
 #include "error.h"
 #include "test.h"
@@ -135,7 +137,7 @@ int test_own_addr2(int my_cpu, int stage)
     // Calculate the offset (in pages) between the virtual address and the physical address.
     offset = (vm_map[0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
     offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
     // Convert to a byte address offset. This will translate the virtual address into a physical address.
     offset *= PAGE_SIZE;
 #else

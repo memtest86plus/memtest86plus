@@ -21,12 +21,21 @@
 static inline uint32_t read32(const volatile uint32_t *ptr)
 {
     uint32_t val;
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__(
         "movl %1, %0"
         : "=r" (val)
         : "m" (*ptr)
         : "memory"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__(
+        "ld.w %0, %1"
+        : "=r" (val)
+        : "m" (*ptr)
+        : "memory"
+    );
+#endif
     return val;
 }
 
@@ -35,6 +44,7 @@ static inline uint32_t read32(const volatile uint32_t *ptr)
  */
 static inline void write32(const volatile uint32_t *ptr, uint32_t val)
 {
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__(
         "movl %1, %0"
         :
@@ -42,6 +52,15 @@ static inline void write32(const volatile uint32_t *ptr, uint32_t val)
           "r" (val)
         : "memory"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__(
+        "st.w %1, %0"
+        :
+        : "m" (*ptr),
+          "r" (val)
+        : "memory"
+    );
+#endif
 }
 
 /**
@@ -50,6 +69,7 @@ static inline void write32(const volatile uint32_t *ptr, uint32_t val)
  */
 static inline void flush32(const volatile uint32_t *ptr, uint32_t val)
 {
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ __volatile__(
         "movl %1, %0\n"
         "movl %0, %1"
@@ -58,6 +78,16 @@ static inline void flush32(const volatile uint32_t *ptr, uint32_t val)
           "r" (val)
         : "memory"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__(
+        "st.w %1, %0\n"
+        "ld.w %1, %0"
+        :
+        : "m" (*ptr),
+          "r" (val)
+        : "memory"
+    );
+#endif
 }
 
 #endif // MEMRW32_H

@@ -74,6 +74,10 @@
 #define IMC_K19_STK     0x81A0  // Zen4 (Storm Peak)
 #define IMC_K19_GRG     0x8150  // Zen5 (Granite Ridge)
 
+#define IMC_LSLA        0xC000  // Loongson LoongArch family
+#define IMC_LA464       0xC010  // LA464 (Loongson 3th Gen)
+#define IMC_LA664       0xC011  // LA664 (Loongson 4th Gen)
+
 /**
  * A string identifying the CPU make and model.
  */

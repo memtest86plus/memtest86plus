@@ -75,12 +75,18 @@ void heap_rewind(heap_type_t heap_id, uintptr_t mark)
 
 void heap_init(void)
 {
-    // Use the largest 20-bit addressable physical memory segment for the low-memory heap.
+    // For x86_64 and i386 use the largest 20-bit addressable physical memory segment for the low-memory heap.
+    // For loongarch use the largest 28-bit addressable physical memory segment for the low-memory heap.
     // Use the largest 32-bit addressable physical memory segment for the high-memory heap.
     // Exclude memory occupied by the program or below it in that segment.
     uintptr_t program_start = (uintptr_t)_start >> PAGE_SHIFT;
     uintptr_t program_end   = program_start + num_pages(_end - _start);
     uintptr_t max_segment_size = 0;
+#if defined(__i386__) || defined (__x86_64__)
+    uintptr_t low_memory_heap = PAGE_C(1, MB);
+#elif defined(__loongarch_lp64)
+    uintptr_t low_memory_heap = PAGE_C(256, MB);
+#endif
     for (int i = 0; i < pm_map_size && pm_map[i].end <= PAGE_C(4,GB); i++) {
         uintptr_t try_heap_start = pm_map[i].start;
         uintptr_t try_heap_end   = pm_map[i].end;
@@ -90,7 +96,7 @@ void heap_init(void)
         uintptr_t segment_size = try_heap_end - try_heap_start;
         if (segment_size >= max_segment_size) {
             max_segment_size = segment_size;
-            if (try_heap_end <= PAGE_C(1,MB)) {
+            if (try_heap_end <= low_memory_heap) {
                 heaps[HEAP_TYPE_LM_1].segment = i;
                 heaps[HEAP_TYPE_LM_1].start   = try_heap_start;
                 heaps[HEAP_TYPE_LM_1].end     = try_heap_end;

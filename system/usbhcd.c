@@ -7,6 +7,8 @@
 #include "screen.h"
 #include "usb.h"
 #include "vmem.h"
+#include "boot.h"
+#include "hwquirks.h"
 
 #include "ehci.h"
 #include "ohci.h"
@@ -424,7 +426,7 @@ static void reset_usb_controller(hci_info_t *hci)
     uintptr_t mmio_size = pci_config_read32(bus, dev, func, bar);
     pci_config_write32(bus, dev, func, bar, base_addr);
     bool in_io_space = base_addr & 0x1;
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
     if (!in_io_space && (base_addr & 0x4)) {
         base_addr += (uintptr_t)pci_config_read32(bus, dev, func, bar + 4) << 32;
         pci_config_write32(bus, dev, func, bar + 4, 0xffffffff);
@@ -433,6 +435,9 @@ static void reset_usb_controller(hci_info_t *hci)
     } else {
         mmio_size += (uintptr_t)0xffffffff << 32;
     }
+#if defined(__loongarch_lp64)
+    base_addr |= (0xEULL << 40); // LoongArch64 64-bit PCI MMIO perfix
+#endif
 #endif
     base_addr &= ~(uintptr_t)0xf;
     mmio_size &= ~(uintptr_t)0xf;
@@ -833,6 +838,10 @@ void find_usb_keyboards(bool pause_if_none)
     print_usb_info("Scanning for USB keyboards...");
 
     hci_info_t hci_list[MAX_HCI];
+
+    if ((quirk.type & QUIRK_TYPE_USB) && (quirk.process != NULL)) {
+        quirk.process();
+    }
 
     int num_hci = find_usb_controllers(hci_list);
 

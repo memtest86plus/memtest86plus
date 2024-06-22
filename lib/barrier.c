@@ -45,7 +45,20 @@ void barrier_spin_wait(barrier_t *barrier)
     if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
         volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
         while (*i_am_blocked) {
+#if defined(__x86_64) || defined(__i386__)
             __builtin_ia32_pause();
+#elif defined (__loongarch_lp64)
+            __asm__ __volatile__ (
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+            );
+#endif
         }
         return;
     }
@@ -78,6 +91,7 @@ void barrier_halt_wait(barrier_t *barrier)
     //     return;
     // }
     //
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ goto ("\t"
         "lock decl %0 \n\t"
         "je 0f        \n\t"
@@ -89,6 +103,23 @@ void barrier_halt_wait(barrier_t *barrier)
         : /* no clobbers */
         : end
     );
+#elif defined(__loongarch_lp64)
+    __asm__ goto ("\t"
+        "li.w $t0, -1\n\t" \
+        "li.w $t2, 1\n\t" \
+        "amadd_db.w $t1, $t0, %0\n\t" \
+        "bge $t2, $t1, 0f\n\t" \
+        "1:          \n\t" \
+        "idle 0x0\n\t" \
+        "b    1b\n\t" \
+        "bl %l[end]\n\t" \
+        "0:\n\t" \
+        : /* no outputs */
+        : "r" (&(barrier->count))
+        : "$t0", "t1", "$t2"
+        : end
+    );
+#endif
     // Last one here, so reset the barrier and wake the others.
     barrier->count = barrier->num_threads;
     __sync_synchronize();

@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "boot.h"
+
 #include "pmem.h"
 #include "smp.h"
 
@@ -52,7 +54,7 @@ extern barrier_t *run_barrier;
  */
 extern spinlock_t *error_mutex;
 
-#ifdef __x86_64__
+#ifdef CONFIG_64BIT
 /**
  * The word width (in bits) used for memory testing.
  */
