@@ -107,6 +107,7 @@ bool            pause_at_start     = true;
 power_save_t    power_save         = POWER_SAVE_HIGH;
 
 bool            enable_tty         = false;
+bool            tty_usb            = false;
 uintptr_t       tty_address        = 0x3F8;             // Legacy IO or MMIO Address accepted
 int             tty_baud_rate      = 115200;
 int             tty_update_period  = 2;                 // Update TTY every 2 seconds (default)
@@ -127,6 +128,10 @@ static void parse_serial_params(const char *params)
     // No parameters passed (only "console"), use default
      if (params == NULL) {
         return;
+    }
+
+    if (strncmp(params, "usb", 3) == 0) {
+	    tty_usb = true;
     }
 
     // Check if console is MMIO and grab address and stride
