@@ -42,7 +42,7 @@ static char *get_tstruct_string(struct tstruct_header *header, uint16_t maxlen, 
     return NULL;
 }
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
 static smbiosv2_t *find_smbiosv2_in_efi64_system_table(efi64_system_table_t *system_table)
 {
     efi64_config_table_t *config_tables = (efi64_config_table_t *) map_region(system_table->config_tables, system_table->num_config_tables * sizeof(efi64_config_table_t), true);
@@ -90,7 +90,7 @@ static uintptr_t find_smbiosv2_adr(void)
             }
         }
     }
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     if (rp == NULL && efi_info -> loader_signature == EFI64_LOADER_SIGNATURE) {
         // EFI64
         if (rp == NULL && efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {

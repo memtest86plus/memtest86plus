@@ -146,7 +146,7 @@ static void test_frame_buffer(screen_info_t *si)
     pixel_value.word = (r_value << si->red_pos) | (g_value << si->green_pos) | (b_value << si->blue_pos);
 
     uintptr_t lfb_base = si->lfb_base;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     if (LFB_CAPABILITY_64BIT_BASE & si->capabilities) {
         lfb_base |= (uintptr_t)si->ext_lfb_base << 32;
     }
@@ -489,7 +489,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     si->lfb_width  = best_info.h_resolution;
     si->lfb_height = best_info.v_resolution;
     si->lfb_base   = lfb_base;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     if (lfb_base >> 32) {
         si->capabilities |= LFB_CAPABILITY_64BIT_BASE;
         si->ext_lfb_base = lfb_base >> 32;
@@ -669,7 +669,7 @@ static efi_status_t set_efi_info_and_exit_boot_services(efi_handle_t handle, boo
         goto fail;
     }
 
-#ifdef __x86_64
+#if (ARCH_BITS == 64)
     boot_params->efi_info.loader_signature  = EFI64_LOADER_SIGNATURE;
 #else
     boot_params->efi_info.loader_signature  = EFI32_LOADER_SIGNATURE;
@@ -679,7 +679,7 @@ static efi_status_t set_efi_info_and_exit_boot_services(efi_handle_t handle, boo
     boot_params->efi_info.mem_desc_version  = mem_desc_version;
     boot_params->efi_info.mem_map           = (uintptr_t)mem_map;
     boot_params->efi_info.mem_map_size      = mem_map_size;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     boot_params->efi_info.sys_tab_hi        = (uintptr_t)sys_table >> 32;
     boot_params->efi_info.mem_map_hi        = (uintptr_t)mem_map   >> 32;
 #endif
@@ -691,7 +691,7 @@ fail:
 static void set_e820_map(boot_params_t *params)
 {
     uintptr_t mem_map_addr = params->efi_info.mem_map;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     mem_map_addr |= (uintptr_t)params->efi_info.mem_map_hi << 32;
 #endif
     size_t mem_map_size  = params->efi_info.mem_map_size;

@@ -52,7 +52,7 @@ extern barrier_t *run_barrier;
  */
 extern spinlock_t *error_mutex;
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
 /**
  * The word width (in bits) used for memory testing.
  */

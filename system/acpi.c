@@ -100,7 +100,7 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
     return NULL;
 }
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
 static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_table)
 {
     efi64_config_table_t *config_tables = (efi64_config_table_t *)map_region(system_table->config_tables,
@@ -150,7 +150,7 @@ static uintptr_t find_rsdp(void)
 
     // Search for the RSDP
     rsdp_t *rp = NULL;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     if (efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
         system_table_addr = map_region(system_table_addr, sizeof(efi64_system_table_t), true);
@@ -279,7 +279,7 @@ static bool parse_fadt(uintptr_t fadt_addr)
     acpi_config.pm_addr  = *(uint32_t *)(fadt_addr+FADT_PM_TMR_BLK_OFFSET);
     acpi_config.pm_is_io = true;
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     acpi_gen_addr_struct *rt;
 
     // Get APIC Timer Address
