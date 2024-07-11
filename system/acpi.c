@@ -83,6 +83,7 @@ acpi_t acpi_config = {0, 0, 0, 0, 0, /*0,*/ 0, 0, 0, false};
 // Private Functions
 //------------------------------------------------------------------------------
 
+#if defined(__i386__) || defined(__x86_64__)
 static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
 {
     uint32_t *ptr = (uint32_t *)addr;
@@ -99,6 +100,7 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
     }
     return NULL;
 }
+#endif
 
 #if (ARCH_BITS == 64)
 static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_table)
@@ -168,6 +170,7 @@ static uintptr_t find_rsdp(void)
         }
     }
 #endif
+#if defined(__i386__) || defined(__x86_64__)
     if (rp == NULL) {
         // Search the BIOS EBDA area.
         uintptr_t address = *(uint16_t *)0x40E << 4;
@@ -181,6 +184,7 @@ static uintptr_t find_rsdp(void)
         rp = scan_for_rsdp(0xE0000, 0x20000);
         if (rp) rsdp_source = "BIOS reserved area";
     }
+#endif
     if (rp == NULL) {
         // RSDP not found, give up.
         return 0;
