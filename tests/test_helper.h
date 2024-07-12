@@ -19,12 +19,11 @@
 /**
  * Test word atomic read and write functions.
  */
+#include "memrw.h"
 #ifdef __x86_64__
-#include "memrw64.h"
 #define read_word   read64
 #define write_word  write64
 #else
-#include "memrw32.h"
 #define read_word   read32
 #define write_word  write32
 #endif

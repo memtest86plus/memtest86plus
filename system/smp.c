@@ -23,7 +23,7 @@
 #include "cpuid.h"
 #include "heap.h"
 #include "hwquirks.h"
-#include "memrw32.h"
+#include "memrw.h"
 #include "memsize.h"
 #include "msr.h"
 #include "string.h"

@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "heap.h"
-#include "memrw32.h"
+#include "memrw.h"
 #include "memsize.h"
 #include "pci.h"
 #include "usb.h"
