@@ -28,7 +28,8 @@ typedef enum {
     QUIRK_X10SDV_NOSMP,
     QUIRK_K8_BSTEP_NOTEMP,
     QUIRK_K8_REVFG_TEMP,
-    QUIRK_AMD_ERRATA_319
+    QUIRK_AMD_ERRATA_319,
+    QUIRK_LOONGSON7A00_EHCI_WORKARD
 } quirk_id_t;
 
 typedef struct {
