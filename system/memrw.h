@@ -4,7 +4,7 @@
 /**
  * \file
  *
- * Provides some 32/64-bit memory access functions. These stop the compiler
+ * Provides some 8/16/32/64-bit memory access functions. These stop the compiler
  * optimizing accesses which need to be ordered and atomic. Mostly used
  * for accessing memory-mapped hardware registers.
  *
@@ -15,6 +15,8 @@
 
 #include <stdint.h>
 
+#define __MEMRW_SUFFIX_8BIT  "b"
+#define __MEMRW_SUFFIX_16BIT "w"
 #define __MEMRW_SUFFIX_32BIT "l"
 #define __MEMRW_SUFFIX_64BIT "q"
 #define __MEMRW_READ_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
@@ -38,7 +40,7 @@ static inline uint##bitwidth##_t read##bitwidth(const volatile uint##bitwidth##_
 static inline void write##bitwidth(const volatile uint##bitwidth##_t *ptr, uint##bitwidth##_t val) \
 { \
     __asm__ __volatile__( \
-	__MEMRW_WRITE_INSTRUCTIONS(bitwidth) \
+       __MEMRW_WRITE_INSTRUCTIONS(bitwidth) \
         : \
         : "m" (*ptr), \
           "r" (val) \
@@ -50,7 +52,7 @@ static inline void write##bitwidth(const volatile uint##bitwidth##_t *ptr, uint#
 static inline void flush##bitwidth(const volatile uint##bitwidth##_t *ptr, uint##bitwidth##_t val) \
 { \
     __asm__ __volatile__( \
-	__MEMRW_FLUSH_INSTRUCTIONS(bitwidth) \
+       __MEMRW_FLUSH_INSTRUCTIONS(bitwidth) \
         : \
         : "m" (*ptr), \
           "r" (val) \
@@ -58,6 +60,14 @@ static inline void flush##bitwidth(const volatile uint##bitwidth##_t *ptr, uint#
     ); \
 }
 
+/**
+ * Reads and returns the value stored in the 8-bit memory location pointed to by ptr.
+ */
+__MEMRW_READ_FUNC(8)
+/**
+ * Reads and returns the value stored in the 16-bit memory location pointed to by ptr.
+ */
+__MEMRW_READ_FUNC(16)
 /**
  * Reads and returns the value stored in the 32-bit memory location pointed to by ptr.
  */
@@ -68,6 +78,14 @@ __MEMRW_READ_FUNC(32)
 __MEMRW_READ_FUNC(64)
 
 /**
+ * Writes val to the 8-bit memory location pointed to by ptr.
+ */
+__MEMRW_WRITE_FUNC(8)
+/**
+ * Writes val to the 16-bit memory location pointed to by ptr.
+ */
+__MEMRW_WRITE_FUNC(16)
+/**
  * Writes val to the 32-bit memory location pointed to by ptr.
  */
 __MEMRW_WRITE_FUNC(32)
@@ -76,6 +94,14 @@ __MEMRW_WRITE_FUNC(32)
  */
 __MEMRW_WRITE_FUNC(64)
 
+/**
+ * Writes val to the 8-bit memory location pointed to by ptr. Only returns when the write is complete.
+ */
+__MEMRW_FLUSH_FUNC(8)
+/**
+ * Writes val to the 16-bit memory location pointed to by ptr. Only returns when the write is complete.
+ */
+__MEMRW_FLUSH_FUNC(16)
 /**
  * Writes val to the 32-bit memory location pointed to by ptr. Only returns when the write is complete.
  */
