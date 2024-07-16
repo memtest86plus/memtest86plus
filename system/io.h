@@ -20,6 +20,8 @@
  * (original contained no copyright statement)
  */
 
+#if defined(__x86_64) || defined(__i386__)
+
 #ifdef SLOW_IO_BY_JUMPING
 #define __SLOW_DOWN_IO __asm__ __volatile__("jmp 1f\n1:\tjmp 1f\n1:")
 #else
@@ -144,5 +146,62 @@ outb_p (unsigned char __value, unsigned short int __port)
           "Nd" (__port)
     );
 }
+
+#elif defined(__loongarch_lp64)
+
+#define LOONGSON_IO_PROT_BASE 0x0efdfc000000
+
+#define __IN(s, s1) \
+static inline RETURN_TYPE __in##s(unsigned short port) { \
+    RETURN_TYPE _v; \
+    __asm__ __volatile__ ( \
+        "li.d $t0, 0x28\n\t" \
+        "csrwr $t0, 0x0\n\t" \
+        "ld." s1 " %0, %1, 0 \n\t" \
+        "csrwr $t0, 0x0\n\t" \
+        : "=r" (_v) \
+        : "r" (LOONGSON_IO_PROT_BASE + port) \
+        : "$t0" \
+    ); \
+    return _v; \
+}
+#define RETURN_TYPE uint8_t
+__IN(b, "b");
+#undef RETURN_TYPE
+#define RETURN_TYPE uint16_t
+__IN(w, "h");
+#undef RETURN_TYPE
+#define RETURN_TYPE uint32_t
+__IN(l, "w");
+
+#define __OUT(s, s1) \
+static __inline void __out##s (VALUE_TYPE val, unsigned short port) { \
+    __asm__ __volatile__ ( \
+        "li.d $t0, 0x28\n\t" \
+        "csrwr $t0, 0x0\n\t" \
+        "st." s1 " %z0, %1, 0 \n\t" \
+        "csrwr $t0, 0x0\n\t" \
+        : \
+        : "Jr" (val), "r" (LOONGSON_IO_PROT_BASE + port) \
+        : "$t0" \
+    ); \
+}
+#define VALUE_TYPE uint8_t
+__OUT(b, "b");
+#undef VALUE_TYPE
+#define VALUE_TYPE uint16_t
+__OUT(w, "h");
+#undef VALUE_TYPE
+#define VALUE_TYPE uint32_t
+__OUT(l, "w");
+
+#define outb(val,port) __outb(val,port)
+#define inb(port) __inb(port)
+#define outw(val,port) __outw(val,port)
+#define inw(port) __inw(port)
+#define outl(val,port) __outl(val,port)
+#define inl(port) __inl(port)
+
+#endif
 
 #endif // IO_H
