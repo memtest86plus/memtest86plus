@@ -2,7 +2,7 @@
 // Copyright (C) 2021-2022 Martin Whitaker.
 
 #include "keyboard.h"
-#include "memrw32.h"
+#include "memrw.h"
 #include "pci.h"
 #include "screen.h"
 #include "usb.h"
