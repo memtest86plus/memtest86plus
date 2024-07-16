@@ -15,6 +15,8 @@
 
 #include <stdint.h>
 
+#if defined(__i386__) || defined(__x86_64__)
+
 #define __MEMRW_SUFFIX_8BIT  "b"
 #define __MEMRW_SUFFIX_16BIT "w"
 #define __MEMRW_SUFFIX_32BIT "l"
@@ -22,6 +24,18 @@
 #define __MEMRW_READ_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
 #define __MEMRW_WRITE_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
 #define __MEMRW_FLUSH_INSTRUCTIONS(bitwidth) "mov" __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0; mov" __MEMRW_SUFFIX_##bitwidth##BIT " %0, %1"
+
+#elif defined(__loongarch_lp64)
+
+#define __MEMRW_SUFFIX_8BIT  "b"
+#define __MEMRW_SUFFIX_16BIT "h"
+#define __MEMRW_SUFFIX_32BIT "w"
+#define __MEMRW_SUFFIX_64BIT "d"
+#define __MEMRW_READ_INSTRUCTIONS(bitwidth) "ld." __MEMRW_SUFFIX_##bitwidth##BIT " %0, %1"
+#define __MEMRW_WRITE_INSTRUCTIONS(bitwidth) "st." __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
+#define __MEMRW_FLUSH_INSTRUCTIONS(bitwidth) "st." __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0; dbar 0"
+
+#endif
 
 #define __MEMRW_READ_FUNC(bitwidth) \
 static inline uint##bitwidth##_t read##bitwidth(const volatile uint##bitwidth##_t *ptr) \
