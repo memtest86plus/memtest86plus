@@ -14,7 +14,9 @@
 
 ram_info ram = { 0, 0, 0, 0, 0, 0, "N/A"};
 
-static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
+typedef uint8_t(*OBTAIN_SPD_FUNC_TYPE)(uint8_t, uint16_t);
+
+OBTAIN_SPD_FUNC_TYPE get_spd = NULL;
 
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
