@@ -23,6 +23,7 @@ static const uint16_t serial_io_ports[] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 struct serial_port {
     bool enable;
     bool is_mmio;
+    bool is_usb;
     int parity;
     int bits;
     int baudrate;
