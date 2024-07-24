@@ -23,6 +23,7 @@
 
 #include "spd.c"
 
+#if defined(__i386__) || defined(__x86_64__)
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
 uint32_t smbus_id = 0;
@@ -30,15 +31,23 @@ static uint16_t extra_initial_sleep_for_smb_transaction = 0;
 
 static int8_t spd_page = -1;
 static int8_t last_adr = -1;
-static uint8_t max_mc_nu = 0;
+#endif
 
+#ifdef __loongarch_lp64
 i2c_param i2c_info;
+static uint8_t max_mc_nu = 0;
+#endif
 
 // Functions Prototypes
+#if defined(__i386__) || defined(__x86_64__)
 static bool setup_smb_controller(void);
 static bool find_smb_controller(uint16_t vid, uint16_t did);
+#endif
+#ifdef __loongarch_lp64
 static bool determined_i2c_address(void);
+#endif
 
+#if defined(__i386__) || defined(__x86_64__)
 static bool nv_mcp_get_smb(void);
 static bool amd_sb_get_smb(void);
 static bool fch_zen_get_smb(void);
@@ -50,9 +59,12 @@ static uint8_t ich5_read_spd_byte(uint8_t adr, uint16_t cmd);
 static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 static uint8_t ali_m1563_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 static uint8_t ali_m1543_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
-static uint8_t i2c_read_byte(uint8_t *base, uint8_t dev_addr, uint16_t offset);
 static uint8_t get_spd_via_smbus(uint8_t slot_idx, uint16_t spd_adr);
+#endif
+#ifdef __loongarch_lp64
+static uint8_t i2c_read_byte(uint8_t *base, uint8_t dev_addr, uint16_t offset);
 static uint8_t get_spd_via_i2c(uint8_t slot_idx, uint16_t spd_adr);
+#endif
 
 void print_smbus_startup_info(void)
 {
@@ -66,12 +78,15 @@ void print_smbus_startup_info(void)
         quirk.process();
     }
 
+#if defined(__i386__) || defined(__x86_64__)
     if (setup_smb_controller() || smbusbase != 0) {
         get_spd = get_spd_via_smbus;
         max_slot_count = MAX_SPD_SLOT;
+#elif defined(__loongarch_lp64)
     } else if (determined_i2c_address()) {
         get_spd = get_spd_via_i2c;
         max_slot_count = max_mc_nu * 2;
+#endif
     } else {
         return;
     }
@@ -128,6 +143,7 @@ void print_smbus_startup_info(void)
 // I2C Controller Functions
 // --------------------------
 //
+#ifdef __loongarch_lp64
 static bool determined_i2c_address(void)
 {
     uint8_t i;
@@ -255,11 +271,13 @@ static uint8_t __attribute__((optimize("O0"))) i2c_read_byte(uint8_t *base, uint
     }
     return buf;
 }
+#endif
 
 // --------------------------
 // SMBUS Controller Functions
 // --------------------------
 
+#if defined(__i386__) || defined(__x86_64__)
 static bool setup_smb_controller(void)
 {
     uint16_t vid, did;
@@ -693,11 +711,12 @@ static bool ali_get_smb(uint8_t address)
 
     return false;
 }
+#endif
 
 // ------------------------
 // get_spd series functions
 // ------------------------
-
+#if defined(__i386__) || defined(__x86_64__)
 static uint8_t get_spd_via_smbus(uint8_t slot_idx, uint16_t spd_adr)
 {
     switch ((smbus_id >> 16) & 0xFFFF) {
@@ -712,7 +731,9 @@ static uint8_t get_spd_via_smbus(uint8_t slot_idx, uint16_t spd_adr)
         return ich5_read_spd_byte(slot_idx, spd_adr);
     }
 }
+#endif
 
+#ifdef __loongarch_lp64
 static uint8_t get_spd_via_i2c(uint8_t slot_idx, uint16_t spd_adr)
 {
     uint8_t device_id, mc;
@@ -728,6 +749,7 @@ static uint8_t get_spd_via_i2c(uint8_t slot_idx, uint16_t spd_adr)
                     i2c_info.i2c_mc[mc].devid.slot0_addr) << 1);
     return i2c_read_byte(i2c_info.i2c_mc[mc].i2c_base, device_id, spd_adr);
 }
+#endif
 
 /*************************************************************************************
 / *****************************         WARNING          *****************************
@@ -737,6 +759,7 @@ static uint8_t get_spd_via_i2c(uint8_t slot_idx, uint16_t spd_adr)
 /                /!\  Your RAM modules will not work anymore  /!\
 / *************************************************************************************/
 
+#if defined(__i386__) || defined(__x86_64__)
 static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
 {
     smbus_adr += 0x50;
@@ -934,3 +957,4 @@ static uint8_t ali_m1543_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr)
 
     return __inb(ALI_OLD_SMBHSTDAT0);
 }
+#endif
