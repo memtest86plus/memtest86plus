@@ -49,16 +49,4 @@ typedef struct ram_infos {
 
 extern ram_info ram;
 
-void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len);
-
-void parse_spd_rdram (spd_info *spdi, uint8_t slot_idx);
-void parse_spd_sdram (spd_info *spdi, uint8_t slot_idx);
-void parse_spd_ddr   (spd_info *spdi, uint8_t slot_idx);
-void parse_spd_ddr2  (spd_info *spdi, uint8_t slot_idx);
-void parse_spd_ddr3  (spd_info *spdi, uint8_t slot_idx);
-void parse_spd_ddr4  (spd_info *spdi, uint8_t slot_idx);
-void parse_spd_ddr5  (spd_info *spdi, uint8_t slot_idx);
-void print_spdi(spd_info spdi, uint8_t lidx);
-uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
-
 #endif // SPD_H

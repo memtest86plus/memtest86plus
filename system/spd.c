@@ -14,13 +14,14 @@
 
 ram_info ram = { 0, 0, 0, 0, 0, 0, "N/A"};
 
+static uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
+
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
     return bcd - 6 * (bcd >> 4);
 }
 
-
-void print_spdi(spd_info spdi, uint8_t lidx)
+static void print_spdi(spd_info spdi, uint8_t lidx)
 {
     uint8_t curcol;
     uint16_t i;
@@ -89,7 +90,7 @@ void print_spdi(spd_info spdi, uint8_t lidx)
     }
 }
 
-void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len)
+static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len)
 {
     uint8_t sku_len;
 
@@ -113,7 +114,7 @@ void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len)
     sku[sku_len] = '\0';
 }
 
-void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR5";
 
@@ -293,7 +294,7 @@ void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR4";
 
@@ -412,7 +413,7 @@ void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR3";
 
@@ -569,7 +570,7 @@ void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR2";
 
@@ -706,7 +707,7 @@ void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR";
 
@@ -795,7 +796,7 @@ void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "RDRAM";
 
@@ -868,7 +869,7 @@ void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "SDRAM";
 

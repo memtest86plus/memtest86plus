@@ -35,17 +35,16 @@ SYS_OBJS = system/acpi.o \
            system/heap.o \
            system/hwctrl.o \
            system/hwquirks.o \
+           system/i2c.o \
            system/keyboard.o \
-           system/ohci.o \
            system/memctrl.o \
+           system/ohci.o \
            system/pci.o \
            system/pmem.o \
            system/reloc.o \
            system/screen.o \
            system/serial.o \
            system/smbios.o \
-           system/spd.o \
-           system/i2c.o \
            system/smp.o \
            system/temperature.o \
            system/timers.o \

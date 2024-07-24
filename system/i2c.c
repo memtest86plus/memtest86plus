@@ -15,7 +15,8 @@
 #include "smbus.h"
 #include "smbios.h"
 #include "hwquirks.h"
-#include "spd.h"
+
+#include "spd.c"
 
 int smbdev, smbfun;
 unsigned short smbusbase = 0;
