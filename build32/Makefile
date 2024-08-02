@@ -177,7 +177,7 @@ memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_b
 
 memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o -b binary memtest_shared.bin -o memtest.efi
 
 memtest.mbr: memtest_shared.bin boot/mbr.o ldscripts/memtest_mbr.lds
 	$(LD) -T ldscripts/memtest_mbr.lds boot/mbr.o -b binary memtest_shared.bin -o memtest.mbr
