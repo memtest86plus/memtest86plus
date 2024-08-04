@@ -45,6 +45,7 @@ SYS_OBJS = system/acpi.o \
            system/serial.o \
            system/smbios.o \
            system/smbus.o \
+           system/spd.o \
            system/smp.o \
            system/temperature.o \
            system/timers.o \

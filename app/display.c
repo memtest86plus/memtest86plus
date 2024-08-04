@@ -15,6 +15,7 @@
 #include "pmem.h"
 #include "smbios.h"
 #include "smbus.h"
+#include "spd.h"
 #include "temperature.h"
 #include "tsc.h"
 
@@ -265,7 +266,7 @@ void display_cpu_topology(void)
 void post_display_init(void)
 {
     print_smbios_startup_info();
-    print_smbus_startup_info();
+    print_spd_startup_info();
 
     if (imc.freq) {
         // Try to get RAM information from IMC
