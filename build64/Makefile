@@ -12,7 +12,7 @@ endif
 
 CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
          -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector \
-         -DARCH_BITS=64
+         -fexcess-precision=standard -DARCH_BITS=64
 
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
