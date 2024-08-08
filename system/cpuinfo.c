@@ -51,6 +51,7 @@ uint32_t    l3_cache_speed  = 0;
 uint32_t    ram_speed = 0;
 
 uint32_t    clks_per_msec = 0;
+uint32_t    loops_per_usec = 0;
 
 //------------------------------------------------------------------------------
 // Private Functions
