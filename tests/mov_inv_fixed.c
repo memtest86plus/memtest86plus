@@ -70,7 +70,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 : "c" (length), "D" (p), "a" (pattern1)
                 :
             );
-            p = pe;
+            p += length;
 #else
             uint32_t length = pe - p + 1;
             __asm__  __volatile__ ("\t"
@@ -80,7 +80,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 : "c" (length), "D" (p), "a" (pattern1)
                 :
             );
-            p = pe;
+            p += length;
 #endif
 #else
             do {
