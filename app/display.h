@@ -21,6 +21,8 @@
 
 #include "test.h"
 
+#define ROW_SPD         13
+
 #define ROW_MESSAGE_T   10
 #define ROW_MESSAGE_B   (SCREEN_HEIGHT - 2)
 
