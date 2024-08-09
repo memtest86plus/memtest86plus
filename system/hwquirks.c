@@ -16,6 +16,8 @@
 #include "cpuid.h"
 #include "config.h"
 #include "temperature.h"
+#include "memrw.h"
+#include "vmem.h"
 
 quirk_t quirk;
 
@@ -97,6 +99,22 @@ static void amd_k8_revfg_temp(void)
         return;
 
     cpu_temp_offset = 21.0f;
+}
+
+static void loongson_7a00_ehci_workaround(void)
+{
+    uintptr_t reg_addr = 0x10010000;
+
+#if (ARCH_BITS == 64)
+    reg_addr |= 0xEULL << 40;
+#endif
+    reg_addr = map_region(reg_addr, 0x0, false);
+    write8((uint8_t *)(reg_addr + 0x3820), 0xFF);
+    write8((uint8_t *)(reg_addr + 0x3830), 0xFF);
+    write32 ((uint32_t *)(reg_addr + 0x3100), 0xFFFFFFFF);
+    write32 ((uint32_t *)(reg_addr + 0x3180), 0xFFFFFFFF);
+    write8((uint8_t *)(reg_addr + 0x3820), 0x0);
+    write8((uint8_t *)(reg_addr + 0x3830), 0x0);
 }
 
 // ---------------------
@@ -198,5 +216,14 @@ void quirks_init(void)
                 quirk.process = disable_temp_reporting;
             }
         }
+    }
+
+    //  -----------------------------------------------------------
+    //  -- Loongson 7A1000 and 7A2000 chipset USB 2.0 workaround --
+    //  -----------------------------------------------------------
+    if (quirk.root_vid == PCI_VID_LOONGSON && quirk.root_did == 0x7a00) {
+        quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
+        quirk.type |= QUIRK_TYPE_USB;
+        quirk.process = loongson_7a00_ehci_workaround;
     }
 }

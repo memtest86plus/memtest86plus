@@ -17,6 +17,25 @@
  */
 typedef volatile bool spinlock_t;
 
+#ifdef __loongarch_lp64
+/**
+ * LoongArch CPU pause.
+ */
+static inline void cpu_pause (void)
+{
+    __asm__ __volatile__ (
+      "nop \n\t" \
+      "nop \n\t" \
+      "nop \n\t" \
+      "nop \n\t" \
+      "nop \n\t" \
+      "nop \n\t" \
+      "nop \n\t" \
+      "nop \n\t" \
+    );
+}
+#endif
+
 /**
  * Spins until the mutex is unlocked.
  */
@@ -24,7 +43,11 @@ static inline void spin_wait(spinlock_t *lock)
 {
     if (lock) {
         while (*lock) {
+#if defined(__x86_64) || defined(__i386__)
             __builtin_ia32_pause();
+#elif defined (__loongarch_lp64)
+            cpu_pause();
+#endif
         }
     }
 }
@@ -37,7 +60,11 @@ static inline void spin_lock(spinlock_t *lock)
     if (lock) {
         while (!__sync_bool_compare_and_swap(lock, false, true)) {
             do {
+#if defined(__x86_64) || defined(__i386__)
                 __builtin_ia32_pause();
+#elif defined (__loongarch_lp64)
+                cpu_pause();
+#endif
             } while (*lock);
         }
     }

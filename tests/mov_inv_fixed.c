@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2024 Loongson Technology Corporation Limited. All rights reserved.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -61,7 +62,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
             }
             test_addr[my_cpu] = (uintptr_t)p;
 #if HAND_OPTIMISED
-#ifdef __x86_64__
+#if defined(__x86_64__)
             uint64_t length = pe - p + 1;
             __asm__  __volatile__ ("\t"
                 "rep    \n\t"
@@ -71,7 +72,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 :
             );
             p = pe;
-#else
+#elif defined(__i386__)
             uint32_t length = pe - p + 1;
             __asm__  __volatile__ ("\t"
                 "rep    \n\t"
@@ -79,6 +80,19 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 :
                 : "c" (length), "D" (p), "a" (pattern1)
                 :
+            );
+            p = pe;
+#elif defined(__loongarch_lp64)
+            uint64_t length = pe - p + 1;
+            __asm__  __volatile__ ("\t"
+                "loop:               \n\t"
+                "st.d %2, %1, 0x0    \n\t"
+                "addi.d %1, %1, 0x8  \n\t"
+                "addi.d %0, %0, -0x1 \n\t"
+                "bnez %0, loop       \n\t"
+                :
+                : "r" (length), "r" (p), "r" (pattern1)
+                : "memory"
             );
             p = pe;
 #endif

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
 // Copyright (C) 2004-2022 Sam Demeulemeester.
+// Copyright (C) 2024 Loongson Technology Corporation Limited. All rights reserved.
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -11,6 +12,11 @@
 #include "cpuinfo.h"
 #include "io.h"
 #include "tsc.h"
+
+#if defined(__loongarch_lp64)
+// LoongArch GCC builtin function
+#include <larchintrin.h>
+#endif
 
 //------------------------------------------------------------------------------
 // Constants
@@ -23,6 +29,7 @@
 // Private Functions
 //------------------------------------------------------------------------------
 
+#if defined(__i386__) || defined(__x86_64__)
 static void correct_tsc(void)
 {
     uint32_t start_time, end_time, run_time, counter;
@@ -85,6 +92,33 @@ static void correct_tsc(void)
        clks_per_msec = run_time / 50;
     }
 }
+#elif defined(__loongarch_lp64)
+static void correct_tsc(void)
+{
+    uint64_t start, end, excepted_ticks, current_ticks, calc_base_freq, clock_multiplier, clock_divide;
+    uint64_t num_millisec = 50, millisec_div = 1000;
+
+    //
+    // Get stable count frequency
+    //
+    calc_base_freq   = __cpucfg(0x4);
+    clock_multiplier = __cpucfg(0x5) & 0xFFFF;
+    clock_divide     = (__cpucfg(0x5) >> 16) & 0xFFFF;
+
+    excepted_ticks = (((calc_base_freq * clock_multiplier) / clock_divide) * num_millisec) / millisec_div;
+
+    __asm__ __volatile__("rdtime.d %0, $zero":"=r"(current_ticks):);
+    excepted_ticks += current_ticks;
+
+    start = __csrrd_d(0x201);
+    do {
+      __asm__ __volatile__("rdtime.d %0, $zero":"=r"(current_ticks):);
+    } while (current_ticks < excepted_ticks);
+    end = __csrrd_d(0x201);
+
+    clks_per_msec = (end - start) / num_millisec;
+}
+#endif
 
 //------------------------------------------------------------------------------
 // Public Functions

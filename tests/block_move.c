@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2024 Loongson Technology Corporation Limited. All rights reserved.
 //
 // Derived from an extract of memtest86+ test.c:
 //
@@ -113,7 +114,7 @@ int test_block_move(int my_cpu, int iterations)
                     continue;
                 }
                 test_addr[my_cpu] = (uintptr_t)p;
-#ifdef __x86_64__
+#if defined(__x86_64__)
                 __asm__ __volatile__ (
                     "cld\n"
                     "jmp L110\n\t"
@@ -151,7 +152,7 @@ int test_block_move(int my_cpu, int iterations)
                     :: "g" (p), "g" (pm), "g" (half_length)
                     : "rdi", "rsi", "rcx"
                 );
-#else
+#elif defined(__i386__)
                 __asm__ __volatile__ (
                     "cld\n"
                     "jmp L110\n\t"
@@ -188,6 +189,59 @@ int test_block_move(int my_cpu, int iterations)
 
                     :: "g" (p), "g" (pm), "g" (half_length)
                     : "edi", "esi", "ecx"
+                );
+#elif defined(__loongarch_lp64)
+                __asm__ __volatile__ (
+                    "b L110\n"
+
+                    ".p2align 4,,8\n\t"
+                    "L110:\n\t"
+
+                    // At the end of all this
+                    // - the second half equals the initial value of the first half
+                    // - the first half is right shifted 64-bytes (with wrapping)
+
+                    // Move first half to second half
+                    "move $t1, %1\n\t"     // Destination, pm (mid point)
+                    "move $t0, %0\n\t"     // Source, p (start point)
+                    "move $t2, %2\n\t"     // Length, half_length (size of a half in DWORDS)
+                    "first_loop:\n\t"
+                    "ld.d $t3, $t0, 0x0\n\t"
+                    "st.d $t3, $t1, 0x0\n\t"
+                    "addi.d $t0, $t0, 0x8\n\t"
+                    "addi.d $t1, $t1, 0x8\n\t"
+                    "addi.d $t2, $t2, -0x1\n\t"
+                    "bnez $t2, first_loop\n\t"
+
+                    // Move the second half, less the last 64 bytes, to the first half, offset plus 64 bytes
+                    "move $t1, %0\n\t"
+                    "addi.d $t1, $t1, 64\n\t"   // Destination, p (start-point) plus 32 bytes
+                    "move $t0, %1\n\t"           // Source, pm (mid-point)
+                    "move $t2, %2\n\t"
+                    "addi.d $t2, $t2, -0x8\n\t" // Length, half_length (size of a half in QWORDS) minus 8 QWORDS (64 bytes)
+                    "second_loop:\n\t"
+                    "ld.d $t3, $t0, 0x0\n\t"
+                    "st.d $t3, $t1, 0x0\n\t"
+                    "addi.d $t0, $t0, 0x8\n\t"
+                    "addi.d $t1, $t1, 0x8\n\t"
+                    "addi.d $t2, $t2, -0x1\n\t"
+                    "bnez $t2, second_loop\n\t"
+
+
+                    // Move last 8 QWORDS (64 bytes) of the second half to the start of the first half
+                    "move $t1, %0\n\t"       // Destination, p(start-point)
+                                            // Source, 8 QWORDS from the end of the second half, left over by the last rep/movsl
+                    "li.d $t2, 0x8\n\t"
+                    "last_loop:\n\t"
+                    "ld.d $t3, $t0, 0x0\n\t"
+                    "st.d $t3, $t1, 0x0\n\t"
+                    "addi.d $t0, $t0, 0x8\n\t"
+                    "addi.d $t1, $t1, 0x8\n\t"
+                    "addi.d $t2, $t2, -0x1\n\t"
+                    "bnez $t2, last_loop\n\t"
+
+                    :: "r" (p), "r" (pm), "r" (half_length)
+                    : "$t0", "$t1", "$t2", "$t3"
                 );
 #endif
                 do_tick(my_cpu);

@@ -7,6 +7,7 @@
 #include "screen.h"
 #include "usb.h"
 #include "vmem.h"
+#include "hwquirks.h"
 
 #include "ehci.h"
 #include "ohci.h"
@@ -433,6 +434,9 @@ static void reset_usb_controller(hci_info_t *hci)
     } else {
         mmio_size += (uintptr_t)0xffffffff << 32;
     }
+#if defined(__loongarch_lp64)
+    base_addr |= (0xEULL << 40); // LoongArch64 64-bit PCI MMIO perfix
+#endif
 #endif
     base_addr &= ~(uintptr_t)0xf;
     mmio_size &= ~(uintptr_t)0xf;
@@ -833,6 +837,10 @@ void find_usb_keyboards(bool pause_if_none)
     print_usb_info("Scanning for USB keyboards...");
 
     hci_info_t hci_list[MAX_HCI];
+
+    if ((quirk.type & QUIRK_TYPE_USB) && (quirk.process != NULL)) {
+        quirk.process();
+    }
 
     int num_hci = find_usb_controllers(hci_list);
 

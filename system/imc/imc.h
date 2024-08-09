@@ -25,6 +25,9 @@ void get_imc_config_intel_icl(void);
 /* Memory configuration Detection for Intel Alder Lake */
 void get_imc_config_intel_adl(void);
 
+/* Memory configuration Detection for Loongson LoongArch DDR4 CPU family */
+void get_imc_config_loongson_ddr4(void);
+
 /**
  * ECC Polling Code for various IMCs
  */

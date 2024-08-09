@@ -19,7 +19,20 @@ void usleep(unsigned int usec)
         uint64_t cycles = ((uint64_t)usec * clks_per_msec) / 1000;
         uint64_t t0 = get_tsc();
         do {
+#if defined(__x86_64) || defined(__i386__)
             __builtin_ia32_pause();
+#elif defined (__loongarch_lp64)
+            __asm__ __volatile__ (
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+              "nop \n\t" \
+            );
+#endif
         } while ((get_tsc() - t0) < cycles);
     } else {
         // This will be highly inaccurate, but should give at least the requested delay.
