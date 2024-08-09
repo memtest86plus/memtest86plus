@@ -17,6 +17,7 @@
 #include "vmem.h"
 
 #include "badram.h"
+#include "bad_pages_list.h"
 #include "config.h"
 #include "display.h"
 #include "test.h"
@@ -160,6 +161,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     if (new_header) {
         clear_message_area();
         badram_init();
+        bad_pages_list_init();
     }
     last_error_mode = error_mode;
 
@@ -187,6 +189,10 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     bool new_badram = false;
     if (error_mode == ERROR_MODE_BADRAM && use_for_badram) {
         new_badram = badram_insert(page, offset);
+    }
+
+    if (error_mode == ERROR_MODE_BADPAGESLIST && use_for_badram) {
+        new_badram = bad_pages_list_insert(page);
     }
 
     if (new_address) {
@@ -306,6 +312,12 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
       case ERROR_MODE_BADRAM:
         if (new_badram) {
             badram_display();
+        }
+        break;
+
+      case ERROR_MODE_BADPAGESLIST:
+        if (new_badram) {
+            bad_pages_list_display();
         }
         break;
 
