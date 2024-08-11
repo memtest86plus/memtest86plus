@@ -67,20 +67,18 @@ using the GNU toolchain and the ELF file format. The tools required are:
   * xorrisofs (optional)
 
 To build a 32-bit image, change directory into the `build32` directory and
-type `make`. The result is a `memtest.bin` binary image file which can be
-booted directly by a legacy BIOS (in floppy mode) or by an intermediate
-bootloader using the Linux 16-bit boot protocol and a `memtest.efi` binary
-image file which can be booted directly by a 32-bit UEFI BIOS. Either image
-can be booted by an intermediate bootloader using the Linux 32-bit or 32-bit
-EFI handover boot protocols.
+type `make`. The result is a `mt86plus` binary image file which can be
+booted directly by a 32-bit UEFI BIOS (if named mt86plus.efi), by a legacy
+BIOS (in floppy mode) or by an intermediate bootloader using the Linux 16-bit
+boot protocol. The image can be also booted by an intermediate bootloader
+using the Linux 32-bit or 32-bit EFI handover boot protocols.
 
 To build a 64-bit image, change directory into the `build64` directory and
-type `make`. The result is a `memtest.bin` binary image file which can be
-booted directly by a legacy BIOS (in floppy mode) or by an intermediate
-bootloader using the Linux 16-bit boot protocol and a `memtest.efi` binary
-image file which can be booted directly by a 64-bit UEFI BIOS. Either image
-can be booted by an intermediate bootloader using the Linux 32-bit, 64-bit,
-or 64-bit EFI handover boot protocols.
+type `make`. The result is a `mt86plus` binary image file which can be
+booted directly by a 64-bit UEFI BIOS (if named mt86plus.efi), by a legacy
+BIOS (in floppy mode) or by an intermediate bootloader using the Linux 16-bit
+boot protocol. The image can be also booted by an intermediate bootloader
+using the Linux 32-bit, 64-bit, or 64-bit EFI handover boot protocols.
 
 In either case, to build an ISO image that can be used to create a bootable
 CD, DVD, or USB Flash drive, type `make iso`, The result is a `memtest.iso`
@@ -92,16 +90,16 @@ Note that when writing to a USB Flash drive, the ISO image must be written
 directly ('dumped') to the raw device, either by using the `dd` command or
 by using a utility that provides the same functionality.
 
-When using an intermediate bootloader, either the `memtest.bin` file or the
-`memtest.efi` file should be stored in a disk partition the bootloader can
-access, and the bootloader configuration should be updated to boot from
-that file as if it were a Linux kernel with no initial RAM disk. Several
-boot command line options are recognised, as described below. If using the
-16-bit boot protocol, Memtest86+ will use the display in text mode (640x400).
-If using the 32-bit or 64-bit boot protocols, Memtest86+ will use the display
-in either text mode or graphics mode, as specified in the `boot_params` struct
-passed to it by the bootloader. If in graphics mode, the supplied framebuffer
-must be at least 640x400 pixels; if larger, the display will be centred. If
+When using an intermediate bootloader, `mt86plus` file should be stored
+in a disk partition the bootloader can access, and the bootloader
+configuration should be updated to boot from that file as if it were a Linux
+kernel with no initial RAM disk. Several boot command line options are
+recognised, as described below. If using the 16-bit boot protocol, Memtest86+
+will use the display in text mode (640x400). If using the 32-bit or 64-bit
+boot protocols, Memtest86+ will use the display in either text mode or
+graphics mode, as specified in the `boot_params` struct passed to it by
+the bootloader. If in graphics mode, the supplied framebuffer must be
+at least 640x400 pixels; if larger, the display will be centred. If
 the system was booted in UEFI mode, graphics mode must be used.
 
 For test purposes, there is also an option to build an ISO image that uses

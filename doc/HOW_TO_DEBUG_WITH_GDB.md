@@ -1,4 +1,4 @@
-#		How to debug memtest.efi in QEMU with GDB
+#		How to debug mt86plus in QEMU with GDB
 
 `debug_memtest.sh` is a script that allows memtest86plus developers to set up a debugging environment with GDB in QEMU.  
 It calls the `make debug` target of a modified Makefile to create an additional debug-symbol file called `memtest.debug`.  
@@ -28,7 +28,7 @@ This script will automatically be loaded when gdb starts.
 
 * wait until UEFI-Shell is loaded
 * type "fs0:" - Enter
-* type "memtest.efi" - Enter
+* type "mt86plus.efi" - Enter
 
 ###	Inside GDB
 
@@ -36,9 +36,9 @@ When GDB is running, it stops at the first breakpoint at main(). Feel free to ad
 
 ###	Remarks - auto-boot memtest86+
 
-In step **Navigate inside QEMU/UEFI**, you have to navigate to the directory which contains memtest.efi and manually launch it.
+In step **Navigate inside QEMU/UEFI**, you have to navigate to the directory which contains mt86plus.efi and manually launch it.
 
-If you want to automatically boot from memtest.efi, there is an additional step required to add memtest to the first place at the bootorder:
+If you want to automatically boot from mt86plus.efi, there is an additional step required to add memtest to the first place at the bootorder:
 
 When the UEFI Shell is running, type
 		`bcfg boot add 0 FS0:\EFI\boot\BOOT_X64.efi "memtest"`
@@ -46,7 +46,7 @@ and confirm with Enter.
 The directory "\EFI\boot" and the file "BOOT_X64.efi" are automatically
 created by the debug-script.
 
-When you run the script the next time, memtest.efi should run without
+When you run the script the next time, mt86plus.efi should run without
 previous user interaction.
 
 !! But be careful when cleaning the directory by './debug_memtest.sh -c'. It also removes this setting.
@@ -68,15 +68,15 @@ Both values are defined in `memtest86plus/boot/header.S`
 
 * IMMUTABILITY OF ALL CONDITIONS
 
-if you assume, that these values will never change during the development phase of memtest86plus AND memtest.efi is always loaded at this preferred address in qemu-system-x86_64 (which seems to be the case) then it is possible to hardcode the offset in the script (for the implementation see debug_memtest_simple.sh)
+if you assume, that these values will never change during the development phase of memtest86plus AND mt86plus.efi is always loaded at this preferred address in qemu-system-x86_64 (which seems to be the case) then it is possible to hardcode the offset in the script (for the implementation see debug_memtest_simple.sh)
 
 * ADAPTABILITY TO DEVELOPMENT CHANGES
 
-if there is a chance, that these values WILL change during the development phase but memtest.efi is always loaded at this preferred address then the value can be read from header.S by the debug script just right before starting the debugging (for an example, see debug_memtest_full.sh)
+if there is a chance, that these values WILL change during the development phase but mt86plus.efi is always loaded at this preferred address then the value can be read from header.S by the debug script just right before starting the debugging (for an example, see debug_memtest_full.sh)
 
 * EXPECTED ERRATIC BEHAVIOUR OF QEMU
 
-If it is expected that memtest.efi is NOT always loaded at the same address, it is inevitable to determine the actual loading address first. This approach comprises a DEBUG-build of OVMF.fd (which requires the cloning of the whole edk2-repository and manually build OVMF.fd). With this DEBUG-version of OVMF.fd it is possible to write the loading addresses of all modules into a debug.log.
+If it is expected that mt86plus.efi is NOT always loaded at the same address, it is inevitable to determine the actual loading address first. This approach comprises a DEBUG-build of OVMF.fd (which requires the cloning of the whole edk2-repository and manually build OVMF.fd). With this DEBUG-version of OVMF.fd it is possible to write the loading addresses of all modules into a debug.log.
 This proceeding has been tested successfully but is actually not implemented in one of the srcipts.
 
 ###	Handle relocation of memtest
