@@ -69,7 +69,11 @@
 #define EFI_SYSTEM_TABLE_SIGNATURE      UINT64_C(0x5453595320494249)
 #define EFI_RUNTIME_SERVICES_SIGNATURE  UINT64_C(0x5652453544e5552)
 
+#if defined(__x86_64__) || defined(__i386__)
 #define efiapi __attribute__((ms_abi))
+#else
+#define efiapi
+#endif
 
 #if (ARCH_BITS == 64)
 typedef uint64_t        uintn_t;

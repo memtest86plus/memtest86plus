@@ -144,11 +144,14 @@ void display_init(void)
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
     prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
-#if TESTWORD_WIDTH > 32
-    prints(ROW_FOOTER, 76, ".x64");
-#else
-    prints(ROW_FOOTER, 76, ".x32");
+#if defined (__x86_64__)
+    prints(ROW_FOOTER, 74, ".x64");
+#elif defined (__i386__)
+    prints(ROW_FOOTER, 74, ".x32");
+#elif defined (__loongarch_lp64)
+    prints(ROW_FOOTER, 74, ".la64");
 #endif
+
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
 

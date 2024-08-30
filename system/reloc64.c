@@ -32,6 +32,8 @@
 
 #define R_X86_64_NONE      0
 #define R_X86_64_RELATIVE  8
+#define R_LARCH_NONE       0
+#define R_LARCH_RELATIVE   3
 
 //------------------------------------------------------------------------------
 // Types
@@ -70,12 +72,21 @@ typedef struct
 static inline Elf64_Addr __attribute__ ((unused)) get_load_address(void)
 {
     Elf64_Addr addr;
+#if defined(__x86_64__)
     __asm__ __volatile__ (
         "leaq _start(%%rip), %0"
         : "=r" (addr)
         :
         : "cc"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__ (
+        "la.pcrel %0, _start"
+        : "=r" (addr)
+        :
+        : "memory"
+    );
+#endif
     return addr;
 }
 
@@ -86,12 +97,22 @@ static inline Elf64_Addr __attribute__ ((unused)) get_load_address(void)
 static inline Elf64_Addr __attribute__ ((unused)) get_dynamic_section_offset(void)
 {
     Elf64_Addr offs;
+#if defined(__x86_64__)
     __asm__ __volatile__ (
         "movq _GLOBAL_OFFSET_TABLE_(%%rip), %0"
         : "=r" (offs)
         :
         : "cc"
     );
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__ (
+        "la.pcrel $t0, _GLOBAL_OFFSET_TABLE_ \n\t"
+        "ld.d %0, $t0, 0x0"
+        : "=r" (offs)
+        :
+        : "$t0", "memory"
+    );
+#endif
     return offs;
 }
 
@@ -120,7 +141,8 @@ static void get_dynamic_info(Elf64_Dyn *dyn_section, Elf64_Addr load_offs, Elf64
 static void do_relocation(Elf64_Addr load_addr, Elf64_Addr load_offs, const Elf64_Rela *rel)
 {
     Elf64_Addr *target_addr = (Elf64_Addr *)(load_addr + rel->r_offset);
-    if (ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) {
+    if ((ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) ||
+        (ELF64_R_TYPE(rel->r_info) == R_LARCH_RELATIVE)) {
         if (load_offs == load_addr) {
             *target_addr = load_addr + rel->r_addend;
         } else {
@@ -128,7 +150,8 @@ static void do_relocation(Elf64_Addr load_addr, Elf64_Addr load_offs, const Elf6
         }
         return;
     }
-    if (ELF64_R_TYPE(rel->r_info) == R_X86_64_NONE) {
+    if ((ELF64_R_TYPE(rel->r_info) == R_X86_64_NONE) ||
+        (ELF64_R_TYPE(rel->r_info) == R_LARCH_NONE)) {
         return;
     }
     assert(! "unexpected dynamic reloc type");
