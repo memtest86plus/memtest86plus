@@ -26,7 +26,8 @@ typedef enum {
     ERROR_MODE_NONE,
     ERROR_MODE_SUMMARY,
     ERROR_MODE_ADDRESS,
-    ERROR_MODE_BADRAM
+    ERROR_MODE_BADRAM,
+    ERROR_MODE_RANGES,
 } error_mode_t;
 
 typedef enum {
