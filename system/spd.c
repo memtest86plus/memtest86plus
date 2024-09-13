@@ -119,7 +119,7 @@ static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_l
     sku[sku_len] = '\0';
 }
 
-static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr5(volatile spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR5";
 
@@ -194,8 +194,10 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     }
 
     // Compute Frequency (including XMP)
-    uint16_t tCK, tCKtmp, tns;
+    uint16_t tCK;
     int xmp_offset = 0;
+    // force sequential SPD read
+    volatile uint16_t tns, tCKtmp;
 
     spdi->XMP = ((get_spd(slot_idx, 640) == 0x0C && get_spd(slot_idx, 641) == 0x4A)) ? 3 : 0;
 
@@ -203,8 +205,8 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
         // XMP 3.0 (enumerate all profiles to find the fastest)
         tCK = 0;
         for (int offset = 0; offset < 3*64; offset += 64) {
-            tCKtmp = get_spd(slot_idx, 710 + offset) << 8 |
-                     get_spd(slot_idx, 709 + offset);
+            tCKtmp = get_spd(slot_idx, 709 + offset) |
+                     get_spd(slot_idx, 710 + offset) << 8;
 
             if (tCKtmp != 0 && (tCK == 0 || tCKtmp < tCK)) {
                 xmp_offset = offset;
@@ -213,8 +215,9 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
         }
     } else {
         // JEDEC
-        tCK = get_spd(slot_idx, 21) << 8 |
-              get_spd(slot_idx, 20);
+        tCKtmp = get_spd(slot_idx, 20) |
+                 get_spd(slot_idx, 21) << 8;
+        tCK = tCKtmp;
     }
 
     if (tCK == 0) {
@@ -231,29 +234,29 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
         // ------------------
 
         // CAS# Latency
-        tns  = (uint16_t)get_spd(slot_idx, 718 + xmp_offset) << 8 |
-               (uint16_t)get_spd(slot_idx, 717 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 717 + xmp_offset) |
+               (uint16_t)get_spd(slot_idx, 718 + xmp_offset) << 8;
         spdi->tCL = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
         spdi->tCL += spdi->tCL % 2; // if tCL is odd, round to upper even.
 
         // RAS# to CAS# Latency
-        tns  = (uint16_t)get_spd(slot_idx, 720 + xmp_offset) << 8 |
-               (uint16_t)get_spd(slot_idx, 719 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 719 + xmp_offset) |
+               (uint16_t)get_spd(slot_idx, 720 + xmp_offset) << 8;
         spdi->tRCD = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // RAS# Precharge
-        tns  = (uint16_t)get_spd(slot_idx, 722 + xmp_offset) << 8 |
-               (uint16_t)get_spd(slot_idx, 721 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 721 + xmp_offset) |
+               (uint16_t)get_spd(slot_idx, 722 + xmp_offset) << 8;
         spdi->tRP = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Active Time
-        tns  = (uint16_t)get_spd(slot_idx, 724 + xmp_offset) << 8 |
-               (uint16_t)get_spd(slot_idx, 723 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 723 + xmp_offset) |
+               (uint16_t)get_spd(slot_idx, 724 + xmp_offset) << 8;
         spdi->tRAS = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Cycle Time
-        tns  = (uint16_t)get_spd(slot_idx, 726 + xmp_offset) << 8 |
-               (uint16_t)get_spd(slot_idx, 725 + xmp_offset);
+        tns  = (uint16_t)get_spd(slot_idx, 725 + xmp_offset) |
+               (uint16_t)get_spd(slot_idx, 726 + xmp_offset) << 8;
         spdi->tRC = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
     } else {
         // --------------------
@@ -261,29 +264,29 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
         // --------------------
 
         // CAS# Latency
-        tns  = (uint16_t)get_spd(slot_idx, 31) << 8 |
-               (uint16_t)get_spd(slot_idx, 30);
+        tns  = (uint16_t)get_spd(slot_idx, 30) |
+               (uint16_t)get_spd(slot_idx, 31) << 8;
         spdi->tCL = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
         spdi->tCL += spdi->tCL % 2;
 
         // RAS# to CAS# Latency
-        tns  = (uint16_t)get_spd(slot_idx, 33) << 8 |
-               (uint16_t)get_spd(slot_idx, 32);
+        tns  = (uint16_t)get_spd(slot_idx, 32) |
+               (uint16_t)get_spd(slot_idx, 33) << 8;
         spdi->tRCD = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // RAS# Precharge
-        tns  = (uint16_t)get_spd(slot_idx, 35) << 8 |
-               (uint16_t)get_spd(slot_idx, 34);
+        tns  = (uint16_t)get_spd(slot_idx, 34) |
+               (uint16_t)get_spd(slot_idx, 35) << 8;
         spdi->tRP = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Active Time
-        tns  = (uint16_t)get_spd(slot_idx, 37) << 8 |
-               (uint16_t)get_spd(slot_idx, 36);
+        tns  = (uint16_t)get_spd(slot_idx, 36) |
+               (uint16_t)get_spd(slot_idx, 37) << 8;
         spdi->tRAS = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
 
         // Row Cycle Time
-        tns  = (uint16_t)get_spd(slot_idx, 39) << 8 |
-               (uint16_t)get_spd(slot_idx, 38);
+        tns  = (uint16_t)get_spd(slot_idx, 38) |
+               (uint16_t)get_spd(slot_idx, 39) << 8;
         spdi->tRC = (tns + tCK - DDR5_ROUNDING_FACTOR) / tCK;
     }
 
@@ -291,7 +294,7 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     spdi->jedec_code = (get_spd(slot_idx, 512) & 0x1F) << 8;
     spdi->jedec_code |= get_spd(slot_idx, 513) & 0x7F;
 
-    read_sku(spdi->sku, slot_idx, 521, 30);
+    read_sku((char*)spdi->sku, slot_idx, 521, 30);
 
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 515));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 516));
@@ -299,23 +302,29 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
-static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
+static void parse_spd_ddr4(volatile spd_info *spdi, uint8_t slot_idx)
 {
     spdi->type = "DDR4";
+
+    volatile uint8_t byte12 = get_spd(slot_idx, 12);
+    volatile uint8_t byte13 = get_spd(slot_idx, 13);
 
     // Compute module size in MB with shifts
     spdi->module_size = 1U << (
                                ((get_spd(slot_idx, 4) & 0xF) + 5)   +  // Total SDRAM capacity: (256 Mbits << byte4[3:0] with an oddity for values >= 8) / 1 KB
-                               ((get_spd(slot_idx, 13) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte13[2:0]
-                               ((get_spd(slot_idx, 12) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte12[2:0]
-                               ((get_spd(slot_idx, 12) >> 3) & 0x7) +  // Number of Ranks: byte12[5:3]
+                               ((byte13 & 0x7) + 3)  -  // Primary Bus Width: 8 << byte13[2:0]
+                               ((byte12 & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte12[2:0]
+                               ((byte12 >> 3) & 0x7) +  // Number of Ranks: byte12[5:3]
                                ((get_spd(slot_idx, 6) >> 4) & 0x7)     // Die count - 1: byte6[6:4]
                               );
 
-    spdi->hasECC = (((get_spd(slot_idx, 13) >> 3) & 1) == 1);
+    spdi->hasECC = (((byte13 >> 3) & 1) == 1);
 
     // Module max clock
-    float tns, tCK, ramfreq, fround;
+    float tCK, ramfreq, fround;
+    // force sequential SPD read
+    volatile float tns_cl, tns_rcd, tns_rp, tns_ras, tns_rc;
+    volatile uint8_t tns_trp;
 
     if (get_spd(slot_idx, 384) == 0x0C && get_spd(slot_idx, 385) == 0x4A) {
         // Max XMP
@@ -350,67 +359,71 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
         // XMP Specifications
         // ------------------
 
-        // CAS# Latency
-        tns  = (uint8_t)get_spd(slot_idx, 401) * 0.125f +
-               (int8_t)get_spd(slot_idx, 430)  * 0.001f;
-        spdi->tCL = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
-
-        // RAS# to CAS# Latency
-        tns  = (uint8_t)get_spd(slot_idx, 402) * 0.125f +
-               (int8_t)get_spd(slot_idx, 429)  * 0.001f;
-        spdi->tRCD = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
-
-        // RAS# Precharge
-        tns  = (uint8_t)get_spd(slot_idx, 403) * 0.125f +
-               (int8_t)get_spd(slot_idx, 428)  * 0.001f;
-        spdi->tRP = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_cl  = (uint8_t)get_spd(slot_idx, 401) * 0.125f;
+        tns_rcd = (uint8_t)get_spd(slot_idx, 402) * 0.125f;
+        tns_rp 	= (uint8_t)get_spd(slot_idx, 403) * 0.125f;
+        tns_trp = (uint8_t)get_spd(slot_idx, 404);
+        tns_ras = (uint8_t)get_spd(slot_idx, 405) * 0.125f;
+        tns_rc  = (uint8_t)get_spd(slot_idx, 406) * 0.125f;
 
         // Row Active Time
-        tns = (uint8_t)get_spd(slot_idx, 405) * 0.125f +
-              (int8_t)get_spd(slot_idx, 427)  * 0.001f  +
-              (uint8_t)(get_spd(slot_idx, 404) & 0x0F) * 32.0f;
-        spdi->tRAS = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_ras += (int8_t)get_spd(slot_idx, 427)  * 0.001f +
+              (uint8_t)(tns_trp & 0x0F) * 32.0f;
+        spdi->tRAS = (uint16_t)(tns_ras/tCK + ROUNDING_FACTOR);
+
+        // RAS# Precharge
+        tns_rp += (int8_t)get_spd(slot_idx, 428) * 0.001f;
+        spdi->tRP = (uint16_t)(tns_rp/tCK + ROUNDING_FACTOR);
+
+        // RAS# to CAS# Latency
+        tns_rcd += (int8_t)get_spd(slot_idx, 429) * 0.001f;
+        spdi->tRCD = (uint16_t)(tns_rcd/tCK + ROUNDING_FACTOR);
+
+        // CAS# Latency
+        tns_cl += (int8_t)get_spd(slot_idx, 430) * 0.001f;
+        spdi->tCL = (uint16_t)(tns_cl/tCK + ROUNDING_FACTOR);
 
         // Row Cycle Time
-        tns = (uint8_t)get_spd(slot_idx, 406) * 0.125f +
-              (uint8_t)(get_spd(slot_idx, 404) >> 4) * 32.0f;
-        spdi->tRC = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_rc += (uint8_t)(tns_trp >> 4) * 32.0f;
+        spdi->tRC = (uint16_t)(tns_rc/tCK + ROUNDING_FACTOR);
     } else {
         // --------------------
         // JEDEC Specifications
         // --------------------
 
-        // CAS# Latency
-        tns  = (uint8_t)get_spd(slot_idx, 24) * 0.125f +
-               (int8_t)get_spd(slot_idx, 123) * 0.001f;
-        spdi->tCL = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
-
-        // RAS# to CAS# Latency
-        tns  = (uint8_t)get_spd(slot_idx, 25) * 0.125f +
-               (int8_t)get_spd(slot_idx, 122) * 0.001f;
-        spdi->tRCD = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_cl  = (uint8_t)get_spd(slot_idx, 24) * 0.125f;
+        tns_rcd = (uint8_t)get_spd(slot_idx, 25) * 0.125f;
+        tns_rp  = (uint8_t)get_spd(slot_idx, 26) * 0.125f;
+        tns_trp = (uint8_t)get_spd(slot_idx, 27);
+        tns_ras = (uint8_t)get_spd(slot_idx, 28) * 0.125f;
+        tns_rc  = (uint8_t)get_spd(slot_idx, 29) * 0.125f;
 
         // RAS# Precharge
-        tns  = (uint8_t)get_spd(slot_idx, 26) * 0.125f +
-               (int8_t)get_spd(slot_idx, 121) * 0.001f;
-        spdi->tRP = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_rp += (int8_t)get_spd(slot_idx, 121) * 0.001f;
+        spdi->tRP = (uint16_t)(tns_rp/tCK + ROUNDING_FACTOR);
+
+        // RAS# to CAS# Latency
+        tns_rcd += (int8_t)get_spd(slot_idx, 122) * 0.001f;
+        spdi->tRCD = (uint16_t)(tns_rcd/tCK + ROUNDING_FACTOR);
+
+        // CAS# Latency
+        tns_cl += (int8_t)get_spd(slot_idx, 123) * 0.001f;
+        spdi->tCL = (uint16_t)(tns_cl/tCK + ROUNDING_FACTOR);
 
         // Row Active Time
-        tns = (uint8_t)get_spd(slot_idx, 28) * 0.125f +
-              (uint8_t)(get_spd(slot_idx, 27) & 0x0F) * 32.0f;
-        spdi->tRAS = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_ras += (uint8_t)(tns_trp & 0x0F) * 32.0f;
+        spdi->tRAS = (uint16_t)(tns_ras/tCK + ROUNDING_FACTOR);
 
         // Row Cycle Time
-        tns = (uint8_t)get_spd(slot_idx, 29) * 0.125f +
-              (uint8_t)(get_spd(slot_idx, 27) >> 4) * 32.0f;
-        spdi->tRC = (uint16_t)(tns/tCK + ROUNDING_FACTOR);
+        tns_rc += (uint8_t)(tns_trp >> 4) * 32.0f;
+        spdi->tRC = (uint16_t)(tns_rc/tCK + ROUNDING_FACTOR);
     }
 
     // Module manufacturer
     spdi->jedec_code  = ((uint16_t)(get_spd(slot_idx, 320) & 0x1F)) << 8;
     spdi->jedec_code |= get_spd(slot_idx, 321) & 0x7F;
 
-    read_sku(spdi->sku, slot_idx, 329, 20);
+    read_sku((char*)spdi->sku, slot_idx, 329, 20);
 
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 323));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 324));
