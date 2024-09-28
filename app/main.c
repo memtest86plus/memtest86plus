@@ -42,6 +42,7 @@
 #include "unistd.h"
 
 #include "badram.h"
+#include "bad_pages_list.h"
 #include "config.h"
 #include "display.h"
 #include "error.h"
@@ -234,6 +235,7 @@ static void global_init(void)
     smbios_init();
 
     badram_init();
+    bad_pages_list_init();
 
     config_init();
 
@@ -621,6 +623,7 @@ void main(void)
                 if (!dummy_run) {
                     display_start_run();
                     badram_init();
+                    bad_pages_list_init();
                     error_init();
                 }
             }
