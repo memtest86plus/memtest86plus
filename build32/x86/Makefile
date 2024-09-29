@@ -1,4 +1,4 @@
-AS = as -64
+AS = as -32
 CC = gcc
 OBJCOPY = objcopy
 
@@ -10,9 +10,9 @@ else
   GIT_AVAILABLE = true
 endif
 
-CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector \
-         -fexcess-precision=standard -DARCH_BITS=64
+CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m32 -march=i586 -fpic -fno-builtin \
+         -ffreestanding -fomit-frame-pointer -fno-stack-protector \
+         -fexcess-precision=standard -DARCH_BITS=32
 
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
@@ -25,40 +25,41 @@ else
   MS_LDS=ldscripts/memtest_shared.lds
 endif
 
-INC_DIRS = -I../boot -I../system -I../lib -I../tests -I../app -Iapp
+INC_DIRS = -I../../boot -I../../system -I../../system/imc -I../../system/x86 -I../../lib -I../../tests -I../../app -Iapp
 
 SYS_OBJS = system/acpi.o \
-           system/cpuid.o \
-           system/cpuinfo.o \
            system/cpulocal.o \
            system/ehci.o \
            system/font.o \
-           system/hwctrl.o \
            system/heap.o \
            system/hwquirks.o \
            system/keyboard.o \
            system/ohci.o \
-           system/memctrl.o \
            system/pci.o \
            system/pmem.o \
            system/reloc.o \
            system/screen.o \
            system/serial.o \
            system/smbios.o \
-           system/i2c_x86.o \
            system/spd.o \
            system/smp.o \
-           system/temperature.o \
            system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
-           system/vmem.o \
-           system/xhci.o
+           system/xhci.o \
+           system/x86/cpuid.o \
+           system/x86/cpuinfo.o \
+           system/x86/hwctrl.o \
+           system/x86/i2c.o \
+           system/x86/memctrl.o \
+           system/x86/temperature.o \
+           system/x86/vmem.o
 
-IMC_SRCS = $(wildcard ../system/imc/*.c)
-IMC_OBJS = $(subst ../,,$(IMC_SRCS:.c=.o))
+IMC_SRCS = $(wildcard ../../system/imc/x86/*.c)
+IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
+           lib/div64.o \
            lib/print.o \
            lib/read.o \
            lib/string.o \
@@ -79,10 +80,10 @@ APP_OBJS = app/badram.o \
            app/config.o \
            app/display.o \
            app/error.o \
-           app/interrupt.o \
-           app/main.o
+           app/main.o \
+           app/x86/interrupt.o
 
-OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
+OBJS = boot/x86/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
 all: memtest.bin memtest.efi
 
@@ -101,49 +102,57 @@ debug: check memtest.debug memtest.efi
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
 
-boot/header.o : | ../boot/sbat.csv
+boot/header.o : | ../../boot/sbat.csv
 
-boot/startup.o: ../boot/startup64.S ../boot/boot.h
+boot/x86/startup.o: ../../boot/x86/startup32.S ../../boot/boot.h
+	@mkdir -p boot/x86
+	$(CC) -m32 -x assembler-with-cpp -c -I../../boot -o $@ $<
+
+boot/%.o: ../../boot/%.S ../../boot/boot.h app/build_version.h
 	@mkdir -p boot
-	$(CC) -m64 -x assembler-with-cpp -c -I../boot -o $@ $<
+	$(CC) -m32 -x assembler-with-cpp -c -I../../boot -Iapp -o $@ $<
 
-boot/%.o: ../boot/%.S ../boot/boot.h app/build_version.h
+boot/efisetup.o: ../../boot/efisetup.c
 	@mkdir -p boot
-	$(CC) -m64 -x assembler-with-cpp -c -I../boot -Iapp -o $@ $<
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-boot/efisetup.o: ../boot/efisetup.c
-	@mkdir -p boot
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
-
-system/reloc.o: ../system/reloc64.c
+system/reloc.o: ../../system/reloc32.c
 	@mkdir -p system
-	$(CC) -c $(CFLAGS) -fno-strict-aliasing $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) -fno-strict-aliasing $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/%.o: ../system/%.c
+system/%.o: ../../system/%.c
 	@mkdir -p system
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/imc/%.o: ../system/imc/%.c
-	@mkdir -p system/imc
+system/imc/x86/%.o: ../../system/imc/x86/%.c
+	@mkdir -p system/imc/x86
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+system/x86/%.o: ../../system/x86/%.c
+	@mkdir -p system/x86
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+lib/%.o: ../../lib/%.c
+	@mkdir -p lib
+	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+tests/%.o: ../../tests/%.c
+	@mkdir -p tests
+	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+app/%.o: ../../app/%.c app/build_version.h
+	@mkdir -p app
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-lib/%.o: ../lib/%.c
-	@mkdir -p lib
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
-
-tests/%.o: ../tests/%.c
-	@mkdir -p tests
-	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
-
-app/%.o: ../app/%.c app/build_version.h
-	@mkdir -p app
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+app/x86/%.o: ../../app/x86/%.c app/build_version.h
+	@mkdir -p app/x86
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 app/build_version.h: FORCE
 	@mkdir -p app
 	@( \
-	  cp -f ../app/version.h $@.tmp; \
-	  if $(GIT_AVAILABLE) && test -d ../.git ; then \
+	  cp -f ../../app/version.h $@.tmp; \
+	  if $(GIT_AVAILABLE) && test -d ../../.git ; then \
 	    hash=`git rev-parse HEAD | cut -c1-7`; \
 	    sed -i 's/GIT_HASH\s\".*"/GIT_HASH "'$$hash'"/' $@.tmp; \
 	  else \
@@ -187,7 +196,7 @@ floppy.img: memtest.bin
 
 esp.img: memtest.efi
 	@mkdir -p iso/EFI/BOOT
-	cp memtest.efi iso/EFI/BOOT/bootx64.efi
+	cp memtest.efi iso/EFI/BOOT/bootia32.efi
 	@rm -f esp.img
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
@@ -195,7 +204,7 @@ esp.img: memtest.efi
 memtest.iso: memtest.mbr floppy.img esp.img
 	@mkdir -p iso/boot
 	cp floppy.img iso/boot/floppy.img
-	xorrisofs -pad -R -J -volid MT86PLUS_64 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
+	xorrisofs -pad -R -J -volid MT86PLUS_32 -graft-points -hide-rr-moved --grub2-mbr memtest.mbr \
 		  -b /boot/floppy.img --efi-boot --interval:appended_partition_2:all:: \
 		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /boot=./iso/boot /EFI=./iso/EFI
@@ -235,28 +244,28 @@ GRUB_MODULES = iso9660 fat part_msdos part_gpt all_video font gfxterm gfxmenu \
 grub-eltorito.img:
 	$(GRUB_MKIMAGE) --output $@ --prefix /boot/grub --format i386-pc-eltorito biosdisk $(GRUB_MODULES)
 
-grub-bootx64.efi:
-	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format x86_64-efi $(GRUB_MODULES)
+grub-bootia32.efi:
+	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format i386-efi $(GRUB_MODULES)
 
-grub-esp.img: memtest.efi grub-bootx64.efi ../grub/${GRUB_CFG}-efi.cfg
-	@mkdir -p grub-iso/EFI/BOOT/grub/x86_64-efi grub-iso/EFI/BOOT/grub/fonts
+grub-esp.img: memtest.efi grub-bootia32.efi ../../grub/${GRUB_CFG}-efi.cfg
+	@mkdir -p grub-iso/EFI/BOOT/grub/i386-efi grub-iso/EFI/BOOT/grub/fonts
 	cp memtest.efi grub-iso/EFI/BOOT/memtest
-	cp grub-bootx64.efi grub-iso/EFI/BOOT/bootx64.efi
-	cp ../grub/${GRUB_CFG}-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
+	cp grub-bootia32.efi grub-iso/EFI/BOOT/bootia32.efi
+	cp ../../grub/${GRUB_CFG}-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
-	cp $(GRUB_LIB_DIR)/x86_64-efi/*.mod grub-iso/EFI/BOOT/grub/x86_64-efi/
+	cp $(GRUB_LIB_DIR)/i386-efi/*.mod grub-iso/EFI/BOOT/grub/i386-efi/
 	@rm -f grub-esp.img
 	/sbin/mkdosfs -n MT86P_ESP -F12 -C grub-esp.img 8192
 	mcopy -s -i grub-esp.img grub-iso/EFI ::
 
-grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/${GRUB_CFG}-legacy.cfg grub-esp.img
+grub-memtest.iso: memtest.bin grub-eltorito.img ../../grub/${GRUB_CFG}-legacy.cfg grub-esp.img
 	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
 	cp memtest.bin grub-iso/boot/memtest
 	cp grub-eltorito.img grub-iso/boot/eltorito.img
-	cp ../grub/${GRUB_CFG}-legacy.cfg grub-iso/boot/grub/grub.cfg
+	cp ../../grub/${GRUB_CFG}-legacy.cfg grub-iso/boot/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
 	cp $(GRUB_LIB_DIR)/i386-pc/*.mod grub-iso/boot/grub/i386-pc/
-	xorrisofs -pad -R -J -volid MT86PLUS_64 -graft-points -hide-rr-moved \
+	xorrisofs -pad -R -J -volid MT86PLUS_32 -graft-points -hide-rr-moved \
 		  --grub2-mbr $(GRUB_LIB_DIR)/i386-pc/boot_hybrid.img \
 		  -b /boot/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
 		  --efi-boot --interval:appended_partition_2:all:: \
