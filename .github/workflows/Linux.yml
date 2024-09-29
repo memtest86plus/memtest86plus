@@ -45,9 +45,9 @@ jobs:
         working-directory: ./
         run: |
           if [ ${{ matrix.arch }} == 'i386' ]; then
-            cd build32
+            cd build32/x86
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
-            cd build64
+            cd build64/x86
           elif [ ${{ matrix.arch }} == 'la64' ]; then
             cd build64/la64
           fi
@@ -57,9 +57,9 @@ jobs:
         working-directory: ./
         run: |
           if [ ${{ matrix.arch }} == 'i386' ]; then
-            cd build32
+            cd build32/x86
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
-            cd build64
+            cd build64/x86
           elif [ ${{ matrix.arch }} == 'la64' ]; then
             export PATH=/opt/LoongArch_Toolchains/cross-tools/bin/:$PATH
             cd build64/la64
