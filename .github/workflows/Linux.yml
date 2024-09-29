@@ -45,11 +45,11 @@ jobs:
         working-directory: ./
         run: |
           if [ ${{ matrix.arch }} == 'i386' ]; then
-            cd build32
+            cd build/ia32
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
-            cd build64
+            cd build/x64
           elif [ ${{ matrix.arch }} == 'la64' ]; then
-            cd build64/la64
+            cd build/loongarch64
           fi
           make clean
 
@@ -57,11 +57,11 @@ jobs:
         working-directory: ./
         run: |
           if [ ${{ matrix.arch }} == 'i386' ]; then
-            cd build32
+            cd build/ia32
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
-            cd build64
+            cd build/x64
           elif [ ${{ matrix.arch }} == 'la64' ]; then
             export PATH=/opt/LoongArch_Toolchains/cross-tools/bin/:$PATH
-            cd build64/la64
+            cd build/loongarch64
           fi
           make -j 2 CC="${{matrix.compiler}}" iso
