@@ -37,10 +37,12 @@
 #define SMBHSTSTS_INTR          0x02
 #define SMBHSTSTS_HOST_BUSY     0x01
 
+/* i801 Hosts Control register bits */
 #define SMBHSTCNT_QUICK             0x00
 #define SMBHSTCNT_BYTE              0x04
 #define SMBHSTCNT_BYTE_DATA         0x08
 #define SMBHSTCNT_WORD_DATA         0x0C
+#define SMBHSTCNT_PROC_CALL         0x10
 #define SMBHSTCNT_BLOCK_DATA        0x14
 #define SMBHSTCNT_I2C_BLOCK_DATA    0x18
 #define SMBHSTCNT_LAST_BYTE         0x20

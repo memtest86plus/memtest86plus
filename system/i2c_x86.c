@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2024 Sam Demeulemeester
 
 #include "display.h"
 
@@ -19,7 +19,7 @@
 
 #define MAX_SPD_SLOT    8
 
-int smbdev, smbfun;
+int smbbus, smbdev, smbfun;
 unsigned short smbusbase = 0;
 uint32_t smbus_id = 0;
 static uint16_t extra_initial_sleep_for_smb_transaction = 0;
@@ -81,14 +81,16 @@ static bool setup_smb_controller(void)
 {
     uint16_t vid, did;
 
-    for (smbdev = 0; smbdev < 32; smbdev++) {
-        for (smbfun = 0; smbfun < 8; smbfun++) {
-            vid = pci_config_read16(0, smbdev, smbfun, 0);
-            if (vid != 0xFFFF) {
-                did = pci_config_read16(0, smbdev, smbfun, 2);
-                if (did != 0xFFFF) {
-                    if (find_smb_controller(vid, did)) {
-                        return true;
+    for(smbbus = 0; smbbus < 0xFF; smbbus += 0x80) {
+        for (smbdev = 0; smbdev < 32; smbdev++) {
+            for (smbfun = 0; smbfun < 8; smbfun++) {
+                vid = pci_config_read16(smbbus, smbdev, smbfun, 0);
+                if (vid != 0xFFFF) {
+                    did = pci_config_read16(smbbus, smbdev, smbfun, 2);
+                    if (did != 0xFFFF) {
+                        if (find_smb_controller(vid, did)) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -170,6 +172,9 @@ static const uint16_t intel_ich5_dids[] =
     0x51A3,  // Alder Lake-P (PCH)
     0x54A3,  // Alder Lake-M (PCH)
     0x7A23,  // Raptor Lake-S (PCH)
+    //0x7E22,  // Meteor Lake-P (SOC)
+    0x7F23,  // Arrow Lake-S (PCH)
+    //0xA822,  // Lunar Lake
 };
 
 static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int size)
@@ -185,6 +190,7 @@ static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int s
 static bool find_smb_controller(uint16_t vid, uint16_t did)
 {
     smbus_id = (((uint32_t)vid) << 16) | did;
+
     switch(vid)
     {
         case PCI_VID_INTEL:
@@ -373,20 +379,21 @@ static bool ich5_get_smb(void)
     uint16_t x;
 
     // Enable SMBus IO Space if disabled
-    x = pci_config_read16(0, smbdev, smbfun, 0x4);
+    x = pci_config_read16(smbbus, smbdev, smbfun, 0x4);
 
     if (!(x & 1)) {
-        pci_config_write16(0, smbdev, smbfun, 0x4, x | 1);
+        pci_config_write16(smbbus, smbdev, smbfun, 0x4, x | 1);
     }
 
     // Read Base Address
-    x = pci_config_read16(0, smbdev, smbfun, 0x20);
+    x = pci_config_read16(smbbus, smbdev, smbfun, 0x20);
     smbusbase = x & 0xFFF0;
 
     // Enable I2C Host Controller Interface if disabled
-    uint8_t temp = pci_config_read8(0, smbdev, smbfun, 0x40);
-    if ((temp & 4) == 0) {
-        pci_config_write8(0, smbdev, smbfun, 0x40, temp | 0x04);
+    // Use SMBUS Mode for DDR5 to allow bank switch using Proc Call
+    uint8_t temp = pci_config_read8(smbbus, smbdev, smbfun, 0x40);
+    if ((temp & 4) == 0 && dmi_memory_device->type != DMI_DDR5) {
+       pci_config_write8(smbbus, smbdev, smbfun, 0x40, temp | 0x04);
     }
 
     // Reset SMBUS Controller
@@ -405,7 +412,7 @@ static bool amd_sb_get_smb(void)
     uint8_t rev_id;
     uint16_t pm_reg;
 
-    rev_id = pci_config_read8(0, smbdev, smbfun, 0x08);
+    rev_id = pci_config_read8(smbbus, smbdev, smbfun, 0x08);
 
     if ((smbus_id & 0xFFFF) == 0x4385 && rev_id <= 0x3D) {
         // Older AMD SouthBridge (SB700 & older) use PIIX4 registers
@@ -567,12 +574,18 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
         uint8_t adr_page = spd_adr / 128;
 
         if (adr_page != spd_page || last_adr != smbus_adr) {
-            __outb((smbus_adr << 1) | I2C_WRITE, SMBHSTADD);
+
+            __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
             __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
-            __outb(adr_page, SMBHSTDAT0);
-            __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+            __outb(adr_page & 7, SMBHSTDAT0);
+            __outb(0, SMBHSTDAT1);
+            __outb(SMBHSTCNT_PROC_CALL, SMBHSTCNT);
 
             ich5_process();
+
+            // These dummy read are mandatory to finish a Proc Call
+            __inb(SMBHSTDAT0);
+            __inb(SMBHSTDAT1);
 
             spd_page = adr_page;
             last_adr = smbus_adr;
