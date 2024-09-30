@@ -57,6 +57,9 @@ void memctrl_init(void)
       case IMC_ADL:
         get_imc_config_intel_adl();
         break;
+      case IMC_ARL:
+      case IMC_MTL:
+        get_imc_config_intel_mtl();
       default:
         break;
     }

@@ -84,10 +84,10 @@ static void amd_k8_revfg_temp(void)
     }
 
     // K8 Rev G Desktop requires an additional offset.
-    if (cpuid_info.version.extendedModel < 6 && cpuid_info.version.extendedModel > 7)   // Not Rev G
+    if (cpuid_info.version.extendedModel < 6 || cpuid_info.version.extendedModel > 7)   // Not Rev G
         return;
 
-    if (cpuid_info.version.extendedModel == 6 && cpuid_info.version.extendedModel < 9)  // Not Desktop
+    if (cpuid_info.version.extendedModel == 6 && cpuid_info.version.model < 9)  // Not Desktop
         return;
 
     uint16_t brandID = (cpuid_info.version.extendedBrandID >> 9) & 0x1f;

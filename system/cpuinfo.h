@@ -31,6 +31,7 @@
 #define IMC_ADL         0x1100  // Core 12th Gen (Alder Lake-S)
 #define IMC_RPL         0x1110  // Core 13th Gen (Raptor Lake)
 #define IMC_MTL         0x1120  // Core 14th Gen (Meteor Lake)
+#define IMC_ARL         0x1130  // Core 15th Gen (Arrow Lake)
 
 #define IMC_NHM_E       0x2010  // Core i7 1st Gen 45 nm (Nehalem-E)
 #define IMC_SNB_E       0x2020  // Core 2nd Gen (Sandy Bridge-E)

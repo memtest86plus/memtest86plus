@@ -375,17 +375,17 @@ static void determine_imc(void)
         switch (cpuid_info.version.model) {
           case 0x5:
             switch (cpuid_info.version.extendedModel) {
-              case 2:
+              case 0x2:
                 imc.family = IMC_NHM;         // Core i3/i5 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
-              case 3:
+              case 0x3:
                 imc.family = IMC_CLT;
                 enable_temperature = false;   // Atom Clover Trail
                 break;
-              case 4:
+              case 0x4:
                 imc.family = IMC_HSW_ULT;     // Core 4th Gen (Haswell-ULT)
                 break;
-              case 5:
+              case 0x5:
                 imc.family = IMC_SKL_SP;      // Skylake/Cascade Lake/Cooper Lake (Server)
                 break;
               default:
@@ -395,22 +395,25 @@ static void determine_imc(void)
 
           case 0x6:
             switch (cpuid_info.version.extendedModel) {
-              case 2:
+              case 0x2:
                 imc.family = IMC_TNC;         // Atom Tunnel Creek / Lincroft
                 enable_temperature = false;
                 break;
-              case 3:
+              case 0x3:
                 imc.family = IMC_CDT;         // Atom Cedar Trail
                 enable_temperature = false;
                 break;
-              case 4:
+              case 0x4:
                 imc.family = IMC_HSW;         // Core 4th Gen (Haswell w/ GT3e)
                 break;
-              case 5:
+              case 0x5:
                 imc.family = IMC_BDW_DE;      // Broadwell-DE (Server)
                 break;
-              case 6:
+              case 0x6:
                 imc.family = IMC_CNL;         // Cannon Lake
+                break;
+              case 0xC:
+                imc.family = IMC_ARL;         // Core 15th Gen (Arrow Lake)
                 break;
               default:
                 break;
@@ -455,6 +458,9 @@ static void determine_imc(void)
                 break;
               case 0x9:
                 imc.family = IMC_ADL;         // Core 12th Gen (Alder Lake-S)
+                break;
+              case 0xA:
+                imc.family = IMC_MTL;         // Core 14th Gen (Meteor Lake)
                 break;
               default:
                 break;
