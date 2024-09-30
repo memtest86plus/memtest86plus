@@ -17,6 +17,7 @@
 #include "vmem.h"
 
 #include "badram.h"
+#include "ranges.h"
 #include "config.h"
 #include "display.h"
 #include "test.h"
@@ -160,6 +161,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     if (new_header) {
         clear_message_area();
         badram_init();
+        ranges_display_init();
     }
     last_error_mode = error_mode;
 
@@ -306,6 +308,12 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
       case ERROR_MODE_BADRAM:
         if (new_badram) {
             badram_display();
+
+      case ERROR_MODE_RANGES:
+        if (use_for_badram) {
+            if (ranges_display_insert(addr)) {
+                ranges_display();
+            }
         }
         break;
 

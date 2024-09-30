@@ -42,6 +42,7 @@
 #include "unistd.h"
 
 #include "badram.h"
+#include "ranges.h"
 #include "config.h"
 #include "display.h"
 #include "error.h"
@@ -234,6 +235,8 @@ static void global_init(void)
     smbios_init();
 
     badram_init();
+
+    ranges_display_init();
 
     config_init();
 
@@ -621,6 +624,7 @@ void main(void)
                 if (!dummy_run) {
                     display_start_run();
                     badram_init();
+                    ranges_display_init();
                     error_init();
                 }
             }

@@ -223,6 +223,8 @@ static void parse_option(const char *option, const char *params)
             error_mode = ERROR_MODE_ADDRESS;
         } else if (strncmp(params, "badram", 7) == 0) {
             error_mode = ERROR_MODE_BADRAM;
+        } else if (strncmp(params, "chunks", 7) == 0) {
+            error_mode = ERROR_MODE_RANGES;
         }
     } else if (strncmp(option, "keyboard", 9) == 0 && params != NULL) {
         if (strncmp(params, "legacy", 7) == 0) {
@@ -652,7 +654,8 @@ static void error_mode_menu(void)
     prints(POP_R+4, POP_LI, "<F2>  Error summary");
     prints(POP_R+5, POP_LI, "<F3>  Individual errors");
     prints(POP_R+6, POP_LI, "<F4>  BadRAM patterns");
-    prints(POP_R+7, POP_LI, "<F10> Exit menu");
+    prints(POP_R+7, POP_LI, "<F5>  Address ranges");
+    prints(POP_R+8, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+error_mode, POP_LM, '*');
 
     bool tty_update = enable_tty;
@@ -671,6 +674,7 @@ static void error_mode_menu(void)
           case '2':
           case '3':
           case '4':
+          case '5':
             set_error_mode(ch - '1');
             break;
           case 'u':
