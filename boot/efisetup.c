@@ -179,6 +179,11 @@ static int get_cmd_line_length(efi_loaded_image_t *image)
     efi_char16_t *cmd_line = (efi_char16_t *)image->load_options;
     int max_length = image->load_options_size / sizeof(efi_char16_t);
     int length = 0;
+    // Skip Unicode byte order mark if present
+    if (cmd_line[0] == u'\uFEFF') {
+        cmd_line = &cmd_line[1];
+        max_length--;
+    }
     while (length < max_length && cmd_line[length] > 0x00 && cmd_line[length] < 0x80) {
         length++;
     }
@@ -188,6 +193,9 @@ static int get_cmd_line_length(efi_loaded_image_t *image)
 static void get_cmd_line(efi_loaded_image_t *image, int num_chars, char *buffer)
 {
     efi_char16_t *cmd_line = (efi_char16_t *)image->load_options;
+    if (cmd_line[0] == u'\uFEFF') {
+        cmd_line = &cmd_line[1];
+    }
     for (int i = 0; i < num_chars; i++) {
         buffer[i] = cmd_line[i];
     }
