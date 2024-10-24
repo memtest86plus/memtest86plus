@@ -331,14 +331,6 @@ Jmp:
     li.w    $t0, 0xB0        # PG mode, load/store cacheable, instructions cacheable, disable intrrupts, DMWn effected.
     csrwr   $t0, LOONGARCH_CSR_CRMD
 
-    //
-    // Set PMCNT0.
-    //
-    li.w      $t0, (0x1 << 16)
-    li.w      $t1, ((0x1 << 16) | 0x3FF)
-    csrxchg   $t0, $t1, LOONGARCH_CSR_PERFCTRL0
-    csrwr     $zero, LOONGARCH_CSR_PERFCNTR0
-
     # Enable all IPIs
     li.w       $t0, 0xFFFFFFFF
     li.w       $t1, 0x1004
