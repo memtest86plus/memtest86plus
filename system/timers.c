@@ -16,6 +16,7 @@
 #if defined(__loongarch_lp64)
 // LoongArch GCC builtin function
 #include <larchintrin.h>
+#include "registers.h"
 #endif
 
 //------------------------------------------------------------------------------
@@ -99,6 +100,11 @@ static void correct_tsc(void)
     uint64_t num_millisec = 50, millisec_div = 1000;
 
     //
+    // Enable PMCNT0.
+    //
+    __csrxchg_d((0x1 << 16), (0x1 << 16) | 0x3FF, LOONGARCH_CSR_PERFCTRL0);
+
+    //
     // Get stable count frequency
     //
     calc_base_freq   = __cpucfg(0x4);
@@ -110,11 +116,16 @@ static void correct_tsc(void)
     __asm__ __volatile__("rdtime.d %0, $zero":"=r"(current_ticks):);
     excepted_ticks += current_ticks;
 
-    start = __csrrd_d(0x201);
+    start = __csrrd_d(LOONGARCH_CSR_PERFCNTR0);
     do {
       __asm__ __volatile__("rdtime.d %0, $zero":"=r"(current_ticks):);
     } while (current_ticks < excepted_ticks);
-    end = __csrrd_d(0x201);
+    end = __csrrd_d(LOONGARCH_CSR_PERFCNTR0);
+
+    //
+    // Disable PMCNT0.
+    //
+    __csrxchg_d(0, (0x1 << 16) | 0x3FF, LOONGARCH_CSR_PERFCTRL0);
 
     clks_per_msec = (end - start) / num_millisec;
 }

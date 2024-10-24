@@ -1059,14 +1059,6 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 #endif
     }
 
-#if defined(__loongarch_lp64)
-    //
-    // MP sync the PMCNT0 with AP
-    //
-    __csrxchg_d(1 << 16, (1 << 16 | 0x3FF), LOONGARCH_CSR_PERFCTRL0);
-    __csrwr_d(0x0, LOONGARCH_CSR_PERFCNTR0);
-#endif
-
 #if SEQUENTIAL_AP_START
     return 0;
 #else

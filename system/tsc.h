@@ -11,6 +11,11 @@
  */
 
 #include <stdint.h>
+#if defined(__loongarch_lp64)
+#include "cpuinfo.h"
+// LoongArch GCC builtin function
+#include <larchintrin.h>
+#endif
 
 #define rdtsc(low, high)            \
     __asm__ __volatile__("rdtsc"    \
@@ -37,18 +42,23 @@ static inline uint64_t get_tsc(void)
     rdtsc(tl, th);
     return (uint64_t)th << 32 | (uint64_t)tl;
 }
-#else
+#elif defined(__loongarch_lp64)
 static inline uint64_t get_tsc(void)
 {
-  uint64_t val = 0;
+    uint64_t val = 0;
+    static uint64_t stable_count_freq = 0;
 
-  __asm__ __volatile__(
-    "csrrd %0, 0x201\n\t"
-    : "=r"(val)
-    :
-    );
+    if (!stable_count_freq) {
+      stable_count_freq = ((__cpucfg(0x4) * (__cpucfg(0x5) & 0xFFFF)) / ((__cpucfg(0x5) >> 16) & 0xFFFF)) / 1000; // KHz
+    }
 
-  return val;
+    __asm__ __volatile__(
+      "rdtime.d %0, $zero\n\t"
+      : "=r"(val)
+      :
+      );
+
+    return (val * (clks_per_msec / stable_count_freq));
 }
 #endif
 

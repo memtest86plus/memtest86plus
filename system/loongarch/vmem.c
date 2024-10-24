@@ -29,7 +29,9 @@ extern uint8_t highest_map_bit;
 
 uintptr_t map_region(uintptr_t base_addr, size_t size __attribute__((unused)), bool only_for_startup __attribute__((unused)))
 {
-    if (((base_addr < 0x80000000) && (base_addr >= 0x30000000)) || ((base_addr & PCI_IO_PERFIX) != 0x0)) {
+    if (((base_addr < 0x80000000) && (base_addr >= 0x30000000)) ||         // 32-bit PCI memory space
+      ((base_addr < 0xFD00000000ULL) && (base_addr >= 0x8000000000ULL)) || // 64-bit PCI memory space
+      ((base_addr & PCI_IO_PERFIX) != 0x0)) {
         return MMIO_BASE | base_addr;
     } else if ((base_addr < 0x20000000) && (base_addr > 0x10000000)) {
         return DMW0_BASE | base_addr;
