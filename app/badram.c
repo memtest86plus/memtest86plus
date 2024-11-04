@@ -108,20 +108,6 @@ static uint64_t combi_cost(uint64_t addr1, uint64_t mask1, uint64_t addr2, uint6
 }
 
 /*
- * Determine if pattern is already covered by an existing pattern.
- * Return true if that's the case, else false.
- */
-static bool is_covered(pattern_t pattern)
-{
-    for (int i = 0; i < num_patterns; i++) {
-        if (combi_cost(patterns[i].addr, patterns[i].mask, pattern.addr, pattern.mask) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/*
  * Find the pair of entries that would be the cheapest to merge.
  * Assumes patterns is sorted by .addr asc and that for each index i, the cheapest entry to merge with is at i-1 or i+1.
  * Return -1 if <= 1 patterns exist, else the index of the first entry of the pair (the other being that + 1).
@@ -260,9 +246,18 @@ bool badram_insert(testword_t page, testword_t offset)
         .mask = DEFAULT_MASK
     };
 
-    // If covered by existing entry we return immediately
-    if (is_covered(pattern)) {
-        return false;
+    // Test if covered by an existing entry or can be covered by adding one
+    // testword address to an existing entry.
+    for (int i = 0; i < num_patterns; i++) {
+        uint64_t cost = combi_cost(patterns[i].addr, patterns[i].mask, pattern.addr, pattern.mask);
+        if (cost == 0) {
+            return false;
+        }
+        if (cost == sizeof(uintptr_t)) {
+            combine(patterns[i].addr, patterns[i].mask, pattern.addr, pattern.mask,
+                    &patterns[i].addr, &patterns[i].mask);
+            return true;
+        }
     }
 
     // Add entry in order sorted by .addr asc
