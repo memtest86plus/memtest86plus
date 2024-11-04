@@ -214,6 +214,31 @@ static void insert_sorted(pattern_t pattern)
     insert_at(pattern, new_idx);
 }
 
+static int num_digits(uint64_t value)
+{
+    int count = 0;
+
+    do {
+        value >>= 4;
+        count++;
+    } while (value != 0);
+
+    return count;
+}
+
+static int display_hex_uint64(int col, uint64_t value)
+{
+#if (ARCH_BITS == 64)
+    return display_scrolled_message(col, "0x%x", value);
+#else
+    if (value > 0xffffffffU) {
+        return display_scrolled_message(col, "0x%x%08x", (uintptr_t)(value >> 32), (uintptr_t)(value & 0xFFFFFFFFU));
+    } else {
+        return display_scrolled_message(col, "0x%x", (uintptr_t)value);
+    }
+#endif
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -275,17 +300,15 @@ void badram_display(void)
     int col = 7;
     for (int i = 0; i < num_patterns; i++) {
         if (i > 0) {
-            display_scrolled_message(col, ",");
-            col++;
+            col = display_scrolled_message(col, ",");
         }
-        int text_width = 2 * (16 + 2) + 1;
+        int text_width = num_digits(patterns[i].addr) + num_digits(patterns[i].mask) + 5;
         if (col > (SCREEN_WIDTH - text_width)) {
             scroll();
             col = 7;
         }
-        display_scrolled_message(col, "0x%08x%08x,0x%08x%08x",
-                                 (uintptr_t)(patterns[i].addr >> 32), (uintptr_t)(patterns[i].addr & 0xFFFFFFFFU),
-                                 (uintptr_t)(patterns[i].mask >> 32), (uintptr_t)(patterns[i].mask & 0xFFFFFFFFU));
-        col += text_width;
+        col = display_hex_uint64(col, patterns[i].addr);
+        col = display_scrolled_message(col, ",");
+        col = display_hex_uint64(col, patterns[i].mask);
     }
 }
