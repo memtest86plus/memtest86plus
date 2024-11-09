@@ -36,7 +36,7 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define MAX_PATTERNS 10
+#define MAX_PATTERNS 20
 #define PATTERNS_SIZE (MAX_PATTERNS + 1)
 
 // DEFAULT_MASK covers a uintptr_t, since that is the testing granularity.
