@@ -38,7 +38,7 @@
 #define PATTERNS_SIZE (MAX_PATTERNS + 1)
 
 // DEFAULT_MASK covers a uintptr_t, since that is the testing granularity.
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
 #define DEFAULT_MASK (UINT64_MAX << 3)
 #else
 #define DEFAULT_MASK (UINT64_MAX << 2)
