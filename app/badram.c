@@ -26,9 +26,11 @@
 #include <stdint.h>
 
 #include "display.h"
+#include "memsize.h"
+
+#include "config.h"
 
 #include "badram.h"
-#include "memsize.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -49,8 +51,8 @@
 //------------------------------------------------------------------------------
 
 typedef struct {
-    uint64_t   addr;
-    uint64_t   mask;
+    uint64_t   addr;    // used as the lower address in memmap or pages mode
+    uint64_t   mask;    // used as the upper address in memmap or pages mode
 } pattern_t;
 
 //------------------------------------------------------------------------------
@@ -73,10 +75,15 @@ static int          num_patterns = 0;
  */
 static void combine(uint64_t addr1, uint64_t mask1, uint64_t addr2, uint64_t mask2, uint64_t *addr, uint64_t *mask)
 {
-    *mask = COMBINE_MASK(addr1, mask1, addr2, mask2);
+    if (error_mode == ERROR_MODE_BADRAM) {
+        *mask = COMBINE_MASK(addr1, mask1, addr2, mask2);
 
-    *addr  = addr1 | addr2;
-    *addr &= *mask;    // Normalise to ensure sorting on .addr will work as intended
+        *addr  = addr1 | addr2;
+        *addr &= *mask;    // Normalise to ensure sorting on .addr will work as intended
+    } else {
+        *addr = (addr1 < addr2) ? addr1 : addr2;  // the lower address
+        *mask = (mask1 > mask2) ? mask1 : mask2;  // the upper address
+    }
 }
 
 /*
@@ -101,10 +108,13 @@ static uint64_t addresses(uint64_t mask)
  */
 static uint64_t combi_cost(uint64_t addr1, uint64_t mask1, uint64_t addr2, uint64_t mask2)
 {
-    uint64_t cost1 = addresses(mask1);
-    uint64_t tmp, mask;
-    combine(addr1, mask1, addr2, mask2, &tmp, &mask);
-    return addresses(mask) - cost1;
+    uint64_t addr, mask;
+    combine(addr1, mask1, addr2, mask2, &addr, &mask);
+    if (error_mode == ERROR_MODE_BADRAM) {
+        return addresses(mask) - addresses(mask1);
+    } else {
+        return (mask - addr) - (mask1 - addr1);
+    }
 }
 
 /*
@@ -185,8 +195,10 @@ static void insert_at(pattern_t pattern, int idx)
  */
 static void insert_sorted(pattern_t pattern)
 {
-    // Normalise to ensure sorting on .addr will work as intended
-    pattern.addr &= pattern.mask;
+    if (error_mode == ERROR_MODE_BADRAM) {
+        // Normalise to ensure sorting on .addr will work as intended
+        pattern.addr &= pattern.mask;
+    }
 
     // Find index to insert entry into
     int new_idx = num_patterns;
@@ -250,10 +262,14 @@ void badram_init(void)
 
 bool badram_insert(testword_t page, testword_t offset)
 {
-    pattern_t pattern = {
-        .addr = ((uint64_t)page << PAGE_SHIFT) + offset,
-        .mask = DEFAULT_MASK
-    };
+    pattern_t pattern;
+
+    pattern.addr = ((uint64_t)page << PAGE_SHIFT) + offset;
+    if (error_mode == ERROR_MODE_BADRAM) {
+        pattern.mask = DEFAULT_MASK;
+    } else {
+        pattern.mask = pattern.addr;
+    }
 
     // Test if covered by an existing entry or can be covered by adding one
     // testword address to an existing entry.
@@ -297,18 +313,59 @@ void badram_display(void)
     check_input();
 
     clear_message_area();
-    display_pinned_message(0, 0, "BadRAM Patterns (excludes test 0 and test 7)");
-    display_pinned_message(1, 0, "--------------------------------------------");
-    scroll();
-    display_scrolled_message(0, "badram=");
-    int col = 7;
-    for (int i = 0; i < num_patterns; i++) {
-        if (i > 0) {
+
+    int col = 0;
+    switch (error_mode) {
+      case ERROR_MODE_BADRAM:
+        display_pinned_message(0, 0, "BadRAM Patterns (excludes test 0 and test 7)");
+        display_pinned_message(1, 0, "--------------------------------------------");
+        scroll();
+        col = display_scrolled_message(col, "badram=");
+        for (int i = 0; i < num_patterns; i++) {
+            if (i > 0) {
+                col = display_scrolled_message(col, ",");
+            }
+            col = scroll_if_needed(col, num_digits(patterns[i].addr) + num_digits(patterns[i].mask) + 5, 7);
+            col = display_hex_uint64(col, patterns[i].addr);
             col = display_scrolled_message(col, ",");
+            col = display_hex_uint64(col, patterns[i].mask);
         }
-        col = scroll_if_needed(col, num_digits(patterns[i].addr) + num_digits(patterns[i].mask) + 5, 7);
-        col = display_hex_uint64(col, patterns[i].addr);
-        col = display_scrolled_message(col, ",");
-        col = display_hex_uint64(col, patterns[i].mask);
+        break;
+      case ERROR_MODE_MEMMAP:
+        display_pinned_message(0, 0, "Linux memmap (excludes test 0 and test 7)");
+        display_pinned_message(1, 0, "-----------------------------------------");
+        scroll();
+        col = display_scrolled_message(0, "memmap=");
+        for (int i = 0; i < num_patterns; i++) {
+            if (i > 0) {
+                col = display_scrolled_message(col, ",");
+            }
+            uint64_t size = patterns[i].mask - patterns[i].addr + sizeof(uintptr_t);
+            col = scroll_if_needed(col, num_digits(size) + num_digits(patterns[i].addr) + 5, 7);
+            col = display_hex_uint64(col, size);
+            col = display_scrolled_message(col, "$");
+            col = display_hex_uint64(col, patterns[i].addr);
+        }
+        break;
+      case ERROR_MODE_PAGES:
+        display_pinned_message(0, 0, "Bad pages (excludes test 0 and test 7)");
+        display_pinned_message(1, 0, "--------------------------------------");
+        scroll();
+        for (int i = 0; i < num_patterns; i++) {
+            if (i > 0) {
+                col = display_scrolled_message(col, ",");
+            }
+            uint64_t lower_page = patterns[i].addr >> PAGE_SHIFT;
+            uint64_t upper_page = patterns[i].mask >> PAGE_SHIFT;
+            col = scroll_if_needed(col, num_digits(lower_page) + (upper_page != lower_page ? num_digits(upper_page) + 6 : 2), 0);
+            col = display_hex_uint64(col, lower_page);
+            if (upper_page != lower_page) {
+                col = display_scrolled_message(col, "..");
+                col = display_hex_uint64(col, upper_page);
+            }
+        }
+        break;
+      default:
+        break;
     }
 }
