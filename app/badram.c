@@ -225,6 +225,15 @@ static int display_hex_uint64(int col, uint64_t value)
 #endif
 }
 
+static int scroll_if_needed(int col, int text_width, int indent)
+{
+    if (col > (SCREEN_WIDTH - text_width)) {
+        scroll();
+        col = indent;
+    }
+    return col;
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -297,11 +306,7 @@ void badram_display(void)
         if (i > 0) {
             col = display_scrolled_message(col, ",");
         }
-        int text_width = num_digits(patterns[i].addr) + num_digits(patterns[i].mask) + 5;
-        if (col > (SCREEN_WIDTH - text_width)) {
-            scroll();
-            col = 7;
-        }
+        col = scroll_if_needed(col, num_digits(patterns[i].addr) + num_digits(patterns[i].mask) + 5, 7);
         col = display_hex_uint64(col, patterns[i].addr);
         col = display_scrolled_message(col, ",");
         col = display_hex_uint64(col, patterns[i].mask);
