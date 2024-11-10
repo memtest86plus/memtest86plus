@@ -361,7 +361,23 @@ static void determine_imc(void)
             }
             break;
           case 0xB:
-            imc.family = IMC_K19_GRG; // Zen5 APU (Family 19h - Granite Ridge)
+            switch(cpuid_info.version.extendedModel) {
+              case 2:
+                imc.family = IMC_K1A_STP; // Zen5 APU (Family 1Ah - Strix Point)
+                break;
+              case 4:
+                imc.family = IMC_K1A_GRG; // Zen5 CPU (Family 1Ah - Granite Ridge)
+                break;
+              case 6:
+                imc.family = IMC_K1A_KRN; // Zen5 APU (Family 1Ah - Krackan)
+                break;
+              case 7:
+                imc.family = IMC_K1A_STH; // Zen5 APU (Family 1Ah - Strix Halo)
+                break;
+              case 8:
+                imc.family = IMC_K1A_MDS; // Zen6 CPU (Family 1Ah - Medusa)
+                break;
+            }
             break;
           default:
             break;

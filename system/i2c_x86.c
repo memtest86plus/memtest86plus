@@ -446,7 +446,7 @@ static bool fch_zen_get_smb(void)
     pm_reg |= __inb(AMD_DATA_IO_PORT);
 
     // Special case for AMD Family 19h & Extended Model > 4 (get smb address in memory)
-    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_RPL) && pm_reg == 0xFFFF) {
+    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_RPL || imc.family >= IMC_K1A_STP) && pm_reg == 0xFFFF) {
         smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
         return true;
     }
@@ -555,7 +555,7 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
             __outb((0x37 << 1) | I2C_WRITE, SMBHSTADD);
             __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
 
-            ich5_process(); // return should 0x42 or 0x44
+            ich5_process(); // return should be 0x42 or 0x44
             spd_page = 1;
 
         } else if (spd_adr <= 0xFF && spd_page != 0) {
@@ -575,17 +575,32 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
 
         if (adr_page != spd_page || last_adr != smbus_adr) {
 
-            __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
-            __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
-            __outb(adr_page & 7, SMBHSTDAT0);
-            __outb(0, SMBHSTDAT1);
-            __outb(SMBHSTCNT_PROC_CALL, SMBHSTCNT);
+            // DDR5 SPD Bank switch can be achieved using 2 methods
+            if(((smbus_id >> 16) & 0xFFFF) == PCI_VID_INTEL) {
+                // On Intel, we use the process call method because the SMBUS write command
+                // is sometimes disabled by BIOS to avoid unexpected SPD corruption
+                __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
+                __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
+                __outb(adr_page & 7, SMBHSTDAT0);
+                __outb(0, SMBHSTDAT1);
+                __outb(SMBHSTCNT_PROC_CALL, SMBHSTCNT);
 
-            ich5_process();
+                 ich5_process();
 
-            // These dummy read are mandatory to finish a Proc Call
-            __inb(SMBHSTDAT0);
-            __inb(SMBHSTDAT1);
+                // These dummy read are mandatory to terminate a Proc Call
+                __inb(SMBHSTDAT0);
+                __inb(SMBHSTDAT1);
+
+            } else {
+                // On AMD, we continue to use the standard smbus write command as it seems
+                // more reliable than the process call method. This may be reevaluated later.
+                __outb((smbus_adr << 1) | I2C_WRITE, SMBHSTADD);
+                __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
+                __outb(adr_page & 7, SMBHSTDAT0);
+                __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+
+                ich5_process();
+            }
 
             spd_page = adr_page;
             last_adr = smbus_adr;
