@@ -4,10 +4,23 @@
 /**
  * \file
  *
- * Provides functions for generating patterns for the Linux kernel BadRAM extension.
+ * Provides functions for recording and displaying faulty address locations
+ * in a condensed form. The display format is determined by the current value
+ * of the error_mode config setting as follows:
+ *
+ *  - ERROR_MODE_BADRAM
+ *      records and displays patterns in the format used by the Linux BadRAM
+ *      extension or GRUB badram command
+ *
+ *  - ERROR_MODE_MEMMAP
+ *      records and displays address ranges in the format used by the Linux
+ *      memmap boot command line option
+ *
+ *  - ERROR_MODE_PAGES
+ *      records and displays memory page numbers
  *
  *//*
- * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2020-2024 Martin Whitaker.
  */
 
 #include <stdbool.h>
@@ -16,19 +29,20 @@
 #include "test.h"
 
 /**
- * Initialises the pattern array.
+ * Initialises the fault record. This must be called each time error_mode is
+ * changed.
  */
 void badram_init(void);
 
 /**
- * Inserts a single faulty address into the pattern array. Returns
- * true iff the array was changed.
+ * Inserts a single faulty address into the fault record. Returns true iff
+ * the fault record was changed.
  */
 bool badram_insert(testword_t page, testword_t offset);
 
 /**
- * Displays the pattern array in the scrollable display region in the
- * format used by the Linux kernel.
+ * Displays the fault record in the scrollable display region in the format
+ * determined by error_mode.
  */
 void badram_display(void);
 

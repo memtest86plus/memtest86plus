@@ -185,7 +185,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     bool new_address = (type != NEW_MODE);
 
     bool new_badram = false;
-    if (error_mode == ERROR_MODE_BADRAM && use_for_badram) {
+    if (error_mode >= ERROR_MODE_BADRAM && use_for_badram) {
         new_badram = badram_insert(page, offset);
     }
 
@@ -304,6 +304,8 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         break;
 
       case ERROR_MODE_BADRAM:
+      case ERROR_MODE_MEMMAP:
+      case ERROR_MODE_PAGES:
         if (new_badram) {
             badram_display();
         }
