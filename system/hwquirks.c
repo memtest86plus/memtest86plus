@@ -50,6 +50,16 @@ static void asus_tusl2_configure_mux(void)
     outb(0xAA, 0x2E);
 }
 
+static int *get_motherboard_cache(void)
+{
+    if (l2_cache == 0) {
+        return &l2_cache;
+    } else if (l3_cache == 0) {
+        return &l3_cache;
+    }
+    return NULL;
+}
+
 static void get_m1541_l2_cache_size(void)
 {
     if (l2_cache != 0) {
@@ -67,6 +77,24 @@ static void get_m1541_l2_cache_size(void)
     if (reg == 0b00) { l2_cache = 256; }
     if (reg == 0b01) { l2_cache = 512; }
     if (reg == 0b10) { l2_cache = 1024; }
+}
+
+static void get_vt82c597_mb_cache_size(void)
+{
+    int *const mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
+        return;
+    }
+
+    // Check if cache is enabled with CC1 Register[7:6]
+    if ((pci_config_read8(0, 0, 0, 0x50) & 0xc0) != 0x80) {
+        return;
+    }
+
+    // Get cache size with CC2 Register[1:0]
+    const uint8_t reg = pci_config_read8(0, 0, 0, 0x51) & 0x03;
+
+    *mb_cache = 256 << reg;
 }
 
 static void disable_temp_reporting(void)
@@ -138,6 +166,16 @@ void quirks_init(void)
         quirk.id    = QUIRK_ALI_ALADDIN_V;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
         quirk.process = get_m1541_l2_cache_size;
+    }
+
+    //  -----------------------------------------------
+    //  -- VIA VP3 (VT82C597), MVP3 (VT82C598) Quirk --
+    //  -----------------------------------------------
+    // Motherboard cache detection
+    else if (quirk.root_vid == PCI_VID_VIA && (quirk.root_did == 0x0597 || quirk.root_did == 0x0598)) { // VIA VT82C597/8
+        quirk.id    = QUIRK_VIA_VP3;
+        quirk.type |= QUIRK_TYPE_MEM_SIZE;
+        quirk.process = get_vt82c597_mb_cache_size;
     }
 
     //  ------------------------
