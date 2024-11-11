@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from extract of memtest86+ lib.c:
 //
@@ -56,7 +56,7 @@
 #define ADR_DIGITS  "8"
 #endif
 
-static const char *codes[] = {
+static const char codes[][13] = {
     "Divide by 0",
     "Debug",
     "NMI",
@@ -99,7 +99,12 @@ struct trap_regs {
     reg_t   dx;
     reg_t   di;
     reg_t   si;
-#ifndef __x86_64__
+#ifdef __x86_64__
+    reg_t   r8;
+    reg_t   r9;
+    reg_t   r10;
+    reg_t   r11;
+#else
     reg_t   reserved1;
     reg_t   reserved2;
     reg_t   sp;

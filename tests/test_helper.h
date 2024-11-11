@@ -19,12 +19,11 @@
 /**
  * Test word atomic read and write functions.
  */
-#ifdef __x86_64__
-#include "memrw64.h"
+#include "memrw.h"
+#if (ARCH_BITS == 64)
 #define read_word   read64
 #define write_word  write64
 #else
-#include "memrw32.h"
 #define read_word   read32
 #define write_word  write32
 #endif
@@ -45,6 +44,11 @@
  * A macro to perform test bailout when requested.
  */
 #define BAILOUT if (bail) return ticks
+
+/**
+ * A macro to skip the current range without disturbing waits on barriers and creating a deadlock.
+ */
+#define SKIP_RANGE(num_ticks) { if (my_cpu >= 0) { for (int iter = 0; iter < num_ticks; iter++) { do_tick(my_cpu); BAILOUT; } } continue; }
 
 /**
  * Returns value rounded down to the nearest multiple of align_size.
@@ -69,7 +73,7 @@ static inline uintptr_t round_up(uintptr_t value, size_t align_size)
 static inline testword_t prsg(testword_t state)
 {
     // This uses the algorithms described at https://en.wikipedia.org/wiki/Xorshift
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     state ^= state << 13;
     state ^= state >> 7;
     state ^= state << 17;

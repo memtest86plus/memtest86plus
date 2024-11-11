@@ -18,7 +18,11 @@
 static inline void assert(int expr)
 {
     if (!expr) {
+#if defined(__i386__) || defined(__x86_64__)
         __asm__ __volatile__ ("int $3");
+#elif defined(__loongarch_lp64)
+        __asm__ __volatile__ ("break 0");
+#endif
     }
 }
 

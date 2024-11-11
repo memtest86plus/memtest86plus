@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "heap.h"
-#include "memrw32.h"
+#include "memrw.h"
 #include "memsize.h"
 #include "usb.h"
 #include "vmem.h"
@@ -353,17 +353,17 @@ static size_t round_up(size_t size, size_t alignment)
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
-// The read64 and write64 functions provided here provide compatibility with both
+// The read64_ and write64_ functions provided here provide compatibility with both
 // 32-bit and 64-bit hosts and with both 32-bit and 64-bit XHCI controllers.
 
-static uint64_t read64(const volatile uint64_t *ptr)
+static uint64_t read64_(const volatile uint64_t *ptr)
 {
     uint32_t val_l = read32((const volatile uint32_t *)ptr + 0);
     uint32_t val_h = read32((const volatile uint32_t *)ptr + 1);
     return (uint64_t)val_h << 32 | (uint64_t)val_l;
 }
 
-static void write64(volatile uint64_t *ptr, uint64_t val)
+static void write64_(volatile uint64_t *ptr, uint64_t val)
 {
     write32((volatile uint32_t *)ptr + 0, (uint32_t)(val >>  0));
     write32((volatile uint32_t *)ptr + 1, (uint32_t)(val >> 32));
@@ -504,7 +504,7 @@ static uint32_t enqueue_trb(xhci_trb_t *trb_ring, uint32_t ring_size, uint32_t e
 
     // If at the last slot, insert a Link TRB and start a new cycle.
     if (index == (ring_size - 1)) {
-        write64(&trb_ring[index].params1, (uintptr_t)trb_ring);
+        write64_(&trb_ring[index].params1, (uintptr_t)trb_ring);
         write32(&trb_ring[index].params2, 0);
         write32(&trb_ring[index].control, XHCI_TRB_LINK | XHCI_TRB_TC | cycle);
         cycle ^= 1;
@@ -512,7 +512,7 @@ static uint32_t enqueue_trb(xhci_trb_t *trb_ring, uint32_t ring_size, uint32_t e
     }
 
     // Insert the TRB.
-    write64(&trb_ring[index].params1, params1);
+    write64_(&trb_ring[index].params1, params1);
     write32(&trb_ring[index].params2, params2);
     write32(&trb_ring[index].control, control | cycle);
     index++;
@@ -542,7 +542,7 @@ static bool get_xhci_event(workspace_t *ws, xhci_trb_t *event)
     if ((event->control & 0x1) != cycle) return false;
 
     // Advance the dequeue pointer.
-    write64(&ws->rt_regs->ir[0].erdp, (uintptr_t)(&ws->er[index]));
+    write64_(&ws->rt_regs->ir[0].erdp, (uintptr_t)(&ws->er[index]));
 
     // Update the event ring dequeue state.
     if (index == (WS_ER_SIZE - 1)) {
@@ -667,7 +667,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
     }
     int slot_id = event_slot_id(&event);
 
-    write64(&ws->device_context_index[slot_id], device_workspace_addr);
+    write64_(&ws->device_context_index[slot_id], device_workspace_addr);
 
     return slot_id;
 
@@ -688,7 +688,7 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
         return false;
     }
 
-    write64(&ws->device_context_index[slot_id], 0);
+    write64_(&ws->device_context_index[slot_id], 0);
 
     heap_rewind(HEAP_TYPE_LM_1, ws->initial_heap_mark);
 
@@ -1108,13 +1108,13 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     ws->erst[0].segment_addr = (uintptr_t)(&ws->er);
     ws->erst[0].segment_size = WS_ER_SIZE;
 
-    write64(&rt_regs->ir[0].erdp,      (uintptr_t)(&ws->er));
+    write64_(&rt_regs->ir[0].erdp,      (uintptr_t)(&ws->er));
     write32(&rt_regs->ir[0].erst_size, 1);
-    write64(&rt_regs->ir[0].erst_addr, (uintptr_t)(&ws->erst));
+    write64_(&rt_regs->ir[0].erst_addr, (uintptr_t)(&ws->erst));
 
     // Initialise and start the controller.
-    write64(&op_regs->cr_control, (read64(&op_regs->cr_control) & 0x30) | (uintptr_t)(&ws->cr) | 0x1);
-    write64(&op_regs->dcbaap,     device_context_index_paddr);
+    write64_(&op_regs->cr_control, (read64_(&op_regs->cr_control) & 0x30) | (uintptr_t)(&ws->cr) | 0x1);
+    write64_(&op_regs->dcbaap,     device_context_index_paddr);
     write32(&op_regs->config,     (read32(&op_regs->config) & 0xfffffc00) | max_slots);
     if (!start_host_controller(op_regs)) {
         goto no_keyboards_found;

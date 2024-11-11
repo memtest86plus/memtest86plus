@@ -20,7 +20,11 @@
 #define	MAX_APS		255		/* Maximum number of active APs */
 
 #define BSP_STACK_SIZE	16384		/* Stack size for the BSP */
+#ifdef __loongarch_lp64
+#define AP_STACK_SIZE	2048		/* Stack size for each AP */
+#else
 #define AP_STACK_SIZE	1024		/* Stack size for each AP */
+#endif
 
 #define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
@@ -65,6 +69,8 @@
 extern uint8_t	_start[];
 
 extern uint8_t	startup32[];
+
+extern uint8_t	startup64[];
 
 extern uint8_t	startup[];
 

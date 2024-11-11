@@ -26,7 +26,9 @@ typedef enum {
     ERROR_MODE_NONE,
     ERROR_MODE_SUMMARY,
     ERROR_MODE_ADDRESS,
-    ERROR_MODE_BADRAM
+    ERROR_MODE_BADRAM,
+    ERROR_MODE_MEMMAP,
+    ERROR_MODE_PAGES,
 } error_mode_t;
 
 typedef enum {
@@ -59,6 +61,8 @@ extern bool         enable_sm;
 extern bool         enable_tty;
 extern bool         enable_bench;
 extern bool         enable_mch_read;
+extern bool         enable_ecc_polling;
+extern bool         enable_numa;
 
 extern bool         pause_at_start;
 

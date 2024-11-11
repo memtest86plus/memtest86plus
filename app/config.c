@@ -98,6 +98,9 @@ bool            enable_trace       = false;
 bool            enable_sm          = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
+bool            enable_numa        = false;
+
+bool            enable_ecc_polling = false;
 
 bool            pause_at_start     = true;
 
@@ -220,6 +223,10 @@ static void parse_option(const char *option, const char *params)
             error_mode = ERROR_MODE_ADDRESS;
         } else if (strncmp(params, "badram", 7) == 0) {
             error_mode = ERROR_MODE_BADRAM;
+        } else if (strncmp(params, "memmap", 7) == 0) {
+            error_mode = ERROR_MODE_MEMMAP;
+        } else if (strncmp(params, "pages", 6) == 0) {
+            error_mode = ERROR_MODE_PAGES;
         }
     } else if (strncmp(option, "keyboard", 9) == 0 && params != NULL) {
         if (strncmp(params, "legacy", 7) == 0) {
@@ -243,6 +250,10 @@ static void parse_option(const char *option, const char *params)
         enable_sm = false;
     } else if (strncmp(option, "nosmp", 6) == 0) {
         smp_enabled = false;
+    } else if (strncmp(option, "numa", 5) == 0) {
+        enable_numa = true;
+    } else if (strncmp(option, "nonuma", 7) == 0) {
+        enable_numa = false;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;
@@ -645,7 +656,9 @@ static void error_mode_menu(void)
     prints(POP_R+4, POP_LI, "<F2>  Error summary");
     prints(POP_R+5, POP_LI, "<F3>  Individual errors");
     prints(POP_R+6, POP_LI, "<F4>  BadRAM patterns");
-    prints(POP_R+7, POP_LI, "<F10> Exit menu");
+    prints(POP_R+7, POP_LI, "<F5>  Linux memmap");
+    prints(POP_R+8, POP_LI, "<F6>  Bad pages");
+    prints(POP_R+9, POP_LI, "<F10> Exit menu");
     printc(POP_R+3+error_mode, POP_LM, '*');
 
     bool tty_update = enable_tty;
@@ -664,6 +677,8 @@ static void error_mode_menu(void)
           case '2':
           case '3':
           case '4':
+          case '5':
+          case '6':
             set_error_mode(ch - '1');
             break;
           case 'u':
@@ -672,7 +687,7 @@ static void error_mode_menu(void)
             }
             break;
           case 'd':
-            if (error_mode < 3) {
+            if (error_mode < 5) {
                 set_error_mode(error_mode + 1);
             }
             break;

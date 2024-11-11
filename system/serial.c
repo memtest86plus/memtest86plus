@@ -13,6 +13,11 @@
 #include "config.h"
 #include "display.h"
 
+#ifdef __loongarch_lp64
+#include "vmem.h"
+#include <larchintrin.h>
+#endif
+
 static struct serial_port console_serial;
 
 //------------------------------------------------------------------------------
@@ -101,7 +106,13 @@ void tty_init(void)
     unsigned char lcr;
 
     console_serial.enable       = true;
+#ifdef __loongarch_lp64
+    console_serial.base_addr    = map_region(tty_address, 0x0, false);
+    // By default, CPU UART0 is used, which uses the stable counter as the clock.
+    tty_mmio_ref_clk            = (__cpucfg(0x4) * (__cpucfg(0x5) & 0xFFFF)) / ((__cpucfg(0x5) >> 16) & 0xFFFF);
+#else
     console_serial.base_addr    = tty_address;
+#endif
     console_serial.baudrate     = tty_baud_rate;
     console_serial.parity       = SERIAL_DEFAULT_PARITY;
     console_serial.bits         = SERIAL_DEFAULT_BITS;

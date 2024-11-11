@@ -9,7 +9,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2004-2022 Sam Demeulemeester.
+ * Copyright (C) 2004-2023 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -20,6 +20,8 @@
 #include "string.h"
 
 #include "test.h"
+
+#define ROW_SPD         13
 
 #define ROW_MESSAGE_T   10
 #define ROW_MESSAGE_B   (SCREEN_HEIGHT - 2)
@@ -188,8 +190,14 @@ typedef enum {
 #define display_pass_count(count) \
     printi(8, 51, count, 0, false, true)
 
-#define display_error_count(count) \
+#define display_err_count_without_ecc(count) \
     printi(8, 68, count, 0, false, true)
+
+#define display_err_count_with_ecc(count_err, count_ecc) \
+    { \
+        printi(8, 62, count_err, 0, false, true); \
+        printi(8, 74, count_ecc, 0, false, true); \
+    }
 
 #define clear_message_area() \
     { \
@@ -244,6 +252,8 @@ void display_start_run(void);
 void display_start_pass(void);
 
 void display_start_test(void);
+
+void display_error_count(void);
 
 void display_temperature(void);
 

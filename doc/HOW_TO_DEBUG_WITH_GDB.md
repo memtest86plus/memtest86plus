@@ -46,6 +46,11 @@ and confirm with Enter.
 The directory "\EFI\boot" and the file "BOOT_X64.efi" are automatically
 created by the debug-script.
 
+You can add memtest command line parameters as "optional data" to the boot entry created above, e.g. for `usbdebug`:
+		`bcfg boot -opt 0x0 ^"usbdebug^"`
+Note the UEFI-shell escaped quotes. Alternatively you can create a UTF-16 file with the parameters, e.g. with `edit params.txt` and add its contents:
+		`bcfg boot -opt 0x0 FS0:\params.txt`
+
 When you run the script the next time, memtest.efi should run without
 previous user interaction.
 

@@ -1,2 +1,2 @@
-#define MT_VERSION "7.00"
+#define MT_VERSION "7.20"
 #define GIT_HASH "unknown"

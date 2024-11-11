@@ -64,18 +64,6 @@ typedef struct {
     uint8_t     reserved[3];
 } rsdp_t;
 
-typedef struct {
-    char        signature[4];   // "RSDT" or "XSDT"
-    uint32_t    length;
-    uint8_t     revision;
-    uint8_t     checksum;
-    char        oem_id[6];
-    char        oem_table_id[8];
-    char        oem_revision[4];
-    char        creator_id[4];
-    char        creator_revision[4];
-} rsdt_header_t;
-
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -89,12 +77,13 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 const char *rsdp_source = "";
 
-acpi_t acpi_config = {0, 0, 0, 0, 0, 0, 0, false};
+acpi_t acpi_config = {0, 0, 0, 0, 0, /*0,*/ 0, 0, 0, false};
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
+#if defined(__i386__) || defined(__x86_64__)
 static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
 {
     uint32_t *ptr = (uint32_t *)addr;
@@ -111,8 +100,9 @@ static rsdp_t *scan_for_rsdp(uintptr_t addr, int length)
     }
     return NULL;
 }
+#endif
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
 static rsdp_t *find_rsdp_in_efi64_system_table(efi64_system_table_t *system_table)
 {
     efi64_config_table_t *config_tables = (efi64_config_table_t *)map_region(system_table->config_tables,
@@ -162,7 +152,7 @@ static uintptr_t find_rsdp(void)
 
     // Search for the RSDP
     rsdp_t *rp = NULL;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     if (efi_info->loader_signature == EFI64_LOADER_SIGNATURE) {
         uintptr_t system_table_addr = (uintptr_t)efi_info->sys_tab_hi << 32 | (uintptr_t)efi_info->sys_tab;
         system_table_addr = map_region(system_table_addr, sizeof(efi64_system_table_t), true);
@@ -180,6 +170,7 @@ static uintptr_t find_rsdp(void)
         }
     }
 #endif
+#if defined(__i386__) || defined(__x86_64__)
     if (rp == NULL) {
         // Search the BIOS EBDA area.
         uintptr_t address = *(uint16_t *)0x40E << 4;
@@ -193,6 +184,7 @@ static uintptr_t find_rsdp(void)
         rp = scan_for_rsdp(0xE0000, 0x20000);
         if (rp) rsdp_source = "BIOS reserved area";
     }
+#endif
     if (rp == NULL) {
         // RSDP not found, give up.
         return 0;
@@ -269,7 +261,7 @@ static uintptr_t find_acpi_table(uint32_t table_signature)
 
 static bool parse_fadt(uintptr_t fadt_addr)
 {
-    // FADT is a very big & complex table and we only need a few data.
+    // FADT is a very big & complex table and we only need a few pieces of data.
     // We use byte offset instead of a complete struct.
 
     // FADT Header is identical to RSDP Header
@@ -287,11 +279,11 @@ static bool parse_fadt(uintptr_t fadt_addr)
         acpi_config.ver_min = *(uint8_t *)(fadt_addr+FADT_MINOR_REV_OFFSET) & 0xF;
     }
 
-    // Get Old PM Base Address (32bit IO)
+    // Get Old PM Base Address (32-bit IO)
     acpi_config.pm_addr  = *(uint32_t *)(fadt_addr+FADT_PM_TMR_BLK_OFFSET);
     acpi_config.pm_is_io = true;
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     acpi_gen_addr_struct *rt;
 
     // Get APIC Timer Address
@@ -341,4 +333,8 @@ void acpi_init(void)
     }
 
     acpi_config.hpet_addr = find_acpi_table(HPETSignature);
+
+    acpi_config.srat_addr = find_acpi_table(SRATSignature);
+
+    //acpi_config.slit_addr = find_acpi_table(SLITSignature);
 }

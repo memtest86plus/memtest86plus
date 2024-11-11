@@ -22,9 +22,8 @@
 #include "test.h"
 
 #include "tests.h"
-
 #include "serial.h"
-
+#include "memctrl.h"
 #include "error.h"
 
 //------------------------------------------------------------------------------
@@ -39,7 +38,13 @@
 // Types
 //------------------------------------------------------------------------------
 
-typedef enum { ADDR_ERROR, DATA_ERROR, PARITY_ERROR, NEW_MODE } error_type_t;
+typedef enum { ADDR_ERROR,
+               DATA_ERROR,
+               PARITY_ERROR,
+               UECC_ERROR,
+               CECC_ERROR,
+               NEW_MODE
+} error_type_t;
 
 typedef struct {
     uintptr_t           page;
@@ -71,7 +76,8 @@ static error_info_t     error_info;
 // Public Variables
 //------------------------------------------------------------------------------
 
-uint64_t                error_count = 0;
+uint64_t                error_count      = 0;
+uint64_t                error_count_cecc = 0;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -150,7 +156,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
 
     restore_big_status();
 
-    bool new_header = (error_count == 0) || (error_mode != last_error_mode);
+    bool new_header = (error_count == 0 && error_count_cecc == 0) || (error_mode != last_error_mode);
     if (new_header) {
         clear_message_area();
         badram_init();
@@ -179,16 +185,22 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     bool new_address = (type != NEW_MODE);
 
     bool new_badram = false;
-    if (error_mode == ERROR_MODE_BADRAM && use_for_badram) {
+    if (error_mode >= ERROR_MODE_BADRAM && use_for_badram) {
         new_badram = badram_insert(page, offset);
     }
 
     if (new_address) {
-        if (error_count < ERROR_LIMIT) {
-            error_count++;
-        }
-        if (test_list[test_num].errors < INT_MAX) {
-            test_list[test_num].errors++;
+        if (type == CECC_ERROR) {
+            if ((error_count_cecc + ecc_status.count) < 999999) {
+                error_count_cecc += ecc_status.count;
+            }
+        } else {
+            if (error_count < ERROR_LIMIT) {
+                error_count++;
+            }
+            if (test_list[test_num].errors < INT_MAX) {
+                test_list[test_num].errors++;
+            }
         }
     }
 
@@ -241,7 +253,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
                                        test_list[i].errors);
             }
 
-            display_error_count(error_count);
+            display_error_count();
         }
         break;
 
@@ -268,10 +280,15 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
             scroll();
 
             set_foreground_colour(YELLOW);
+
             display_scrolled_message(0, " %2i   %4i   %2i   %09x%03x (%kB)",
-                                     smp_my_cpu_num(), pass_num, test_num, page, offset, page << 2);
+                                     type != CECC_ERROR ? smp_my_cpu_num() : ecc_status.core,
+                                     pass_num, test_num, page, offset, page << 2);
+
             if (type == PARITY_ERROR) {
                 display_scrolled_message(41, "%s", "Parity error detected near this address");
+            } else if (type == CECC_ERROR) {
+                display_scrolled_message(41, "%s%2i", "Correctable ECC Error - CH#", ecc_status.channel);
             } else {
 #if TESTWORD_WIDTH > 32
                 display_scrolled_message(41, "%016x  %016x", good, bad);
@@ -279,13 +296,16 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
                 display_scrolled_message(41, "%08x  %08x  %08x  %i", good, bad, xor, error_count);
 #endif
             }
+
             set_foreground_colour(WHITE);
 
-            display_error_count(error_count);
+            display_error_count();
         }
         break;
 
       case ERROR_MODE_BADRAM:
+      case ERROR_MODE_MEMMAP:
+      case ERROR_MODE_PAGES:
         if (new_badram) {
             badram_display();
         }
@@ -295,7 +315,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         break;
     }
 
-    if (type != PARITY_ERROR) {
+    if (type != PARITY_ERROR && type != CECC_ERROR) {
         error_info.last_addr = addr;
         error_info.last_xor  = xor;
     }
@@ -345,6 +365,12 @@ void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_
     common_err(DATA_ERROR, (uintptr_t)addr, good, bad, use_for_badram);
 }
 
+void ecc_error()
+{
+    common_err(CECC_ERROR, ecc_status.addr, 0, 0, false);
+    error_update();
+}
+
 #if REPORT_PARITY_ERRORS
 void parity_error(void)
 {
@@ -356,7 +382,7 @@ void parity_error(void)
 
 void error_update(void)
 {
-    if (error_count > 0) {
+    if (error_count > 0 || error_count_cecc > 0) {
         if (error_mode != last_error_mode) {
             common_err(NEW_MODE, 0, 0, 0, false);
         }
@@ -365,12 +391,16 @@ void error_update(void)
                                    test_list[test_num].errors == INT_MAX ? '>' : ' ',
                                    test_list[test_num].errors);
         }
-        display_error_count(error_count);
-        display_status("Failed!");
+        display_error_count();
 
-        // Display FAIL banner on first error
-        if (error_count == 1) {
-            display_big_status(false);
+        // Only fail if error is uncorrected
+        if (error_count > 0) {
+            display_status("Failed!");
+
+            // Display FAIL banner on first uncorrectable error
+            if (error_count == 1) {
+                display_big_status(false);
+            }
         }
 
         if (enable_tty) {

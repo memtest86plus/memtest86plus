@@ -8,7 +8,7 @@
  * display.
  *
  *//*
- * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2020-2024 Martin Whitaker.
  */
 
 #include <stdint.h>

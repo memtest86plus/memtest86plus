@@ -10,8 +10,9 @@ else
   GIT_AVAILABLE = true
 endif
 
-CFLAGS = -std=c11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector
+CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
+         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector \
+         -fexcess-precision=standard -DARCH_BITS=64
 
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
@@ -44,7 +45,8 @@ SYS_OBJS = system/acpi.o \
            system/screen.o \
            system/serial.o \
            system/smbios.o \
-           system/smbus.o \
+           system/i2c_x86.o \
+           system/spd.o \
            system/smp.o \
            system/temperature.o \
            system/timers.o \
@@ -227,7 +229,7 @@ GRUB_LIB_DIR ?= /usr/lib/grub
 
 GRUB_MKIMAGE := $(shell command -v grub2-mkimage || command -v grub-mkimage)
 
-GRUB_MODULES = iso9660 fat part_msdos all_video font gfxterm gfxmenu \
+GRUB_MODULES = iso9660 fat part_msdos part_gpt all_video font gfxterm gfxmenu \
                boot chain configfile echo ls
 
 grub-eltorito.img:

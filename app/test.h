@@ -22,9 +22,14 @@
 /**
  * A mapping from a CPU core number to the index number of the memory chunk
  * it operates on when performing a memory test in parallel across all the
- * enabled cores.
+ * enabled cores (in the current proximity domain, when NUMA awareness is
+ * enabled).
  */
 extern uint8_t chunk_index[MAX_CPUS];
+/**
+ * An array where the count of used CPUs in the current proximity domain.
+ */
+extern uint8_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
  /*
   * The number of CPU cores being used for the current test. This is always
@@ -47,7 +52,7 @@ extern barrier_t *run_barrier;
  */
 extern spinlock_t *error_mutex;
 
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
 /**
  * The word width (in bits) used for memory testing.
  */
@@ -87,6 +92,7 @@ typedef struct {
     uintptr_t   pm_base_addr;
     testword_t  *start;
     testword_t  *end;
+    uint32_t    proximity_domain_idx;
 } vm_map_t;
 
 /**

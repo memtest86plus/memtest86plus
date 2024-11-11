@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from an extract of memtest86+ lib.c:
 //
@@ -130,11 +130,11 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
     for (int i = (base == 16) ? 2 : 0; i < n; i++) {
         value *= base;
         if (buffer[i] >= 'a') {
-            value += buffer[i] - 'a';
+            value += buffer[i] - 'a' + 10;
         } else {
             value += buffer[i] - '0';
         }
     }
 
-    return shift < 0 ? value >> shift : value << shift;
+    return shift < 0 ? value >> -shift : value << shift;
 }

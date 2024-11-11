@@ -77,12 +77,15 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
 #define BARRIER \
     if (my_cpu >= 0) { \
         if (TRACE_BARRIERS) { \
-            trace(my_cpu, "Run barrier wait at %s line %i", __FILE__, __LINE__); \
+            trace(my_cpu, "Run barrier wait begin at %s line %i", __FILE__, __LINE__); \
         } \
         if (power_save < POWER_SAVE_HIGH) { \
             barrier_spin_wait(run_barrier); \
         } else { \
             barrier_halt_wait(run_barrier); \
+        } \
+        if (TRACE_BARRIERS) { \
+            trace(my_cpu, "Run barrier wait end at %s line %i", __FILE__, __LINE__); \
         } \
     }
 

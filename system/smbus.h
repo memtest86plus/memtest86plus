@@ -37,10 +37,12 @@
 #define SMBHSTSTS_INTR          0x02
 #define SMBHSTSTS_HOST_BUSY     0x01
 
+/* i801 Hosts Control register bits */
 #define SMBHSTCNT_QUICK             0x00
 #define SMBHSTCNT_BYTE              0x04
 #define SMBHSTCNT_BYTE_DATA         0x08
 #define SMBHSTCNT_WORD_DATA         0x0C
+#define SMBHSTCNT_PROC_CALL         0x10
 #define SMBHSTCNT_BLOCK_DATA        0x14
 #define SMBHSTCNT_I2C_BLOCK_DATA    0x18
 #define SMBHSTCNT_LAST_BYTE         0x20
@@ -96,17 +98,6 @@
 #define ALI_OLD_SMBHSTDAT0  smbusbase + 4
 #define ALI_OLD_SMBHSTCMD   smbusbase + 7
 
-/** Rounding factors for timing computation
- *
- *  These factors are used as a configurable CEIL() function
- *  to get the upper int from a float past a specific decimal point.
- */
-
-#define DDR5_ROUNDING_FACTOR    30
-#define ROUNDING_FACTOR         0.9f
-
-#define SPD_SKU_LEN         32
-
 #define PIIX4_SMB_BASE_ADR_DEFAULT  0x90
 #define PIIX4_SMB_BASE_ADR_VIAPRO   0xD0
 #define PIIX4_SMB_BASE_ADR_ALI1563  0x80
@@ -118,42 +109,12 @@ struct pci_smbus_controller {
     void (*get_adr)(void);
 };
 
-typedef struct spd_infos {
-    bool        isValid;
-    uint8_t     slot_num;
-    uint16_t    jedec_code;
-    uint32_t    module_size;
-    char        *type;
-    char        sku[SPD_SKU_LEN + 1];
-    uint8_t     XMP;
-    uint16_t    freq;
-    bool        hasECC;
-    uint8_t     fab_year;
-    uint8_t     fab_week;
-    uint16_t    tCL;
-    uint8_t     tCL_dec;
-    uint16_t    tRCD;
-    uint16_t    tRP;
-    uint16_t    tRAS;
-    uint16_t    tRC;
-} spd_info;
-
-typedef struct ram_infos {
-    uint16_t    freq;
-    uint16_t    tCL;
-    uint8_t     tCL_dec;
-    uint16_t    tRCD;
-    uint16_t    tRP;
-    uint16_t    tRAS;
-    char        *type;
-} ram_info;
-
-extern ram_info ram;
-
 /**
- * Print SMBUS Info
+ * Print SPD Info
  */
 
-void print_smbus_startup_info(void);
+void print_spd_startup_info(void);
+
+uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
 
 #endif // SMBUS_H

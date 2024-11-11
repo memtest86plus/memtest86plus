@@ -21,6 +21,11 @@
 extern uint64_t error_count;
 
 /**
+ * The number of correctable ECC errors recorded during the current run.
+ */
+extern uint64_t error_count_cecc;
+
+/**
  * Initialises the error records.
  */
 void error_init(void);
@@ -34,6 +39,12 @@ void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_
  * Adds a data error to the error reports.
  */
 void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_badram);
+
+/**
+ * Adds an ECC error to the error reports.
+ * ECC Error details are stored in ecc_status
+ */
+void ecc_error();
 
 #if REPORT_PARITY_ERRORS
 /**

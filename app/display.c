@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
-// Copyright (C) 2004-2022 Sam Demeulemeester.
+// Copyright (C) 2004-2023 Sam Demeulemeester.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,6 +15,7 @@
 #include "pmem.h"
 #include "smbios.h"
 #include "smbus.h"
+#include "spd.h"
 #include "temperature.h"
 #include "tsc.h"
 
@@ -119,6 +120,10 @@ void display_init(void)
     prints(8, 0, "Using:                                    | Pass:           Errors:");
 //  prints(9, 0, "--------------------------------------------------------------------------------");
 
+    if (ecc_status.ecc_enabled) {
+        prints(8, 57, "Err:        ECC:");
+    }
+
     for (int i = 0;i < 80; i++) {
         print_char(6, i, 0xc4);
         print_char(9, i, 0xc4);
@@ -139,11 +144,14 @@ void display_init(void)
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
     prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
-#if TESTWORD_WIDTH > 32
-    prints(ROW_FOOTER, 76, ".x64");
-#else
-    prints(ROW_FOOTER, 76, ".x32");
+#if defined (__x86_64__)
+    prints(ROW_FOOTER, 74, ".x64");
+#elif defined (__i386__)
+    prints(ROW_FOOTER, 74, ".x32");
+#elif defined (__loongarch_lp64)
+    prints(ROW_FOOTER, 74, ".la64");
 #endif
+
     set_foreground_colour(WHITE);
     set_background_colour(BLUE);
 
@@ -261,7 +269,7 @@ void display_cpu_topology(void)
 void post_display_init(void)
 {
     print_smbios_startup_info();
-    print_smbus_startup_info();
+    print_spd_startup_info();
 
     if (imc.freq) {
         // Try to get RAM information from IMC
@@ -293,11 +301,20 @@ void display_start_run(void)
         clear_message_area();
     }
 
-    clear_screen_region(7, 49, 7, 57);                  // run time
-    clear_screen_region(8, 49, 8, 57);                  // pass number
-    clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
+    clear_screen_region(7, 49, 7, 57);                      // run time
+
+    if (ecc_status.ecc_enabled) {
+        clear_screen_region(8, 49, 8, 53);                  // pass number
+        clear_screen_region(8, 61, 8, 68);                  // error count
+        clear_screen_region(8, 74, 8, SCREEN_WIDTH - 1);    // ecc error count
+    } else {
+        clear_screen_region(8, 49, 8, 59);                  // pass number
+        clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
+    }
+
     display_pass_count(0);
-    display_error_count(0);
+    error_count = 0;
+    display_error_count();
     if (clks_per_msec > 0) {
         // If we've measured the CPU speed, we know the TSC is available.
         run_start_time = get_tsc();
@@ -330,6 +347,23 @@ void display_start_test(void)
     display_test_description(test_list[test_num].description);
     test_bar_length = 0;
     test_ticks = 0;
+
+#if 0
+    uint64_t current_time = get_tsc();
+    int secs = (current_time - run_start_time) / (1000 * (uint64_t)clks_per_msec);
+    int mins  = secs / 60; secs %= 60;
+    int hours = mins / 60; mins %= 60;
+    do_trace(0, "T %i: %i:%02i:%02i", test_num, hours, mins, secs);
+#endif
+}
+
+void display_error_count(void)
+{
+    if (ecc_status.ecc_enabled) {
+        display_err_count_with_ecc(error_count, error_count_cecc);
+    } else {
+        display_err_count_without_ecc(error_count);
+    }
 }
 
 void display_temperature(void)
@@ -477,6 +511,7 @@ void do_tick(int my_cpu)
     } else {
         barrier_halt_wait(run_barrier);
     }
+
     if (master_cpu == my_cpu) {
         check_input();
         error_update();
@@ -551,6 +586,9 @@ void do_tick(int my_cpu)
             display_big_status(false);
         }
 
+        // Check ECC Errors
+        memctrl_poll_ecc();
+
         // Update temperature
         display_temperature();
 
@@ -561,6 +599,7 @@ void do_tick(int my_cpu)
                 tty_partial_redraw();
             }
         }
+
         timed_update_done = true;
     }
 

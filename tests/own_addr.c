@@ -6,7 +6,6 @@
 // MemTest86+ V5 Specific code (GPL V2.0)
 // By Samuel DEMEULEMEESTER, sdemeule@memtest.org
 // http://www.canardpc.com - http://www.memtest.org
-// Thanks to Passmark for calculate_chunk() and various comments !
 // ----------------------------------------------------
 // test.c - MemTest-86  Version 3.4
 //
@@ -136,7 +135,7 @@ int test_own_addr2(int my_cpu, int stage)
     // Calculate the offset (in pages) between the virtual address and the physical address.
     offset = (vm_map[0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
     offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
-#ifdef __x86_64__
+#if (ARCH_BITS == 64)
     // Convert to a byte address offset. This will translate the virtual address into a physical address.
     offset *= PAGE_SIZE;
 #else
