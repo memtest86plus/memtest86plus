@@ -1,4 +1,4 @@
-OUTPUT_FORMAT("binary")
+OUTPUT_FORMAT("elf64-loongarch")
 OUTPUT_ARCH(loongarch)
 
 ENTRY(head);

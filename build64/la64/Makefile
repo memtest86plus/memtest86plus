@@ -183,7 +183,9 @@ memtest.debug: memtest_shared
 
 memtest.efi: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_shared.bin -o memtest.efi
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_shared.bin -o memtest.elf
+	$(OBJCOPY) -O binary memtest.elf memtest.efi
+	rm -f memtest.elf
 
 esp.img: memtest.efi
 	@mkdir -p iso/EFI/BOOT
