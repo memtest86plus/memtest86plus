@@ -16,6 +16,8 @@
 #include "cpuid.h"
 #include "config.h"
 #include "temperature.h"
+#include "memrw.h"
+#include "vmem.h"
 
 quirk_t quirk;
 
@@ -48,6 +50,16 @@ static void asus_tusl2_configure_mux(void)
     outb(0xAA, 0x2E);
 }
 
+static int *get_motherboard_cache(void)
+{
+    if (l2_cache == 0) {
+        return &l2_cache;
+    } else if (l3_cache == 0) {
+        return &l3_cache;
+    }
+    return NULL;
+}
+
 static void get_m1541_l2_cache_size(void)
 {
     if (l2_cache != 0) {
@@ -67,6 +79,24 @@ static void get_m1541_l2_cache_size(void)
     if (reg == 0b10) { l2_cache = 1024; }
 }
 
+static void get_vt82c597_mb_cache_size(void)
+{
+    int *const mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
+        return;
+    }
+
+    // Check if cache is enabled with CC1 Register[7:6]
+    if ((pci_config_read8(0, 0, 0, 0x50) & 0xc0) != 0x80) {
+        return;
+    }
+
+    // Get cache size with CC2 Register[1:0]
+    const uint8_t reg = pci_config_read8(0, 0, 0, 0x51) & 0x03;
+
+    *mb_cache = 256 << reg;
+}
+
 static void disable_temp_reporting(void)
 {
     enable_temperature = false;
@@ -82,10 +112,10 @@ static void amd_k8_revfg_temp(void)
     }
 
     // K8 Rev G Desktop requires an additional offset.
-    if (cpuid_info.version.extendedModel < 6 && cpuid_info.version.extendedModel > 7)   // Not Rev G
+    if (cpuid_info.version.extendedModel < 6 || cpuid_info.version.extendedModel > 7)   // Not Rev G
         return;
 
-    if (cpuid_info.version.extendedModel == 6 && cpuid_info.version.extendedModel < 9)  // Not Desktop
+    if (cpuid_info.version.extendedModel == 6 && cpuid_info.version.model < 9)  // Not Desktop
         return;
 
     uint16_t brandID = (cpuid_info.version.extendedBrandID >> 9) & 0x1f;
@@ -97,6 +127,22 @@ static void amd_k8_revfg_temp(void)
         return;
 
     cpu_temp_offset = 21.0f;
+}
+
+static void loongson_7a00_ehci_workaround(void)
+{
+    uintptr_t reg_addr = 0x10010000;
+
+#if (ARCH_BITS == 64)
+    reg_addr |= 0xEULL << 40;
+#endif
+    reg_addr = map_region(reg_addr, 0x0, false);
+    write8((uint8_t *)(reg_addr + 0x3820), 0xFF);
+    write8((uint8_t *)(reg_addr + 0x3830), 0xFF);
+    write32((uint32_t *)(reg_addr + 0x3100), 0xFFFFFFFF);
+    write32((uint32_t *)(reg_addr + 0x3180), 0xFFFFFFFF);
+    write8((uint8_t *)(reg_addr + 0x3820), 0x0);
+    write8((uint8_t *)(reg_addr + 0x3830), 0x0);
 }
 
 // ---------------------
@@ -120,6 +166,16 @@ void quirks_init(void)
         quirk.id    = QUIRK_ALI_ALADDIN_V;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
         quirk.process = get_m1541_l2_cache_size;
+    }
+
+    //  -----------------------------------------------
+    //  -- VIA VP3 (VT82C597), MVP3 (VT82C598) Quirk --
+    //  -----------------------------------------------
+    // Motherboard cache detection
+    else if (quirk.root_vid == PCI_VID_VIA && (quirk.root_did == 0x0597 || quirk.root_did == 0x0598)) { // VIA VT82C597/8
+        quirk.id    = QUIRK_VIA_VP3;
+        quirk.type |= QUIRK_TYPE_MEM_SIZE;
+        quirk.process = get_vt82c597_mb_cache_size;
     }
 
     //  ------------------------
@@ -198,5 +254,14 @@ void quirks_init(void)
                 quirk.process = disable_temp_reporting;
             }
         }
+    }
+
+    //  -----------------------------------------------------------
+    //  -- Loongson 7A1000 and 7A2000 chipset USB 2.0 workaround --
+    //  -----------------------------------------------------------
+    if (quirk.root_vid == PCI_VID_LOONGSON && quirk.root_did == 0x7a00) {
+        quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
+        quirk.type |= QUIRK_TYPE_USB;
+        quirk.process = loongson_7a00_ehci_workaround;
     }
 }

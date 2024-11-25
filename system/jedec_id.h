@@ -1005,7 +1005,7 @@ static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
 //  { 0x076C, "Hon-Hai Precision" },
 //  { 0x076D, "Smart Storage Systems" },
 //  { 0x076E, "Toumaz Group" },
-//  { 0x076F, "Zentel Electronics Corporation" },
+    { 0x076F, "Zentel" },
 //  { 0x0770, "Panram International Corporation" },
 //  { 0x0771, "Silicon Space Technology" },
     { 0x0772, "LITE-ON" },
@@ -1678,5 +1678,7 @@ static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
 //  { 0x0D1E, "Creative World International Limited" },
 //  { 0x0D1F, "Base Creation International Limited" },
     { 0x0E51, "Xiaoli AI" },
+    { 0x0E58, "Trium Elek." },
+    { 0x0F33, "Xllbyte" },
     { 0xFFFF, "Unknown"}
 };

@@ -6,7 +6,7 @@
 // It supports both the 32-bit and 64-bit Linux boot protocols and EFI boot
 // for the first boot of the BSP.
 //
-// Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from memtest86+ head.S:
 //
@@ -406,6 +406,10 @@ vec19:
 
 int_handler:
 	pushq	%rbp
+	pushq	%r11
+	pushq	%r10
+	pushq	%r9
+	pushq	%r8
 	pushq	%rsi
 	pushq	%rdi
 	pushq	%rdx
@@ -429,6 +433,10 @@ int_handler:
 	popq	%rdx
 	popq	%rdi
 	popq	%rsi
+	popq	%r8
+	popq	%r9
+	popq	%r10
+	popq	%r11
 	popq	%rbp
 	addq	$16, %rsp		# discard the vector number and error code
 	iretq

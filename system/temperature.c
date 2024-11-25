@@ -103,6 +103,14 @@ int get_cpu_temperature(void)
 
             return cpu_temp_offset + 0.125f * (float)((regl >> 21) & 0x7FF);
 
+        } else if (cpuid_info.version.extendedFamily == 6 && (cpuid_info.version.extendedModel == 6 || cpuid_info.version.extendedModel == 7)) { // Target family 15h (Excavator)
+
+            pci_config_write32(0, 0, 0, AMD_SMU_INDEX_ADDR_REG, AMD_F15_M60H_TEMP_CTRL_OFFSET);
+            regl = pci_config_read32(0, 0, 0, AMD_SMU_INDEX_DATA_REG);
+            int raw_temp = ((regl >> 21) & 0x7FF) / 8;
+
+            return (raw_temp > 0) ? raw_temp : 0;
+
         } else if (cpuid_info.version.extendedFamily > 0) { // Target K10 to K15 (Bulldozer)
 
             regl = pci_config_read32(0, 24, 3, AMD_TEMP_REG_K10);

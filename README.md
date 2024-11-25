@@ -272,6 +272,8 @@ The configuration menu allows the user to:
     * error summary
     * individual errors
     * BadRAM patterns
+    * Linux memmap
+    * bad pages
   * select which of the available CPU cores are used (at startup only)
     * a maximum of 256 CPU cores can be selected, due to memory and
       display limits
@@ -289,7 +291,9 @@ The error reporting mode may be changed at any time without disrupting the
 current test sequence. Error statistics are collected regardless of the
 current error reporting mode (so switching to error summary mode will show
 the accumulated statistics since the current test sequence started). BadRAM
-patterns are only accumulated when in BadRAM mode.
+patterns are only accumulated when in BadRAM mode. Linux memmap regions are
+only accumulated when in memmap mode. Bad page numbers are only accumulated
+when in bad page mode.
 
 Any change to the selected tests, address range, or CPU sequencing mode will
 start a new test sequence and reset the error statistics.
@@ -341,17 +345,18 @@ instance:
 ### BadRAM Patterns
 
 The BadRAM patterns mode accumulates and displays error patterns for use with
-the [Linux BadRAM feature](http://rick.vanrein.org/linux/badram/). Lines are
-printed in the form `badram=F1,M1,F2,M2...` In each `F,M` pair, the `F`
-represents a fault address and the `M` is a bitmask for that address. These
+the [Linux BadRAM feature](http://rick.vanrein.org/linux/badram/) or [GRUB
+badram command](https://www.gnu.org/software/grub/manual/grub/grub.html#badram).
+Lines are printed in the form `badram=F1,M1,F2,M2...` In each `F,M` pair, the
+`F` represents a fault address and the `M` is a bitmask for that address. These
 patterns state that faults have occurred in addresses that equal F on all `1`
-bits in M. Such a pattern may capture more errors that actually exist, but
+bits in M. Such a pattern may capture more errors than actually exist, but
 at least all the errors are captured. These patterns have been designed to
 capture regular patterns of errors caused by the hardware structure in a terse
 syntax.
 
 The BadRAM patterns are grown incrementally rather than calculated from an
-overview of all errors. The number of pairs is constrained to ten for a
+overview of all errors. The number of pairs is constrained to 20 for a
 number of practical reasons. As a result, handcrafting patterns from the
 output in address printing mode may, in exceptional cases, yield better
 results.
@@ -359,6 +364,39 @@ results.
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
 address test (test 0) and the block move test (test 7) do not contribute to
 the BadRAM patterns as these tests do not allow the exact address of the
+fault to be determined.
+
+### Linux memmap
+
+The Linux memmap mode accumulates and displays faulty memory regions for use
+with the [Linux memmap boot command line option]
+(https://www.kernel.org/doc/Documentation/admin-guide/kernel-parameters.txt).
+Lines are printed in the form `memmap=S1$A1,S2,A2...` In each `S,A` pair, the
+`A` represents the first address in the region and the `S` is the size of the
+region (in bytes). Up to 20 faulty memory regions are recorded. Once more than
+20 regions of contiguous faulty locations have been found, regions will be
+merged, which will mean some regions include non-faulty locations. The program
+will try to minimise the number of non-faulty locations that are included.
+
+**NOTE** As mentioned in the individual test descriptions, the walking-ones
+address test (test 0) and the block move test (test 7) do not contribute to
+the faulty memory regions as these tests do not allow the exact address of
+the fault to be determined.
+
+### Bad Pages
+
+The bad pages mode accumulates and displays faulty memory page numbers. These
+may be used with the Windows bcdedit command to add those pages to the Windows
+PFA memory list. The page numbers are either displayed as a single hexadecimal
+number (e.g. `0x20`) or a range of hexadecimal page numbers (e.g. `0x20..0x2a`).
+Up to 20 ranges of faulty pages are recorded. Once more than 20 ranges of
+contiguous faulty pages have been found, ranges will be merged, which will
+mean some ranges include non-faulty pages. The program will try to minimise
+the number of non-faulty pages that are included.
+
+**NOTE** As mentioned in the individual test descriptions, the walking-ones
+address test (test 0) and the block move test (test 7) do not contribute to
+the faulty page numbers as these tests do not allow the exact address of the
 fault to be determined.
 
 ## Trouble-shooting Memory Errors
@@ -515,8 +553,8 @@ memory region in turn. Caching is enabled for all but the first test.
 ### Test 0 : Address test, walking ones, no cache
 
 In each memory region in turn, tests all address bits by using a walking
-ones address pattern. Errors from this test are not used to calculate BadRAM
-patterns.
+ones address pattern. Errors from this test do not contribute to BadRAM
+patterns, memmap regions, or bad page regions.
 
 ### Test 1 : Address test, own address in window
 
@@ -569,7 +607,7 @@ the movs instruction. After the moves are completed the data patterns are
 checked. Because the data is checked only after the memory moves are completed
 it is not possible to know where the error occurred. The addresses reported
 are only for where the bad pattern was found. In consequence, errors from this
-test are not used to calculate BadRAM patterns.
+test do not contribute to BadRAM patterns, memmap regions, or bad page regions.
 
 ### Test 8 : Random number sequence
 

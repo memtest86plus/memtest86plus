@@ -37,6 +37,7 @@ void memctrl_init(void)
       case IMC_K19_VRM:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
+      case IMC_K1A_GRG:
         get_imc_config_amd_zen();
         break;
       case IMC_SNB:
@@ -57,6 +58,9 @@ void memctrl_init(void)
       case IMC_ADL:
         get_imc_config_intel_adl();
         break;
+      case IMC_ARL:
+      case IMC_MTL:
+        get_imc_config_intel_mtl();
       default:
         break;
     }

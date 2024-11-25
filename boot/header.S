@@ -27,7 +27,7 @@
 // remainder of the header and the setup code being provided in the ".setup".
 // section.
 //
-// Copyright (C) 2020-2023 Martin Whitaker.
+// Copyright (C) 2020-2024 Martin Whitaker.
 //
 // Derived from Linux 5.6 arch/x86/boot/header.S:
 //
@@ -906,6 +906,7 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
+	      | IMAGE_SCN_MEM_WRITE		\
 	      | IMAGE_SCN_MEM_EXECUTE		\
 	      | IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
 
