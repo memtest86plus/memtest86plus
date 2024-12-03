@@ -43,9 +43,8 @@
 #define KERNEL_CS	0x10		/* 32-bit segment address for code */
 #define KERNEL_DS	0x18		/* 32-bit segment address for data */
 
-/* The following addresses are offsets from BOOT_SEG. */
+/* The following address is an offset from BOOT_SEG. */
 
-#define BOOT_STACK	((1 + SETUP_SECS) * 512)
 #define BOOT_STACK_TOP	((MAIN_SEG - BOOT_SEG) << 4)
 
 /* The following definitions must match the Linux boot_params struct. */

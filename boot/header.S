@@ -69,33 +69,36 @@ init:
 	movw	%ax, %ds
 	movw	%ax, %es
 	movw	%ax, %ss
-	movw	$BOOT_STACK_TOP, %bp
-	movw	%bp, %sp
+	movw	$(BOOT_STACK_TOP - 12), %sp	# Reserve 12 bytes for the FDD Parameter Table
 	sti
-	cld
 
-	leaw	boot_msg, %bp
-	movw	$(boot_msg_end - boot_msg), %cx
+	# Turn off the text display cursor.
+	movb	$0x01, %ah
+	xorb	%bh, %bh			# %bh = 0: page 0
+	movw	$0x2000, %cx
+	int	$0x10
+
+	movw	$boot_msg, %si
 	call	print_string
 
 	jmp	init_fdd
 
+# Print NULL terminated string from %ds:%si via BIOS routine int 10h: 0eh (WRITE_TTY)
 print_string:
-	# Print string from %es:%bp of length %cx via BIOS routine int 10h: 1301h
-	push	%cx
-	movb	$0x03, %ah		# read cursor pos
-	xorb	%bh, %bh		# page 0
-	int	$0x10
+	lods	%ds:(%si), %al
+	cmp	$0, %al
+	jz	0f
 
-	pop	%cx
-	movb	$0x07, %bl		# (page 0 set above) attribute 7 (normal)
-	movw	$0x1301, %ax		# write string, move cursor
+	movb	$0x0e, %ah
+	xorw	%bx, %bx			# %bh = 0: page 0, %bl = 0: foreground color
 	int	$0x10
+	jmp	print_string
+0:
 	ret
 
-	boot_msg:
+boot_msg:
 	.ascii	"Loading "
-	boot_msg_end:
+	.byte	0
 
 	.org	0x3c
 # The PE header pointer.
@@ -115,70 +118,64 @@ init_fdd:
 	# High doesn't hurt. Low does.
 	#
 	# Segments are as follows:
-	#	ds=es=ss=cs = BOOT_SEG,
-	#	fs = 0, gs = parameter table segment
+	#	%ds=%es=%ss=%cs = BOOT_SEG (already set),
+	#	%fs = 0, %gs = parameter table segment
 
-	xorw	%dx, %dx
+	xorw	%bx, %bx
+	movw	%bx, %fs
+	movb	$0x78, %bl		# %fs:%bx is the parameter table with address 0000h:0078h
+	lgs	%fs:(%bx), %si		# load into %gs (segment) and %si (offset) - the source
+	movw	%sp, %di		# %es:%di is the destination - 07c0:83f4h -> 0xFFF4
 
-	pushw	$0
-	popw	%fs
-	movw	$0x78, %bx		# fs:bx is parameter table address
-	lgs	%fs:(%bx),%si		# gs:si is source
-
-	movw	%dx, %di		# es:di is destination
-	movw	$6, %cx 		# copy 12 bytes
+	movw	$12, %cx 		# copy 12 bytes, will advance %di by the same number
 	cld
+	rep	movsb %gs:(%si), %es:(%di)
 
-	rep	movsw %gs:(%si), (%di)
+	movb	$18, %ds:-8(%di)	# set sector count located at 4-12=-8 from %di
 
-	movw	%dx, %di
-	movb	$18, 4(%di)		# patch sector count
-
-	movw	%di, %fs:(%bx)
-	movw	%es, %fs:2(%bx)
-
-	movw	%cs, %ax
-	movw	%ax, %fs
-	movw	%ax, %gs
-
-	xorb	%ah, %ah		# reset FDC
-	xorb	%dl, %dl
-	int	$0x13
-
-	# Load the setup sectors directly after the boot block.
-	# Note that 'es' is already set up.
+	movw	%ds, %fs:2(%bx)
+	movw	%sp, %fs:(%bx)
 
 load_setup:
-	xorw	%dx, %dx			# drive 0, head 0
-	movw	$0x0002, %cx			# sector 2, track 0
-	movw	$0x0200, %bx			# address = 512, in BOOT_SEG
+	# Load the setup sectors directly after the boot block.
+	# Note that %es is already set to %cs and %cx to 0.
+
+	# Reset FDC
+	xorb	%ah, %ah			# %ah = 0: Reset Disk System
+	cwtd					# %dl = 0: drive number (cwtd sets %dx to 0 with %ah=0)
+	int	$0x13
+
 	movw	$(0x0200 + SETUP_SECS), %ax	# service 2, nr of sectors
-						# (assume all on head 0, track 0)
+	movw	$0x0200, %bx			# address = 512, in BOOT_SEG
+	movw	$0x0002, %cx			# %cl = 2: sector 2, %ch = 0: track 0
+	cwtd					# %dh = 0: head number, %dl = 0: drive number (cwtd sets %dx to 0 with %ah=2)
 	int	$0x13				# read it
 	jnc	load_setup_done 		# ok - continue
 
-	pushw	%ax			# dump error code
+	pushw	%ax				# dump error code
 	call	print_nl
 	movw	%sp, %bp
 	call	print_hex
 	popw	%ax
 
-	xorb	%dl, %dl		# reset FDC
-	xorb	%ah, %ah
-	int	$0x13
 	jmp	load_setup
 
 load_setup_done:
+	movw	$mt86plus_version, %si
+	call	print_string
 
 	# Get disk drive parameters, specifically number of sectors/track.
 	# It seems that there is no BIOS call to get the number of sectors.
 	# Guess 18 sectors if sector 18 can be read, 15 if sector 15 can be
 	# read. Otherwise guess 9.
 
-	xorw	%dx, %dx		# drive 0, head 0
-	movw	$0x0012, %cx		# sector 18, track 0
-	movw	$BOOT_STACK, %bx	# use the bottom of the stack (es = cs)
+	movw	$MAIN_SEG, %ax
+	movw	%ax, %es
+
 	movw	$0x0201, %ax		# service 2, 1 sector
+	xorw	%bx, %bx		# output buffer = $MAIN_SEG:0000
+	movw	$0x0012, %cx		# sector 18, track 0
+	cwtd				# %dh = 0: head number, %dl = 0: drive number (cwtd sets %dx to 0 with %ah=2)
 	int	$0x13
 	jnc	got_sectors
 	movb	$0x0f, %cl		# sector 15
@@ -189,23 +186,19 @@ load_setup_done:
 
 got_sectors:
 	movw	%cx, %cs:sectors
-	movw	$BOOT_SEG, %ax
-	movw	%ax, %es
 
-	leaw	mt86plus_version, %bp
-	movw	$(mt86plus_version_end - mt86plus_version), %cx
-	call	print_string
-
-	# Load the main test program.
-
-	movw	$MAIN_SEG, %ax
-	movw	%ax, %es
+	# Load the main test program, %es is already set to $MAIN_SEG.
 	call	read_it
-	call	kill_motor
-	call	turn_off_cursor
+
+	# Turn off the floppy drive motor, so that we enter the kernel
+	# in a known state, and don't have to worry about it later.
+	movw	$0x3f2, %dx
+	xorb	%al, %al
+	outb	%al, %dx
+
 	call	print_nl
 
-	# Fix up the Linux boot header to indicate we've loaded into low memory.
+	# Update up the Linux boot header to indicate we've loaded into low memory.
 
 	movl	$LOW_LOAD_ADDR, code32_start
 
@@ -329,7 +322,7 @@ print_loop:
 	pushw	%cx			# save count left
 	call	print_nl		# nl for readability
 
-	cmpb	5, %cl			# see if register name is needed
+	cmpb	$5, %cl			# No register name for the first value
 	jae	no_reg
 
 	movw	$(0xe05 + 'A' - 1), %ax
@@ -341,7 +334,8 @@ print_loop:
 	int	$0x10
 
 no_reg:
-	addw	$2, %bp 		# next register
+	inc	%bp
+	inc	%bp			# next register
 	call	print_hex		# print it
 	popw	%cx
 	loop	print_loop
@@ -374,26 +368,6 @@ print_digit:
 good_digit:
 	int	$0x10
 	loop	print_digit
-	ret
-
-# This subroutine turns off the floppy drive motor, so that we enter the
-# kernel in a known state, and don't have to worry about it later.
-
-kill_motor:
-	pushw	%dx
-	movw	$0x3f2, %dx
-	xorb	%al, %al
-	outb	%al, %dx
-	popw	%dx
-	ret
-
-# This subroutine turns off the text display cursor.
-
-turn_off_cursor:
-	movb	$0x01, %ah
-	movb	$0x00, %bh
-	movw	$0x2000, %cx
-	int	$0x10
 	ret
 
 # Local variables.
@@ -791,9 +765,8 @@ idt_descr:
 	.long	0			# idt base=0
 
 mt86plus_version:
-	.ascii "Memtest86+ v" , MT_VERSION
-mt86plus_version_end:
-	.byte   0
+	.ascii	"Memtest86+ v", MT_VERSION
+	.byte	0
 
 pe_header:
 	.ascii	"PE"
