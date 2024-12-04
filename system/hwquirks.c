@@ -259,9 +259,11 @@ void quirks_init(void)
     //  -----------------------------------------------------------
     //  -- Loongson 7A1000 and 7A2000 chipset USB 2.0 workaround --
     //  -----------------------------------------------------------
-    if (quirk.root_vid == PCI_VID_LOONGSON && quirk.root_did == 0x7a00) {
-        quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
-        quirk.type |= QUIRK_TYPE_USB;
-        quirk.process = loongson_7a00_ehci_workaround;
+    if (quirk.root_vid == PCI_VID_LOONGSON) {
+        if (pci_config_read16(0, 4, 1, PCI_DID_REG) == 0x7a14) {
+            quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
+            quirk.type |= QUIRK_TYPE_USB;
+            quirk.process = loongson_7a00_ehci_workaround;
+        }
     }
 }
