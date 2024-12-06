@@ -197,9 +197,9 @@ Prepare_Directory() {
         exit 1
     fi
 
-    # Copy memtest.efi to hda-contents
-    cp memtest.efi hda-contents/
-    cp memtest.efi hda-contents/EFI/boot/BOOT_IA32.efi
+    # Copy mt86plus to hda-contents
+    cp mt86plus hda-contents/mt86plus.efi
+    cp mt86plus hda-contents/EFI/boot/BOOT_IA32.efi
 
     # Copy OVMF* files from /usr/share
     if [ ! -f OVMF32_VARS.fd ] || [ ! -f OVMF32_CODE.fd ]; then
