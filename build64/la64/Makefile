@@ -24,7 +24,7 @@ else
   MS_LDS=ldscripts/memtest_shared.lds
 endif
 
-INC_DIRS = -I../../boot -I../../system -I../../system/loongarch -I../../lib -I../../tests -I../../app -Iapp
+INC_DIRS = -I../../boot -I../../system -I ../../system/imc -I../../system/loongarch -I../../lib -I../../tests -I../../app -Iapp
 
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
