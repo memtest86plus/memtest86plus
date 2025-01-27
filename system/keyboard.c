@@ -248,9 +248,13 @@ char get_key(void)
 
     static bool escaped = false;
     if (keyboard_types & KT_LEGACY) {
-        uint8_t c = inb(0x64);
-        if (c & 0x01) {
-            c = inb(0x60);
+        uint8_t status = inb(0x64);
+        if (status & 0x01) {
+            uint8_t c = inb(0x60);
+            if (status & 0x20) {
+                // Ignore mouse events.
+                return '\0';
+            }
             if (escaped) {
                 escaped = false;
                 switch (c) {
