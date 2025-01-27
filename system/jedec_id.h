@@ -1333,7 +1333,7 @@ static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
 //  { 0x0A3F, "Shanghai Han Rong Microelectronics Co" },
 //  { 0x0A40, "Shenzhen Zhongguang Yunhe Trading" },
 //  { 0x0A41, "Smart Shine(QingDao) Microelectronics" },
-//  { 0x0A42, "Thermaltake Technology Co Ltd" },
+    { 0x0A42, "Thermaltake" },
 //  { 0x0A43, "Shenzhen O?Yang Maile Technology Ltd" },
 //  { 0x0A44, "UPMEM" },
     { 0x0A45, "Chun Well" },
@@ -1680,5 +1680,6 @@ static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
     { 0x0E51, "Xiaoli AI" },
     { 0x0E58, "Trium Elek." },
     { 0x0F33, "Xllbyte" },
+    { 0x0F37, "SSTC" },
     { 0xFFFF, "Unknown"}
 };
