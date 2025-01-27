@@ -4,8 +4,8 @@ OUTPUT_ARCH(i386)
 ENTRY(boot);
 SECTIONS {
 	. = 0;
-	.header : {
-		*(.header)
+	.bootsect : {
+		*(.bootsect)
 	}
 	.setup : {
 		*(.setup)
@@ -56,4 +56,7 @@ SECTIONS {
 	_virt_sbat_start  = _virt_reloc_start + _virt_reloc_size;
 
 	_virt_img_size = _virt_sbat_start + _virt_sbat_size;
+
+	. = ASSERT(header == 0x202, "The setup header has the wrong offset!");
+	. = ASSERT(_file_text_start == 0x600, "The .text is at the wrong offset!");
 }

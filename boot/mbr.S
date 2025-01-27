@@ -9,8 +9,8 @@
 // offset 0x1b0. The LBA value is assumed to be offset by 4, for compatibility
 // with the xorrisofs --grub2-mbr option.
 //
-// The first 512B of the memtest binary image is not used, so either of the
-// memtest.bin or memtest.efi images may be used.
+// The first 512B of the memtest binary image is not used, so mt86plus image
+// can be used.
 //
 // Copyright (C) 2020 Martin Whitaker.
 

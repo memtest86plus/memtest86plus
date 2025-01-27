@@ -85,7 +85,7 @@ APP_OBJS = app/badram.o \
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
-all: memtest.bin memtest.efi
+all: mt86plus
 
 check:
 	@if [ -z ${DEBUG} ]; then\
@@ -93,7 +93,7 @@ check:
 		exit 1;\
 	fi
 
-debug: check memtest.debug memtest.efi
+debug: check memtest.debug mt86plus
 
 -include boot/efisetup.d
 -include $(subst .o,.d,$(SYS_OBJS))
@@ -114,7 +114,7 @@ boot/%.o: ../boot/%.S ../boot/boot.h app/build_version.h
 
 boot/efisetup.o: ../boot/efisetup.c
 	@mkdir -p boot
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/reloc.o: ../system/reloc32.c
 	@mkdir -p system
@@ -122,15 +122,15 @@ system/reloc.o: ../system/reloc32.c
 
 system/%.o: ../system/%.c
 	@mkdir -p system
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 system/imc/%.o: ../system/imc/%.c
 	@mkdir -p system/imc
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../lib/%.c
 	@mkdir -p lib
-	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 tests/%.o: ../tests/%.c
 	@mkdir -p tests
@@ -171,24 +171,20 @@ memtest.debug: memtest_shared
 	strip -R .eh_frame memtest_shared
 	strip -R .comment memtest_shared
 
-memtest.bin: memtest_shared.bin boot/bootsect.o boot/setup.o ldscripts/memtest_bin.lds
+mt86plus: memtest_shared.bin boot/header.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_bin.lds boot/bootsect.o boot/setup.o -b binary memtest_shared.bin -o memtest.bin
-
-memtest.efi: memtest_shared.bin boot/header.o boot/setup.o ldscripts/memtest_efi.lds
-	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o boot/setup.o -b binary memtest_shared.bin -o memtest.efi
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/header.o -b binary memtest_shared.bin -o mt86plus
 
 memtest.mbr: memtest_shared.bin boot/mbr.o ldscripts/memtest_mbr.lds
 	$(LD) -T ldscripts/memtest_mbr.lds boot/mbr.o -b binary memtest_shared.bin -o memtest.mbr
 
-floppy.img: memtest.bin
+floppy.img: mt86plus
 	dd if=/dev/zero of=floppy.img bs=1474560 count=1
-	dd if=memtest.bin of=floppy.img bs=1474560 conv=notrunc
+	dd if=mt86plus of=floppy.img bs=1474560 conv=notrunc
 
-esp.img: memtest.efi
+esp.img: mt86plus
 	@mkdir -p iso/EFI/BOOT
-	cp memtest.efi iso/EFI/BOOT/bootia32.efi
+	cp mt86plus iso/EFI/BOOT/bootia32.efi
 	@rm -f esp.img
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
@@ -204,7 +200,7 @@ memtest.iso: memtest.mbr floppy.img esp.img
 iso: memtest.iso
 
 clean:
-	rm -rf boot system lib tests app *.img *.iso memtest* iso grub-*
+	rm -rf boot system lib tests app *.img *.iso memtest* mt86plus iso grub-*
 
 # grub-memtest.iso uses GRUB as an intermediate bootloader to allow Memtest86+
 # to be started with the native USB keyboard drivers either enabled or disabled,
@@ -239,9 +235,9 @@ grub-eltorito.img:
 grub-bootia32.efi:
 	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format i386-efi $(GRUB_MODULES)
 
-grub-esp.img: memtest.efi grub-bootia32.efi ../grub/${GRUB_CFG}-efi.cfg
+grub-esp.img: mt86plus grub-bootia32.efi ../grub/${GRUB_CFG}-efi.cfg
 	@mkdir -p grub-iso/EFI/BOOT/grub/i386-efi grub-iso/EFI/BOOT/grub/fonts
-	cp memtest.efi grub-iso/EFI/BOOT/memtest
+	cp mt86plus grub-iso/EFI/BOOT/memtest
 	cp grub-bootia32.efi grub-iso/EFI/BOOT/bootia32.efi
 	cp ../grub/${GRUB_CFG}-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
@@ -250,9 +246,9 @@ grub-esp.img: memtest.efi grub-bootia32.efi ../grub/${GRUB_CFG}-efi.cfg
 	/sbin/mkdosfs -n MT86P_ESP -F12 -C grub-esp.img 8192
 	mcopy -s -i grub-esp.img grub-iso/EFI ::
 
-grub-memtest.iso: memtest.bin grub-eltorito.img ../grub/${GRUB_CFG}-legacy.cfg grub-esp.img
+grub-memtest.iso: mt86plus grub-eltorito.img ../grub/${GRUB_CFG}-legacy.cfg grub-esp.img
 	@mkdir -p grub-iso/boot/grub/i386-pc grub-iso/boot/grub/fonts
-	cp memtest.bin grub-iso/boot/memtest
+	cp mt86plus grub-iso/boot/memtest
 	cp grub-eltorito.img grub-iso/boot/eltorito.img
 	cp ../grub/${GRUB_CFG}-legacy.cfg grub-iso/boot/grub/grub.cfg
 	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
