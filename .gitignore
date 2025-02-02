@@ -13,6 +13,7 @@ gdbscript
 memtest_shared_debug.lds
 
 # Binaries
+mt86plus
 memtest_shared
 memtest_shared.bin
 *.bin
