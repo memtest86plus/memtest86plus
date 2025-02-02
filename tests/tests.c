@@ -51,7 +51,7 @@
 test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     // ena,  cpu, stgs, itrs, errs, description
     { true,  ONE,    1,    6,    0, "[Address test, walking ones, no cache] "},
-    {false,  SEQ,    1,    6,    0, "[Address test, own address in window]  "},
+    {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
     { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
     { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
     { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
