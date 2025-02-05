@@ -46,6 +46,7 @@ SYS_OBJS = system/acpi.o \
            system/serial.o \
            system/smbios.o \
            system/i2c_x86.o \
+           system/jep106.o \
            system/spd.o \
            system/smp.o \
            system/temperature.o \
@@ -123,6 +124,10 @@ system/reloc.o: ../system/reloc32.c
 system/%.o: ../system/%.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+system/%.o: ../system/%.S
+	@mkdir -p system
+	$(CC) -m32 -x assembler-with-cpp -c -o $@ $<
 
 system/imc/%.o: ../system/imc/%.c
 	@mkdir -p system/imc

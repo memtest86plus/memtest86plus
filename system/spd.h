@@ -42,7 +42,15 @@ typedef struct ram_infos {
     char        *type;
 } ram_info_t;
 
+struct jep106 {
+    uint8_t     len;
+    uint8_t     code_h;
+    uint8_t     code_l;
+    char        name[];
+} __attribute__((packed));
+
 extern ram_info_t ram;
+extern const uint8_t jep106_data[];
 
 void print_spdi(spd_info spdi, uint8_t lidx);
 void parse_spd(spd_info *spdi, uint8_t slot_idx);

@@ -7,7 +7,6 @@
 
 #include "smbus.h"
 #include "spd.h"
-#include "jedec_id.h"
 #include "print.h"
 
 /** Rounding factors for timing computation
@@ -26,10 +25,40 @@ static inline uint8_t bcd_to_ui8(uint8_t bcd)
     return bcd - 6 * (bcd >> 4);
 }
 
+static const char *find_jep106(int jedec_code) {
+    const struct jep106     *j = (const struct jep106 *)jep106_data;
+    static const char       *name = NULL;
+    static int32_t          code = -1;
+
+    if (code == jedec_code)
+        // No need to search, use the cached name
+        return name;
+
+    while (j->len > 4) {
+        code = (j->code_h << 8) + j->code_l;
+
+        if (code > jedec_code)
+            break;
+
+        if (code == jedec_code) {
+            // Cache the result
+            name = j->name;
+            return name;
+        }
+
+        j = (const struct jep106 *)((uint8_t *)j + j->len);
+    }
+
+    // Also cache a negative result
+    code = jedec_code;
+    name = NULL;
+    return name;
+}
+
 void print_spdi(spd_info spdi, uint8_t row)
 {
     uint8_t curcol;
-    uint16_t i;
+    const char *jedec_name;
 
     // Print Slot Index, Module Size, type & Max frequency (Jedec or XMP)
     curcol = printf(row, 0, " - Slot %i: %kB %s-%i",
@@ -50,20 +79,13 @@ void print_spdi(spd_info spdi, uint8_t row)
         curcol = prints(row, ++curcol, "EPP");
     }
 
-    // Print Manufacturer from JEDEC106
-    for (i = 0; i < JEP106_CNT; i++) {
-        if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(row, ++curcol, "- %s", jep106[i].name);
-            break;
-        }
-    }
-
-    // If not present in JEDEC106, display raw JEDEC ID
-    if (spdi.jedec_code == 0) {
-        curcol = prints(row, ++curcol, "- Noname");
-    } else if (i == JEP106_CNT) {
+    // Look for Manufacturer in JEDEC JEP106 database
+    jedec_name = find_jep106(spdi.jedec_code);
+    if (jedec_name)
+        curcol = printf(row, ++curcol, "- %s", jedec_name);
+    else
+        // If not present in the database, display raw JEDEC ID
         curcol = printf(row, ++curcol, "- Unknown (0x%x)", spdi.jedec_code);
-    }
 
     // Print SKU
     if (*spdi.sku)

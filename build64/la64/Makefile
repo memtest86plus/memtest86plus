@@ -40,6 +40,7 @@ SYS_OBJS = system/acpi.o \
            system/screen.o \
            system/serial.o \
            system/smbios.o \
+           system/jep106.o \
            system/spd.o \
            system/smp.o \
            system/timers.o \
@@ -125,6 +126,10 @@ system/reloc.o: ../../system/reloc64.c
 system/%.o: ../../system/%.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+system/%.o: ../../system/%.S
+	@mkdir -p system
+	$(CC) -x assembler-with-cpp -c -o $@ $<
 
 system/loongarch/%.o: ../../system/loongarch/%.c
 	@mkdir -p system/loongarch/
