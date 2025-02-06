@@ -195,8 +195,8 @@ esp.img: memtest.efi
 	mcopy -s -i esp.img iso/EFI ::
 
 memtest.iso: esp.img
-	xorrisofs -pad -R -J -volid MT86PLUS_64 -graft-points \
-		  -part_like_isohybrid -iso_mbr_part_type 0x00 -append_partition 2 0xef ./esp.img \
+	xorrisofs -pad -R -J -volid MT86PLUS_64_EFI_ONLY -no-emul-boot -graft-points \
+		  -append_partition 2 0xef ./esp.img \
 		  -o ./memtest.iso /EFI=./iso/EFI
 
 iso: memtest.iso
