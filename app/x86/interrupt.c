@@ -239,8 +239,7 @@ void interrupt(struct trap_regs *trap_regs)
         display_pinned_message(11, 7 + 3*i, "%02x", (uintptr_t)pp[i]);
     }
 
-    clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
-    prints(ROW_FOOTER, 0, "Press any key to reboot...");
+    printf_region(ROW_FOOTER, 0, SCREEN_MAX_COL, "Press any key to reboot...");
 
     while (get_key() == 0) { }
     reboot();
