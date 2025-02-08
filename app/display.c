@@ -175,7 +175,7 @@ void display_init(void)
 
     set_foreground_colour(palette.footer_foreground);
     set_background_colour(palette.footer_background);
-    clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
+    clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_MAX_COL);
     prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
     prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
 #if defined (__x86_64__)
@@ -340,10 +340,10 @@ void display_start_run(void)
     if (ecc_status.ecc_enabled) {
         clear_screen_region(8, 49, 8, 53);                  // pass number
         clear_screen_region(8, 61, 8, 68);                  // error count
-        clear_screen_region(8, 74, 8, SCREEN_WIDTH - 1);    // ecc error count
+        clear_screen_region(8, 74, 8, SCREEN_MAX_COL);      // ecc error count
     } else {
         clear_screen_region(8, 49, 8, 59);                  // pass number
-        clear_screen_region(8, 68, 8, SCREEN_WIDTH - 1);    // error count
+        clear_screen_region(8, 68, 8, SCREEN_MAX_COL);      // error count
     }
 
     display_pass_count(0);
@@ -364,7 +364,7 @@ void display_start_run(void)
 
 void display_start_pass(void)
 {
-    clear_screen_region(1, 39, 1, SCREEN_WIDTH - 1);    // progress bar
+    clear_screen_region(1, 39, 1, SCREEN_MAX_COL);      // progress bar
     display_pass_percentage(0);
     pass_bar_length = 0;
     pass_ticks = 0;
@@ -372,10 +372,9 @@ void display_start_pass(void)
 
 void display_start_test(void)
 {
-    clear_screen_region(2, 39, 3, SCREEN_WIDTH - 1);    // progress bar, test details
-    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6);    // Avoid erasing paging mode
-    clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1);
-    clear_screen_region(3, 36, 3, 37);                  // test number
+    clear_screen_region(2, 39, 2, SCREEN_MAX_COL);      // test progress bar
+    clear_screen_region(4, 39, 4, SCREEN_MAX_COL - 5);  // test addr / desc, keep addr mode
+    clear_screen_region(5, 39, 5, SCREEN_MAX_COL);      // test pattern
     display_test_percentage(0);
     display_test_number(test_num);
     display_test_description(test_list[test_num].description);
