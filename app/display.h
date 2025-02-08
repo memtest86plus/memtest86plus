@@ -35,11 +35,19 @@
 
 #define ERROR_LIMIT     UINT64_C(999999999999)
 
+#define SCREEN_MAX_COL  (SCREEN_WIDTH - 1)
+
 typedef enum {
     DISPLAY_MODE_NA,
     DISPLAY_MODE_SPD,
     DISPLAY_MODE_IMC
 } display_mode_t;
+
+#define printf_region(row, col_start, col_end, ...) \
+    clear_screen_region(row, printf(row, col_start, __VA_ARGS__), row, col_end)
+
+#define prints_region(row, col_start, col_end, str) \
+    clear_screen_region(row, prints(row, col_start, str), row, col_end)
 
 #define display_cpu_model(str) \
     prints(0, 30, str)
@@ -78,43 +86,40 @@ typedef enum {
     prints(7, 68, status)
 
 #define display_threading(nb, mode) \
-    printf(7,31, "%uT (%s)", nb, mode)
+    printf(7, 31, "%uT (%s)", nb, mode)
 
 #define display_threading_disabled() \
-    prints(7,31, "Disabled")
+    prints(7, 31, "Disabled")
 
 #define display_cpu_topo_hybrid(num_pcores, num_ecores, num_threads) \
-    { \
-        clear_screen_region(7, 5, 7, 25); \
-        printf(7, 5, "%uP+%uE-Cores (%uT)", num_pcores, num_ecores, num_threads); \
-    }
+    printf_region(7, 5, 25, "%uP+%uE-Cores (%uT)", num_pcores, num_ecores, num_threads)
 
 #define display_cpu_topo_hybrid_short(num_threads) \
-    printf(7, 5, "%u Threads (Hybrid)", num_threads)
+    printf_region(7, 5, 25, "%u Threads (Hybrid)", num_threads)
 
 #define display_cpu_topo_multi_socket(num_sockets, num_cores, num_threads) \
-    printf(7, 5, "%uS / %uC / %uT", num_sockets, num_cores, num_threads)
+    printf_region(7, 5, 25, "%uS / %uC / %uT", num_sockets, num_cores, num_threads)
 
 #define display_cpu_topo( num_cores, num_threads) \
-    printf(7, 5, "%u Cores %u Threads", num_cores, num_threads)
+    printf_region(7, 5, 25, "%u Cores %u Threads", num_cores, num_threads)
 
 #define display_cpu_topo_short( num_cores, num_threads) \
     printf(7, 5, "%u Cores (%uT)",  num_cores, num_threads)
 
 #define display_spec_mode(mode) \
-    prints(8,0, mode);
+    prints(8, 0, mode);
 
 #define display_spec_ddr5(freq, type, cl, cl_dec, rcd, rp, ras) \
-    printf(8,5, "%s-%u / CAS %u%s-%u-%u-%u", \
-                type, freq, cl, cl_dec?".5":"", rcd, rp, ras);
+    printf(8, 5, "%s-%u / CAS %u%s-%u-%u-%u", \
+                 type, freq, cl, cl_dec?".5":"", rcd, rp, ras);
 
 #define display_spec_ddr(freq, type, cl, cl_dec, rcd, rp, ras) \
-    printf(8,5, "%uMHz (%s-%u) CAS %u%s-%u-%u-%u", \
-                freq / 2, type, freq, cl, cl_dec?".5":"", rcd, rp, ras);
+    printf(8, 5, "%uMHz (%s-%u) CAS %u%s-%u-%u-%u", \
+                 freq / 2, type, freq, cl, cl_dec?".5":"", rcd, rp, ras);
 
 #define display_spec_sdr(freq, type, cl, rcd, rp, ras) \
-    printf(8,5, "%uMHz (%s PC%u) CAS %u-%u-%u-%u", \
-                freq, type, freq, cl, rcd, rp, ras);
+    printf(8, 5, "%uMHz (%s PC%u) CAS %u-%u-%u-%u", \
+                 freq, type, freq, cl, rcd, rp, ras);
 
 #define display_dmi_mb(sys_ma, sys_sku) \
     dmicol = prints(23, dmicol, sys_man); \
@@ -155,34 +160,19 @@ typedef enum {
     prints(3, 39, str)
 
 #define display_test_addresses(pb, pe, total) \
-    { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
-        printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
-    }
+    printf_region(4, 39, SCREEN_MAX_COL - 5, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total)
 
 #define display_test_stage_description(...) \
-    { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
-        printf(4, 39, __VA_ARGS__); \
-    }
+    printf_region(4, 39, SCREEN_MAX_COL - 5, __VA_ARGS__)
 
 #define display_test_pattern_name(str) \
-    { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        prints(5, 39, str); \
-    }
+    prints_region(5, 39, SCREEN_MAX_COL, str); \
 
 #define display_test_pattern_value(pattern) \
-    { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
-    }
+    printf_region(5, 39, SCREEN_MAX_COL, "0x%0*x", TESTWORD_DIGITS, pattern)
 
 #define display_test_pattern_values(pattern, offset) \
-    { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
-    }
+    printf_region(5, 39, SCREEN_MAX_COL, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset)
 
 #define display_run_time(hours, mins, secs) \
     printf(7, 51, "%i:%02i:%02i", hours, mins, secs)
@@ -201,7 +191,7 @@ typedef enum {
 
 #define clear_message_area() \
     { \
-        clear_screen_region(ROW_MESSAGE_T, 0, ROW_MESSAGE_B, SCREEN_WIDTH - 1); \
+        clear_screen_region(ROW_MESSAGE_T, 0, ROW_MESSAGE_B, SCREEN_MAX_COL); \
         scroll_message_row = ROW_SCROLL_T - 1; \
     }
 
@@ -220,7 +210,7 @@ typedef enum {
 #define clear_footer_message() \
     { \
         set_background_colour(palette.foreground); \
-        clear_screen_region(ROW_FOOTER, 56, ROW_FOOTER, SCREEN_WIDTH - 1); \
+        clear_screen_region(ROW_FOOTER, 56, ROW_FOOTER, SCREEN_MAX_COL); \
         set_background_colour(palette.background);  \
     }
 
@@ -235,7 +225,7 @@ typedef enum {
     if (enable_trace) do_trace(my_cpu, __VA_ARGS__)
 
 #define display_msr_failed_flag() \
-    printc(0, SCREEN_WIDTH - 1, '*');
+    printc(0, SCREEN_MAX_COL, '*');
 
 extern int scroll_message_row;
 
