@@ -140,6 +140,10 @@ static int lfb_offset(int row, int col, int x, int y, int bpp)
 
 static void lfb8_put_char(int row, int col, uint8_t ch, uint8_t attr)
 {
+    if (shadow_buffer[row][col].ch   == ch &&
+        shadow_buffer[row][col].attr == attr)
+        return;
+
     shadow_buffer[row][col].ch   = ch;
     shadow_buffer[row][col].attr = attr;
 
@@ -170,6 +174,10 @@ static void lfb8_put_char(int row, int col, uint8_t ch, uint8_t attr)
 
 static void lfb16_put_char(int row, int col, uint8_t ch, uint8_t attr)
 {
+    if (shadow_buffer[row][col].ch   == ch &&
+        shadow_buffer[row][col].attr == attr)
+        return;
+
     shadow_buffer[row][col].ch   = ch;
     shadow_buffer[row][col].attr = attr;
 
@@ -200,6 +208,11 @@ static void lfb16_put_char(int row, int col, uint8_t ch, uint8_t attr)
 
 static void lfb24_put_char(int row, int col, uint8_t ch, uint8_t attr)
 {
+
+    if (shadow_buffer[row][col].ch   == ch &&
+        shadow_buffer[row][col].attr == attr)
+        return;
+
     shadow_buffer[row][col].ch   = ch;
     shadow_buffer[row][col].attr = attr;
 
@@ -236,6 +249,10 @@ static void lfb24_put_char(int row, int col, uint8_t ch, uint8_t attr)
 
 static void lfb32_put_char(int row, int col, uint8_t ch, uint8_t attr)
 {
+    if (shadow_buffer[row][col].ch   == ch &&
+        shadow_buffer[row][col].attr == attr)
+        return;
+
     shadow_buffer[row][col].ch   = ch;
     shadow_buffer[row][col].attr = attr;
 
