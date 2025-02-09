@@ -157,7 +157,7 @@ typedef enum {
     printi(3, 36, number, 2, false, true)
 
 #define display_test_description(str) \
-    prints(3, 39, str)
+    printf_region(3, 39, SCREEN_MAX_COL, "[%s]", str)
 
 #define display_test_addresses(pb, pe, total) \
     printf_region(4, 39, SCREEN_MAX_COL - 5, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total)

@@ -49,22 +49,22 @@
 //------------------------------------------------------------------------------
 
 test_pattern_t test_list[NUM_TEST_PATTERNS] = {
-    // ena,  cpu, stgs, itrs, errs, description
-    { true,  ONE,    1,    6,    0, "[Address test, walking ones, no cache] "},
-    {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
-    { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
-    { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
-    { true,  PAR,    1,   30,    0, "[Moving inversions, random pattern]    "},
+    // ena,  cpu, stgs, itrs, errs, [description, up to 38 characters long!]
+    { true,  ONE,    1,    6,    0, "Address test, walking ones, no cache"},
+    {false,  ONE,    1,    6,    0, "Address test, own address in window"},
+    { true,  ONE,    2,    6,    0, "Address test, own address + window"},
+    { true,  PAR,    1,    6,    0, "Moving inversions, 1s & 0s"},
+    { true,  PAR,    1,    3,    0, "Moving inversions, 8 bit pattern"},
+    { true,  PAR,    1,   30,    0, "Moving inversions, random pattern"},
 #if TESTWORD_WIDTH > 32
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 64 bit pattern]    "},
+    { true,  PAR,    1,    3,    0, "Moving inversions, 64 bit pattern"},
 #else
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 32 bit pattern]    "},
+    { true,  PAR,    1,    3,    0, "Moving inversions, 32 bit pattern"},
 #endif
-    { true,  PAR,    1,   81,    0, "[Block move]                           "},
-    { true,  PAR,    1,   48,    0, "[Random number sequence]               "},
-    { true,  PAR,    1,    6,    0, "[Modulo 20, random pattern]            "},
-    { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
+    { true,  PAR,    1,   81,    0, "Block move"},
+    { true,  PAR,    1,   48,    0, "Random number sequence"},
+    { true,  PAR,    1,    6,    0, "Modulo 20, random pattern"},
+    { true,  ONE,    6,  240,    0, "Bit fade test, 2 patterns"},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
