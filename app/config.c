@@ -953,7 +953,7 @@ void config_menu(bool initial)
     }
 
     restore_screen_region(POP_REGION, popup_save_buffer);
-    set_background_colour(mt_palette.background);
+    set_background_colour(palette.background);
 
     if (enable_tty) {
         tty_send_region(POP_REGION);

@@ -219,16 +219,16 @@ typedef enum {
 
 #define clear_footer_message() \
     { \
-        set_background_colour(mt_palette.foreground); \
+        set_background_colour(palette.foreground); \
         clear_screen_region(ROW_FOOTER, 56, ROW_FOOTER, SCREEN_WIDTH - 1); \
-        set_background_colour(mt_palette.background);  \
+        set_background_colour(palette.background);  \
     }
 
 #define display_footer_message(str) \
     { \
-        set_foreground_colour(mt_palette.footer_foreground);  \
+        set_foreground_colour(palette.footer_foreground);  \
         prints(ROW_FOOTER, 56, str);  \
-        set_foreground_colour(mt_palette.footer_background); \
+        set_foreground_colour(palette.footer_background); \
     }
 
 #define trace(my_cpu, ...) \
@@ -241,7 +241,7 @@ extern int scroll_message_row;
 
 extern display_mode_t display_mode;
 
-extern screen_palette_t mt_palette;
+extern screen_palette_t palette;
 
 void display_init(void);
 
