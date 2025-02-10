@@ -9,7 +9,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2004-2023 Sam Demeulemeester.
+ * Copyright (C) 2004-2025 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -219,16 +219,16 @@ typedef enum {
 
 #define clear_footer_message() \
     { \
-        set_background_colour(WHITE); \
+        set_background_colour(mt_palette.foreground); \
         clear_screen_region(ROW_FOOTER, 56, ROW_FOOTER, SCREEN_WIDTH - 1); \
-        set_background_colour(BLUE);  \
+        set_background_colour(mt_palette.background);  \
     }
 
 #define display_footer_message(str) \
     { \
-        set_foreground_colour(BLUE);  \
+        set_foreground_colour(mt_palette.footer_foreground);  \
         prints(ROW_FOOTER, 56, str);  \
-        set_foreground_colour(WHITE); \
+        set_foreground_colour(mt_palette.footer_background); \
     }
 
 #define trace(my_cpu, ...) \
@@ -240,6 +240,8 @@ typedef enum {
 extern int scroll_message_row;
 
 extern display_mode_t display_mode;
+
+extern screen_palette_t mt_palette;
 
 void display_init(void);
 

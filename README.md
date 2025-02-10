@@ -135,6 +135,8 @@ recognised:
     * disables memory controller configuration polling
   * nopause
     * skips the pause for configuration at startup
+  * dark
+    * change the default background colour from blue to black
   * keyboard=*type*
     * where *type* is one of
       * legacy

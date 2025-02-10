@@ -184,7 +184,7 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
         pos = 0;
         for (int col = start_col; col <= end_col; col++) {
 
-            inverse = ((shadow_buffer[row][col].attr & 0x70) >> 4 != BLUE);
+            inverse = ((shadow_buffer[row][col].attr & 0x70) >> 4 != mt_palette.background);
 
             if (cur_inverse != inverse) {
 
