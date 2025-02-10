@@ -46,9 +46,21 @@ typedef enum {
 } screen_colour_t;
 
 /**
+ * Colour Palette definition
+ */
+typedef struct {
+    screen_colour_t background;
+    screen_colour_t foreground;
+    screen_colour_t title_background;
+    screen_colour_t title_foreground;
+    screen_colour_t footer_background;
+    screen_colour_t footer_foreground;
+    screen_colour_t popup_background;
+} screen_palette_t;
+
+/**
  * BIOS/UEFI(GOP) agnostic framebuffer copy
  */
-
 extern vga_buffer_t shadow_buffer;
 
 /**

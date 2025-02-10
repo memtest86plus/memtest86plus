@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
-// Copyright (C) 2004-2023 Sam Demeulemeester.
+// Copyright (C) 2004-2025 Sam Demeulemeester.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -87,6 +87,37 @@ int max_cpu_temp = 0;
 
 display_mode_t display_mode = DISPLAY_MODE_NA;
 
+screen_palette_t palette = {BLUE, WHITE, WHITE, BLACK, WHITE, BLUE, BLACK};
+
+//------------------------------------------------------------------------------
+// Private Functions
+//------------------------------------------------------------------------------
+
+static void set_screen_palette(screen_palette_t *mt_palette)
+{
+    if (dark_mode) {
+        *mt_palette = (screen_palette_t){
+            .background        = BLACK,
+            .foreground        = WHITE,
+            .title_background  = WHITE,
+            .title_foreground  = BLACK,
+            .footer_background = WHITE,
+            .footer_foreground = BLACK,
+            .popup_background  = WHITE
+        };
+    } else {
+        *mt_palette = (screen_palette_t){
+            .background        = BLUE,
+            .foreground        = WHITE,
+            .title_background  = WHITE,
+            .title_foreground  = BLACK,
+            .footer_background = WHITE,
+            .footer_foreground = BLUE,
+            .popup_background  = BLACK
+        };
+    }
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -95,6 +126,9 @@ void display_init(void)
 {
     cursor_off();
 
+    set_screen_palette(&palette);
+    set_background_colour(palette.background);
+
     clear_screen();
 
     /* The commented horizontal lines provide visual cue for where and how
@@ -102,14 +136,14 @@ void display_init(void)
      * Extended ASCII characters.
      */
 
-    set_foreground_colour(BLACK);
-    set_background_colour(WHITE);
+    set_foreground_colour(palette.title_foreground);
+    set_background_colour(palette.title_background);
     clear_screen_region(0, 0, 0, 27);
     prints(0, 0, "      Memtest86+ v" MT_VERSION);
     set_foreground_colour(RED);
     printc(0, 15, '+');
-    set_foreground_colour(WHITE);
-    set_background_colour(BLUE);
+    set_foreground_colour(palette.foreground);
+    set_background_colour(palette.background);
     prints(1, 0, "CLK/Temp:   N/A             | Pass   %");
     prints(2, 0, "L1 Cache:   N/A             | Test   %");
     prints(3, 0, "L2 Cache:   N/A             | Test #");
@@ -139,8 +173,8 @@ void display_init(void)
     print_char(6, 42, 0xc2);
     print_char(9, 42, 0xc1);
 
-    set_foreground_colour(BLUE);
-    set_background_colour(WHITE);
+    set_foreground_colour(palette.footer_foreground);
+    set_background_colour(palette.footer_background);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
     prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
@@ -152,8 +186,8 @@ void display_init(void)
     prints(ROW_FOOTER, 74, ".la64");
 #endif
 
-    set_foreground_colour(WHITE);
-    set_background_colour(BLUE);
+    set_foreground_colour(palette.foreground);
+    set_background_colour(palette.background);
 
     if (cpu_model) {
         display_cpu_model(cpu_model);
@@ -399,7 +433,7 @@ void display_big_status(bool pass)
 
     save_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
 
-    set_background_colour(BLACK);
+    set_background_colour(palette.popup_background);
     set_foreground_colour(pass ? GREEN : RED);
     clear_screen_region(POP_STATUS_REGION);
 
@@ -424,8 +458,8 @@ void display_big_status(bool pass)
     prints(POP_STAT_R+8, POP_STAT_C+5, "                                    ");
     prints(POP_STAT_R+9, POP_STAT_C+5, "Press any key to remove this banner ");
 
-    set_background_colour(BLUE);
-    set_foreground_colour(WHITE);
+    set_foreground_colour(palette.foreground);
+    set_background_colour(palette.background);
     big_status_displayed = true;
 }
 
@@ -473,9 +507,9 @@ void check_input(void)
 void set_scroll_lock(bool enabled)
 {
     scroll_lock = enabled;
-    set_foreground_colour(BLUE);
+    set_foreground_colour(palette.footer_foreground);
     prints(ROW_FOOTER, 48, scroll_lock ? "unlock" : "lock  ");
-    set_foreground_colour(WHITE);
+    set_foreground_colour(palette.foreground);
 }
 
 void toggle_scroll_lock(void)
