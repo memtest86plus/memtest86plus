@@ -24,7 +24,7 @@ else
   MS_LDS=ldscripts/memtest_shared.lds
 endif
 
-INC_DIRS = -I../../boot -I../../system -I../../system/loongarch -I../../lib -I../../tests -I../../app -Iapp
+INC_DIRS = -I../../boot -I../../system -I ../../system/imc -I../../system/loongarch -I../../lib -I../../tests -I../../app -Iapp
 
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
@@ -54,7 +54,7 @@ SYS_OBJS = system/acpi.o \
            system/loongarch/temperature.o \
            system/loongarch/vmem.o
 
-IMC_SRCS = $(wildcard ../../system/imc/loongson/*.c)
+IMC_SRCS = $(wildcard ../../system/imc/loongarch/*.c)
 IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
@@ -130,8 +130,8 @@ system/loongarch/%.o: ../../system/loongarch/%.c
 	@mkdir -p system/loongarch/
 	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/imc/loongson/%.o: ../../system/imc/loongson/%.c
-	@mkdir -p system/imc/loongson/
+system/imc/loongarch/%.o: ../../system/imc/loongarch/%.c
+	@mkdir -p system/imc/loongarch/
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../../lib/%.c
