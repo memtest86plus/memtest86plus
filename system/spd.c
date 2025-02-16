@@ -5,7 +5,7 @@
 #include "stdint.h"
 #include "string.h"
 
-#include "i2c.h"
+#include "i2c_x86.h"
 #include "spd.h"
 #include "jedec_id.h"
 #include "print.h"

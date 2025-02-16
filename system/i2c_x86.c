@@ -12,7 +12,7 @@
 
 #include "cpuinfo.h"
 #include "hwquirks.h"
-#include "i2c.h"
+#include "i2c_x86.h"
 #include "memctrl.h"
 #include "smbios.h"
 #include "spd.h"

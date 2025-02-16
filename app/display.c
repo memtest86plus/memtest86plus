@@ -8,7 +8,7 @@
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwctrl.h"
-#include "i2c.h"
+#include "i2c_x86.h"
 #include "io.h"
 #include "keyboard.h"
 #include "memctrl.h"
