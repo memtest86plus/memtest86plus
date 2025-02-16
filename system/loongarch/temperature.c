@@ -39,3 +39,8 @@ int get_cpu_temp(void)
 {
     return (int)(__iocsrrd_w(0x428));
 }
+
+int get_ram_temp(uint8_t slot)
+{
+    return 0;
+}
