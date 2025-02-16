@@ -254,14 +254,14 @@ flush:	movw	$KERNEL_DS, %ax
 	# Enable SSE.
 
 	movq	%cr0, %rax
-	andw	$0xfffb, %ax	# clear coprocessor emulation bit
+	andw	$0xfffb, %ax		# clear coprocessor emulation bit
 	orw	$0x0002, %ax		# set coprocessor monitoring bit
 	mov	%rax, %cr0
 	movq	%cr4, %rax
 	orw	$0x0600, %ax		# set OSFXSR and OSXMMEXCPT
 	movq	%rax, %cr4
 
-	movq	$0x1F80, %rax   # Default MXCSR value (exceptions masked, round to nearest)
+	movq	$0x1F80, %rax		# Default MXCSR value (exceptions masked, round to nearest)
 	movq	%rax, (%rsp)
 	ldmxcsr (%rsp)
 
