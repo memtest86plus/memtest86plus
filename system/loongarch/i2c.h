@@ -8,8 +8,8 @@
  *
  */
 
-#ifndef _I2C_H_
-#define _I2C_H_
+#ifndef _I2C_LA64_H_
+#define _I2C_LA64_H_
 
 #define PRER_LO_REG 0x0
 #define PRER_HI_REG 0x1
@@ -66,4 +66,4 @@ typedef struct {
     i2c_slot_param  i2c_mc[4];
 } i2c_param;
 
-#endif // I2C_H
+#endif // I2C_LA64_H

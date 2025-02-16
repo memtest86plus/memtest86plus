@@ -8,7 +8,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2003-2023 Sam Demeulemeester.
+ * Copyright (C) 2003-2025 Sam Demeulemeester.
  */
 
 #define AMD_TEMP_REG_K8     0xE4
@@ -30,12 +30,18 @@ extern float cpu_temp_offset;
 /**
  * Init temperature sensor and compute offsets if needed
  */
-void temperature_init(void);
+void cpu_temp_init(void);
 
 /**
  * Returns the current temperature of the CPU. Returns 0 if
  * the temperature cannot be read.
  */
-int get_cpu_temperature(void);
+int get_cpu_temp(void);
+
+/**
+ * Returns the current temperature of the RAM. Returns 0 if
+ * the temperature cannot be read. Only for DDR5
+ */
+int get_ram_temp(uint8_t slot);
 
 #endif // TEMPERATURE_H

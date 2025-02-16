@@ -260,7 +260,7 @@ static void global_init(void)
 
     error_init();
 
-    temperature_init();
+    cpu_temp_init();
 
     initial_config();
 
