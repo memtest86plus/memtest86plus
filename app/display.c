@@ -8,13 +8,13 @@
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwctrl.h"
+#include "i2c.h"
 #include "io.h"
 #include "keyboard.h"
 #include "memctrl.h"
 #include "serial.h"
 #include "pmem.h"
 #include "smbios.h"
-#include "smbus.h"
 #include "spd.h"
 #include "temperature.h"
 #include "tsc.h"
@@ -406,7 +406,8 @@ void display_temperature(void)
         return;
     }
 
-    int actual_cpu_temp = get_cpu_temperature();
+    // Display CPU Temperature
+    int actual_cpu_temp = get_cpu_temp();
 
     if (actual_cpu_temp == 0) {
         if (max_cpu_temp == 0) {
@@ -420,9 +421,23 @@ void display_temperature(void)
     }
 
     int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
+    display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset);
 
-    clear_screen_region(1, 18, 1, 22);
-    printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8);
+    // Display RAM Temperature (DDR5+ Only) - LA64 unsupported yet
+    if (dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
+
+        for (int i = 0; i < MAX_SPD_SLOT; i++) {
+
+            if (!ram_slot_info[i].isPopulated || !ram_slot_info[i].hasTempSensor)
+                continue;
+
+            int ram_temp = get_ram_temp(i);
+
+            if (ram_temp > 0) {
+                display_ram_temperature(ram_temp, ram_slot_info[i].display_idx)
+            }
+        }
+    }
 }
 
 void display_big_status(bool pass)

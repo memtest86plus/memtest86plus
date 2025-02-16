@@ -23,7 +23,7 @@ float cpu_temp_offset = 0;
 // Public Functions
 //------------------------------------------------------------------------------
 
-void temperature_init(void)
+void cpu_temp_init(void)
 {
     if (!enable_temperature) {
         return;
@@ -35,7 +35,7 @@ void temperature_init(void)
     }
 }
 
-int get_cpu_temperature(void)
+int get_cpu_temp(void)
 {
     return (int)(__iocsrrd_w(0x428));
 }

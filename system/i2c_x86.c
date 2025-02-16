@@ -11,13 +11,11 @@
 #include "macros.h"
 
 #include "cpuinfo.h"
+#include "hwquirks.h"
+#include "i2c.h"
 #include "memctrl.h"
-#include "smbus.h"
 #include "smbios.h"
 #include "spd.h"
-#include "hwquirks.h"
-
-#define MAX_SPD_SLOT    8
 
 int smbbus, smbdev, smbfun;
 unsigned short smbusbase = 0;
@@ -60,8 +58,15 @@ void print_spd_startup_info(void)
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
         parse_spd(&curspd, spdidx);
 
+        ram_slot_info[spdidx].slot_idx = spdidx;
+        ram_slot_info[spdidx].isPopulated = curspd.isValid;
+        ram_slot_info[spdidx].hasTempSensor = false;
+
         if (!curspd.isValid)
             continue;
+
+        ram_slot_info[spdidx].display_idx = spd_line_idx;
+        ram_slot_info[spdidx].hasTempSensor = curspd.hasTempSensor;
 
         if (spd_line_idx == 0) {
             prints(ROW_SPD-2, 0, "Memory SPD Information");
@@ -518,9 +523,9 @@ static bool ali_get_smb(uint8_t address)
     return false;
 }
 
-// ------------------
-// get_spd() function
-// ------------------
+// --------------------
+//  SPD Read functions
+// --------------------
 
 uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 {
@@ -535,6 +540,15 @@ uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
       default:
         return ich5_read_spd_byte(slot_idx, spd_adr);
     }
+}
+
+uint8_t get_spd_hub_register(uint8_t slot_idx, uint8_t spd_hub_adr)
+{
+    if(dmi_memory_device->type == DMI_DDR5) {
+        return ich5_read_spd_byte(slot_idx, spd_hub_adr | 0xFF00);
+    }
+
+    return 0;
 }
 
 /*************************************************************************************
@@ -570,44 +584,55 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
             spd_adr -= 0x100;
         }
     } else if (dmi_memory_device->type == DMI_DDR5) {
-        // Switch page if needed (DDR5)
-        uint8_t adr_page = spd_adr / 128;
+            // For DDR5, choose between reading from the SPD EEPROM (which may require a bank switch)
+            // and reading from the DDR5 SPD Hub Register (where we added a 0xFF00 offset).
 
-        if (adr_page != spd_page || last_adr != smbus_adr) {
+        if (spd_adr >> 8 != 0xFF) {
+            // DDR5 SPD Read (7-bit address translated to  0x80-0xFF)
+            // Switch page if needed (pages are 7-bit/128 bytes wide)
+            uint8_t adr_page = spd_adr / 128;
 
-            // DDR5 SPD Bank switch can be achieved using 2 methods
-            if(((smbus_id >> 16) & 0xFFFF) == PCI_VID_INTEL) {
-                // On Intel, we use the process call method because the SMBUS write command
-                // is sometimes disabled by BIOS to avoid unexpected SPD corruption
-                __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
-                __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
-                __outb(adr_page & 7, SMBHSTDAT0);
-                __outb(0, SMBHSTDAT1);
-                __outb(SMBHSTCNT_PROC_CALL, SMBHSTCNT);
+            if (adr_page != spd_page || last_adr != smbus_adr) {
 
-                 ich5_process();
+                // DDR5 SPD Bank switch can be achieved using 2 methods
+                if(((smbus_id >> 16) & 0xFFFF) == PCI_VID_INTEL) {
+                    // On Intel, we use the process call method because the SMBUS write command
+                    // is sometimes disabled by BIOS to avoid unexpected SPD corruption
+                    __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
+                    __outb(SPD5_HUB_I2C_CONF & 0x7F, SMBHSTCMD);
+                    __outb(adr_page & 7, SMBHSTDAT0);
+                    __outb(0, SMBHSTDAT1);
+                    __outb(SMBHSTCNT_PROC_CALL, SMBHSTCNT);
 
-                // These dummy read are mandatory to terminate a Proc Call
-                __inb(SMBHSTDAT0);
-                __inb(SMBHSTDAT1);
+                     ich5_process();
 
-            } else {
-                // On AMD, we continue to use the standard smbus write command as it seems
-                // more reliable than the process call method. This may be reevaluated later.
-                __outb((smbus_adr << 1) | I2C_WRITE, SMBHSTADD);
-                __outb(SPD5_MR11 & 0x7F, SMBHSTCMD);
-                __outb(adr_page & 7, SMBHSTDAT0);
-                __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+                    // These dummy read are mandatory to terminate a Proc Call
+                    __inb(SMBHSTDAT0);
+                    __inb(SMBHSTDAT1);
 
-                ich5_process();
-            }
+                } else {
+                    // On AMD, we continue to use the standard smbus write command as it seems
+                    // more reliable than the process call method. This may be reevaluated later.
+                    __outb((smbus_adr << 1) | I2C_WRITE, SMBHSTADD);
+                    __outb(SPD5_HUB_I2C_CONF & 0x7F, SMBHSTCMD);
+                    __outb(adr_page & 7, SMBHSTDAT0);
+                    __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
 
-            spd_page = adr_page;
-            last_adr = smbus_adr;
-         }
+                    ich5_process();
+                }
 
-          spd_adr -= adr_page * 128;
-          spd_adr |= 0x80;
+                spd_page = adr_page;
+                last_adr = smbus_adr;
+             }
+
+             // Get final I2C byte address on the current page (0x00-0x7F -> 0x80-0xFF).
+             spd_adr -= adr_page * 128;
+             spd_adr |= 0x80;
+
+        } else {
+            // SPD5 Hub Register Read (7-bit address at 0x00 - 0x7F)
+            spd_adr &= 0x7F;
+        }
     }
 
     __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);

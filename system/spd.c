@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 
 #include "stdbool.h"
 #include "stdint.h"
 #include "string.h"
 
-#include "smbus.h"
+#include "i2c.h"
 #include "spd.h"
 #include "jedec_id.h"
 #include "print.h"
@@ -20,6 +20,7 @@
 #define ROUNDING_FACTOR         0.9f
 
 ram_info_t ram = { 0, 0, 0, 0, 0, 0, "N/A"};
+ram_slot_info_t ram_slot_info[MAX_SPD_SLOT];
 
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
@@ -296,6 +297,9 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 515));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 516));
 
+    // All DDR5s should have temperature sensor. Add a check if proved wrong.
+    spdi->hasTempSensor = true;
+
     spdi->isValid = true;
 }
 
@@ -414,6 +418,8 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
 
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 323));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 324));
+
+    spdi->hasTempSensor = false;
 
     spdi->isValid = true;
 }
@@ -572,6 +578,8 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 120));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 121));
 
+    spdi->hasTempSensor = false;
+
     spdi->isValid = true;
 }
 
@@ -709,6 +717,8 @@ static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
+    spdi->hasTempSensor = false;
+
     spdi->isValid = true;
 }
 
@@ -798,6 +808,8 @@ static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
+    spdi->hasTempSensor = false;
+
     spdi->isValid = true;
 }
 
@@ -871,6 +883,8 @@ static void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
 
+    spdi->hasTempSensor = false;
+
     spdi->isValid = true;
 }
 
@@ -936,6 +950,8 @@ static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
 
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 93));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 94));
+
+    spdi->hasTempSensor = false;
 
     spdi->isValid = true;
 }
