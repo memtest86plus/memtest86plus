@@ -273,11 +273,11 @@ flush:	movw	$KERNEL_DS, %ax
 	testl	$0x18000000, %ecx	# Check bits 27 (OSXSAVE) and 28 (AVX)
 	jz	no_avx
 	movq	%cr4, %rax
-	orq	$(1 << 18), %rax	# Set bit 18 (OSXSAVE)
+	orl	$(1 << 18), %eax	# Set bit 18 (OSXSAVE)
 	movq	%rax, %cr4
 	xorq	%rcx, %rcx
 	xgetbv
-	orq	$0x7, %rax		# Enable x87 (bit 0), XMM (bit 1) and YMM (bit 2)
+	orb	$0x07, %al		# Enable x87 (bit 0), XMM (bit 1) and YMM (bit 2)
 	xsetbv
 
 no_avx:
@@ -445,6 +445,7 @@ int_handler:
 	movdqa	%xmm14,	0xE0(%rsp)
 	movdqa	%xmm15,	0xF0(%rsp)
 
+	pushq	%r12
 	pushq	%r11
 	pushq	%r10
 	pushq	%r9
@@ -476,6 +477,7 @@ int_handler:
 	popq	%r9
 	popq	%r10
 	popq	%r11
+	popq	%r12
 
 	movdqa  0xF0(%rsp),	%xmm15
 	movdqa  0xE0(%rsp),	%xmm14

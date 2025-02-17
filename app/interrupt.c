@@ -86,7 +86,7 @@ static const char codes[][13] = {
 #ifdef __x86_64__
 
 typedef uint64_t    reg_t;
-typedef float __m128 __attribute__ ((__vector_size__ (16)));
+typedef float __m128 __attribute__((__vector_size__ (16), __aligned__ (16)));
 
 struct trap_regs {
     reg_t   ds;
@@ -102,7 +102,8 @@ struct trap_regs {
     reg_t   r9;
     reg_t   r10;
     reg_t   r11;
-    reg_t   xmm[16*2];
+    reg_t   r12;
+    __m128  xmm[16];
     reg_t   bp;
     reg_t   vect;
     reg_t   code;
