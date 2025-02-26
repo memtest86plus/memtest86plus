@@ -83,7 +83,7 @@ APP_OBJS = app/badram.o \
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
-all: memtest.efi
+all: mt86plus
 
 check:
 	@if [ -z ${DEBUG} ]; then\
@@ -181,15 +181,15 @@ memtest.debug: memtest_shared
 	strip -R .eh_frame memtest_shared
 	strip -R .comment memtest_shared
 
-memtest.efi: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
+mt86plus: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_shared.bin -o memtest.elf
-	$(OBJCOPY) -O binary memtest.elf memtest.efi
+	$(OBJCOPY) -O binary memtest.elf mt86plus
 	rm -f memtest.elf
 
-esp.img: memtest.efi
+esp.img: mt86plus
 	@mkdir -p iso/EFI/BOOT
-	cp memtest.efi iso/EFI/BOOT/BOOTLOONGARCH64.EFI
+	cp mt86plus iso/EFI/BOOT/BOOTLOONGARCH64.EFI
 	@rm -f esp.img
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
@@ -202,6 +202,6 @@ memtest.iso: esp.img
 iso: memtest.iso
 
 clean:
-	rm -rf boot system lib tests app *.img *.iso memtest* iso grub-*
+	rm -rf boot system lib tests app *.img *.iso memtest* mt86plus iso grub-*
 
 # grub-memtest.iso will be added in future. TODO
