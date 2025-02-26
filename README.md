@@ -1,7 +1,7 @@
 # Memtest86+
 
-Memtest86+ is a free, open-source, stand-alone memory tester for x86 and
-x86-64 architecture computers. It provides a much more thorough memory
+Memtest86+ is a free, open-source, stand-alone memory tester for x86, x86-64
+and LoongArch64 architecture computers. It provides a much more thorough memory
 check than that provided by BIOS memory tests.
 
 It is also able to access almost all the computer's memory, not being
@@ -10,8 +10,9 @@ on any underlying software like UEFI libraries.
 
 Memtest86+ can be loaded and run either directly by a PC BIOS (legacy or UEFI)
 or via an intermediate bootloader that supports the Linux 16-bit, 32-bit,
-64-bit, or EFI handover boot protocol. It should work on any Pentium class or
-later 32-bit or 64-bit CPU.
+64-bit, or EFI handover boot protocol. It should work on most x86, x86-64 CPU
+ (Pentium class or later 32-bit or 64-bit) and most LoongArch64 CPU (Loongson 3
+and Loongson 2 family).
 
 Binary releases (both stable and nightly dev builds) are available on
 [memtest.org](https://memtest.org).
@@ -60,25 +61,59 @@ restrictions for use, private or commercial. See the LICENSE file for details.
 Build is only tested on a Linux system, but should be possible on any system
 using the GNU toolchain and the ELF file format. The tools required are:
 
-  * GCC
+  * GCC or corss-GCC
   * binutils
   * make
   * dosfstools and mtools (optional)
   * xorrisofs (optional)
 
-To build a 32-bit image, change directory into the `build32` directory and
-type `make`. The result is a `mt86plus` binary image file which can be
-booted directly by a 32-bit UEFI BIOS (if named mt86plus.efi), by a legacy
-BIOS (in floppy mode) or by an intermediate bootloader using the Linux 16-bit
-boot protocol. The image can be also booted by an intermediate bootloader
-using the Linux 32-bit or 32-bit EFI handover boot protocols.
+### To build a x86 32-bit image
 
-To build a 64-bit image, change directory into the `build64` directory and
-type `make`. The result is a `mt86plus` binary image file which can be
-booted directly by a 64-bit UEFI BIOS (if named mt86plus.efi), by a legacy
-BIOS (in floppy mode) or by an intermediate bootloader using the Linux 16-bit
-boot protocol. The image can be also booted by an intermediate bootloader
-using the Linux 32-bit, 64-bit, or 64-bit EFI handover boot protocols.
+Change directory into the `build/i586` directoryand type `make`. The result
+is a `mt86plus` binary image file which can be booted directly by a 32-bit
+UEFI BIOS (if named mt86plus.efi), by a legacy BIOS (in floppy mode) or by
+an intermediate bootloader using the Linux 16-bit boot protocol. The image
+can be also booted by an intermediate bootloader using the Linux 32-bit or
+32-bit EFI handover boot protocols.
+
+### To build a x86-64 64-bit image
+
+Change directory into the `build/x86_64` directory and type `make`. The result
+is a `mt86plus` binary image file which can be booted directly by a 64-bit
+UEFI BIOS (if named mt86plus.efi), by a legacy BIOS (in floppy mode) or by
+an intermediate bootloader using the Linux 16-bit boot protocol. The image
+can be also booted by an intermediate bootloader using the Linux 32-bit,
+64-bit, or 64-bit EFI handover boot protocols.
+
+### To build a LoongArch64 64-bit image
+
+#### x86-64 Linux environment
+
+  * Download the [cross-compiler](https://github.com/loongson/build-tools/releases).
+    ```
+    sudo mkdir /opt/LoongArch_Toolchains -p; cd /opt/LoongArch_Toolchains
+    ```
+    Use `wget` to download the latest version or other versions cross-compiler.
+  * Configure corss-GCC.
+    ```
+    sudo tar -xvf x86_64-cross-tools-xxxxxx.tar.gz
+    export PATH=/opt/LoongArch_Toolchains/cross-tools/bin/:$PATH
+    ```
+  * Return to the `memtest86plus` directory
+  * Change directory into the `build/loongarch64` directory and make.
+    ```
+    cd build/loongarch64
+    make CC=loongarch64-unknown-linux-gnu-gcc LD=loongarch64-unknown-linux-gnu-ld OBJCOPY=loongarch64-unknown-linux-gnu-objcopy
+    ```
+
+#### LoongArch64 Linux environment
+
+Change directory into the `build/loongarch64` directory type `make`.
+
+The result is a `mt86plus` binary image file which can be booted directly
+by a 64-bit UEFI BIOS (if named mt86plus.efi), and the image can also booted
+by an intermediate bootloader using the 64-bit EFI handover boot protocols.
+* * *
 
 In either case, to build an ISO image that can be used to create a bootable
 CD, DVD, or USB Flash drive, type `make iso`, The result is a `memtest.iso`
@@ -103,13 +138,14 @@ at least 640x400 pixels; if larger, the display will be centred. If
 the system was booted in UEFI mode, graphics mode must be used.
 
 For test purposes, there is also an option to build an ISO image that uses
-GRUB as an intermediate bootloader. See the `Makefile` in the `build32` or
-`build64` directory for details. The ISO image is both legacy and UEFI
-bootable, so you need GRUB modules for both legacy and EFI boot installed
-on your build system (e.g. on Debian, the required GRUB modules are located
-in packages `grub-pc-bin`, `grub-efi-ia32-bin` and `grub-efi-amd64-bin`).
-You may need to adjust some path and file names in the Makefile to match
-the naming on your system.
+GRUB as an intermediate bootloader. See the individual `Makefile` under the
+`build` directory for details. The ISO image is both legacy and UEFI bootable,
+so you need GRUB modules for both legacy and EFI boot installed on your
+build system (e.g. on Debian, the required GRUB modules are located in
+packages `grub-pc-bin`, `grub-efi-ia32-bin`, `grub-efi-amd64-bin` and
+`grub-efi-loong64-bin`). You may need to adjust some path and file names
+in the Makefile to match the naming on your system.<br>
+**P.S.** LoongArch64 GRUB ISO can only be created on LoongArch64 Linux ENV.
 
 The GRUB configuration files contained in the `grub` directory are there for
 use on the test ISO, but also serve as an example of how to boot Memtest86+
@@ -181,22 +217,21 @@ recognised:
 
 ## Keyboard Selection
 
-Memtest86+ supports both the legacy keyboard interface (using I/O ports 0x60
-and 0x64) and USB keyboards (using its own USB device drivers). One or the
-other or both can be selected via the boot command line, If not specified on
-the command line, the default is to use both if the system was booted in UEFI
-mode, otherwise to only use the legacy interface.
+Memtest86+ supports both the legacy keyboard interface (using I/O or MMIO
+ports 0x60 and 0x64) and USB keyboards (using its own USB device drivers).
+One or the other or both can be selected via the boot command line, If not
+specified on the command line, the default is to use both if the system
+was booted in UEFI mode, otherwise to only use the legacy interface.
 
-Older BIOSs usually support USB legacy keyboard emulation, which makes USB
-keyboards act like legacy keyboards connected to ports 0x60 and 0x64. This
-can often be enabled or disabled in the BIOS setup menus. If Memtest86+'s
+Older x86 or x86-64 BIOSs usually support USB legacy keyboard emulation, which
+makes USB keyboards act like legacy keyboards connected to ports 0x60 and 0x64.
+This can often be enabled or disabled in the BIOS setup menus. If Memtest86+'s
 USB device drivers are enabled, they will override this and access any USB
-keyboards directly. The downside of that is that the USB controllers and
-device drivers require some memory to be reserved for their private use,
-which means that memory can't then be covered by the memory tests. So to
-maximise test coverage, if it is supported, enable USB legacy keyboard
-emulation and, if booting in UEFI mode, add `keyboard=legacy` on the boot
-command line.
+keyboards directly. The downside of that is that the USB controllers and device
+drivers require some memory to be reserved for their private use, which means
+that memory can't then be covered by the memory tests. So to maximise test
+coverage, if it is supported, enable USB legacy keyboard emulation and, if
+booting in UEFI mode, add `keyboard=legacy` on the boot command line.
 
 **NOTE**: Some UEFI BIOSs only support USB legacy keyboard emulation when
 you enable the Compatibility System Module (CSM) in the BIOS setup. Others
