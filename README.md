@@ -215,6 +215,8 @@ recognised:
       * mmio16 = 16-bit MMIO
       * mmio32 = 32-bit MMIO
     * and *y* is the MMIO address in hex. with `0x` prefix (eg: 0xFEDC9000)
+  * singlepass
+    * performs one pass of selected tests then reboots rather than testing endlessly
 
 ## Keyboard Selection
 
