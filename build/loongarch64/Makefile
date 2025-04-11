@@ -61,6 +61,7 @@ IMC_SRCS = $(wildcard ../../system/imc/loongarch/*.c)
 IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
+           lib/log.o \
            lib/print.o \
            lib/read.o \
            lib/string.o \

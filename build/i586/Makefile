@@ -64,6 +64,7 @@ IMC_SRCS = $(wildcard ../../system/imc/x86/*.c)
 IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
+           lib/log.o \
            lib/div64.o \
            lib/print.o \
            lib/read.o \

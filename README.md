@@ -226,6 +226,11 @@ recognised:
       * mmio16 = 16-bit MMIO
       * mmio32 = 32-bit MMIO
     * and *y* is the MMIO address in hex. with `0x` prefix (eg: 0xFEDC9000)
+  * log=ttyS*x*,*y*
+  * log=*x*,*y*
+    * log status/progress to serial/tty/UART console.
+    * takes the same parameters as console.
+    * mutually exclusive with console.
   * newline
     * modifies the console to print a newline after every change to the frame buffer
       * useful in logging over serial where an escape or newline is needed

@@ -22,6 +22,8 @@
 #include "display.h"
 #include "test.h"
 
+#include "log.h"
+
 #include "tests.h"
 #include "serial.h"
 #include "memctrl.h"
@@ -289,18 +291,26 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
             display_scrolled_message(0, " %2i   %4i   %2i   %09x%03x (%kB)",
                                      type != CECC_ERROR ? smp_my_cpu_num() : ecc_status.core,
                                      pass_num, test_num, page, offset, page << 2);
+            tty_log("ERROR: pCPU:%i Pass:%i Test:%i Address:%x%x (%kB) ",
+                    type != CECC_ERROR ? smp_my_cpu_num() : ecc_status.core,
+                    pass_num, test_num, page, offset, page << 2);
 
             if (type == PARITY_ERROR) {
                 display_scrolled_message(41, "%s", "Parity error detected near this address");
+                tty_log("%s", "Parity error detected near this address");
             } else if (type == CECC_ERROR) {
                 display_scrolled_message(41, "%s%2i", "Correctable ECC Error - CH#", ecc_status.channel);
+                tty_log("%s%i", "Correctable ECC Error - CH#", ecc_status.channel);
             } else {
 #if TESTWORD_WIDTH > 32
                 display_scrolled_message(41, "%016x  %016x", good, bad);
+                tty_log("good:%x  bad:%x", good, bad);
 #else
                 display_scrolled_message(41, "%08x  %08x  %08x  %i", good, bad, xor, error_count);
+                tty_log("good:%x bad:%x xor:%x count:%i", good, bad, xor, error_count);
 #endif
             }
+            tty_log("\r\n");
 
             set_foreground_colour(WHITE);
 

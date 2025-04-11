@@ -111,6 +111,7 @@ bool            dark_mode          = false;
 power_save_t    power_save         = POWER_SAVE_HIGH;
 
 bool            enable_tty         = false;
+bool            enable_tty_log     = false;
 uintptr_t       tty_address        = 0x3F8;             // Legacy IO or MMIO Address accepted
 int             tty_baud_rate      = 115200;
 int             tty_update_period  = 2;                 // Update TTY every 2 seconds (default)
@@ -128,8 +129,6 @@ bool            err_banner_redraw  = false;             // Redraw banner on new 
 
 static void parse_serial_params(const char *params)
 {
-    enable_tty = true;
-
     // No parameters passed (only "console"), use default
      if (params == NULL) {
         return;
@@ -297,6 +296,16 @@ static void parse_option(const char *option, const char *params)
     if (params == NULL) params = "";
 
     if (strncmp(option, "console", 8) == 0) {
+        enable_tty = true;
+        if (enable_tty_log) {
+            enable_tty_log = false;
+        }
+        parse_serial_params(params);
+    } else if (strncmp(option, "log", 4) == 0) {
+        enable_tty_log = true;
+        if (enable_tty) {
+            enable_tty = false;
+        }
         parse_serial_params(params);
     } else if (strncmp(option, "newline", 7) == 0) {
         tty_new_line = true;

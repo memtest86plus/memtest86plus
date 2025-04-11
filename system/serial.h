@@ -193,4 +193,6 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col);
 
 char tty_get_char(int max_wait_frames);
 
+void tty_echo_print(const char *p);
+
 #endif /* _SERIAL_REG_H */

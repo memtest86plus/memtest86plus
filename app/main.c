@@ -41,6 +41,7 @@
 #include "timers.h"
 #include "vmem.h"
 
+#include "log.h"
 #include "unistd.h"
 
 #include "badram.h"
@@ -48,6 +49,7 @@
 #include "display.h"
 #include "error.h"
 #include "test.h"
+#include "version.h"
 
 #include "tests.h"
 
@@ -681,6 +683,16 @@ void main(void)
         cache_on();
         if (my_cpu == 0) {
             global_init();
+            tty_log("\r\n");
+            tty_log("Memtest86+ v" MT_VERSION "." GIT_HASH);
+#if defined (__x86_64__)
+            tty_log(".x64");
+#elif defined (__i386__)
+            tty_log(".x32");
+#elif defined (__loongarch_lp64)
+            tty_log(".la64");
+#endif
+            tty_log("\r\n");
             init_state = 1;
             if (enable_trace && num_enabled_cpus > 1) {
                 set_scroll_lock(false);
@@ -749,6 +761,7 @@ void main(void)
                     ticks_per_test[pass_num][test_num] = 0;
                 } else if (test_list[test_num].enabled) {
                     display_start_test();
+                    tty_log("start pass %i test %i\r\n", pass_num, test_num);
                 }
                 bail = false;
             }
@@ -836,8 +849,10 @@ void main(void)
             display_pass_count(pass_num);
             if (error_count == 0) {
                 display_status("Pass   ");
+                tty_log("Test Result: PASS\r\n");
                 display_big_status(true);
             } else {
+                tty_log("Test Result: FAIL (%u errors)\r\n", error_count);
                 display_big_status(false);
             }
         }

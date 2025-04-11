@@ -110,7 +110,7 @@ static void tty_goto(int y, int x)
 
 void tty_init(void)
 {
-    if (!enable_tty) {
+    if (!(enable_tty || enable_tty_log)) {
         return;
     }
 
@@ -181,8 +181,10 @@ void tty_init(void)
         serial_write_reg(&console_serial, UART_FCR, (0xFF) & (UART_FCR_ENA | UART_FCR_THR));
     }
 
-    tty_clear_screen();
-    tty_disable_cursor();
+    if (enable_tty) {
+        tty_clear_screen();
+        tty_disable_cursor();
+    }
 }
 
 void tty_send_region(int start_row, int start_col, int end_row, int end_col)
@@ -291,4 +293,8 @@ char tty_get_char(int max_wait_frames)
     } while (wait_time > 0);
 
     return '\0';
+}
+
+void tty_echo_print(const char *p) {
+    serial_echo_print(p);
 }

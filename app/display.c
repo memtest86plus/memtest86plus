@@ -22,6 +22,7 @@
 #include "tsc.h"
 
 #include "barrier.h"
+#include "log.h"
 #include "spinlock.h"
 
 #include "config.h"
@@ -603,25 +604,25 @@ void do_tick(int my_cpu)
 
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
-    int pct = 0;
+    int test_pct = 0;
     if (ticks_per_test[pass_type][test_num] > 0) {
-        pct = 100 * test_ticks / ticks_per_test[pass_type][test_num];
-        if (pct > 100) {
-            pct = 100;
+        test_pct = 100 * test_ticks / ticks_per_test[pass_type][test_num];
+        if (test_pct > 100) {
+            test_pct = 100;
         }
     }
-    display_test_percentage(pct);
-    display_test_bar((BAR_LENGTH * pct) / 100);
+    display_test_percentage(test_pct);
+    display_test_bar((BAR_LENGTH * test_pct) / 100);
 
-    pct = 0;
+    int pass_pct = 0;
     if (ticks_per_pass[pass_type] > 0) {
-        pct = 100 * pass_ticks / ticks_per_pass[pass_type];
-        if (pct > 100) {
-            pct = 100;
+        pass_pct = 100 * pass_ticks / ticks_per_pass[pass_type];
+        if (pass_pct > 100) {
+            pass_pct = 100;
         }
     }
-    display_pass_percentage(pct);
-    display_pass_bar((BAR_LENGTH * pct) / 100);
+    display_pass_percentage(pass_pct);
+    display_pass_bar((BAR_LENGTH * pass_pct) / 100);
 
     bool update_spinner = true;
     if (clks_per_msec > 0) {
@@ -677,6 +678,12 @@ void do_tick(int my_cpu)
 
             if (act_sec % tty_update_period == 0) {
                 tty_partial_redraw();
+            }
+        }
+
+        if (enable_tty_log) {
+            if (act_sec % tty_update_period == 0) {
+                tty_log("pass %i (%i%%) test %i (%i%%)\r\n", pass_num, pass_pct, test_num, test_pct);
             }
         }
 
