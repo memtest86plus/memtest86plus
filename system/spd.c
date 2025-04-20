@@ -202,14 +202,14 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
     if (spdi->XMP == 3) {
         // XMP 3.0 (enumerate all profiles to find the fastest)
         tCK = 0;
-        for (int offset = 0; offset < 3*64; offset += 64) {
+        for (int offset = 0; offset < 2*64; offset += 64) {
             tCKtmp = get_spd(slot_idx, 710 + offset) << 8 |
                      get_spd(slot_idx, 709 + offset);
 
-            if (tCKtmp != 0 && (tCK == 0 || tCKtmp < tCK)) {
-                xmp_offset = offset;
-                tCK = tCKtmp;
-            }
+            if (tCKtmp == 0 || tCKtmp < 100 || (tCK != 0 && tCKtmp >= tCK)) continue;
+
+            xmp_offset = offset;
+            tCK = tCKtmp;
         }
     } else {
         // JEDEC
