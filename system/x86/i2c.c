@@ -446,7 +446,7 @@ static bool fch_zen_get_smb(void)
     pm_reg |= __inb(AMD_DATA_IO_PORT);
 
     // Special case for AMD Family 19h & Extended Model > 4 (get smb address in memory)
-    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_RPL || imc.family >= IMC_K1A_STP) && pm_reg == 0xFFFF) {
+    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_PHX || imc.family == IMC_K19_RPL || imc.family >= IMC_K1A_STP) && pm_reg == 0xFFFF) {
         smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
         return true;
     }
