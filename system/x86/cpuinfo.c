@@ -97,6 +97,13 @@ static void determine_cache_size()
           break;
         }
         /* fall through */
+      case 'U':
+        // UMC UMC UMC
+        if (cpuid_info.vendor_id.str[0] == 'U') {
+          l1_cache = 8;
+          break;
+        }
+        /* fall through */
       case 'G':
         if (cpuid_info.vendor_id.str[9] == 'N') {
           // National Semiconductor
@@ -899,7 +906,17 @@ static void determine_cpu_model(void)
             }
         }
         break;
-
+      case 'U':
+        // UMC UMC UMC
+        switch (cpuid_info.version.family) {
+          case 4:
+            l1_cache = 8;
+            cpu_model = "UMC Green CPU U5S 486";
+            break;
+          default:
+            break;
+        }
+        break;
       case 'V':
         // Vortex86 SoC
         switch (cpuid_info.version.family) {
@@ -933,6 +950,9 @@ static void determine_cpu_model(void)
       default:
         // Unknown processor - make a guess at the family.
         switch (cpuid_info.version.family) {
+          case 4:
+            cpu_model = "486-class CPU (unknown)";
+            break;
           case 5:
             cpu_model = "586-class CPU (unknown)";
             break;

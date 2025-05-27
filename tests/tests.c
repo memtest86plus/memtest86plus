@@ -64,7 +64,7 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     { true,  PAR,    1,   81,    0, "[Block move]                           "},
     { true,  PAR,    1,   48,    0, "[Random number sequence]               "},
     { true,  PAR,    1,    6,    0, "[Modulo 20, random pattern]            "},
-    { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
+    { false, ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
