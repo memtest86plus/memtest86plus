@@ -32,6 +32,7 @@ SECTIONS {
 		*(.got)
 		_edata = . ;
 	}
+	.rela.dyn     : { *(.rela.dyn    .rela.dyn.*) }
 
 	. = ALIGN(4);
 	.data : {
