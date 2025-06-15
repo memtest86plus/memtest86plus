@@ -1,8 +1,8 @@
-AS = as -64
-CC = gcc
-OBJCOPY = objcopy
+AS ?= as -64
+CC ?= cc
+OBJCOPY ?= objcopy
 
-GIT = git
+GIT ?= git
 
 ifeq ($(GIT),none)
   GIT_AVAILABLE = false
