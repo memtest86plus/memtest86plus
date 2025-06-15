@@ -25,6 +25,11 @@ else
   MS_LDS=ldscripts/memtest_shared.lds
 endif
 
+CCVER := $(shell $(CC) --version)
+ifneq (,$(findstring clang,$(CCVER)))
+  ASMEXTRAFLAGS=-mllvm -asm-macro-max-nesting-depth=64
+endif
+
 INC_DIRS = -I../../boot -I../../system -I../../system/imc -I../../system/x86 -I../../lib -I../../tests -I../../app -Iapp
 
 SYS_OBJS = system/acpi.o \
@@ -105,7 +110,7 @@ boot/x86/header.o : | ../../boot/sbat.csv
 
 boot/x86/startup.o: ../../boot/x86/startup64.S ../../boot/boot.h
 	@mkdir -p boot/x86
-	$(CC) -m64 -x assembler-with-cpp -c -I../../boot -o $@ $<
+	$(CC) -m64 -x assembler-with-cpp -c -I../../boot $(ASMEXTRAFLAGS) -o $@ $<
 
 boot/%.o: ../../boot/%.S ../../boot/boot.h app/build_version.h
 	@mkdir -p boot
