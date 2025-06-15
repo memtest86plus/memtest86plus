@@ -53,7 +53,7 @@ void *memmove(void *dest, const void *src, size_t n)
     return dest;
 }
 
-#if (defined(DEBUG_GDB) || defined(__loongarch_lp64))
+#if (defined(DEBUG_GDB) || defined(__loongarch_lp64) || defined(__llvm__))
 
 void *memcpy (void *dest, const void *src, size_t len)
 {
