@@ -132,7 +132,9 @@ typedef enum {
     USB_EXTRA_RESET     = 1 << 0,
     USB_IGNORE_EHCI     = 1 << 1,
     USB_2_STEP_INIT     = 1 << 2,
-    USB_DEBUG           = 1 << 3
+    USB_DEBUG           = 1 << 3,
+    USB_DEBUG_HUB       = 1 << 4,
+    USB_DEBUG_KBD       = 1 << 5
 } usb_init_options_t;
 
 /**

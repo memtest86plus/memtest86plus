@@ -269,6 +269,11 @@ static void parse_option(const char *option, const char *params)
         enable_trace = true;
     } else if (strncmp(option, "usbdebug", 9) == 0) {
         usb_init_options |= USB_DEBUG;
+        if (strncmp(params, "hub", 4) == 0) {
+            usb_init_options |= USB_DEBUG_HUB;
+        } else if (strncmp(params, "kbd", 4) == 0) {
+            usb_init_options |= USB_DEBUG_KBD;
+	}
     } else if (strncmp(option, "usbinit", 8) == 0) {
         if (strncmp(params, "1", 2) == 0) {
             usb_init_options |= USB_2_STEP_INIT;

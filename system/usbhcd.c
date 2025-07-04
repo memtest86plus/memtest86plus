@@ -117,10 +117,11 @@ static usb_endpoint_desc_t *find_hub_endpoint_descriptor(const uint8_t *desc_buf
 
         if (header->type == USB_DESC_ENDPOINT && header->length == sizeof(usb_endpoint_desc_t)) {
             usb_endpoint_desc_t *endpoint = (usb_endpoint_desc_t *)curr_ptr;
-#if 0
-            print_usb_info("endpoint addr 0x%02x attr 0x%02x",
-                           (uintptr_t)endpoint->address, (uintptr_t)endpoint->attributes);
-#endif
+            if (usb_init_options & USB_DEBUG_HUB) {
+                print_usb_info("endpoint addr 0x%02x attr 0x%02x",
+                               (uintptr_t)endpoint->address, (uintptr_t)endpoint->attributes);
+                sleep(1);
+            }
             if ((endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
                 return endpoint;
             }
@@ -223,10 +224,11 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
 
         if (header->type == USB_DESC_INTERFACE && header->length == sizeof(usb_interface_desc_t)) {
             const usb_interface_desc_t *ifc = (const usb_interface_desc_t *)curr_ptr;
-#if 0
-            print_usb_info("interface %i class %i subclass %i protocol %i",
-                           ifc->interface_num, ifc->class, ifc->subclass, ifc->protocol);
-#endif
+            if (usb_init_options & USB_DEBUG_KBD) {
+                print_usb_info("interface %i class %i subclass %i protocol %i",
+                               ifc->interface_num, ifc->class, ifc->subclass, ifc->protocol);
+                sleep(1);
+            }
             if (ifc->class == 3 && ifc->subclass == 1 && ifc->protocol == 1) {
                 kbd = &keyboards[*num_keyboards];
                 kbd->interface_num = ifc->interface_num;
@@ -235,10 +237,11 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
             }
         } else if (header->type == USB_DESC_ENDPOINT && header->length == sizeof(usb_endpoint_desc_t)) {
             usb_endpoint_desc_t *endpoint = (usb_endpoint_desc_t *)curr_ptr;
-#if 0
-            print_usb_info("endpoint addr 0x%02x attr 0x%02x",
-                           (uintptr_t)endpoint->address, (uintptr_t)endpoint->attributes);
-#endif
+            if (usb_init_options & USB_DEBUG_KBD) {
+                print_usb_info("endpoint addr 0x%02x attr 0x%02x",
+                               (uintptr_t)endpoint->address, (uintptr_t)endpoint->attributes);
+                sleep(1);
+            }
             if (kbd && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
