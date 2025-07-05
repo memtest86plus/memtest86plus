@@ -350,7 +350,7 @@ static void determine_imc(void)
                 imc.family = IMC_K19_RBT; // Zen3+ (Family 19h - Rembrandt FP7 & AM5 FTV)
                 break;
               case 5:
-                imc.family = IMC_K19_CZN; // Zen3 APU (Family 19h - Cezanne FP6)
+                imc.family = IMC_K19_CZN; // Zen3 APU (Family 19h - Cezanne FP6/AM4)
                 break;
               case 6:
                 imc.family = IMC_K19_RPL; // Zen4 (Family 19h - Raphael AM5)
