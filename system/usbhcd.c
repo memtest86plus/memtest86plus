@@ -92,7 +92,7 @@ static int print_col = 0;
 // Public Variables
 //------------------------------------------------------------------------------
 
-usb_init_options_t usb_init_options = USB_DEFAULT_INIT;
+usb_init_options_t usb_init_options = USB_DEFAULT_INIT|USB_DEBUG;
 
 //------------------------------------------------------------------------------
 // Macro Functions
@@ -808,6 +808,19 @@ bool process_usb_keyboard_report(const usb_hcd_t *hcd, const hid_kbd_rpt_t *repo
 {
     hcd_workspace_t *ws = hcd->ws;
 
+    if (usb_init_options & USB_DEBUG) {
+	print_usb_info("KBD RPT: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x",
+                       report->modifiers,
+                       report->reserved,
+                       report->key_code[0],
+                       report->key_code[1],
+                       report->key_code[2],
+                       report->key_code[3],
+                       report->key_code[4],
+                       report->key_code[5]);
+        return true;
+    }
+
     int error_count = 0;
     for (int i = 0; i < 6; i++) {
         uint8_t key_code = report->key_code[i];
@@ -879,8 +892,8 @@ void find_usb_keyboards(bool pause_if_none)
     }
 
     if (usb_init_options & USB_DEBUG) {
-        print_usb_info("Press any key to continue...");
-        while (get_key() == 0) {}
+        print_usb_info("Start pressing keys...");
+        while (true) get_key();
     } else if (pause_if_none && num_hcd == 0) {
         for (int i = PAUSE_IF_NONE_TIME; i > 0; i--) {
             print_usb_info("No USB keyboards found. Continuing in %i second%c ", i, i == 1 ? ' ' : 's');
