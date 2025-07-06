@@ -35,6 +35,7 @@ void memctrl_init(void)
     switch(imc.family) {
       case IMC_K17:
       case IMC_K19_VRM:
+      case IMC_K19_CZN:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
       case IMC_K19_PHX:
