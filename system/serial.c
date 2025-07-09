@@ -236,6 +236,10 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
             serial_echo_print(p);
         }
     }
+
+    if (tty_new_line) {
+        serial_echo_print("\n");
+    }
 }
 
 char tty_get_key(void)
