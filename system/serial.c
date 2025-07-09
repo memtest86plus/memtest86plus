@@ -161,11 +161,9 @@ void tty_init(void)
 
 void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 {
-    if (tty_new_line) {
-        tty_send_region_actual(0,0,24,79);
+    tty_send_region_actual(start_row, start_col, end_row, end_col);
+    if (tty_new_line) {  
         serial_echo_print("\n");
-    } else {
-        tty_send_region_actual(start_row, start_col, end_row, end_col);
     }
 }
 
