@@ -215,6 +215,10 @@ recognised:
       * mmio16 = 16-bit MMIO
       * mmio32 = 32-bit MMIO
     * and *y* is the MMIO address in hex. with `0x` prefix (eg: 0xFEDC9000)
+  * newline
+    * modifies the console to print a newline after every change to the frame buffer
+      * useful in logging over serial where an escape or newline is needed
+    * only used when using console/serial output
 
 ## Keyboard Selection
 
