@@ -179,6 +179,8 @@ void tty_print(int y, int x, const char *p);
 
 void tty_send_region(int start_row, int start_col, int end_row, int end_col);
 
+void tty_send_region_actual(int start_row, int start_col, int end_row, int end_col);
+
 char tty_get_key(void);
 
 #endif /* _SERIAL_REG_H */
