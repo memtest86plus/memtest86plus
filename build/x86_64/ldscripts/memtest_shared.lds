@@ -20,23 +20,25 @@ SECTIONS {
 	.hash       : { *(.hash) }
 	.gnu.hash   : { *(.gnu.hash) }
 	.dynamic    : { *(.dynamic) }
+	.shstrtab   : { *(.shstrtab) }
 
 	.rela.text    : { *(.rela.text   .rela.text.*) }
 	.rela.rodata  : { *(.rela.rodata .rela.rodata.*) }
 	.rela.data    : { *(.rela.data   .rela.data.*) }
-	.rela.got     : { *(.rela.got    .rela.got.*) }
 	.rela.plt     : { *(.rela.plt    .rela.plt.*) }
+	.rela.got     : { *(.rela.got    .rela.got.*) }
+	.got : {
+		*(.got.plt)
+		*(.got)
+		_edata = . ;
+	}
+	.rela.dyn     : { *(.rela.dyn    .rela.dyn.*) }
 
 	. = ALIGN(4);
 	.data : {
 		 _data = .;
 		*(.data)
 		*(.data.*)
-	}
-	.got : {
-		*(.got.plt)
-		*(.got)
-		_edata = . ;
 	}
 	. = ALIGN(4);
 	.bss : {
