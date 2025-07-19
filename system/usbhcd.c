@@ -260,12 +260,14 @@ static bool configure_device(const usb_hcd_t *hcd, const usb_ep_t *ep0, int conf
     usb_setup_pkt_t setup_pkt;
 
     build_setup_packet(&setup_pkt, USB_REQ_TO_DEVICE, USB_SET_CONFIGURATION, config_num, 0, 0);
+    print_usb_info("setting configuration %i", config_num);
     return hcd->methods->setup_request(hcd, ep0, &setup_pkt);
 }
 
 static bool configure_keyboard(const usb_hcd_t *hcd, const usb_ep_t *ep0, int interface_num)
 {
     usb_setup_pkt_t setup_pkt;
+    uint8_t protocol;
 
     // Set the idle duration to infinite.
     build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_CLASS, HID_SET_IDLE, 0, interface_num, 0);
@@ -273,11 +275,27 @@ static bool configure_keyboard(const usb_hcd_t *hcd, const usb_ep_t *ep0, int in
         return false;
     }
 
+    build_setup_packet(&setup_pkt, USB_REQ_FROM_INTERFACE | USB_REQ_CLASS, HID_GET_PROTOCOL, 0, interface_num, 1);
+    if (!hcd->methods->get_data_request(hcd, ep0, &setup_pkt, &protocol, 1)) {
+        print_usb_info("HID_GET_PROTOCOL failed");
+	return false;
+    }
+    print_usb_info("current HID protocol is %i", (int)protocol);
+
     // Select the boot protocol.
     build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_CLASS, HID_SET_PROTOCOL, 0, interface_num, 0);
+    print_usb_info("setting HID protocol on interface %i", interface_num);
     if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        print_usb_info("HID_SET_PROTOCOL failed");
         return false;
     }
+
+    build_setup_packet(&setup_pkt, USB_REQ_FROM_INTERFACE | USB_REQ_CLASS, HID_GET_PROTOCOL, 0, interface_num, 1);
+    if (!hcd->methods->get_data_request(hcd, ep0, &setup_pkt, &protocol, 1)) {
+        print_usb_info("HID_GET_PROTOCOL failed");
+	return false;
+    }
+    print_usb_info("current HID protocol is %i", (int)protocol);
 
     return true;
 }
