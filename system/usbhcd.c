@@ -88,13 +88,11 @@ static int num_hcd = 0;
 static int print_row = 0;
 static int print_col = 0;
 
-static bool in_hub_scan = false;
-
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
 
-usb_init_options_t usb_init_options = USB_DEFAULT_INIT|USB_DEBUG|USB_DEBUG_KBD;
+usb_init_options_t usb_init_options = USB_DEFAULT_INIT|USB_DEBUG;
 
 //------------------------------------------------------------------------------
 // Macro Functions
@@ -194,7 +192,6 @@ static int get_configuration_descriptors(const usb_hcd_t *hcd, const usb_ep_t *e
                                    USB_DESC_CONFIGURATION << 8 | config_idx, 0, fetch_length);
     if (!hcd->methods->get_data_request(hcd, ep0, &setup_pkt, data_buffer, fetch_length)
     ||  !valid_usb_config_descriptor(data_buffer)) {
-        print_usb_info("failed to read config descriptors");
         return 0;
     }
     usb_config_desc_t *config = (usb_config_desc_t *)data_buffer;
@@ -215,7 +212,6 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
     usb_ep_t *kbd = NULL;
     const uint8_t *curr_ptr = desc_buffer + sizeof(usb_config_desc_t);
     const uint8_t *tail_ptr = desc_buffer + desc_length;
-    int desc_count = 0;
     while (curr_ptr < tail_ptr) {
         // If we've filled the keyboard info table, abort now.
         if (*num_keyboards >= max_keyboards) break;
@@ -224,14 +220,7 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
         const uint8_t *next_ptr = curr_ptr + header->length;
 
         // Basic checks for validity.
-        if (next_ptr < (curr_ptr + 2) || next_ptr > tail_ptr) {
-            if (in_hub_scan) {
-                print_usb_info("invalid header: curr_ptr = 0x%x next_ptr = 0x%x tail_ptr = 0x%x",
-                               (uintptr_t)curr_ptr, (uintptr_t)next_ptr, (uintptr_t)tail_ptr);
-            }
-            break;
-        }
-        desc_count++;
+        if (next_ptr < (curr_ptr + 2) || next_ptr > tail_ptr) break;
 
         if (header->type == USB_DESC_INTERFACE && header->length == sizeof(usb_interface_desc_t)) {
             const usb_interface_desc_t *ifc = (const usb_interface_desc_t *)curr_ptr;
@@ -264,7 +253,6 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
         }
         curr_ptr = next_ptr;
     }
-    if (in_hub_scan) print_usb_info("found %i descriptors", desc_count);
 }
 
 static bool configure_device(const usb_hcd_t *hcd, const usb_ep_t *ep0, int config_num)
@@ -331,31 +319,28 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
 
     usleep(100*MILLISEC);  // USB maximum device attach time.
 
-    in_hub_scan = true;
     // Scan the ports, looking for hubs and keyboards.
     for (int port_num = 1; port_num <= hub->num_ports; port_num++) {
         // If we've filled the keyboard info table, abort now.
         if (*num_keyboards >= max_keyboards) break;
-
-        print_usb_info("scanning port %i", port_num);
 
         uint32_t port_status;
 
         get_hub_port_status(hcd, hub, port_num, &port_status);
 
         // Check the port is powered up.
-        if (~port_status & HUB_PORT_POWERED) { print_usb_info("port not powered"); continue; }
+        if (~port_status & HUB_PORT_POWERED) continue;
 
         // Check if anything is connected to this port.
-        if (~port_status & HUB_PORT_CONNECTED) { print_usb_info("port not connected 1"); continue; }
+        if (~port_status & HUB_PORT_CONNECTED) continue;
 
-        if (!reset_usb_hub_port(hcd, hub, port_num)) { print_usb_info("  failed to reset port"); continue; }
+        if (!reset_usb_hub_port(hcd, hub, port_num)) continue;
 
         get_hub_port_status(hcd, hub, port_num, &port_status);
 
         // Check the port is active.
-        if (~port_status & HUB_PORT_CONNECTED) { print_usb_info("port not connected 2"); continue; }
-        if (~port_status & HUB_PORT_ENABLED)   { print_usb_info("port not enabled"); continue; }
+        if (~port_status & HUB_PORT_CONNECTED) continue;
+        if (~port_status & HUB_PORT_ENABLED)   continue;
 
         // Now the port has been enabled, we can determine the device speed.
         usb_speed_t device_speed;
@@ -375,7 +360,7 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
         // Allocate a controller slot for this device (only needed for some controllers).
         if (hcd->methods->allocate_slot) {
             device_id = hcd->methods->allocate_slot(hcd);
-            if (device_id == 0) { print_usb_info("failed to allocate slot"); break; }
+            if (device_id == 0) break;
         }
 
         // Look for keyboards attached directly or indirectly to this port.
@@ -392,9 +377,7 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
         if (hcd->methods->release_slot) {
             (void)hcd->methods->release_slot(hcd, device_id);
         }
-        sleep(1);
     }
-    in_hub_scan = false;
 
     return keyboard_found;
 }
@@ -770,7 +753,6 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     // (ep0) and leaves the device descriptor in the data transfer buffer.
     usb_ep_t ep0;
     if (!hcd->methods->assign_address(hcd, hub, port_num, device_speed, device_id, &ep0)) {
-        print_usb_info("failed to set device address");
         return false;
     }
     usb_device_desc_t *device = (usb_device_desc_t *)hcd->ws->data_buffer;
@@ -781,7 +763,6 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     // this seems unlikely in practice. A hub should only ever have one configuration.
     int config_num = get_configuration_descriptors(hcd, &ep0, 0);
     if (config_num == 0) {
-        print_usb_info("failed to get configuration descriptors");
         return false;
     }
 
@@ -814,7 +795,6 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
             return false;
         }
         if (!configure_device(hcd, &ep0, config_num)) {
-            print_usb_info("failed to configure device");
             return false;
         }
 
@@ -826,11 +806,10 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
             kbd->device_id    = device_id;
             if (hcd->methods->configure_kbd_ep) {
                 if (!hcd->methods->configure_kbd_ep(hcd, kbd, kbd_idx)) {
-                    print_usb_info("failed to configure keyboard %i ep", kbd_idx);
                     return false;
                 }
             }
-            if (!configure_keyboard(hcd, &ep0, kbd->interface_num)) { print_usb_info("failed to configure keyboard %i", kbd_idx); break; }
+            if (!configure_keyboard(hcd, &ep0, kbd->interface_num)) break;
 
             print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
                            port_num, kbd->interface_num, kbd->endpoint_num);
