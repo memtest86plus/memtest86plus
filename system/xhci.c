@@ -763,7 +763,9 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
   set_address:
     enqueue_xhci_command(ws, XHCI_TRB_ADDRESS_DEVICE | command_flags | device_id << 24, ws->input_context_addr, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 5000*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    uint32_t cc = wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 5000*MILLISEC, &event);
+    if (cc != XHCI_EVENT_CC_SUCCESS) {
+        print_usb_info("address device command failed port=%i flags=0x%08x cc=0x%08x", port_num, command_flags, cc);
         return false;
     }
     if (command_flags == 0) {
@@ -771,8 +773,13 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
     }
 
     build_setup_packet(&setup_pkt, USB_REQ_FROM_DEVICE, USB_GET_DESCRIPTOR, USB_DESC_DEVICE << 8, 0, fetch_length);
-    if (!get_data_request(hcd, ep0, &setup_pkt, data_buffer, fetch_length)
-    ||  !valid_usb_device_descriptor(data_buffer)) {
+    if (!get_data_request(hcd, ep0, &setup_pkt, data_buffer, fetch_length)) {
+        print_usb_info("get descriptor command failed port=%i fetch_length=%i", port_num, fetch_length);
+        return false;
+    }
+    if (!valid_usb_device_descriptor(data_buffer)) {
+        usb_desc_header_t *desc = (usb_desc_header_t *)data_buffer;
+        print_usb_info("invalid device descriptor port=%i type=%i length=%i", port_num, desc->type, desc->length);
         return false;
     }
 
@@ -780,10 +787,12 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
         usb_device_desc_t *device = (usb_device_desc_t *)data_buffer;
         ep0->max_packet_size = device->max_packet_size;
         if (!valid_usb_max_packet_size(device->max_packet_size, device_speed)) {
+            print_usb_info("invalid max packet size port=%i speed=%i size=%i", port_num, device_speed, device->max_packet_size);
             return false;
         }
         if (usb_init_options & USB_EXTRA_RESET) {
             if (!reset_usb_hub_port(hcd, hub, port_num)) {
+                print_usb_info("failed to reset port %i", port_num);
                 return false;
             }
         }
