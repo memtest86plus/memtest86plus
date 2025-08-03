@@ -782,6 +782,10 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
         print_usb_info("invalid device descriptor port=%i type=%i length=%i", port_num, desc->type, desc->length);
         return false;
     }
+    {
+        usb_device_desc_t *device = (usb_device_desc_t *)data_buffer;
+        print_usb_info("fetched length=%i max_packet_size=%i", fetch_length, device->max_packet_size);
+    }
 
     if (command_flags != 0) {
         usb_device_desc_t *device = (usb_device_desc_t *)data_buffer;

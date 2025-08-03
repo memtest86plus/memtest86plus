@@ -370,6 +370,7 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
             continue;
         }
 
+#if 0
         // If we didn't find any keyboards, we can disable the port and release the slot.
         build_setup_packet(&setup_pkt, USB_REQ_TO_HUB_PORT | USB_REQ_CLASS, HUB_CLR_FEATURE, HUB_PORT_ENABLE, port_num, 0);
         (void)hcd->methods->setup_request(hcd, hub->ep0, &setup_pkt);
@@ -377,6 +378,7 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
         if (hcd->methods->release_slot) {
             (void)hcd->methods->release_slot(hcd, device_id);
         }
+#endif
     }
 
     return keyboard_found;
