@@ -170,7 +170,7 @@ static bool build_hub_info(const usb_hcd_t *hcd, const usb_hub_t *parent, int po
 
 static void add_hub_quirks(const usb_device_desc_t *device, usb_hub_t *hub)
 {
-    if ((device->vendor_id == 0x046b) && (device->product_id == 0xff01)) {
+    if ((device->vendor_id == USB_VID_AMERICAN_MEGATRENDS) && (device->product_id == 0xff01)) {
         // add quirk for AMI Virtual Hub - see issue #523
         hub->quirks |= USB_HUB_DONT_DISABLE_PORTS;
     }
