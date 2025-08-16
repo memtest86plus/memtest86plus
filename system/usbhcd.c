@@ -150,6 +150,7 @@ static bool build_hub_info(const usb_hcd_t *hcd, const usb_hub_t *parent, int po
     hub->tt_think_time  = hub_desc.characteristics & 0x0060 >> 5;
     hub->power_up_delay = hub_desc.power_up_delay;
     hub->hs_parent      = usb_hs_parent(parent, port_num, ep0->device_speed);
+    hub->quirks         = USB_HUB_NO_QUIRKS;
 
     usb_endpoint_desc_t *ep1_desc = find_hub_endpoint_descriptor(hcd->ws->data_buffer, hcd->ws->data_length);
     if (ep1_desc == NULL) {
@@ -165,6 +166,14 @@ static bool build_hub_info(const usb_hcd_t *hcd, const usb_hub_t *parent, int po
     ep1->interval        = ep1_desc->interval;
 
     return true;
+}
+
+static void add_hub_quirks(const usb_device_desc_t *device, usb_hub_t *hub)
+{
+    if ((device->vendor_id == USB_VID_AMERICAN_MEGATRENDS) && (device->product_id == 0xff01)) {
+        // add quirk for AMI Virtual Hub - see issue #523
+        hub->quirks |= USB_HUB_DONT_DISABLE_PORTS;
+    }
 }
 
 static bool get_hub_port_status(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num, uint32_t *port_status)
@@ -369,6 +378,8 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
             keyboard_found = true;
             continue;
         }
+
+        if (hub->quirks & USB_HUB_DONT_DISABLE_PORTS) continue;
 
         // If we didn't find any keyboards, we can disable the port and release the slot.
         build_setup_packet(&setup_pkt, USB_REQ_TO_HUB_PORT | USB_REQ_CLASS, HUB_CLR_FEATURE, HUB_PORT_ENABLE, port_num, 0);
@@ -772,6 +783,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         if (!build_hub_info(hcd, hub, port_num, &ep0, &new_hub, &ep1)) {
             return false;
         }
+        add_hub_quirks(device, &new_hub);
         if (!configure_device(hcd, &ep0, config_num)) {
             return false;
         }
