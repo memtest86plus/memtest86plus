@@ -72,6 +72,7 @@ extern power_save_t power_save;
 extern uintptr_t    tty_address;
 extern int          tty_baud_rate;
 extern int          tty_update_period;
+extern bool         tty_new_line;
 
 extern uint32_t     tty_mmio_ref_clk;
 extern int          tty_mmio_stride;
