@@ -78,6 +78,8 @@ extern int          tty_mmio_stride;
 
 extern bool err_banner_redraw;
 
+extern bool         single_pass;
+
 void config_init(void);
 
 void config_menu(bool initial);
