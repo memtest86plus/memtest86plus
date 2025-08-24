@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2022 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 #ifndef _QUIRK_H_
 #define _QUIRK_H_
 /**
@@ -30,7 +30,9 @@ typedef enum {
     QUIRK_K8_REVFG_TEMP,
     QUIRK_AMD_ERRATA_319,
     QUIRK_VIA_VP3,
-    QUIRK_LOONGSON7A00_EHCI_WORKARD
+    QUIRK_LOONGSON7A00_EHCI_WORKARD,
+    QUIRK_UNHIDE_ICH05,
+    QUIRK_UNHIDE_ASUS_SMBUS
 } quirk_id_t;
 
 typedef struct {

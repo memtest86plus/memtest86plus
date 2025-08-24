@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 //
 // ------------------------
 // This file is used to detect quirks on specific hardware
@@ -145,6 +145,36 @@ static void loongson_7a00_ehci_workaround(void)
     write8((uint8_t *)(reg_addr + 0x3830), 0x0);
 }
 
+
+static void unhide_ich_0_5(void)
+{
+    uint32_t smb_ctrl_reg;
+
+    smb_ctrl_reg = pci_config_read32(0, 0x1F, 0x00, 0xF0);
+    smb_ctrl_reg &= ~(1 << 19);
+    pci_config_write32(0, 0x1F, 0x00, 0xF0, smb_ctrl_reg);
+
+}
+
+static void unhide_asus_smbus(void)
+{
+    uint32_t smb_ctrl_reg;
+
+    smb_ctrl_reg = pci_config_read32(0, 0x1F, 0x00, 0xF0);
+    pci_config_write32(0, 0x1F, 0x00, 0xF0, smb_ctrl_reg | 0x01);
+
+    // Get MMIO base address
+    smb_ctrl_reg = pci_config_read32(0, 0x1F, 0x00, 0xF0);
+
+    if ((smb_ctrl_reg & 1) == 0) { return; }
+
+    // Read MMIO at offset 0x3418
+    uint32_t *ptr =  (uint32_t *)((smb_ctrl_reg & 0xFFFFC000) + 0x3418);
+
+    // Set Bit 3 to 0 to enable SMBUS Controler
+    *ptr &= ~(1u << 3);
+}
+
 // ---------------------
 // -- Public function --
 // ---------------------
@@ -264,6 +294,43 @@ void quirks_init(void)
             quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
             quirk.type |= QUIRK_TYPE_USB;
             quirk.process = loongson_7a00_ehci_workaround;
+        }
+    }
+
+    //  -----------------------------------------------------
+    //  -- Unhide SMBus on early Intel Southbridges (ICHx) --
+    //  -----------------------------------------------------
+    if (quirk.root_vid == PCI_VID_INTEL) {
+
+        uint16_t sb_lpc_did = pci_config_read16(0, 0x1F, 0, PCI_DID_REG);
+        uint16_t root_subvid  = pci_config_read16(0, 0, 0, PCI_SUB_VID_REG);
+        uint16_t root_subdid  = pci_config_read16(0, 0, 0, PCI_SUB_DID_REG);
+
+        switch(sb_lpc_did)
+        {
+            case PCI_SB_ICH:
+            case PCI_SB_ICH1:
+            case PCI_SB_ICH2:
+            case PCI_SB_ICH2M:
+            case PCI_SB_ICH3:
+            case PCI_SB_ICH3M:
+            case PCI_SB_ICH4:
+            case PCI_SB_ICH4M:
+            case PCI_SB_ICH5:
+            case PCI_SB_6300ESB:
+                quirk.id      = QUIRK_UNHIDE_ICH05;
+                quirk.type   |= QUIRK_TYPE_SMBUS;
+                quirk.process = unhide_ich_0_5;
+                break;
+            case PCI_SB_ICH6M:
+                if (root_subvid == PCI_VID_DELL && root_subdid == 0x0182) { // Dell D620
+                    quirk.id      = QUIRK_UNHIDE_ASUS_SMBUS;
+                    quirk.type   |= QUIRK_TYPE_SMBUS;
+                    quirk.process = unhide_asus_smbus;
+                }
+                break;
+            default:
+                break;
         }
     }
 }
