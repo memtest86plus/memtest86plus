@@ -47,4 +47,20 @@ void keyboard_init(void);
  */
 char get_key(void);
 
+/**
+ * The key to use to 'escape', e.g. reboot / exit.
+ * Use this function rather than hardcoding 'ESC' to work well with TTY mode.
+ */
+char get_logical_escape_key(void);
+
+/**
+ * String label for the logical escape key.
+ */
+const char *get_logical_escape_key_label(void);
+
+/**
+ * String label for function keys.
+ */
+const char *get_function_key_label(int num);
+
 #endif // KEYBOARD_H

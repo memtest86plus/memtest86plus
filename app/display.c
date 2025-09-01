@@ -176,7 +176,7 @@ void display_init(void)
     set_foreground_colour(palette.footer_foreground);
     set_background_colour(palette.footer_background);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
-    prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
+    printf(ROW_FOOTER, 0, " <%s> Exit  <%s> Configuration  <Space> Scroll Lock", get_logical_escape_key_label(), get_function_key_label(1));
     prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
 #if defined (__x86_64__)
     prints(ROW_FOOTER, 74, ".x64");
@@ -484,12 +484,13 @@ void check_input(void)
         enable_big_status = false;
     }
 
-    switch (input_key) {
-      case ESC:
+    if (input_key == get_logical_escape_key()) {
         clear_message_area();
         display_notice("Rebooting...");
         reboot();
-        break;
+    }
+
+    switch (input_key) {
       case '1':
         config_menu(false);
         break;

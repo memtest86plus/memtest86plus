@@ -312,11 +312,15 @@ static void parse_command_line(char *cmd_line, int cmd_line_size)
 
 static void display_initial_notice(void)
 {
+    char *fmt;
     if (smp_enabled) {
-        display_notice("Press <F1> to configure, <F2> to disable SMP, <Enter> to start testing");
+        fmt = "Press <%s> to configure, <%s> to disable SMP, <Enter> to start testing";
     } else {
-        display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
+        fmt = "Press <%s> to configure, <%s> to enable SMP, <Enter> to start testing ";
     }
+    // strlen is not fully accurate since the format specifiers can expand, but
+    // without sprintf this is the best we can do.
+    display_notice_with_args(strlen(fmt), fmt, get_function_key_label(1), get_function_key_label(2));
 }
 
 static void update_num_pages_to_test(void)
@@ -458,12 +462,12 @@ static void test_selection_menu(void)
 {
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_LM, "Test Selection:");
-    prints(POP_R+3, POP_LI, "<F1>  Clear selection");
-    prints(POP_R+4, POP_LI, "<F2>  Remove one test");
-    prints(POP_R+5, POP_LI, "<F3>  Add one test");
-    prints(POP_R+6, POP_LI, "<F4>  Add test range");
-    prints(POP_R+7, POP_LI, "<F5>  Add all tests");
-    prints(POP_R+8, POP_LI, "<F10> Exit menu");
+    printf(POP_R+3, POP_LI, "<%3s> Clear selection", get_function_key_label(1));
+    printf(POP_R+4, POP_LI, "<%3s> Remove one test", get_function_key_label(2));
+    printf(POP_R+5, POP_LI, "<%3s> Add one test", get_function_key_label(3));
+    printf(POP_R+6, POP_LI, "<%3s> Add test range", get_function_key_label(4));
+    printf(POP_R+7, POP_LI, "<%3s> Add all tests", get_function_key_label(5));
+    printf(POP_R+8, POP_LI, "<%3s> Exit menu", get_function_key_label(10));
 
     display_selection_header(POP_R+10, NUM_TEST_PATTERNS - 1, 0);
     for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
@@ -528,10 +532,10 @@ static void address_range_menu(void)
 {
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_LM, "Address Range:");
-    prints(POP_R+3, POP_LI, "<F1>  Set lower limit");
-    prints(POP_R+4, POP_LI, "<F2>  Set upper limit");
-    prints(POP_R+5, POP_LI, "<F3>  Test all memory");
-    prints(POP_R+6, POP_LI, "<F10> Exit menu");
+    printf(POP_R+3, POP_LI, "<%3s> Set lower limit", get_function_key_label(1));
+    printf(POP_R+4, POP_LI, "<%3s> Set upper limit", get_function_key_label(2));
+    printf(POP_R+5, POP_LI, "<%3s> Test all memory", get_function_key_label(3));
+    printf(POP_R+6, POP_LI, "<%3s> Exit menu", get_function_key_label(10));
     printf(POP_R+8, POP_LM, "Current range: %kB - %kB", pm_limit_lower << 2, pm_limit_upper << 2);
 
     bool tty_update = enable_tty;
@@ -604,10 +608,10 @@ static void cpu_mode_menu(void)
 {
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_LM, "CPU Sequencing Mode:");
-    prints(POP_R+3, POP_LI, "<F1>  Parallel    (PAR)");
-    prints(POP_R+4, POP_LI, "<F2>  Sequential  (SEQ)");
-    prints(POP_R+5, POP_LI, "<F3>  Round robin (RR)");
-    prints(POP_R+6, POP_LI, "<F10> Exit menu");
+    printf(POP_R+3, POP_LI, "<%3s> Parallel    (PAR)", get_function_key_label(1));
+    printf(POP_R+4, POP_LI, "<%3s> Sequential  (SEQ)", get_function_key_label(2));
+    printf(POP_R+5, POP_LI, "<%3s> Round robin (RR)", get_function_key_label(3));
+    printf(POP_R+6, POP_LI, "<%3s> Exit menu", get_function_key_label(10));
     printc(POP_R+3+cpu_mode, POP_LM, '*');
 
     bool tty_update = enable_tty;
@@ -660,13 +664,13 @@ static void error_mode_menu(void)
 {
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_LM, "Error Reporting Mode:");
-    prints(POP_R+3, POP_LI, "<F1>  Error counts only");
-    prints(POP_R+4, POP_LI, "<F2>  Error summary");
-    prints(POP_R+5, POP_LI, "<F3>  Individual errors");
-    prints(POP_R+6, POP_LI, "<F4>  BadRAM patterns");
-    prints(POP_R+7, POP_LI, "<F5>  Linux memmap");
-    prints(POP_R+8, POP_LI, "<F6>  Bad pages");
-    prints(POP_R+9, POP_LI, "<F10> Exit menu");
+    printf(POP_R+3, POP_LI, "<%3s> Error counts only", get_function_key_label(1));
+    printf(POP_R+4, POP_LI, "<%3s> Error summary", get_function_key_label(2));
+    printf(POP_R+5, POP_LI, "<%3s> Individual errors", get_function_key_label(3));
+    printf(POP_R+6, POP_LI, "<%3s> BadRAM patterns", get_function_key_label(4));
+    prints(POP_R+7, POP_LI, "<%3s> Linux memmap", get_function_key_label(5));
+    prints(POP_R+8, POP_LI, "<%3s> Bad pages", get_function_key_label(6));
+    printf(POP_R+9, POP_LI, "<%3s> Exit menu", get_function_key_label(10));
     printc(POP_R+3+error_mode, POP_LM, '*');
 
     bool tty_update = enable_tty;
@@ -777,19 +781,19 @@ static void cpu_selection_menu(void)
 
     clear_screen_region(POP_REGION);
     prints(POP_R+1, POP_LM, "CPU Selection:");
-    prints(POP_R+3, POP_LI, "<F1>  Clear selection");
-    prints(POP_R+4, POP_LI, "<F2>  Remove one CPU");
-    prints(POP_R+5, POP_LI, "<F3>  Add one CPU");
-    prints(POP_R+6, POP_LI, "<F4>  Add CPU range");
-    prints(POP_R+7, POP_LI, "<F5>  Add all CPUs");
+    printf(POP_R+3, POP_LI, "<%3s> Clear selection", get_function_key_label(1));
+    printf(POP_R+4, POP_LI, "<%3s> Remove one CPU", get_function_key_label(2));
+    printf(POP_R+5, POP_LI, "<%3s> Add one CPU", get_function_key_label(3));
+    printf(POP_R+6, POP_LI, "<%3s> Add CPU range", get_function_key_label(4));
+    printf(POP_R+7, POP_LI, "<%3s> Add all CPUs", get_function_key_label(5));
     if (cpuid_info.topology.is_hybrid) {
         if (exclude_ecores) {
-            prints(POP_R+8, POP_LI, "<F6>  Include E-Cores");
+            printf(POP_R+8, POP_LI, "<%3s> Include E-Cores", get_function_key_label(6));
         } else {
-            prints(POP_R+8, POP_LI, "<F6>  Exclude E-Cores");
+            printf(POP_R+8, POP_LI, "<%3s> Exclude E-Cores", get_function_key_label(6));
         }
     }
-    prints(POP_R+9, POP_LI, "<F10> Exit menu");
+    printf(POP_R+9, POP_LI, "<%3s> Exit menu", get_function_key_label(10));
 
     display_cpu_selection(display_offset);
 
@@ -890,22 +894,22 @@ void config_menu(bool initial)
     bool exit_menu = false;
     while (!exit_menu) {
         prints(POP_R+1,  POP_LM, "Settings:");
-        prints(POP_R+3,  POP_LI, "<F1>  Test selection");
-        prints(POP_R+4,  POP_LI, "<F2>  Address range");
-        prints(POP_R+5,  POP_LI, "<F3>  CPU sequencing mode");
-        prints(POP_R+6,  POP_LI, "<F4>  Error reporting mode");
+        printf(POP_R+3,  POP_LI, "<%3s> Test selection", get_function_key_label(1));
+        printf(POP_R+4,  POP_LI, "<%3s> Address range", get_function_key_label(2));
+        printf(POP_R+5,  POP_LI, "<%3s> CPU sequencing mode", get_function_key_label(3));
+        printf(POP_R+6,  POP_LI, "<%3s> Error reporting mode", get_function_key_label(4));
         if (initial) {
             if (!smp_enabled)  set_foreground_colour(BOLD+BLACK);
-            prints(POP_R+7,  POP_LI, "<F5>  CPU selection");
+            printf(POP_R+7,  POP_LI, "<%3s> CPU selection", get_function_key_label(5));
             if (!smp_enabled)  set_foreground_colour(WHITE);
             //if (no_temperature) set_foreground_colour(BOLD+BLACK);
-            printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
+            printf(POP_R+8,  POP_LI, "<%3s> Temperature %s", get_function_key_label(6), enable_temperature ? "disable" : "enable ");
             //if (no_temperature) set_foreground_colour(WHITE);
-            printf(POP_R+9,  POP_LI, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
-            prints(POP_R+10, POP_LI, "<F10> Exit menu");
+            printf(POP_R+9,  POP_LI, "<%3s> Boot trace %s", get_function_key_label(7), enable_trace  ? "disable" : "enable ");
+            printf(POP_R+10, POP_LI, "<%3s> Exit menu", get_function_key_label(10));
         } else {
-            prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
-            prints(POP_R+8 , POP_LI, "<F10> Exit menu");
+            printf(POP_R+7,  POP_LI, "<%3s> Skip current test", get_function_key_label(5));
+            printf(POP_R+8 , POP_LI, "<%3s> Exit menu", get_function_key_label(10));
         }
 
         if (tty_update) {
@@ -985,12 +989,13 @@ void initial_config(void)
         bool got_key = false;
         for (int i = 0; i < 3000 && !got_key; i++) {
             usleep(1000);
-            switch (get_key()) {
-              case ESC:
+            char input_key = get_key();
+            if (input_key == get_logical_escape_key()) {
                 clear_message_area();
                 display_notice("Rebooting...");
                 reboot();
-                break;
+            }
+            switch (input_key) {
               case '1':
                 config_menu(true);
                 got_key = true;

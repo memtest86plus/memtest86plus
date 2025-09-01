@@ -284,3 +284,38 @@ char get_key(void)
 
     return '\0';
 }
+
+// In tty mode, many special keys, like F1, F2 but also certain terminal
+// events, start with the escape character. To avoid unintentional
+// reboot/exit, use a different key for such purposes.
+
+char get_logical_escape_key(void)
+{
+    if (enable_tty) {
+      return 'q';
+    } else {
+        return ESC;
+    }
+}
+const char *get_logical_escape_key_label(void)
+{
+    if (enable_tty) {
+        return "q";
+    } else {
+        return "ESC";
+    }
+}
+const char *get_function_key_label(int num)
+{
+    if (num < 1 || num > 10) {
+        return "invalid function key";
+    }
+
+    if (enable_tty) {
+        const char* labels[] = {"-", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+        return labels[num];
+    } else {
+        const char *labels[] = {"-", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"};
+        return labels[num];
+    }
+}
