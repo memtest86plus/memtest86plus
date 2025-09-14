@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 //
 // ------------------------
 //
@@ -44,6 +44,9 @@ void get_imc_config_amd_zen(void)
 {
     uint32_t smn_reg, offset;
     uint32_t reg_cha, reg_chb;
+
+    /* Select UMC MCA MSR base */
+    uint32_t mca_ctrl_base = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_CTRL : MSR_AMD64_K17_UMC_MCA_CTRL;
 
     imc.tCL_dec = 0;
 
@@ -103,7 +106,7 @@ void get_imc_config_amd_zen(void)
             uint8_t umc = 0, umc_max = 0;
             uint32_t umc_banks_bits = 0;
 
-            if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL) {
+            if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL || imc.family == IMC_K19_RBT) {
                 umc_max = 4;
                 umc_banks_bits = AMD_MCG_CTL_4_BANKS;
             } else {
@@ -116,12 +119,12 @@ void get_imc_config_amd_zen(void)
             wrmsr(MSR_IA32_MCG_CTL, regl | umc_banks_bits, regh);
 
             rdmsr(MSR_AMD64_HW_CONF, regl, regh);
-            wrmsr(MSR_AMD64_HW_CONF, regl | AMD_MCA_STATUS_WR_ENABLE, regh); // // Enable Write to MCA STATUS Register
+            wrmsr(MSR_AMD64_HW_CONF, regl | AMD_MCA_STATUS_WR_ENABLE, regh); // Enable Write to MCA STATUS Register
 
             for (umc = 0; umc < umc_max; umc++)
             {
-                rdmsr(MSR_AMD64_UMC_MCA_CTRL + (umc * AMD_UMC_OFFSET), regl, regh);
-                wrmsr(MSR_AMD64_UMC_MCA_CTRL + (umc * AMD_UMC_OFFSET), regl | 1, regh);
+                rdmsr(mca_ctrl_base + (umc * AMD_UMC_OFFSET), regl, regh);
+                wrmsr(mca_ctrl_base + (umc * AMD_UMC_OFFSET), regl | 1, regh);
             }
 
             smn_reg = amd_smn_read(AMD_SMN_UMC_ECC_ERR_CNT_SEL);
@@ -141,8 +144,12 @@ void poll_ecc_amd_zen(bool report)
     uint8_t umc = 0, umc_max = 0;
     uint32_t regh, regl;
 
+    /* Select UMC MCA MSR base */
+    uint32_t mca_status_base = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_STATUS : MSR_AMD64_K17_UMC_MCA_STATUS;
+    uint32_t mca_addr_base   = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_ADDR   : MSR_AMD64_K17_UMC_MCA_ADDR;
+
     // Number of UMC to check
-    if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL) {
+    if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL || imc.family == IMC_K19_RBT) {
         umc_max = 4;
     } else {
         umc_max = 2;
@@ -152,7 +159,7 @@ void poll_ecc_amd_zen(bool report)
     for (umc = 0; umc < umc_max; umc++)
     {
         // Get Status Register
-        rdmsr(MSR_AMD64_UMC_MCA_STATUS + (AMD_UMC_OFFSET * umc), regl, regh);
+        rdmsr(mca_status_base + (AMD_UMC_OFFSET * umc), regl, regh);
 
         // Check if ECC error happened
         if (regh & AMD_UMC_VALID_ERROR_BIT) {
@@ -174,7 +181,7 @@ void poll_ecc_amd_zen(bool report)
             ecc_status.core = regh & 0x3F;
 
             // Get address
-            rdmsr(MSR_AMD64_UMC_MCA_ADDR + (AMD_UMC_OFFSET * umc), regl, regh);
+            rdmsr(mca_addr_base + (AMD_UMC_OFFSET * umc), regl, regh);
 
             ecc_status.addr = (uint64_t)(regh & 0x00FFFFFF) << 32;
             ecc_status.addr |= regl;
@@ -192,8 +199,8 @@ void poll_ecc_amd_zen(bool report)
             }
 
             // Clear Error
-            rdmsr(MSR_AMD64_UMC_MCA_STATUS + (AMD_UMC_OFFSET * umc), regl, regh);
-            wrmsr(MSR_AMD64_UMC_MCA_STATUS + (AMD_UMC_OFFSET * umc), regl, regh & ~AMD_UMC_VALID_ERROR_BIT);
+            rdmsr(mca_status_base + (AMD_UMC_OFFSET * umc), regl, regh);
+            wrmsr(mca_status_base + (AMD_UMC_OFFSET * umc), regl, regh & ~AMD_UMC_VALID_ERROR_BIT);
             amd_smn_write(AMD_SMN_UMC_ECC_ERR_CNT + (AMD_SMN_UMC_CHB_OFFSET * umc), 0x0);
 
             // Clear Internal ECC Error status

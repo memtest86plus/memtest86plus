@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 //
 // ------------------------
 //
@@ -84,6 +84,7 @@ void memctrl_poll_ecc(void)
       case IMC_K19_VRM:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
+      case IMC_K1A_GRG:
         poll_ecc_amd_zen(true);
         break;
       default:
