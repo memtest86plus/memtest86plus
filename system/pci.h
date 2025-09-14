@@ -40,21 +40,21 @@
 #define PCI_VID_INTEL        0x8086
 
 /* Intel Southbridge ISA/LPC (Device 0x1F, Function 0x00) DIDs */
-#define PCI_SB_ICH           0x2410
-#define PCI_SB_ICH1          0x2420
-#define PCI_SB_ICH2          0x2440
-#define PCI_SB_ICH2M         0x244C
-#define PCI_SB_ICH3          0x2480
-#define PCI_SB_ICH3M         0x248C
-#define PCI_SB_ICH4          0x24C0
-#define PCI_SB_ICH4M         0x24CC
-#define PCI_SB_ICH5          0x24D0
-#define PCI_SB_6300ESB       0x25A1
-#define PCI_SB_ICH5S         0x25A1
-#define PCI_SB_ICH6          0x2640
-#define PCI_SB_ICH6M         0x2641
-#define PCI_SB_ICH7          0x27B8
-#define PCI_SB_ICH7M         0x27B9
+#define PCI_DID_LPC_ICH      0x2410
+#define PCI_DID_LPC_ICH1     0x2420
+#define PCI_DID_LPC_ICH2     0x2440
+#define PCI_DID_LPC_ICH2M    0x244C
+#define PCI_DID_LPC_ICH3     0x2480
+#define PCI_DID_LPC_ICH3M    0x248C
+#define PCI_DID_LPC_ICH4     0x24C0
+#define PCI_DID_LPC_ICH4M    0x24CC
+#define PCI_DID_LPC_ICH5     0x24D0
+#define PCI_DID_LPC_6300ESB  0x25A1
+#define PCI_DID_LPC_ICH5S    0x25A1
+#define PCI_DID_LPC_ICH6     0x2640
+#define PCI_DID_LPC_ICH6M    0x2641
+#define PCI_DID_LPC_ICH7     0x27B8
+#define PCI_DID_LPC_ICH7M    0x27B9
 
 /**
  * Initialises the PCI access support.

@@ -32,7 +32,7 @@ typedef enum {
     QUIRK_VIA_VP3,
     QUIRK_LOONGSON7A00_EHCI_WORKARD,
     QUIRK_UNHIDE_ICH05,
-    QUIRK_UNHIDE_ASUS_SMBUS
+    QUIRK_UNHIDE_ASUS_SMBUS,
 } quirk_id_t;
 
 typedef struct {

@@ -153,7 +153,6 @@ static void unhide_ich_0_5(void)
     smb_ctrl_reg = pci_config_read32(0, 0x1F, 0x00, 0xF0);
     smb_ctrl_reg &= ~(1 << 19);
     pci_config_write32(0, 0x1F, 0x00, 0xF0, smb_ctrl_reg);
-
 }
 
 static void unhide_asus_smbus(void)
@@ -308,21 +307,21 @@ void quirks_init(void)
 
         switch(sb_lpc_did)
         {
-            case PCI_SB_ICH:
-            case PCI_SB_ICH1:
-            case PCI_SB_ICH2:
-            case PCI_SB_ICH2M:
-            case PCI_SB_ICH3:
-            case PCI_SB_ICH3M:
-            case PCI_SB_ICH4:
-            case PCI_SB_ICH4M:
-            case PCI_SB_ICH5:
-            case PCI_SB_6300ESB:
+            case PCI_DID_LPC_ICH:
+            case PCI_DID_LPC_ICH1:
+            case PCI_DID_LPC_ICH2:
+            case PCI_DID_LPC_ICH2M:
+            case PCI_DID_LPC_ICH3:
+            case PCI_DID_LPC_ICH3M:
+            case PCI_DID_LPC_ICH4:
+            case PCI_DID_LPC_ICH4M:
+            case PCI_DID_LPC_ICH5:
+            case PCI_DID_LPC_6300ESB:
                 quirk.id      = QUIRK_UNHIDE_ICH05;
                 quirk.type   |= QUIRK_TYPE_SMBUS;
                 quirk.process = unhide_ich_0_5;
                 break;
-            case PCI_SB_ICH6M:
+            case PCI_DID_LPC_ICH6M:
                 if (root_subvid == PCI_VID_DELL && root_subdid == 0x0182) { // Dell D620
                     quirk.id      = QUIRK_UNHIDE_ASUS_SMBUS;
                     quirk.type   |= QUIRK_TYPE_SMBUS;
