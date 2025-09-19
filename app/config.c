@@ -117,6 +117,8 @@ int             tty_mmio_stride    = 4;                 // Stride for MMIO (regi
 
 bool            err_banner_redraw  = false;             // Redraw banner on new errors
 
+bool            single_pass        = false;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
@@ -282,6 +284,8 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "3", 2) == 0) {
             usb_init_options |= USB_2_STEP_INIT|USB_EXTRA_RESET;
         }
+    } else if (strncmp(option, "singlepass", 11) == 0) {
+        single_pass = true;
     }
 }
 
@@ -902,10 +906,16 @@ void config_menu(bool initial)
             printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
             //if (no_temperature) set_foreground_colour(WHITE);
             printf(POP_R+9,  POP_LI, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
-            prints(POP_R+10, POP_LI, "<F10> Exit menu");
+            printf(POP_R+10, POP_LI, "<F8>  Single pass %s",  single_pass  ? "disable" : "enable ");
+            prints(POP_R+11, POP_LI, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
-            prints(POP_R+8 , POP_LI, "<F10> Exit menu");
+            if (single_pass) {
+                prints(POP_R+8,  POP_LI, "<F6>  Run tests forever     ");
+            } else {
+                prints(POP_R+8,  POP_LI, "<F6>  End after current pass");
+            }
+            prints(POP_R+9,  POP_LI, "<F10> Exit menu");
         }
 
         if (tty_update) {
@@ -940,11 +950,18 @@ void config_menu(bool initial)
           case '6':
             if (initial) {
                 enable_temperature = !enable_temperature;
+            } else {
+                single_pass = !single_pass;
             }
             break;
           case '7':
             if (initial) {
                 enable_trace = !enable_trace;
+            }
+            break;
+          case '8':
+            if (initial) {
+                single_pass = !single_pass;
             }
             break;
           case '0':
