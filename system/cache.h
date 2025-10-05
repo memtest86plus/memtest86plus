@@ -94,12 +94,22 @@ static inline void cache_flush(void)
         : "memory"
     );
 #elif defined (__loongarch_lp64)
-    if (!(__cpucfg(0x10) & (1 << 10))) {
-        return; // No L3
+    uint64_t cache_present, cache_info_reg;
+    /*detect_max_cache_level*/
+    if (__cpucfg(0x10) & (1 << 10)) {
+	cache_present = 3; //L3 unified cache
+    } else if (__cpucfg(0x10) & (1 << 3)) {
+	cache_present = 2; //L2 unified cache
+    } else if (__cpucfg(0x10) & (1 << 0)) {
+	cache_present = 1; //L1 data cache
+    } else {
+	return; //No Cache present
     }
-    uint64_t ways = (__cpucfg(0x14) & 0xFFFF) + 1;
-    uint64_t sets = 1 << ((__cpucfg(0x14) >> 16) & 0xFF);
-    uint64_t line_size = 1 << ((__cpucfg(0x14) >> 24) & 0x7F);
+    cache_info_reg = 0x11 + cache_present; //cache last leaf
+
+    uint64_t ways = (__cpucfg(cache_info_reg) & 0xFFFF) + 1;
+    uint64_t sets = 1 << ((__cpucfg(cache_info_reg) >> 16) & 0xFF);
+    uint64_t line_size = 1 << ((__cpucfg(cache_info_reg) >> 24) & 0x7F);
     uint64_t va, i, j;
     uint64_t cpu_module[1];
     va = 0;
@@ -119,7 +129,17 @@ static inline void cache_flush(void)
     } else {
         for (i = 0; i < sets; i++) {
             for (j = 0; j < ways; j++) {
-                cache_op(0xB, va);
+		switch (cache_present) {
+		    case 1:
+		        cache_op(0x9,va); //Flush L1
+			break;
+		    case 2:
+		        cache_op(0xA,va); //Flush L2
+			break;
+		    case 3:
+		        cache_op(0xB,va); //Flush L3
+			break;
+		}
                 va++;
             }
             va -= ways;

@@ -24,7 +24,7 @@ else
   MS_LDS=ldscripts/memtest_shared.lds
 endif
 
-INC_DIRS = -I../../boot -I../../system -I../../system/loongarch -I../../lib -I../../tests -I../../app -Iapp
+INC_DIRS = -I../../boot -I../../system -I ../../system/imc -I../../system/loongarch -I../../lib -I../../tests -I../../app -Iapp
 
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
@@ -54,7 +54,7 @@ SYS_OBJS = system/acpi.o \
            system/loongarch/temperature.o \
            system/loongarch/vmem.o
 
-IMC_SRCS = $(wildcard ../../system/imc/loongson/*.c)
+IMC_SRCS = $(wildcard ../../system/imc/loongarch/*.c)
 IMC_OBJS = $(subst ../../,,$(IMC_SRCS:.c=.o))
 
 LIB_OBJS = lib/barrier.o \
@@ -83,7 +83,7 @@ APP_OBJS = app/badram.o \
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
-all: memtest.efi
+all: mt86plus
 
 check:
 	@if [ -z ${DEBUG} ]; then\
@@ -130,8 +130,8 @@ system/loongarch/%.o: ../../system/loongarch/%.c
 	@mkdir -p system/loongarch/
 	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-system/imc/loongson/%.o: ../../system/imc/loongson/%.c
-	@mkdir -p system/imc/loongson/
+system/imc/loongarch/%.o: ../../system/imc/loongarch/%.c
+	@mkdir -p system/imc/loongarch/
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 lib/%.o: ../../lib/%.c
@@ -181,15 +181,15 @@ memtest.debug: memtest_shared
 	strip -R .eh_frame memtest_shared
 	strip -R .comment memtest_shared
 
-memtest.efi: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
+mt86plus: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_shared.bin -o memtest.elf
-	$(OBJCOPY) -O binary memtest.elf memtest.efi
+	$(OBJCOPY) -O binary memtest.elf mt86plus
 	rm -f memtest.elf
 
-esp.img: memtest.efi
+esp.img: mt86plus
 	@mkdir -p iso/EFI/BOOT
-	cp memtest.efi iso/EFI/BOOT/BOOTLOONGARCH64.EFI
+	cp mt86plus iso/EFI/BOOT/BOOTLOONGARCH64.EFI
 	@rm -f esp.img
 	/sbin/mkdosfs -n MEMTEST-ESP -F12 -C esp.img 4096
 	mcopy -s -i esp.img iso/EFI ::
@@ -202,6 +202,47 @@ memtest.iso: esp.img
 iso: memtest.iso
 
 clean:
-	rm -rf boot system lib tests app *.img *.iso memtest* iso grub-*
+	rm -rf boot system lib tests app *.img *.iso memtest* mt86plus iso grub-*
 
-# grub-memtest.iso will be added in future. TODO
+# grub-memtest.iso uses GRUB as an intermediate bootloader to allow Memtest86+
+# to be started with the native USB keyboard drivers either enabled or disabled,
+# or to be started in a fail-safe mode with SMP and memory identification &
+# speed testing disabled.
+#
+# Notice: LoongArch64 Linux ENV only!
+#
+
+GRUB_CFG ?= grub
+
+GRUB_FONT_DIR ?= /usr/share/grub
+
+GRUB_LIB_DIR ?= /usr/lib/grub
+
+GRUB_MKIMAGE := $(shell command -v grub2-mkimage || command -v grub-mkimage)
+
+GRUB_MODULES = iso9660 fat part_msdos part_gpt all_video font gfxterm gfxmenu \
+               boot chain configfile echo ls
+
+grub-bootloongarch64.efi:
+	$(GRUB_MKIMAGE) --output $@ --prefix /EFI/BOOT/grub --format loongarch64-efi $(GRUB_MODULES)
+
+grub-esp.img: mt86plus grub-bootloongarch64.efi ../../grub/${GRUB_CFG}-efi.cfg
+	@mkdir -p grub-iso/EFI/BOOT/grub/loongarch64-efi grub-iso/EFI/BOOT/grub/fonts
+	cp mt86plus grub-iso/EFI/BOOT/memtest
+	cp grub-bootloongarch64.efi grub-iso/EFI/BOOT/BOOTLOONGARCH64.EFI
+	cp ../../grub/${GRUB_CFG}-efi.cfg grub-iso/EFI/BOOT/grub/grub.cfg
+	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/EFI/BOOT/grub/fonts/
+	cp $(GRUB_LIB_DIR)/loongarch64-efi/*.mod grub-iso/EFI/BOOT/grub/loongarch64-efi/
+	@rm -f grub-esp.img
+	/sbin/mkdosfs -n MT86P_ESP -F12 -C grub-esp.img 8192
+	mcopy -s -i grub-esp.img grub-iso/EFI ::
+
+grub-memtest.iso: mt86plus  grub-esp.img
+	@mkdir -p grub-iso/boot/grub/fonts
+	cp $(GRUB_FONT_DIR)/unicode.pf2 grub-iso/boot/grub/fonts/
+	xorrisofs -pad -R -J -volid MT86PLUS_64_EFI_ONLY  -no-emul-boot -graft-points \
+		  -boot-load-size 4 -boot-info-table --grub2-boot-info \
+		  -append_partition 2 0xef ./grub-esp.img \
+		  -o ./grub-memtest.iso /EFI=./grub-iso/EFI
+
+grub-iso: grub-memtest.iso

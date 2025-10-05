@@ -87,6 +87,10 @@
 #define HUB_PORT_LOW_SPEED      0x00000200
 #define HUB_PORT_HIGH_SPEED     0x00000400
 
+// Vendor IDs
+
+#define USB_VID_AMERICAN_MEGATRENDS     0x046b
+
 // Data structures.
 
 typedef struct __attribute__((packed)) {

@@ -20,11 +20,11 @@ jobs:
       fail-fast: false
       matrix:
         compiler: [gcc]
-        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
-        arch: [i386, x86_64, la64]
+        os: [ubuntu-22.04, ubuntu-24.04]
+        arch: [i586, x86_64, la64]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -44,24 +44,24 @@ jobs:
       - name: Clean up
         working-directory: ./
         run: |
-          if [ ${{ matrix.arch }} == 'i386' ]; then
-            cd build32
+          if [ ${{ matrix.arch }} == 'i586' ]; then
+            cd build/i586
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
-            cd build64
+            cd build/x86_64
           elif [ ${{ matrix.arch }} == 'la64' ]; then
-            cd build64/la64
+            cd build/loongarch64
           fi
           make clean
 
       - name: Build
         working-directory: ./
         run: |
-          if [ ${{ matrix.arch }} == 'i386' ]; then
-            cd build32
+          if [ ${{ matrix.arch }} == 'i586' ]; then
+            cd build/i586
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
-            cd build64
+            cd build/x86_64
           elif [ ${{ matrix.arch }} == 'la64' ]; then
             export PATH=/opt/LoongArch_Toolchains/cross-tools/bin/:$PATH
-            cd build64/la64
+            cd build/loongarch64
           fi
           make -j 2 CC="${{matrix.compiler}}" iso

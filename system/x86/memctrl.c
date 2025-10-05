@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 //
 // ------------------------
 //
@@ -35,8 +35,10 @@ void memctrl_init(void)
     switch(imc.family) {
       case IMC_K17:
       case IMC_K19_VRM:
+      case IMC_K19_CZN:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
+      case IMC_K19_PHX:
       case IMC_K1A_GRG:
         get_imc_config_amd_zen();
         break;
@@ -82,6 +84,7 @@ void memctrl_poll_ecc(void)
       case IMC_K19_VRM:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
+      case IMC_K1A_GRG:
         poll_ecc_amd_zen(true);
         break;
       default:

@@ -71,6 +71,14 @@ typedef struct __attribute__ ((packed)) {
 } usb_parent_t;
 
 /**
+ * A set of USB hub quirk identifiers.
+ */
+typedef enum  __attribute__ ((packed)) {
+    USB_HUB_NO_QUIRKS           = 0,
+    USB_HUB_DONT_DISABLE_PORTS  = 1 << 0
+} usb_hub_quirk_t;
+
+/**
  * A USB hub descriptor (used internally by the various HCI drivers).
  */
 typedef struct __attribute__ ((packed)) {
@@ -81,7 +89,8 @@ typedef struct __attribute__ ((packed)) {
     uint8_t         tt_think_time;
     uint8_t         power_up_delay;
     usb_parent_t    hs_parent;
-    uint16_t        reserved;
+    uint8_t         quirks;
+    uint8_t         reserved;
 } usb_hub_t;
 
 /**
@@ -132,7 +141,9 @@ typedef enum {
     USB_EXTRA_RESET     = 1 << 0,
     USB_IGNORE_EHCI     = 1 << 1,
     USB_2_STEP_INIT     = 1 << 2,
-    USB_DEBUG           = 1 << 3
+    USB_DEBUG           = 1 << 3,
+    USB_DEBUG_HUB       = 1 << 4,
+    USB_DEBUG_KBD       = 1 << 5
 } usb_init_options_t;
 
 /**

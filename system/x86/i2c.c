@@ -177,9 +177,14 @@ static const uint16_t intel_ich5_dids[] =
     0x51A3,  // Alder Lake-P (PCH)
     0x54A3,  // Alder Lake-M (PCH)
     0x7A23,  // Raptor Lake-S (PCH)
-    //0x7E22,  // Meteor Lake-P (SOC)
+    0x7E22,  // Meteor Lake-P (SOC)
+    //0xAE22,  // Meteor Lake-S (PCH)
     0x7F23,  // Arrow Lake-S (PCH)
+    //0x5796,  // Birch Stream (SOC)
+    0x7722,  // Arrow Lake-H (SOC)
     //0xA822,  // Lunar Lake
+    //0xE322,  // Panther Lake-H (SOC)
+    //0xE422,  // Panther Lake-P (SOC)
 };
 
 static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int size)
@@ -451,7 +456,7 @@ static bool fch_zen_get_smb(void)
     pm_reg |= __inb(AMD_DATA_IO_PORT);
 
     // Special case for AMD Family 19h & Extended Model > 4 (get smb address in memory)
-    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_RPL || imc.family >= IMC_K1A_STP) && pm_reg == 0xFFFF) {
+    if ((imc.family == IMC_K19_CZN || imc.family == IMC_K19_PHX || imc.family == IMC_K19_RPL || imc.family >= IMC_K1A_STP) && pm_reg == 0xFFFF) {
         smbusbase = ((*(const uint32_t *)(0xFED80000 + 0x300) >> 8) & 0xFF) << 8;
         return true;
     }

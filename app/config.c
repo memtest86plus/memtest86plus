@@ -111,6 +111,7 @@ bool            enable_tty         = false;
 uintptr_t       tty_address        = 0x3F8;             // Legacy IO or MMIO Address accepted
 int             tty_baud_rate      = 115200;
 int             tty_update_period  = 2;                 // Update TTY every 2 seconds (default)
+bool            tty_new_line       = false;
 
 uint32_t        tty_mmio_ref_clk   = UART_REF_CLK_MMIO; // Reference clock for MMIO (in Hz)
 int             tty_mmio_stride    = 4;                 // Stride for MMIO (register width in bytes)
@@ -207,6 +208,8 @@ static void parse_option(const char *option, const char *params)
 
     if (strncmp(option, "console", 8) == 0) {
         parse_serial_params(params);
+    } else if (strncmp(option, "newline", 7) == 0) {
+        tty_new_line = true;
     } else if (strncmp(option, "cpuseqmode", 11) == 0) {
         if (strncmp(params, "par", 4) == 0) {
             cpu_mode = PAR;
@@ -269,6 +272,11 @@ static void parse_option(const char *option, const char *params)
         enable_trace = true;
     } else if (strncmp(option, "usbdebug", 9) == 0) {
         usb_init_options |= USB_DEBUG;
+        if (strncmp(params, "hub", 4) == 0) {
+            usb_init_options |= USB_DEBUG_HUB;
+        } else if (strncmp(params, "kbd", 4) == 0) {
+            usb_init_options |= USB_DEBUG_KBD;
+	}
     } else if (strncmp(option, "usbinit", 8) == 0) {
         if (strncmp(params, "1", 2) == 0) {
             usb_init_options |= USB_2_STEP_INIT;
