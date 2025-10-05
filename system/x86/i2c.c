@@ -176,7 +176,7 @@ static const uint16_t intel_ich5_dids[] =
     //0xAE22,  // Meteor Lake-S (PCH)
     0x7F23,  // Arrow Lake-S (PCH)
     //0x5796,  // Birch Stream (SOC)
-    //0x7722,  // Arrow Lake-H (SOC)
+    0x7722,  // Arrow Lake-H (SOC)
     //0xA822,  // Lunar Lake
     //0xE322,  // Panther Lake-H (SOC)
     //0xE422,  // Panther Lake-P (SOC)
