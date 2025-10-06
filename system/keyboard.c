@@ -239,6 +239,18 @@ static char get_vt220_sequence1(void)
         return '3';  // VT100/VT220 PF3 (F3 in terminal emulators)
       case 'S':
         return '4';  // VT100/VT220 PF4 (F4 in terminal emulators)
+      case 'T':
+        return '5';  // VT100/VT220 PF5 (F5 in terminal emulators)
+      case 'U':
+        return '6';  // VT100/VT220 PF6 (F6 in terminal emulators)
+      case 'V':
+        return '7';  // VT100/VT220 PF7 (F7 in terminal emulators)
+      case 'W':
+        return '8';  // VT100/VT220 PF8 (F8 in terminal emulators)
+      case 'X':
+        return '9';  // VT100/VT220 PF9 (F9 in terminal emulators)
+      case 'Y':
+        return '0';  // VT100/VT220 PF10 (F10 in terminal emulators)
       default:
         return '\0'; // unrecognised key
         break;
@@ -274,6 +286,14 @@ static char get_vt220_sequence2(void)
     switch (ch1) {
       case '1':
         switch (ch2) {
+          case '1':
+            ch1 = '1'; break;  // F1 in terminal emulators
+          case '2':
+            ch1 = '2'; break;  // F2 in terminal emulators
+          case '3':
+            ch1 = '3'; break;  // F3 in terminal emulators
+          case '4':
+            ch1 = '4'; break;  // F4 in terminal emulators
           case '5':
             ch1 = '5'; break;  // F5 in terminal emulators
           case '7':
@@ -353,6 +373,20 @@ void keyboard_init(void)
 
 char get_key(void)
 {
+    if (enable_tty) {
+        char c = tty_get_char(0);
+        switch (c) {
+          case '\0':
+            break;
+          case '\r':
+            return '\n';
+          case ESC:
+            return get_tty_special_key();
+          default:
+            return c;
+        }
+    }
+
     if (keyboard_types & KT_USB) {
         uint8_t c = get_usb_keycode();
         if (c > 0 && c < sizeof(usb_hid_keymap)) {
@@ -385,20 +419,6 @@ char get_key(void)
             escaped = (c == 0xe0);
 
             // Ignore keys we don't recognise and key up codes
-        }
-    }
-
-    if (enable_tty) {
-        char c = tty_get_char(0);
-        switch (c) {
-          case '\0':
-            break;
-          case '\r':
-            return '\n';
-          case ESC:
-            return get_tty_special_key();
-          default:
-            return c;
         }
     }
 
