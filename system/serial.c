@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2023 Sam Demeulemeester
+// Copyright (C) 2004-2025 Sam Demeulemeester
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -116,6 +116,9 @@ void tty_init(void)
     console_serial.baudrate     = tty_baud_rate;
     console_serial.parity       = SERIAL_DEFAULT_PARITY;
     console_serial.bits         = SERIAL_DEFAULT_BITS;
+
+    // Precalculate the frame time (in microseconds).
+    console_serial.frame_time   = (1000000 * (1 + console_serial.bits + console_serial.parity + 1)) / console_serial.baudrate;
 
     // UART MMIO Address is usually above TOLUD and never < 1MB
     if (console_serial.base_addr > 0xFFFF) {
@@ -242,13 +245,17 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
     }
 }
 
-char tty_get_key(void)
+char tty_get_char(int max_wait_frames)
 {
-    int uart_status = serial_read_reg(&console_serial, UART_LSR);
+    int wait_time = max_wait_frames * console_serial.frame_time;
+    do {
+        int uart_status = serial_read_reg(&console_serial, UART_LSR);
+        if (uart_status & UART_LSR_DR) {
+            return serial_read_reg(&console_serial, UART_RX);
+        }
+        usleep(10);
+        wait_time -= 10;
+    } while (wait_time > 0);
 
-    if (uart_status & UART_LSR_DR) {
-        return serial_read_reg(&console_serial, UART_RX);
-    } else {
-        return 0xFF;
-    }
+    return '\0';
 }
