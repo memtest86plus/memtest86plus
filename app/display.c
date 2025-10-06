@@ -402,39 +402,39 @@ void display_error_count(void)
 
 void display_temperature(void)
 {
-    if (!enable_temperature) {
-        return;
-    }
+    if (enable_temp_cpu) {
+        // Display CPU Temperature
+        int actual_cpu_temp = get_cpu_temp();
 
-    // Display CPU Temperature
-    int actual_cpu_temp = get_cpu_temp();
-
-    if (actual_cpu_temp == 0) {
-        if (max_cpu_temp == 0) {
-            enable_temperature = false;
+        if (actual_cpu_temp == 0) {
+            if (max_cpu_temp == 0) {
+                enable_temp_cpu = false;
+            }
+            return;
         }
-        return;
+
+        if (max_cpu_temp < actual_cpu_temp ) {
+            max_cpu_temp = actual_cpu_temp;
+        }
+
+        int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
+        display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset);
     }
 
-    if (max_cpu_temp < actual_cpu_temp ) {
-        max_cpu_temp = actual_cpu_temp;
-    }
+    if (enable_temp_ram) {
+        // Display RAM Temperature (DDR5+ Only) - LA64 unsupported yet
+        if (dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
 
-    int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
-    display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset);
+            for (int i = 0; i < MAX_SPD_SLOT; i++) {
 
-    // Display RAM Temperature (DDR5+ Only) - LA64 unsupported yet
-    if (dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
+                if (!ram_slot_info[i].isPopulated || !ram_slot_info[i].hasTempSensor)
+                    continue;
 
-        for (int i = 0; i < MAX_SPD_SLOT; i++) {
+                int ram_temp = get_ram_temp(i);
 
-            if (!ram_slot_info[i].isPopulated || !ram_slot_info[i].hasTempSensor)
-                continue;
-
-            int ram_temp = get_ram_temp(i);
-
-            if (ram_temp > 0) {
-                display_ram_temperature(ram_temp, ram_slot_info[i].display_idx)
+                if (ram_temp > 0) {
+                    display_ram_temperature(ram_temp, ram_slot_info[i].display_idx)
+                }
             }
         }
     }

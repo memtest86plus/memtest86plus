@@ -92,8 +92,10 @@ bool            exclude_ecores     = true;
 bool            smp_enabled        = true;
 
 bool            enable_big_status  = true;
-bool            enable_temperature = true;
 bool            enable_trace       = false;
+
+bool            enable_temp_cpu    = true;
+bool            enable_temp_ram    = false;             // DDR5+ temperature polling
 
 bool            enable_sm          = true;
 bool            enable_bench       = true;
@@ -901,11 +903,10 @@ void config_menu(bool initial)
             if (!smp_enabled)  set_foreground_colour(BOLD+BLACK);
             prints(POP_R+7,  POP_LI, "<F5>  CPU selection");
             if (!smp_enabled)  set_foreground_colour(WHITE);
-            //if (no_temperature) set_foreground_colour(BOLD+BLACK);
-            printf(POP_R+8,  POP_LI, "<F6>  Temperature %s", enable_temperature ? "disable" : "enable ");
-            //if (no_temperature) set_foreground_colour(WHITE);
-            printf(POP_R+9,  POP_LI, "<F7>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
-            prints(POP_R+10, POP_LI, "<F10> Exit menu");
+            printf(POP_R+8,  POP_LI, "<F6>  CPU Temperature %s", enable_temp_cpu ? "disable" : "enable ");
+            printf(POP_R+9,  POP_LI, "<F7>  RAM Temperature %s", enable_temp_ram ? "disable" : "enable ");
+            printf(POP_R+10, POP_LI, "<F8>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
+            prints(POP_R+11, POP_LI, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
             prints(POP_R+8 , POP_LI, "<F10> Exit menu");
@@ -942,10 +943,15 @@ void config_menu(bool initial)
             break;
           case '6':
             if (initial) {
-                enable_temperature = !enable_temperature;
+                enable_temp_cpu = !enable_temp_cpu;
             }
             break;
           case '7':
+            if (initial) {
+                enable_temp_ram = !enable_temp_ram;
+            }
+            break;
+          case '8':
             if (initial) {
                 enable_trace = !enable_trace;
             }

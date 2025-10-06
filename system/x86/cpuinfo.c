@@ -396,7 +396,7 @@ static void determine_imc(void)
                 break;
               case 0x3:
                 imc.family = IMC_CLT;
-                enable_temperature = false;   // Atom Clover Trail
+                enable_temp_cpu = false;      // Atom Clover Trail
                 break;
               case 0x4:
                 imc.family = IMC_HSW_ULT;     // Core 4th Gen (Haswell-ULT)
@@ -413,11 +413,11 @@ static void determine_imc(void)
             switch (cpuid_info.version.extendedModel) {
               case 0x2:
                 imc.family = IMC_TNC;         // Atom Tunnel Creek / Lincroft
-                enable_temperature = false;
+                enable_temp_cpu = false;
                 break;
               case 0x3:
                 imc.family = IMC_CDT;         // Atom Cedar Trail
-                enable_temperature = false;
+                enable_temp_cpu = false;
                 break;
               case 0x4:
                 imc.family = IMC_HSW;         // Core 4th Gen (Haswell w/ GT3e)
@@ -491,7 +491,7 @@ static void determine_imc(void)
                 } else {
                     imc.family = IMC_SLT;     // Atom Silverthorne / Diamondvile
                 }
-                enable_temperature = false;
+                enable_temp_cpu = false;
                 break;
               case 0x2:
                 imc.family = IMC_WMR;         // Core i7 1st Gen 32 nm (Westmere)

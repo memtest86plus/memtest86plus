@@ -25,7 +25,7 @@ float cpu_temp_offset = 0;
 
 void cpu_temp_init(void)
 {
-    if (!enable_temperature) {
+    if (!enable_temp_cpu) {
         return;
     }
 

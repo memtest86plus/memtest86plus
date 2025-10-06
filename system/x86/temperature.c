@@ -54,7 +54,7 @@ void cpu_temp_init(void)
 {
     uint32_t regl, regh;
 
-    if (!enable_temperature) {
+    if (!enable_temp_cpu) {
         return;
     }
 
