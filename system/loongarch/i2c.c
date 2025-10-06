@@ -9,7 +9,7 @@
 #include "cpuid.h"
 #include "memrw.h"
 #include "vmem.h"
-#include "smbus.h"
+#include "i2c_x86.h"
 #include "i2c.h"
 #include "spd.h"
 

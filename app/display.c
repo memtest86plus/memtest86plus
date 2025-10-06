@@ -8,13 +8,13 @@
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwctrl.h"
+#include "i2c_x86.h"
 #include "io.h"
 #include "keyboard.h"
 #include "memctrl.h"
 #include "serial.h"
 #include "pmem.h"
 #include "smbios.h"
-#include "smbus.h"
 #include "spd.h"
 #include "temperature.h"
 #include "tsc.h"
@@ -402,27 +402,42 @@ void display_error_count(void)
 
 void display_temperature(void)
 {
-    if (!enable_temperature) {
-        return;
-    }
+    if (enable_temp_cpu) {
+        // Display CPU Temperature
+        int actual_cpu_temp = get_cpu_temp();
 
-    int actual_cpu_temp = get_cpu_temperature();
-
-    if (actual_cpu_temp == 0) {
-        if (max_cpu_temp == 0) {
-            enable_temperature = false;
+        if (actual_cpu_temp == 0) {
+            if (max_cpu_temp == 0) {
+                enable_temp_cpu = false;
+            }
+            return;
         }
-        return;
+
+        if (max_cpu_temp < actual_cpu_temp ) {
+            max_cpu_temp = actual_cpu_temp;
+        }
+
+        int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
+        display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset);
     }
 
-    if (max_cpu_temp < actual_cpu_temp ) {
-        max_cpu_temp = actual_cpu_temp;
+    if (enable_temp_ram) {
+        // Display RAM Temperature (DDR5+ Only) - LA64 unsupported yet
+        if (dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
+
+            for (int i = 0; i < MAX_SPD_SLOT; i++) {
+
+                if (!ram_slot_info[i].isPopulated || !ram_slot_info[i].hasTempSensor)
+                    continue;
+
+                int ram_temp = get_ram_temp(i);
+
+                if (ram_temp > 0) {
+                    display_ram_temperature(ram_temp, ram_slot_info[i].display_idx)
+                }
+            }
+        }
     }
-
-    int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
-
-    clear_screen_region(1, 18, 1, 22);
-    printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8);
 }
 
 void display_big_status(bool pass)

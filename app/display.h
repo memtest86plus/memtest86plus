@@ -47,6 +47,12 @@ typedef enum {
 #define display_cpu_clk(freq) \
     printf(1, 10, "%iMHz", freq)
 
+#define display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset) \
+    { \
+        clear_screen_region(1, 18, 1, 22); \
+        printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
+    }
+
 #define display_cpu_addr_mode(str) \
     prints(4, 75, str)
 
@@ -73,6 +79,9 @@ typedef enum {
 
 #define display_ram_speed(speed) \
     printf(5, 18, "%S6kB/s", (uintptr_t)(speed))
+
+#define display_ram_temperature(ram_temp, idx) \
+    printf(idx+ROW_SPD, SCREEN_WIDTH-4, "%i%cC", ram_temp, 0xF8);
 
 #define display_status(status) \
     prints(7, 68, status)

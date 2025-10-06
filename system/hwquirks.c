@@ -99,7 +99,7 @@ static void get_vt82c597_mb_cache_size(void)
 
 static void disable_temp_reporting(void)
 {
-    enable_temperature = false;
+    enable_temp_cpu = false;
 }
 
 static void amd_k8_revfg_temp(void)
@@ -168,7 +168,8 @@ static void unhide_asus_smbus(void)
     if ((smb_ctrl_reg & 1) == 0) { return; }
 
     // Read MMIO at offset 0x3418
-    uint32_t *ptr =  (uint32_t *)((smb_ctrl_reg & 0xFFFFC000) + 0x3418);
+    uintptr_t base = (uintptr_t)(smb_ctrl_reg & ~0x3FFFu);
+    uint32_t *ptr = (uint32_t *)(base + 0x3418u);
 
     // Set Bit 3 to 0 to enable SMBUS Controler
     *ptr &= ~(1u << 3);
