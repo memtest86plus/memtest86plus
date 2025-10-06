@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
-// Copyright (C) 2004-2023 Sam Demeulemeester.
+// Copyright (C) 2004-2025 Sam Demeulemeester.
 
 #include <stdint.h>
 
@@ -8,9 +8,12 @@
 #include "cpuid.h"
 #include "cpuinfo.h"
 #include "hwquirks.h"
+#include "i2c_x86.h"
 #include "memctrl.h"
 #include "msr.h"
 #include "pci.h"
+#include "smbios.h"
+#include "spd.h"
 
 #include "temperature.h"
 
@@ -47,11 +50,11 @@ void get_specific_TjMax(void)
     }
 }
 
-void temperature_init(void)
+void cpu_temp_init(void)
 {
     uint32_t regl, regh;
 
-    if (!enable_temperature) {
+    if (!enable_temp_cpu) {
         return;
     }
 
@@ -77,7 +80,7 @@ void temperature_init(void)
     }
 }
 
-int get_cpu_temperature(void)
+int get_cpu_temp(void)
 {
     uint32_t regl, regh;
 
@@ -146,4 +149,25 @@ int get_cpu_temperature(void)
     }
 
     return 0;
+}
+
+int get_ram_temp(uint8_t slot)
+{
+    uint16_t temp_reg;
+    float ram_temp;
+
+    // RAM Temperature is only supported on DDR5
+    if (dmi_memory_device->type != DMI_DDR5 || slot >= MAX_SPD_SLOT)
+        return 0;
+
+    // Check if slot has a temp sensor
+    if (ram_slot_info[slot].isPopulated == false || ram_slot_info[slot].hasTempSensor == false)
+        return 0;
+
+    temp_reg = get_spd_hub_register(slot, SPD5_HUB_TS_LSB);
+    temp_reg |= get_spd_hub_register(slot, SPD5_HUB_TS_MSB) << 8;
+
+    ram_temp = (temp_reg >> 2) / 4.0f;
+
+    return ram_temp;
 }

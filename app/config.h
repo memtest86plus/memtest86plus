@@ -54,8 +54,10 @@ extern bool         exclude_ecores;
 extern bool         smp_enabled;
 
 extern bool         enable_big_status;
-extern bool         enable_temperature;
 extern bool         enable_trace;
+
+extern bool         enable_temp_cpu;
+extern bool         enable_temp_ram;
 
 extern bool         enable_sm;
 extern bool         enable_tty;

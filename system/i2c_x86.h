@@ -1,5 +1,5 @@
-#ifndef _SMBUS_H_
-#define _SMBUS_H_
+#ifndef _I2C_X86_H_
+#define _I2C_X86_H_
 /**
  * SPDX-License-Identifier: GPL-2.0
  *
@@ -12,8 +12,6 @@
 
 #define I2C_WRITE   0
 #define I2C_READ    1
-
-#define SPD5_MR11 11
 
 /* i801 Hosts Addresses */
 #define SMBHSTSTS   smbusbase
@@ -116,5 +114,6 @@ struct pci_smbus_controller {
 void print_spd_startup_info(void);
 
 uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
+uint8_t get_spd_hub_register(uint8_t slot_idx, uint8_t spd_hub_adr);
 
-#endif // SMBUS_H
+#endif // I2C_X86_H

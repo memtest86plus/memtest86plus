@@ -45,9 +45,6 @@ void get_imc_config_amd_zen(void)
     uint32_t smn_reg, offset;
     uint32_t reg_cha, reg_chb;
 
-    /* Select UMC MCA MSR base */
-    uint32_t mca_ctrl_base = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_CTRL : MSR_AMD64_K17_UMC_MCA_CTRL;
-
     imc.tCL_dec = 0;
 
     // Get Memory Mapped Register Base Address (Enable MMIO if needed)
@@ -95,6 +92,10 @@ void get_imc_config_amd_zen(void)
 
     // Detect ECC (x64 only)
 #if TESTWORD_WIDTH > 32
+
+    /* Select UMC MCA MSR base */
+    uint32_t mca_ctrl_base = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_CTRL : MSR_AMD64_K17_UMC_MCA_CTRL;
+
     if (enable_ecc_polling) {
         uint32_t regl, regh;
 
