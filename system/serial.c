@@ -65,7 +65,7 @@ static void serial_wait_for_xmit(struct serial_port *port)
     } while ((lsr & BOTH_EMPTY) != BOTH_EMPTY);
 }
 
-void serial_echo_print(const char *p)
+static void serial_echo_print(const char *p)
 {
     struct serial_port *port = &console_serial;
 
@@ -81,7 +81,7 @@ void serial_echo_print(const char *p)
     }
 }
 
-void tty_goto(int y, int x)
+static void tty_goto(int y, int x)
 {
     static char s[3];
 
