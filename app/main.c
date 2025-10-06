@@ -153,6 +153,7 @@ uintptr_t   test_addr[MAX_CPUS];
 static void run_at(uintptr_t addr, int my_cpu)
 {
     uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
+    void (*fn)(void) = (void (*)())new_start_addr;
 
     if (my_cpu == 0) {
         // Copy the program code and all data except the stacks.
@@ -171,7 +172,7 @@ static void run_at(uintptr_t addr, int my_cpu)
     __asm__ __volatile__("movl %0, %%edi" : : "r" (new_start_addr));
 #endif
 
-    goto *new_start_addr;
+    fn();
 }
 
 static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t lower_limit, uintptr_t upper_limit)
