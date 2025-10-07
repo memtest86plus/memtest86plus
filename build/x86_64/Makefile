@@ -1,8 +1,9 @@
-AS = as -64
-CC = gcc
-OBJCOPY = objcopy
+AS ?= as -64
+CC ?= gcc
+LD ?= ld
+OBJCOPY ?= objcopy
 
-GIT = git
+GIT ?= git
 
 ifeq ($(GIT),none)
   GIT_AVAILABLE = false
@@ -167,7 +168,7 @@ FORCE:
 # then link it dynamically so I have full relocation information.
 
 memtest_shared: $(OBJS) $(MS_LDS) Makefile
-	$(LD) --warn-constructors --warn-common -static -T $(MS_LDS) -o $@ $(OBJS) && \
+	$(LD) --warn-common -static -T $(MS_LDS) -o $@ $(OBJS) && \
 	$(LD) -shared -Bsymbolic -T $(MS_LDS) -o $@ $(OBJS)
 
 memtest_shared.bin: memtest_shared

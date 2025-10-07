@@ -20,6 +20,7 @@ SECTIONS {
 	.hash       : { *(.hash) }
 	.gnu.hash   : { *(.gnu.hash) }
 	.dynamic    : { *(.dynamic) }
+	.shstrtab   : { *(.shstrtab) }
 
 	.rel.text    : { *(.rel.text   .rel.text.*) }
 	.rel.rodata  : { *(.rel.rodata .rel.rodata.*) }
