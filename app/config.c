@@ -95,7 +95,7 @@ bool            enable_big_status  = true;
 bool            enable_trace       = false;
 
 bool            enable_temp_cpu    = true;
-bool            enable_temp_ram    = false;             // DDR5+ temperature polling
+bool            enable_temp_ram    = true;              // DDR5+ temperature polling
 
 bool            enable_sm          = true;
 bool            enable_bench       = true;
