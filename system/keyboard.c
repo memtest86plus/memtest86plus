@@ -240,17 +240,17 @@ static char get_vt220_sequence1(void)
       case 'S':
         return '4';  // VT100/VT220 PF4 (F4 in terminal emulators)
       case 'T':
-        return '5';  // VT100/VT220 PF5 (F5 in terminal emulators)
+        return '5';  // F5 in some terminal emulators
       case 'U':
-        return '6';  // VT100/VT220 PF6 (F6 in terminal emulators)
+        return '6';  // F6 in some terminal emulators
       case 'V':
-        return '7';  // VT100/VT220 PF7 (F7 in terminal emulators)
+        return '7';  // F7 in some terminal emulators
       case 'W':
-        return '8';  // VT100/VT220 PF8 (F8 in terminal emulators)
+        return '8';  // F8 in some terminal emulators
       case 'X':
-        return '9';  // VT100/VT220 PF9 (F9 in terminal emulators)
+        return '9';  // F9 in some terminal emulators
       case 'Y':
-        return '0';  // VT100/VT220 PF10 (F10 in terminal emulators)
+        return '0';  // F10 in some terminal emulators
       default:
         return '\0'; // unrecognised key
         break;
