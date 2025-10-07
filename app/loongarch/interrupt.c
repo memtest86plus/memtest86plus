@@ -11,7 +11,10 @@
 #include "hwctrl.h"
 #include "screen.h"
 #include "keyboard.h"
+#include "serial.h"
 #include "smp.h"
+
+#include "config.h"
 #include "display.h"
 
 #include <larchintrin.h>
@@ -226,6 +229,10 @@ void interrupt(struct system_context *system_context)
 
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, "Press any key to reboot...");
+
+    if (enable_tty) {
+        tty_full_redraw();
+    }
 
     while (get_key() == 0) { }
     reboot();

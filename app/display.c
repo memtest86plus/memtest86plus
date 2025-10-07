@@ -229,6 +229,10 @@ void display_init(void)
     }
 
     scroll_message_row = ROW_SCROLL_T;
+
+    if (enable_tty) {
+        tty_full_redraw();
+    }
 }
 
 void display_cpu_topology(void)
@@ -525,6 +529,9 @@ void set_scroll_lock(bool enabled)
     set_foreground_colour(palette.footer_foreground);
     prints(ROW_FOOTER, 48, scroll_lock ? "unlock" : "lock  ");
     set_foreground_colour(palette.foreground);
+    if (enable_tty) {
+        tty_footer_redraw();
+    }
 }
 
 void toggle_scroll_lock(void)
@@ -548,6 +555,9 @@ void scroll(void)
         scroll_wait = false;
         clear_footer_message();
         scroll_screen_region(ROW_SCROLL_T, 0, ROW_SCROLL_B, SCREEN_WIDTH - 1);
+        if (enable_tty) {
+            tty_scroll_redraw();
+        }
     }
 }
 
