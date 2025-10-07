@@ -29,6 +29,7 @@ SECTIONS {
 		. = ALIGN(512);
 		_file_sbat_end = . ;
 	}
+	.shstrtab : { *(.shstrtab) }
 	/DISCARD/ : { *(*) }
 
 	_real_text_size  = _real_text_end  - _file_text_start;

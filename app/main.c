@@ -171,7 +171,8 @@ static void run_at(uintptr_t addr, int my_cpu)
     __asm__ __volatile__("movl %0, %%edi" : : "r" (new_start_addr));
 #endif
 
-    goto *new_start_addr;
+    // Jump to new_start_addr.
+    ((void (*)(void))new_start_addr)();
 }
 
 static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t lower_limit, uintptr_t upper_limit)
