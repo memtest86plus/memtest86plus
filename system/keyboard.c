@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2020-2025 Martin Whitaker.
 
 #include <stdint.h>
 
@@ -12,6 +12,13 @@
 
 #include "keyboard.h"
 #include "config.h"
+
+//------------------------------------------------------------------------------
+// Private Constants
+//------------------------------------------------------------------------------
+
+// The number of frame periods to wait during escape sequence parsing.
+#define TTY_SEQ_WAIT_TIME   2
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -217,6 +224,133 @@ static const char usb_hid_keymap[] = {
 keyboard_types_t keyboard_types = KT_NONE;
 
 //------------------------------------------------------------------------------
+// Private Functions
+//------------------------------------------------------------------------------
+
+// This function is called when an ESC O prefix has been detected.
+static char get_vt220_sequence1(void)
+{
+    switch (tty_get_char(TTY_SEQ_WAIT_TIME)) {
+      case 'P':
+        return '1';  // VT100/VT220 PF1 (F1 in terminal emulators)
+      case 'Q':
+        return '2';  // VT100/VT220 PF2 (F2 in terminal emulators)
+      case 'R':
+        return '3';  // VT100/VT220 PF3 (F3 in terminal emulators)
+      case 'S':
+        return '4';  // VT100/VT220 PF4 (F4 in terminal emulators)
+      case 'T':
+        return '5';  // F5 in some terminal emulators
+      case 'U':
+        return '6';  // F6 in some terminal emulators
+      case 'V':
+        return '7';  // F7 in some terminal emulators
+      case 'W':
+        return '8';  // F8 in some terminal emulators
+      case 'X':
+        return '9';  // F9 in some terminal emulators
+      case 'Y':
+        return '0';  // F10 in some terminal emulators
+      default:
+        return '\0'; // unrecognised key
+        break;
+    }
+}
+
+// This function is called when an ESC [ prefix has been detected.
+static char get_vt220_sequence2(void)
+{
+    char ch1;
+    char ch2;
+
+    ch1 = tty_get_char(TTY_SEQ_WAIT_TIME);
+    switch (ch1) {
+      case 'A':
+        return 'u';  // VT100/VT220 cursor up
+      case 'B':
+        return 'd';  // VT100/VT220 cursor down
+      case 'C':
+        return 'r';  // VT100/VT220 cursor right
+      case 'D':
+        return 'l';  // VT100/VT220 cursor left
+      default:
+        break;
+    }
+    if ((ch1 < '1') || (ch1 > '6')) {
+        return '\0';  // unrecognised sequence - give up
+    }
+    ch2 = tty_get_char(TTY_SEQ_WAIT_TIME);
+    if (ch2 == '~') {
+        return '\0';  // VT100/VT220 editing key - ignore it
+    }
+    switch (ch1) {
+      case '1':
+        switch (ch2) {
+          case '1':
+            ch1 = '1'; break;  // F1 in terminal emulators
+          case '2':
+            ch1 = '2'; break;  // F2 in terminal emulators
+          case '3':
+            ch1 = '3'; break;  // F3 in terminal emulators
+          case '4':
+            ch1 = '4'; break;  // F4 in terminal emulators
+          case '5':
+            ch1 = '5'; break;  // F5 in terminal emulators
+          case '7':
+            ch1 = '6'; break;  // VT220 F6
+          case '8':
+            ch1 = '7'; break;  // VT220 F7
+          case '9':
+            ch1 = '8'; break;  // VT220 F8
+          default:
+            ch1 = '\0'; break; // unrecognised key
+        }
+        break;
+      case '2':
+        switch (ch2) {
+          case '0':
+            ch1 = '9'; break;  // VT220 F9
+          case '1':
+            ch1 = '0'; break;  // VT220 F10
+          default:
+            ch1 = '\0'; break; // unrecognised key
+        }
+        break;
+      default:
+        ch1 = '\0';  // unrecognised key
+        break;
+    }
+    ch2 = tty_get_char(TTY_SEQ_WAIT_TIME);
+    if (ch2 == '~') {
+        return ch1;  // valid key sequence - return decoded key
+    }
+    return '\0';  // invalid key sequence - ignore it
+}
+
+// This function is called when an ESC has been detected.
+static char get_tty_special_key(void)
+{
+    switch (tty_get_char(TTY_SEQ_WAIT_TIME)) {
+      case 'A':
+        return 'u';  // VT52 cursor up
+      case 'B':
+        return 'd';  // VT52 cursor down
+      case 'C':
+        return 'r';  // VT52 cursor right
+      case 'D':
+        return 'l';  // VT52 cursor left
+      case 'O':
+        return get_vt220_sequence1();
+      case '[':
+        return get_vt220_sequence2();
+      case '\0':
+        return ESC;  // timeout - return ESC character
+      default:
+        return '\0'; // unrecognised sequence - give up
+    }
+}
+
+//------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
@@ -239,6 +373,20 @@ void keyboard_init(void)
 
 char get_key(void)
 {
+    if (enable_tty) {
+        char c = tty_get_char(0);
+        switch (c) {
+          case '\0':
+            break;
+          case '\r':
+            return '\n';
+          case ESC:
+            return get_tty_special_key();
+          default:
+            return c;
+        }
+    }
+
     if (keyboard_types & KT_USB) {
         uint8_t c = get_usb_keycode();
         if (c > 0 && c < sizeof(usb_hid_keymap)) {
@@ -271,14 +419,6 @@ char get_key(void)
             escaped = (c == 0xe0);
 
             // Ignore keys we don't recognise and key up codes
-        }
-    }
-
-    if (enable_tty) {
-        uint8_t c = tty_get_key();
-        if (c != 0xFF) {
-            if (c == 0x0D) c = '\n'; // Enter
-            return c;
         }
     }
 
