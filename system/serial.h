@@ -7,7 +7,7 @@
  * display via Serial/UART.
  *
  *//*
- * Copyright (C) 2004-2023 Sam Demeulemeester.
+ * Copyright (C) 2004-2025 Sam Demeulemeester.
  */
 
 #define SERIAL_DEFAULT_BITS     8
@@ -26,6 +26,7 @@ struct serial_port {
     int parity;
     int bits;
     int baudrate;
+    int frame_time;
     int reg_width;
     int refclk;
     uintptr_t base_addr;
@@ -179,6 +180,6 @@ void tty_print(int y, int x, const char *p);
 
 void tty_send_region(int start_row, int start_col, int end_row, int end_col);
 
-char tty_get_key(void);
+char tty_get_char(int max_wait_frames);
 
 #endif /* _SERIAL_REG_H */
