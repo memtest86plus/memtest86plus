@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "cpuid.h"
+#include "msr.h"
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -164,6 +165,20 @@ void cpuid_init(void)
                 }
             }
             cpuid_info.topology.core_count = cpuid_info.topology.thread_count / thread_per_core;
+        }
+        // Attempt to enable SSE on K7 Palomino/Morgan/Thoroughbred/Applebred/Barton if the BIOS neglected to do so.
+        if (cpuid_info.version.family == 6 && (cpuid_info.version.model >= 6 && cpuid_info.version.model <= 10)) {
+            if (!cpuid_info.flags.sse) {
+                uint32_t regl, regh;
+                rdmsr(MSR_K7_HWCR, regl, regh);
+                wrmsr(MSR_K7_HWCR, regl & ~ (1U << 15), regh);
+                cpuid(0x1, 0,
+                    &cpuid_info.version.raw[0],
+                    &cpuid_info.proc_info.raw,
+                    &cpuid_info.flags.raw[1],
+                    &cpuid_info.flags.raw[0]
+                );
+            }
         }
         break;
        case 'C':
