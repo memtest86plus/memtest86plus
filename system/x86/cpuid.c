@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "cpuid.h"
 
@@ -105,6 +106,10 @@ void cpuid_init(void)
         while (q <= &cpuid_info.brand_id.str[CPUID_BRAND_STR_LENGTH]) {
             *q++ = '\0';
         }
+    }
+    // Correct Steam Deck APU
+    if (strncmp("AMD Custom APU 0932", cpuid_info.brand_id.str, sizeof("AMD Custom APU 0932")) == 0) {
+        memcpy(cpuid_info.brand_id.str, "AMD Vangogh (Steam Deck)", sizeof("AMD Vangogh (Steam Deck)"));
     }
 
     // Get cache information.
