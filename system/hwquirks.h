@@ -38,7 +38,7 @@ typedef enum {
 
 typedef struct {
     quirk_id_t   id;
-    uint8_t      type;
+    uint16_t     type;
     uint16_t     root_vid;
     uint16_t     root_did;
     void (*process)(void);
