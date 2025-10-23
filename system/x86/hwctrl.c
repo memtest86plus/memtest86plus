@@ -19,6 +19,7 @@
 #include "unistd.h"
 
 #include "hwctrl.h"
+#include "hwquirks.h"
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -55,10 +56,11 @@ void hwctrl_init(void)
 void reboot(void)
 {
     // Use cf9 method as first try
-    uint8_t cf9 = inb(0xcf9) & ~6;
+    uint8_t method = (quirk.type & QUIRK_TYPE_COLDBOOT) ? 0x0E : 0x06;
+    uint8_t cf9 = inb(0xcf9) & ~(method);
     outb(cf9|2, 0xcf9); // Request hard reset
     usleep(50);
-    outb(cf9|6, 0xcf9); // Actually do the reset
+    outb(cf9|method, 0xcf9); // Actually do the reset
     usleep(50);
 
     // If we have UEFI, try EFI reset service

@@ -8,6 +8,9 @@
 //
 // Please add a quick comment for every quirk added to the list.
 
+#include <stdint.h>
+#include <string.h>
+
 #include "hwquirks.h"
 #include "io.h"
 #include "pci.h"
@@ -284,6 +287,14 @@ void quirks_init(void)
                 quirk.process = disable_temp_reporting;
             }
         }
+    }
+
+    //  ------------------------------------
+    //  -- Steam Deck coldboot workaround --
+    //  ------------------------------------
+    // The Steam Deck corrupts the screen while booting if warmbooted.
+    if (strncmp("AMD Vangogh (Steam Deck)", cpuid_info.brand_id.str, sizeof("AMD Vangogh (Steam Deck)")) == 0) {
+        quirk.type |= QUIRK_TYPE_COLDBOOT;
     }
 
     //  -----------------------------------------------------------
