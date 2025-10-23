@@ -87,7 +87,7 @@ int max_cpu_temp = 0;
 
 display_mode_t display_mode = DISPLAY_MODE_NA;
 
-screen_palette_t palette = {BLUE, WHITE, WHITE, BLACK, WHITE, BLUE, BLACK, BLACK, GREEN, RED};
+screen_palette_t palette = {BLACK, WHITE, WHITE, BLACK, WHITE, BLACK, GREEN, RED, BLACK, BLACK};
 
 //------------------------------------------------------------------------------
 // Private Functions
