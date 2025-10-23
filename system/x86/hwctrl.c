@@ -20,6 +20,7 @@
 
 #include "hwctrl.h"
 #include "hwquirks.h"
+#include "interrupt.h"
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -55,6 +56,7 @@ void hwctrl_init(void)
 
 void reboot(void)
 {
+    ignoreInterrupts(true);
     bool cold = quirk.type & QUIRK_TYPE_COLDBOOT;
 
     // Use cf9 method as first try
