@@ -87,7 +87,7 @@ int max_cpu_temp = 0;
 
 display_mode_t display_mode = DISPLAY_MODE_NA;
 
-screen_palette_t palette = {BLUE, WHITE, WHITE, BLACK, WHITE, BLUE, BLACK};
+screen_palette_t palette = {BLUE, WHITE, WHITE, BLACK, WHITE, BLUE, BLACK, BLACK, GREEN, RED};
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -97,23 +97,29 @@ static void set_screen_palette(screen_palette_t *mt_palette)
 {
     if (dark_mode) {
         *mt_palette = (screen_palette_t){
-            .background        = BLACK,
-            .foreground        = WHITE,
-            .title_background  = WHITE,
-            .title_foreground  = BLACK,
-            .footer_background = WHITE,
-            .footer_foreground = BLACK,
-            .popup_background  = WHITE
+            .background            = BLACK,
+            .foreground            = WHITE,
+            .title_background      = WHITE,
+            .title_foreground      = BLACK,
+            .footer_background     = WHITE,
+            .footer_foreground     = BLACK,
+            .popup_background_pass = GREEN,
+            .popup_background_fail = RED,
+            .popup_foreground_pass = BLACK,
+            .popup_foreground_fail = BLACK
         };
     } else {
         *mt_palette = (screen_palette_t){
-            .background        = BLUE,
-            .foreground        = WHITE,
-            .title_background  = WHITE,
-            .title_foreground  = BLACK,
-            .footer_background = WHITE,
-            .footer_foreground = BLUE,
-            .popup_background  = BLACK
+            .background            = BLUE,
+            .foreground            = WHITE,
+            .title_background      = WHITE,
+            .title_foreground      = BLACK,
+            .footer_background     = WHITE,
+            .footer_foreground     = BLUE,
+            .popup_background_pass = BLACK,
+            .popup_background_fail = BLACK,
+            .popup_foreground_pass = GREEN,
+            .popup_foreground_fail = RED
         };
     }
 }
@@ -448,8 +454,13 @@ void display_big_status(bool pass)
 
     save_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
 
-    set_background_colour(palette.popup_background);
-    set_foreground_colour(pass ? GREEN : RED);
+    if (pass) {
+        set_background_colour(palette.popup_background_pass);
+        set_foreground_colour(palette.popup_foreground_pass);
+    } else {
+        set_background_colour(palette.popup_background_fail);
+        set_foreground_colour(palette.popup_foreground_fail);
+    }
     clear_screen_region(POP_STATUS_REGION);
 
     if (pass) {
