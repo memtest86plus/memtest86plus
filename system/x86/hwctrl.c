@@ -55,10 +55,10 @@ void hwctrl_init(void)
 void reboot(void)
 {
     // Use cf9 method as first try
-    uint8_t cf9 = inb(0xcf9) & ~6;
+    uint8_t cf9 = inb(0xcf9) & ~0x0E;
     outb(cf9|2, 0xcf9); // Request hard reset
     usleep(50);
-    outb(cf9|6, 0xcf9); // Actually do the reset
+    outb(cf9|0x0E, 0xcf9); // Actually do the reset
     usleep(50);
 
     // If we have UEFI, try EFI reset service
