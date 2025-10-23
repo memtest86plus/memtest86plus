@@ -55,7 +55,10 @@ typedef struct {
     screen_colour_t title_foreground;
     screen_colour_t footer_background;
     screen_colour_t footer_foreground;
-    screen_colour_t popup_background;
+    screen_colour_t popup_background_pass;
+    screen_colour_t popup_background_fail;
+    screen_colour_t popup_foreground_pass;
+    screen_colour_t popup_foreground_fail;
 } screen_palette_t;
 
 /**
