@@ -293,7 +293,7 @@ void quirks_init(void)
     //  -- Steam Deck coldboot workaround --
     //  ------------------------------------
     // The Steam Deck corrupts the screen while booting if warmbooted.
-    if (strncmp("AMD Vangogh (Steam Deck)", cpuid_info.brand_id.str, sizeof("AMD Vangogh (Steam Deck)")) == 0) {
+    if (strncmp("AMD Vangogh", cpuid_info.brand_id.str, sizeof("AMD Vangogh") - 1) == 0) {
         quirk.type |= QUIRK_TYPE_COLDBOOT;
     }
 
