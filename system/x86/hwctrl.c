@@ -55,8 +55,10 @@ void hwctrl_init(void)
 
 void reboot(void)
 {
+    bool cold = quirk.type & QUIRK_TYPE_COLDBOOT;
+
     // Use cf9 method as first try
-    uint8_t method = (quirk.type & QUIRK_TYPE_COLDBOOT) ? 0x0E : 0x06;
+    uint8_t method = cold ? 0x0E : 0x06;
     uint8_t cf9 = inb(0xcf9) & ~(method);
     outb(cf9|2, 0xcf9); // Request hard reset
     usleep(50);
@@ -65,7 +67,7 @@ void reboot(void)
 
     // If we have UEFI, try EFI reset service
     if (efi_rs_table != NULL) {
-        efi_rs_table->reset_system(EFI_RESET_COLD, 0, 0);
+        efi_rs_table->reset_system(cold ? EFI_RESET_COLD : EFI_RESET_WARM, 0, 0);
         usleep(1000000);
     }
 
