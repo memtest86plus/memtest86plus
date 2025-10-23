@@ -67,7 +67,7 @@ static uint32_t lfb_pallete[16];
 
 static lfb_rotate_t lfb_rotate = LFB_TOP_UP;
 
-static uint8_t current_attr = WHITE | BLUE << 4;
+static uint8_t current_attr = WHITE | BLACK << 4;
 
 //------------------------------------------------------------------------------
 // Private Functions
