@@ -20,7 +20,7 @@ ifeq ($(DEBUG), 1)
   OPT_FAST=-Og
   MS_LDS=memtest_shared_debug.lds
 else
-  OPT_SMALL=-Os
+  OPT_SMALL=-Os -ffast-math
   OPT_FAST=-O3 -ffast-math -ftree-vectorize
   MS_LDS=ldscripts/memtest_shared.lds
 endif
