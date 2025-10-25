@@ -166,13 +166,14 @@ static void run_at(uintptr_t addr, int my_cpu)
     }
     LONG_BARRIER;
 
+    // Jump to new_start_addr.
 #ifdef __i386__
     // The 32-bit startup code needs to know where it is located.
-    __asm__ __volatile__("movl %0, %%edi" : : "r" (new_start_addr));
+    __asm__ __volatile__("movl %0, %%edi; jmp *%0" : : "r" (new_start_addr));
+    __builtin_unreachable();
+#else
+    ((void (*)(void))new_start_addr)(); // Formerly a non-portable construct: goto *new_start_addr;
 #endif
-
-    // Jump to new_start_addr.
-    ((void (*)(void))new_start_addr)();
 }
 
 static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t lower_limit, uintptr_t upper_limit)
