@@ -38,8 +38,6 @@ static efi_system_table_t *sys_table = NULL;
 static uint32_t pref_h_resolution;
 static uint32_t pref_v_resolution;
 
-static bool rotate;
-
 static bool debug;
 
 //------------------------------------------------------------------------------
@@ -214,14 +212,6 @@ static void parse_option(const char *option, int option_length)
 
     option_length -= 7;
     option += 7;
-    if ((option_length == 6) && (strncmp(option, "rhs-up", 6) == 0)) {
-        rotate = true;
-        return;
-    }
-    if ((option_length == 6) && (strncmp(option, "lhs-up", 6) == 0)) {
-        rotate = true;
-        return;
-    }
     if ((option_length >= 6) && (strncmp(option, "mode=", 5) == 0)) {
         option_length -= 5;
         option += 5;
@@ -256,7 +246,6 @@ static void parse_cmd_line(uintptr_t cmd_line_addr, int cmd_line_size)
 {
     pref_h_resolution = UINT32_MAX;
     pref_v_resolution = UINT32_MAX;
-    rotate = false;
 
     if (cmd_line_addr != 0) {
         const char *cmd_line = (const char *)cmd_line_addr;
@@ -440,9 +429,6 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
             print_string(" x ");
             print_dec(pref_v_resolution);
         }
-        if (rotate) {
-            print_string(" rotated");
-        }
         print_string("\n");
     }
 
@@ -467,20 +453,11 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
                 best_info = *info;
                 break;
             }
-            if (rotate) {
-                if (info->v_resolution >= MIN_H_RESOLUTION
-                 && info->h_resolution >= MIN_V_RESOLUTION
-                 && info->v_resolution < best_info.v_resolution) {
-                    best_mode = mode_num;
-                    best_info = *info;
-                }
-            } else {
-                if (info->h_resolution >= MIN_H_RESOLUTION
-                 && info->v_resolution >= MIN_V_RESOLUTION
-                 && info->h_resolution < best_info.h_resolution) {
-                    best_mode = mode_num;
-                    best_info = *info;
-                }
+            if (info->h_resolution >= MIN_H_RESOLUTION
+             && info->v_resolution >= MIN_V_RESOLUTION
+             && (info->h_resolution < best_info.h_resolution || info->v_resolution < best_info.v_resolution)) {
+                best_mode = mode_num;
+                best_info = *info;
             }
             efi_call_bs(free_pool, info);
         }
