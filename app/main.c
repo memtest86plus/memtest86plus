@@ -214,6 +214,10 @@ static void global_init(void)
 
     hwctrl_init();
 
+    pci_init();
+
+    quirks_init();
+
     screen_init();
 
     cpuinfo_init();
@@ -221,10 +225,6 @@ static void global_init(void)
     pmem_init();
 
     heap_init();
-
-    pci_init();
-
-    quirks_init();
 
     acpi_init();
 
