@@ -177,8 +177,10 @@ recognised:
       * legacy
       * usb
       * both
-  * dark
-    * change the default background colour from blue to black
+  * theme=light
+    * use the classic light theme
+  * theme=dark
+    * use the new dark theme (default)
   * screen.mode=*w*x*h* (EFI framebuffer only)
     * where *w*x*h* is the preferred screen resolution (e.g. 1024x768)
   * screen.mode=bios (EFI framebuffer only)
