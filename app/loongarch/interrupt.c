@@ -8,6 +8,8 @@
 //------------------------------------------------------------------------------
 
 #include <stdint.h>
+#include <stdbool.h>
+
 #include "hwctrl.h"
 #include "screen.h"
 #include "keyboard.h"
@@ -90,6 +92,7 @@ static const char  *exception_code[]    = {
   "#TBR - TLB refill exception"
 };
 
+static volatile bool ignoreI = false;
 
 struct system_context {
     //
@@ -144,6 +147,9 @@ struct system_context {
 
 void interrupt(struct system_context *system_context)
 {
+    if (ignoreI)
+        return;
+
     uint8_t ecode;
 
     if (system_context->estat & (1 << INT_IPI)) {
@@ -230,3 +236,9 @@ void interrupt(struct system_context *system_context)
     while (get_key() == 0) { }
     reboot();
 }
+
+void ignoreInterrupts(bool ignore)
+{
+    ignoreI = ignore;
+}
+

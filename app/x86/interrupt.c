@@ -9,6 +9,7 @@
 // By Chris Brady
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "cpuid.h"
 #include "hwctrl.h"
@@ -79,6 +80,8 @@ static const char codes[][13] = {
     "SIMD FPE"
 };
 
+static volatile bool ignoreI = false;
+
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
@@ -126,6 +129,9 @@ struct trap_regs {
 
 void interrupt(struct trap_regs *trap_regs)
 {
+    if (ignoreI)
+        return;
+
     // Get the page fault address.
     uintptr_t address = 0;
     if (trap_regs->vect == INT_PAGEFLT) {
@@ -244,4 +250,9 @@ void interrupt(struct trap_regs *trap_regs)
 
     while (get_key() == 0) { }
     reboot();
+}
+
+void ignoreInterrupts(bool ignore)
+{
+    ignoreI = ignore;
 }
