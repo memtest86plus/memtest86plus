@@ -881,6 +881,8 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
             hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
+            save_ep(kbd_idx, kbd);
+
             if (!IS_EP_INT(kbd))
                 continue;
 

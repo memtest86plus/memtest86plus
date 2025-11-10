@@ -412,6 +412,13 @@ bool usb_hcd_available(void);
 bool usb_scan_for_msd(void);
 
 /**
+ * Copies endpoint data after initialization
+ *
+ * For USB controller code to hand out endpoints
+ */
+void save_ep(int kbd_idx, usb_ep_t *ep);
+
+/**
  * Prints a string to the USB-serial adapter discovered by find_usb_keyboards.
  */
 bool usb_serial_print(const char *str);

@@ -607,6 +607,8 @@ bool ohci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
+        save_ep(kbd_idx, kbd);
+
         ohci_ed_t *kbd_ed = &ws->ed[1 + kbd_idx];
         ohci_td_t *kbd_td = &ws->td[3 + kbd_idx];
 

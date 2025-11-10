@@ -548,6 +548,8 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
+        save_ep(kbd_idx, kbd);
+
         uhci_qh_t *kbd_qh = &ws->qh[1 + kbd_idx];
         uhci_td_t *kbd_td = &ws->td[2 + kbd_idx];
 
