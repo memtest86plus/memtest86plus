@@ -1256,6 +1256,8 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
         kbd_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
 
+        save_ep(kbd_idx, ep);
+
         if (!IS_EP_KEYBOARD(ep))
             continue;
 

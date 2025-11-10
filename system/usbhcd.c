@@ -89,8 +89,8 @@ static int num_hcd = 0;
 static int print_row = 0;
 static int print_col = 0;
 
-static usb_ep_t uninit_ep;
-static usb_ep_t *print_ep = &uninit_ep;
+static int print_idx = -1;
+static usb_ep_t print_ep = {0};
 static const usb_hcd_t *print_hcd = &hcd_list[0];
 
 //------------------------------------------------------------------------------
@@ -944,7 +944,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
             } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CH341) {
                 if (!configure_ch341(hcd, &ep0)) break;
                 print_hcd = hcd;
-                print_ep = kbd;
+                print_idx = kbd_idx;
 
                 print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i",
                                port_num, kbd->interface_num, kbd->endpoint_num);
@@ -952,7 +952,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
             } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CP210X) {
                 if (!configure_cp210x(hcd, &ep0, kbd->interface_num)) break;
                 print_hcd = hcd;
-                print_ep = kbd;
+                print_idx = kbd_idx;
 
                 print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i",
                                port_num, kbd->interface_num, kbd->endpoint_num);
@@ -960,7 +960,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
             } else if (kbd->reserved == (uint8_t) DEV_SERIAL_PL2303) {
                 if (!configure_pl2303(hcd, &ep0)) break;
                 print_hcd = hcd;
-                print_ep = kbd;
+                print_idx = kbd_idx;
 
                 print_usb_info(" PL2303 serial adapter found on port %i interface %i endpoint %i",
                                port_num, kbd->interface_num, kbd->endpoint_num);
@@ -972,6 +972,13 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     }
 
     return keyboard_found;
+}
+
+void save_ep(int kbd_idx, usb_ep_t *ep)
+{
+    if (kbd_idx == print_idx) {
+        print_ep = *ep;
+    }
 }
 
 bool process_usb_keyboard_report(const usb_hcd_t *hcd, const hid_kbd_rpt_t *report, const hid_kbd_rpt_t *prev_report)
@@ -1080,7 +1087,10 @@ bool usb_serial_print(const char *str)
 {
     const char *packet = str;
 
-    if (print_ep == &uninit_ep)
+    if (print_ep.max_packet_size == 0)
+        return false;
+
+    if (print_ep.reserved == (uint8_t) DEV_UNKNOWN)
         return false;
 
     // OUT data method not implemented for all controller types yet
@@ -1090,9 +1100,9 @@ bool usb_serial_print(const char *str)
     while (*packet != '\0') {
         int i;
 
-        for (i = 0; packet[i] != '\0' && i < print_ep->max_packet_size; i++)
+        for (i = 0; packet[i] != '\0' && i < print_ep.max_packet_size; i++)
             ;
-        if (!print_hcd->methods->out_data_request(print_hcd, print_ep, NULL, packet, i)) {
+        if (!print_hcd->methods->out_data_request(print_hcd, &print_ep, NULL, packet, i)) {
             return false;
         }
         packet = &packet[i];
