@@ -387,11 +387,14 @@ static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
         build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, buffer, length); pkt_num++;
         build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_IN, UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
     } else {
-        // toggle must be preserved across transactions or not?
-        // IOC or not?
-        // TODO split long packets as for control out?
+        // FIXME store toggle per endpoint
         static int bulk_pkt_num;
-        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_Y, buffer, length); pkt_num++;
+        while (length > packet_size) {
+            build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_N, buffer, packet_size); pkt_num++;
+            buffer = (uint8_t *)buffer + packet_size;
+            length -= packet_size;
+        }
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_Y, buffer, length);
     }
     write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
     return wait_for_uhci_done(ws);
