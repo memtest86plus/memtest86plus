@@ -608,10 +608,11 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
     }
 
     // Re-initialise the frame list to execute the periodic schedule.
-    for (int i = 0; i < UHCI_FL_LENGTH; i++) {
+    // Leave the last slots for any control or bulk transfers
+    for (int i = 0; i < UHCI_FL_LENGTH - 96; i++) {
         write32(&fl[i], UHCI_LP_TERMINATE);
     }
-    for (int i = 0; i < UHCI_FL_LENGTH; i += min_interval) {
+    for (int i = 0; i < UHCI_FL_LENGTH - 96; i += min_interval) {
         write32(&fl[i], first_qh_ptr);
     }
 
