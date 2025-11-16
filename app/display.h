@@ -194,7 +194,7 @@ typedef enum {
     }
 
 #define display_run_time(hours, mins, secs) \
-    printf(7, 51, "%i:%02i:%02i", hours, mins, secs)
+    printf(7, 50, "%2i:%02i:%02i", hours, mins, secs)
 
 #define display_pass_count(count) \
     printi(8, 51, count, 0, false, true)
