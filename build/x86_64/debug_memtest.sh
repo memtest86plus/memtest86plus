@@ -120,15 +120,17 @@ Make() {
 }
 
 
-# Retrieve addresses from code (not used in this version)
-# Get_Offsets() {
-# IMAGEBASE=$(grep -P '#define\tIMAGE_BASE' header.S | cut -f3)
-# BASEOFCODE=$(grep -P '#define\tBASE_OF_CODE' header.S | cut -f3)
+# Retrieve addresses from code
+Get_Offsets() {
+    IMAGEBASE=$(grep -P '#define\tIMAGE_BASE' ../../boot/x86/header.S | cut -f4)
+    BASEOFCODE=$(grep -P '#define\tBASE_OF_CODE' ../../boot/x86/header.S | cut -f3)
+    DATA=0x$(objdump -t memtest.debug | grep -w _data | cut -d" " -f1)
+    BSS=0x$(objdump -t memtest.debug | grep -w _bss | cut -d" " -f1)
 
-# TODO: get RELOCADDR and DATA
-# }
+    # TODO: get BASEOFCODE and RELOCADDR (LOW_LOAD_LIMIT in app/main.c)
+}
 
-Init() {
+Init_Gdb() {
 
     QEMU="qemu-system-x86_64"
     QEMU_FLAGS=" -bios OVMF.fd"
@@ -137,13 +139,13 @@ Init() {
     QEMU_FLAGS+=" -drive if=pflash,format=raw,file=OVMF_VARS.fd"
 
     # Define offsets for loading of symbol-table
-    IMAGEBASE=0x200000
+    Get_Offsets
     BASEOFCODE=0x1000
-    DATA=0x23000
     RELOCADDR=0x400000
 
     printf -v OFFSET "0x%X" $(($IMAGEBASE + $BASEOFCODE))
     printf -v DATAOFFSET "0x%X" $(($IMAGEBASE + $BASEOFCODE + $DATA))
+    printf -v BSSOFFSET "0x%X" $(($IMAGEBASE + $BASEOFCODE + $BSS))
     printf -v RELOCDATA "0x%X" $(($RELOCADDR + $DATA))
 
     GDB_FILE="gdbscript"
@@ -160,8 +162,8 @@ Init() {
             exit 1
         fi
 
-        echo "add-symbol-file memtest.debug $OFFSET -s .data $DATAOFFSET" >> $GDB_FILE
-        echo "add-symbol-file memtest.debug $RELOCADDR -s .data $RELOCDATA" >> $GDB_FILE
+        echo "add-symbol-file memtest.debug $OFFSET -s .data $DATAOFFSET -s .bss $BSSOFFSET" >> $GDB_FILE
+        echo "add-symbol-file memtest.debug $RELOCADDR -s .data $RELOCDATA -s .bss $BSSOFFSET" >> $GDB_FILE
 
         echo "b main" >> $GDB_FILE
         echo "commands" >> $GDB_FILE
@@ -176,7 +178,9 @@ Init() {
         echo "info b" >> $GDB_FILE
         echo "c" >> $GDB_FILE
     fi
+}
 
+Init_Lds() {
     if [ ! -f ldscripts/memtest_shared.lds ]; then
         echo "'memtest_shared.lds' does not exist."
         exit 1
@@ -214,11 +218,14 @@ Prepare_Directory() {
 # Global checks
 Check
 
-# Initialize
-Init
+# Prepare linker script
+Init_Lds
 
 # Build
 Make
+
+# Prepare gdb script
+Init_Gdb
 
 # Create needed directories and move efi binary to appropriate location
 Prepare_Directory
