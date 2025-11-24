@@ -220,6 +220,8 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "rr", 3) == 0 || strncmp(params, "one", 4) == 0) {
             cpu_mode = ONE;
         }
+    } else if (strncmp(option, "ecc", 4) == 0) {
+        enable_ecc_polling = true;
     } else if (strncmp(option, "dark", 5) == 0) {
         dark_mode = true;
     } else if (strncmp(option, "reportmode", 11) == 0) {
@@ -849,6 +851,44 @@ static void cpu_selection_menu(void)
     clear_screen_region(POP_REGION);
 }
 
+static void boot_options_menu(void)
+{
+    clear_screen_region(POP_REGION);
+
+    bool tty_update = enable_tty;
+    bool exit_menu = false;
+    while (!exit_menu) {
+        prints(POP_R+1, POP_LM, "Boot options:");
+        printf(POP_R+3, POP_LI, "<F1>  Boot trace %s", enable_trace ? "disable" : "enable");
+        printf(POP_R+4, POP_LI, "<F2>  ECC polling %s", enable_ecc_polling ? "disable" : "enable");
+        prints(POP_R+9, POP_LI, "<F10> Exit menu");
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+
+        tty_update = enable_tty;
+
+        switch (get_key()) {
+          case '1':
+            enable_trace = !enable_trace;
+            break;
+          case '2':
+            enable_ecc_polling = !enable_ecc_polling;
+            break;
+          case '0':
+            exit_menu = true;
+            break;
+          default:
+            usleep(1000);
+            tty_update = false;
+            break;
+        }
+    }
+
+    clear_screen_region(POP_REGION);
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -905,7 +945,7 @@ void config_menu(bool initial)
             if (!smp_enabled)  set_foreground_colour(WHITE);
             printf(POP_R+8,  POP_LI, "<F6>  CPU Temperature %s", enable_temp_cpu ? "disable" : "enable ");
             printf(POP_R+9,  POP_LI, "<F7>  RAM Temperature %s", enable_temp_ram ? "disable" : "enable ");
-            printf(POP_R+10, POP_LI, "<F8>  Boot trace %s",  enable_trace  ? "disable" : "enable ");
+            prints(POP_R+10, POP_LI, "<F8>  Boot options");
             prints(POP_R+11, POP_LI, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
@@ -953,7 +993,10 @@ void config_menu(bool initial)
             break;
           case '8':
             if (initial) {
-                enable_trace = !enable_trace;
+                boot_options_menu();
+            } else {
+                exit_menu = true;
+                bail = true;
             }
             break;
           case '0':
