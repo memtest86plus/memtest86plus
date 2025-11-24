@@ -224,6 +224,8 @@ recognised:
     * if specified, the initial test configuration is modified such that only the
       specified tests in the list are active. The list should be comma separated
       For example: `testlist=0,1` would only run tests 0 and 1.
+  * ecc
+    * Enable ECC polling
 
 ## Keyboard Selection
 
