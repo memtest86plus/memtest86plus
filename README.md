@@ -219,6 +219,8 @@ recognised:
     * modifies the console to print a newline after every change to the frame buffer
       * useful in logging over serial where an escape or newline is needed
     * only used when using console/serial output
+  * ecc
+    * Enable ECC polling
 
 ## Keyboard Selection
 

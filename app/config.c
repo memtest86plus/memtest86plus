@@ -220,6 +220,8 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "rr", 3) == 0 || strncmp(params, "one", 4) == 0) {
             cpu_mode = ONE;
         }
+    } else if (strncmp(option, "ecc", 4) == 0) {
+        enable_ecc_polling = true;
     } else if (strncmp(option, "dark", 5) == 0) {
         dark_mode = true;
     } else if (strncmp(option, "reportmode", 11) == 0) {
