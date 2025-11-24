@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "display.h"
+#include "usbhcd.h"
 
 #ifdef __loongarch_lp64
 #include "vmem.h"
@@ -35,6 +36,8 @@ static void serial_write_reg(struct serial_port *port, uint16_t reg, uint8_t val
 
     if (port->is_mmio) {
         *reg_walker.ptr = val;
+    } else if (port->is_usb) {
+        // ignore
     } else {
         __outb(val, reg_walker.addr);
     }
@@ -51,6 +54,8 @@ static uint8_t serial_read_reg(struct serial_port *port, uint16_t reg)
 
     if (port->is_mmio) {
         return *reg_walker.ptr;
+    } else if (port->is_usb) {
+        return 0; // ignore
     } else {
         return __inb(reg_walker.addr);
     }
@@ -60,6 +65,9 @@ static void serial_wait_for_xmit(struct serial_port *port)
 {
     uint8_t lsr;
 
+    if (port->is_usb) {
+        return; // TODO
+    }
     do {
         lsr = serial_read_reg(port, UART_LSR);
     } while ((lsr & BOTH_EMPTY) != BOTH_EMPTY);
@@ -70,6 +78,11 @@ static void serial_echo_print(const char *p)
     struct serial_port *port = &console_serial;
 
     if (!port->enable) {
+        return;
+    }
+
+    if (port->is_usb) {
+        usb_serial_print(p);
         return;
     }
 
@@ -100,6 +113,10 @@ void tty_init(void)
 {
     if (!enable_tty) {
         return;
+    }
+
+    if (tty_usb) {
+        console_serial.is_usb = true;
     }
 
     int uart_status, serial_div;
@@ -248,6 +265,11 @@ void tty_send_region(int start_row, int start_col, int end_row, int end_col)
 char tty_get_char(int max_wait_frames)
 {
     int wait_time = max_wait_frames * console_serial.frame_time;
+
+    if (console_serial.is_usb) {
+        return '\0'; // not supported
+    }
+
     do {
         int uart_status = serial_read_reg(&console_serial, UART_LSR);
         if (uart_status & UART_LSR_DR) {
