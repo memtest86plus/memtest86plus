@@ -20,6 +20,7 @@
 #define QUIRK_TYPE_TIMER    (1 << 5)
 #define QUIRK_TYPE_MEM_SIZE (1 << 6)
 #define QUIRK_TYPE_TEMP     (1 << 7)
+#define QUIRK_TYPE_COLDBOOT (1 << 8)
 
 typedef enum {
     QUIRK_NONE,
@@ -37,7 +38,7 @@ typedef enum {
 
 typedef struct {
     quirk_id_t   id;
-    uint8_t      type;
+    uint16_t     type;
     uint16_t     root_vid;
     uint16_t     root_did;
     void (*process)(void);
