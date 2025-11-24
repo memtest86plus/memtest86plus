@@ -160,65 +160,67 @@ option consists of an option name, optionally followed by an `=` sign and
 one or more parameters, separated by commas. The following options are
 recognised:
 
-  * nosmp
-    * disables ACPI table parsing and the use of multiple CPU cores
-  * nobench
-    * disables the integrated memory benchmark
-  * nobigstatus
-    * disables the big PASS/FAIL pop-up status display
-  * nosm
-    * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
-  * nomch
-    * disables memory controller configuration polling
-  * nopause
-    * skips the pause for configuration at startup
-  * keyboard=*type*
-    * where *type* is one of
-      * legacy
-      * usb
-      * both
-  * dark
-    * change the default background colour from blue to black
-  * screen.mode=*w*x*h* (EFI framebuffer only)
-    * where *w*x*h* is the preferred screen resolution (e.g. 1024x768)
-  * screen.mode=bios (EFI framebuffer only)
-    * uses the default screen resolution set by the UEFI BIOS
-  * screen.rhs-up (graphics mode only)
-    * rotates the display clockwise by 90 degrees
-  * screen.lhs-up (graphics mode only)
-    * rotates the display anti-clockwise by 90 degrees
-  * efidebug
-    * displays information about the EFI framebuffer
-  * usbdebug
-    * pauses after probing for USB keyboards
-  * usbinit=*mode*
-    * where *mode* is one of
-      * 1 = use the two-step init sequence for high speed devices
-      * 2 = add a second USB reset in the init sequence
-      * 3 = the combination of modes 1 and 2
-  * console=ttyS*x*,*y*
-    * activate serial/tty console output, where *x* is one of the following IO port
-      *  0 = 0x3F8
-      *  1 = 0x2F8
-      *  2 = 0x3E8
-      *  3 = 0x2E8
-    * and *y* is an optional baud rate to choose from the following list
-      * 9600
-      * 19200
-      * 38400
-      * 57600
-      * 115200 (default if not specified or invalid)
-      * 230400
-  * console=*x*,*y*
-    * activate MMIO UART console, where *x* is the MMIO stride (reg. width)
-      * mmio   = 8-bit MMIO
-      * mmio16 = 16-bit MMIO
-      * mmio32 = 32-bit MMIO
-    * and *y* is the MMIO address in hex. with `0x` prefix (eg: 0xFEDC9000)
-  * newline
-    * modifies the console to print a newline after every change to the frame buffer
-      * useful in logging over serial where an escape or newline is needed
-    * only used when using console/serial output
+  * `nosmp`<br />
+    disables ACPI table parsing and the use of multiple CPU cores
+  * `nobench`<br />
+    disables the integrated memory benchmark
+  * `nobigstatus`<br />
+    disables the big PASS/FAIL pop-up status display
+  * `nosm`<br />
+    disables SMBUS/SPD parsing, DMI decoding and memory benchmark
+  * `nomch`<br />
+    disables memory controller configuration polling
+  * `nopause`<br />
+    skips the pause for configuration at startup
+  * `keyboard=<type>`<br />
+    where `type` is one of:
+    * `legacy`
+    * `usb`
+    * `both`
+  * `dark`<br />
+    change the default background colour from blue to black
+  * `screen.mode=<w>x<h>` (EFI framebuffer only)<br />
+    where `<w>x<h>` is the preferred screen resolution (e.g. `1024x768`)
+  * `screen.mode=bios` (EFI framebuffer only)<br />
+    uses the default screen resolution set by the UEFI BIOS
+  * `screen.rhs-up` (graphics mode only)<br />
+    rotates the display clockwise by 90 degrees
+  * `screen.lhs-up` (graphics mode only)<br />
+    rotates the display anti-clockwise by 90 degrees
+  * `efidebug`<br />
+    displays information about the EFI framebuffer
+  * `usbdebug`<br />
+    pauses after probing for USB keyboards
+  * `usbinit=<mode>`<br />
+    where `mode` is one of:
+    * `1`: use the two-step init sequence for high speed devices
+    * `2`: add a second USB reset in the init sequence
+    * `3`: the combination of modes `1` and `2`
+  * `console=ttyS<x>,<y>`<br />
+    activate serial/tty console output, where `x` is one of the following IO port:
+    * `0`: 0x3F8
+    * `1`: 0x2F8
+    * `2`: 0x3E8
+    * `3`: 0x2E8
+
+    and `y` is an optional baud rate to choose from the following list:
+    * `9600`
+    * `19200`
+    * `38400`
+    * `57600`
+    * `115200` (default if not specified or invalid)
+    * `230400`
+  * `console=<x>,<y>`<br />
+    activate MMIO UART console, where `x` is the MMIO stride (reg. width):
+    * `mmio`  : 8-bit MMIO
+    * `mmio16`: 16-bit MMIO
+    * `mmio32`: 32-bit MMIO
+
+    and `y` is the MMIO address in hex. with `0x` prefix (eg: `0xFEDC9000`)
+  * `newline`<br />
+    modifies the console to print a newline after every change to the frame buffer
+    useful in logging over serial where an escape or newline is needed
+    only used when using console/serial output
 
 ## Keyboard Selection
 
@@ -282,32 +284,32 @@ continuing indefinitely until the user reboots or halts the machine.
 
 At startup, and when running tests, Memtest86+ responds to the following keys:
 
-  * F1
-    * enters the configuration menu
-  * F2
-    * toggles use of multiple CPU cores (SMP)
-  * Space
-    * toggles scroll lock (stops/starts error message scrolling)
-  * Enter
-    * single message scroll (only when scroll lock enabled)
-  * Escape
-    * exits the test and reboots the machine
+  * `F1`<br />
+    enters the configuration menu
+  * `F2`<br />
+    toggles use of multiple CPU cores (SMP)
+  * `Space`<br />
+    toggles scroll lock (stops/starts error message scrolling)
+  * `Enter`<br />
+    single message scroll (only when scroll lock enabled)
+  * `Escape`<br />
+    exits the test and reboots the machine
 
 Note that testing is stalled when scroll lock is enabled and the scroll region
 is full.
 
 The configuration menu allows the user to:
 
-  * select which tests are run (default: all tests)
+  * select which tests are run (default: `all tests`)
   * limit the address range over which tests are performed (default: all memory)
-  * select the CPU sequencing mode (default: parallel)
-    * parallel
-      * each CPU core works in parallel on a subset of the memory region being
+  * select the CPU sequencing mode (default: `parallel`)
+    * `parallel`<br />
+      each CPU core works in parallel on a subset of the memory region being
         tested
-    * sequential
-      * each CPU core works in turn on the full memory region being tested
-    * round robin
-      * a single CPU core works on the full memory region being tested, with a
+    * `sequential`<br />
+      each CPU core works in turn on the full memory region being tested
+    * `round robin`<br />
+      a single CPU core works on the full memory region being tested, with a
         new CPU core being selected (in round-robin fashion) for each test
   * select the error reporting mode (default: individual errors)
     * error counts only
@@ -316,10 +318,10 @@ The configuration menu allows the user to:
     * BadRAM patterns
     * Linux memmap
     * bad pages
-  * select which of the available CPU cores are used (at startup only)
-    * a maximum of 256 CPU cores can be selected, due to memory and
-      display limits
-    * the bootstrap processor (BSP) cannot be deselected
+  * select which of the available CPU cores are used (at startup only)<br />
+    a maximum of 256 CPU cores can be selected, due to memory and
+      display limits<br />
+    the bootstrap processor (BSP) cannot be deselected
   * enable or disable the temperature display (at startup only)
   * enable or disable boot tracing for debug (at startup only)
   * skip to the next test (when running tests)
@@ -349,40 +351,40 @@ the current test sequence started.
 
 The error summary mode displays the following information:
 
-  * Lowest Error Address
-    * the lowest address that where an error has been reported
-  * Highest Error Address
-    * the highest address that where an error has been reported
-  * Bits in Error Mask
-    * a hexadecimal mask of all bits that have been in error
-  * Bits in Error
-    * total bits in error for all error instances and the min, max and average
-      number of bits in error across each error instance
-  * Max Contiguous Errors
-    * the maximum of contiguous addresses with errors
-  * Test Errors
-     * the total number of errors for each individual test
+  * Lowest Error Address<br />
+    the lowest address that where an error has been reported
+  * Highest Error Address<br />
+    the highest address that where an error has been reported
+  * Bits in Error Mask<br />
+    a hexadecimal mask of all bits that have been in error
+  * Bits in Error<br />
+    total bits in error for all error instances and the min, max and average
+    number of bits in error across each error instance
+  * Max Contiguous Errors<br />
+    the maximum of contiguous addresses with errors
+  * Test Errors<br />
+    the total number of errors for each individual test
 
 ### Individual Errors
 
 The individual error mode displays the following information for each error
 instance:
 
-  * pCPU
-    * the physical CPU core number that detected the error
-  * Pass
-    * the test pass number where the error occurred (a test pass is a single
-      run over all the currently selected tests)
-  * Test
-    * the individual test number where the error occurred
-  * Failing Address
-    * the memory address where the error occurred
-  * Expected
-    * the hexadecimal data pattern expected to be found
-  * Found
-    * the hexadecimal data pattern read from the failing address
-  * Err Bits (only in 32-bit builds)
-    * a hexadecimal mask showing the bits in error
+  * pCPU<br />
+    the physical CPU core number that detected the error
+  * Pass<br />
+    the test pass number where the error occurred (a test pass is a single
+    run over all the currently selected tests)
+  * Test<br />
+    the individual test number where the error occurred
+  * Failing Address<br />
+    the memory address where the error occurred
+  * Expected<br />
+    the hexadecimal data pattern expected to be found
+  * Found<br />
+    the hexadecimal data pattern read from the failing address
+  * Err Bits (only in 32-bit builds)<br />
+    a hexadecimal mask showing the bits in error
 
 ### BadRAM Patterns
 
@@ -457,25 +459,25 @@ module. However, there are steps that may be taken to determine the failing
 module. Here are some techniques that you may wish to use:
 
 * Removing modules
-  * This is the simplest method for isolating a failing modules, but may only
-    be employed when one or more modules can be removed from the system. By
-    selectively removing modules from the system and then running the test
-    you will be able to find the bad module(s). Be sure to note exactly which
-    modules are in the system when the test passes and when the test fails.
+  This is the simplest method for isolating a failing modules, but may only
+  be employed when one or more modules can be removed from the system. By
+  selectively removing modules from the system and then running the test
+  you will be able to find the bad module(s). Be sure to note exactly which
+  modules are in the system when the test passes and when the test fails.
 
 * Rotating modules
-  * When none of the modules can be removed then you may wish to rotate modules
-    to find the failing one. This technique can only be used if there are three
-    or more modules in the system. Change the location of two modules at a time.
-    For example put the module from slot 1 into slot 2 and put the module from
-    slot 2 in slot 1. Run the test and if either the failing bit or address
-    changes then you know that the failing module is one of the ones just moved.
-    By using several combinations of module movement you should be able to
-    determine which module is failing.
+  When none of the modules can be removed then you may wish to rotate modules
+  to find the failing one. This technique can only be used if there are three
+  or more modules in the system. Change the location of two modules at a time.
+  For example put the module from slot 1 into slot 2 and put the module from
+  slot 2 in slot 1. Run the test and if either the failing bit or address
+  changes then you know that the failing module is one of the ones just moved.
+  By using several combinations of module movement you should be able to
+  determine which module is failing.
 
 * Replacing modules
-  * If you are unable to use either of the previous techniques then you are
-    left to selective replacement of modules to find the failure.
+  If you are unable to use either of the previous techniques then you are
+  left to selective replacement of modules to find the failure.
 
 Sometimes memory errors show up due to component incompatibility. A memory
 module may work fine in one system and not in another. This is not uncommon
