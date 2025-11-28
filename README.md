@@ -219,6 +219,11 @@ recognised:
     * modifies the console to print a newline after every change to the frame buffer
       * useful in logging over serial where an escape or newline is needed
     * only used when using console/serial output
+  * testlist=*x,y,z*
+    * where *x,y,z* is a list of the numerical values of the tests to run.
+    * if specified, the initial test configuration is modified such that only the
+      specified tests in the list are active. The list should be comma separated
+      For example: `testlist=0,1` would only run tests 0 and 1.
 
 ## Keyboard Selection
 
