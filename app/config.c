@@ -204,6 +204,77 @@ static void parse_serial_params(const char *params)
 
 }
 
+static int parse_decimal(const char *str, const char **endptr)
+{
+    int value = 0;
+    const char *p = str;
+    
+    // Skip leading whitespace
+    while (*p == ' ' || *p == '\t') {
+        p++;
+    }
+    
+    // Parse digits
+    while (*p >= '0' && *p <= '9') {
+        value = value * 10 + (*p - '0');
+        p++;
+    }
+    
+    if (endptr) {
+        *endptr = p;
+    }
+    
+    return value;
+}
+
+static void parse_test_list(const char *params)
+{   
+    // Disable all tests
+    for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
+        test_list[i].enabled = false;
+    }
+
+    // No params, do not activate any tests
+    if (params == NULL) {
+        return;
+    }
+
+    // Parse comma-separated list of test numbers
+    const char *p = params;
+    while (*p != '\0') {
+        // Skip whitespace and commas
+        while (*p == ' ' || *p == '\t' || *p == ',') {
+            p++;
+        }
+        
+        // Null line termination
+        if (*p == '\0') {
+            break;
+        }
+        
+        // Parse and validate the test number
+        const char *end;
+        int test_num = parse_decimal(p, &end);
+        if (test_num < 0 || test_num >= NUM_TEST_PATTERNS) {
+            return;
+        }
+        
+        // Enable the test
+        test_list[test_num].enabled = true;
+        
+        // Move to next token
+        p = end;
+        
+        // Skip to comma or end
+        while (*p != '\0' && *p != ',') {
+            if (*p != ' ' && *p != '\t') {
+                return;
+            }
+            p++;
+        }
+    }
+}
+
 static void parse_option(const char *option, const char *params)
 {
     if (option[0] == '\0') return;
@@ -287,6 +358,8 @@ static void parse_option(const char *option, const char *params)
         } else if (strncmp(params, "3", 2) == 0) {
             usb_init_options |= USB_2_STEP_INIT|USB_EXTRA_RESET;
         }
+    } else if (strncmp(option, "testlist", 9) == 0) {
+        parse_test_list(params);
     }
 }
 
