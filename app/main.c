@@ -840,6 +840,13 @@ void main(void)
             } else {
                 display_big_status(false);
             }
+            if (max_passes > 0 && (pass_num + 1) > max_passes) {
+                display_status("Done   ");
+                if (enable_tty){
+                    tty_full_redraw();
+                }
+                reboot();
+            }
         }
     }
 }

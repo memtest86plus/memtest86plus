@@ -82,6 +82,8 @@ extern bool         tty_pl011;
 
 extern bool err_banner_redraw;
 
+extern int          max_passes;
+
 void config_init(void);
 
 void config_menu(bool initial);

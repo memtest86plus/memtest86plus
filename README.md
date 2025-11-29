@@ -237,6 +237,9 @@ recognised:
       For example: `testlist=0,1` would only run tests 0 and 1.
   * ecc
     * Enable ECC polling
+  * maxpasses=*n*
+    * performs *n* passes of selected tests then reboots rather than testing endlessly
+    * if not specified or set to `0`, run tests endlessly
 
 ## Keyboard Selection
 

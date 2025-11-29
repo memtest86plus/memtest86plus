@@ -486,9 +486,10 @@ void display_big_status(bool pass)
         prints(POP_STAT_R+6, POP_STAT_C+5, "##       ##    ##     ##     ##     ");
         prints(POP_STAT_R+7, POP_STAT_C+5, "##       ##    ##   ######   ###### ");
     }
-
-    prints(POP_STAT_R+8, POP_STAT_C+5, "                                    ");
-    prints(POP_STAT_R+9, POP_STAT_C+5, "Press any key to remove this banner ");
+    if (max_passes == 0) {
+        prints(POP_STAT_R+8, POP_STAT_C+5, "                                    ");
+        prints(POP_STAT_R+9, POP_STAT_C+5, "Press any key to remove this banner ");
+    }
 
     set_foreground_colour(palette.foreground);
     set_background_colour(palette.background);

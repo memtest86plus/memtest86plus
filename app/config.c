@@ -121,6 +121,7 @@ int             tty_mmio_stride    = 4;                 // Stride for MMIO (regi
 bool            tty_pl011          = false;             // UART is an ARM PL011 rather than a 16550
 
 bool            err_banner_redraw  = false;             // Redraw banner on new errors
+int             max_passes         = 0;                 // Number of passes to run (0 = infinite)
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -379,6 +380,8 @@ static void parse_option(const char *option, const char *params)
         }
     } else if (strncmp(option, "testlist", 9) == 0) {
         parse_test_list(params);
+    } else if (strncmp(option, "maxpasses", 10) == 0) {
+        max_passes = parse_decimal(params, NULL);
     }
 }
 
@@ -979,6 +982,18 @@ static void boot_options_menu(void)
     clear_screen_region(POP_REGION);
 }
 
+static void set_max_passes(void)
+{
+    display_input_message(POP_R+14, "Enter max passes: ");
+    int n = read_value(POP_R+14, POP_LM+18, 2, 0);
+    if (n < 0) {
+        display_error_message(POP_R+14, "Invalid number of passes");
+        return;
+    }
+    max_passes = n;
+    clear_popup_row(POP_R+14);
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -1036,7 +1051,8 @@ void config_menu(bool initial)
             printf(POP_R+8,  POP_LI, "<F6>  CPU Temperature %s", enable_temp_cpu ? "disable" : "enable ");
             printf(POP_R+9,  POP_LI, "<F7>  RAM Temperature %s", enable_temp_ram ? "disable" : "enable ");
             prints(POP_R+10, POP_LI, "<F8>  Boot options");
-            prints(POP_R+11, POP_LI, "<F10> Exit menu");
+            printf(POP_R+11, POP_LI, "<F9>  Max passes (%i)", max_passes);
+            prints(POP_R+12, POP_LI, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
             if (usb_mass_storage_found || usb_hcd_available()) {
@@ -1047,9 +1063,11 @@ void config_menu(bool initial)
                 } else {
                     prints(POP_R+8,  POP_LI, "<F6>  Save results to USB");
                 }
-                prints(POP_R+9,  POP_LI, "<F10> Exit menu");
+                printf(POP_R+9,  POP_LI, "<F7>  Max passes (%i)", max_passes);
+                prints(POP_R+10,  POP_LI, "<F10> Exit menu");
             } else {
-                prints(POP_R+8,  POP_LI, "<F10> Exit menu");
+                printf(POP_R+8,  POP_LI, "<F6>  Max passes (%i)", max_passes);
+                prints(POP_R+9,  POP_LI, "<F10> Exit menu");
             }
         }
 
@@ -1087,11 +1105,15 @@ void config_menu(bool initial)
                 enable_temp_cpu = !enable_temp_cpu;
             } else if (usb_mass_storage_found || usb_hcd_available()) {
                 save_results_to_usb();
+            } else {
+                set_max_passes();
             }
             break;
           case '7':
             if (initial) {
                 enable_temp_ram = !enable_temp_ram;
+            } else {
+                set_max_passes();
             }
             break;
           case '8':
@@ -1099,6 +1121,11 @@ void config_menu(bool initial)
                 boot_options_menu();
             } else {
                 exit_menu = true;
+            }
+            break;
+          case '9':
+            if (initial) {
+                set_max_passes();
             }
             break;
           case '0':
