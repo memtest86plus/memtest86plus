@@ -6,7 +6,7 @@
 // It supports both the 32-bit and 64-bit Linux boot protocols and EFI boot
 // for the first boot of the BSP.
 //
-// Copyright (C) 2020-2024 Martin Whitaker.
+// Copyright (C) 2020-2025 Martin Whitaker.
 //
 // Derived from memtest86+ head.S:
 //
@@ -133,6 +133,12 @@ startup64:
 efi_handover:
 	andq	$~0xf, %rsp
 	call	efi_setup
+
+	# Disable write protection in case the boot loader has made the
+	# loaded image read-only.
+	movq	%cr0, %rcx
+	andw	$0x7fff, %cx
+	movq	%rcx, %cr0
 
 	# Save the boot params pointer.
 

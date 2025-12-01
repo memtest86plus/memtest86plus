@@ -33,7 +33,7 @@
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */
 
-#define SETUP_SECS	2		/* Size of the 16-bit setup code in sectors */
+#define SETUP_SECS	7		/* Size of the 16-bit setup code in sectors */
 
 #define BOOT_SEG	0x07c0		/* Segment address for the 16-bit boot code */
 #define SETUP_SEG	0x07e0		/* Segment address for the 16-bit setup code */
