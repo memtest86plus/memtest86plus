@@ -19,6 +19,11 @@
 #include "unistd.h"
 
 #include "hwctrl.h"
+#include "hwquirks.h"
+#include "interrupt.h"
+#include "print.h"
+#include "screen.h"
+#include "display.h"
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -54,16 +59,20 @@ void hwctrl_init(void)
 
 void reboot(void)
 {
+    ignoreInterrupts(true);
+    bool cold = quirk.type & QUIRK_TYPE_COLDBOOT;
+
     // Use cf9 method as first try
-    uint8_t cf9 = inb(0xcf9) & ~6;
+    uint8_t method = cold ? 0x0E : 0x06;
+    uint8_t cf9 = inb(0xcf9) & ~(method);
     outb(cf9|2, 0xcf9); // Request hard reset
     usleep(50);
-    outb(cf9|6, 0xcf9); // Actually do the reset
+    outb(cf9|method, 0xcf9); // Actually do the reset
     usleep(50);
 
     // If we have UEFI, try EFI reset service
     if (efi_rs_table != NULL) {
-        efi_rs_table->reset_system(EFI_RESET_COLD, 0, 0);
+        efi_rs_table->reset_system(cold ? EFI_RESET_COLD : EFI_RESET_WARM, 0, 0);
         usleep(1000000);
     }
 
@@ -74,7 +83,15 @@ void reboot(void)
     if (efi_rs_table == NULL) {
         // In last resort, (very) obsolete reboot method using BIOS
         *((uint16_t *)0x472) = 0x1234;
+        usleep(150000);
     }
+
+    // Still here? Tell user to power off and freeze program
+    set_background_colour(palette.background);
+    set_foreground_colour(palette.foreground);
+    clear_screen();
+    prints(1, 1, "Power off your computer now!");
+    while(true) {};
 }
 
 void floppy_off()

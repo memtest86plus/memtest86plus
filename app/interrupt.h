@@ -17,4 +17,9 @@ struct trap_regs;
  */
 void interrupt(struct trap_regs *trap_regs);
 
+/**
+ * Sets the interrupt handler to ignore or handle interrupts.
+ */
+void ignoreInterrupts(bool ignore);
+
 #endif // INTERRUPT_H
