@@ -123,7 +123,7 @@ static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
 
     dst = src + len;
 
-    wlen = len / 8;
+    wlen = len / 64;
     // Get number of clock cycles due to overhead
     start_time = get_tsc();
     for (i = 0; i < iter; i++) {
@@ -133,8 +133,8 @@ static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
           "move   $t2, %2\n\t"        \
           "2:\n\t"                    \
           "beqz   $t2, 1f\n\t"        \
-          "addi.d $t0, $t0, 8\n\t"    \
-          "addi.d $t1, $t1, 8\n\t"    \
+          "addi.d $t0, $t0, 64\n\t"   \
+          "addi.d $t1, $t1, 64\n\t"   \
           "addi.d $t2, $t2, -1\n\t"   \
           "b      2b\n\t"             \
           "1:\n\t"                    \
@@ -153,10 +153,24 @@ static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
         "move   $t2, %2\n\t"        \
         "2:\n\t"                    \
         "beqz   $t2, 1f\n\t"        \
-        "ld.d   $t3, $t0, 0x0\n\t"       \
-        "st.d   $t3, $t1, 0x0\n\t"       \
-        "addi.d $t0, $t0, 8\n\t"    \
-        "addi.d $t1, $t1, 8\n\t"    \
+        "ld.d   $t3, $t0, 0x0\n\t"  \
+        "st.d   $t3, $t1, 0x0\n\t"  \
+        "ld.d   $t3, $t0, 0x8\n\t"  \
+        "st.d   $t3, $t1, 0x8\n\t"  \
+        "ld.d   $t3, $t0, 0x10\n\t" \
+        "st.d   $t3, $t1, 0x10\n\t" \
+        "ld.d   $t3, $t0, 0x18\n\t" \
+        "st.d   $t3, $t1, 0x18\n\t" \
+        "ld.d   $t3, $t0, 0x20\n\t" \
+        "st.d   $t3, $t1, 0x20\n\t" \
+        "ld.d   $t3, $t0, 0x28\n\t" \
+        "st.d   $t3, $t1, 0x28\n\t" \
+        "ld.d   $t3, $t0, 0x30\n\t" \
+        "st.d   $t3, $t1, 0x30\n\t" \
+        "ld.d   $t3, $t0, 0x38\n\t" \
+        "st.d   $t3, $t1, 0x38\n\t" \
+        "addi.d $t0, $t0, 64\n\t"   \
+        "addi.d $t1, $t1, 64\n\t"   \
         "addi.d $t2, $t2, -1\n\t"   \
         "b      2b\n\t"             \
         "1:\n\t"                    \
@@ -173,10 +187,24 @@ static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
           "move   $t2, %2\n\t"        \
           "2:\n\t"                    \
           "beqz   $t2, 1f\n\t"        \
-          "ld.d   $t3, $t0, 0x0\n\t"       \
-          "st.d   $t3, $t1, 0x0\n\t"       \
-          "addi.d $t0, $t0, 8\n\t"    \
-          "addi.d $t1, $t1, 8\n\t"    \
+          "ld.d   $t3, $t0, 0x0\n\t"  \
+          "st.d   $t3, $t1, 0x0\n\t"  \
+          "ld.d   $t3, $t0, 0x8\n\t"  \
+          "st.d   $t3, $t1, 0x8\n\t"  \
+          "ld.d   $t3, $t0, 0x10\n\t" \
+          "st.d   $t3, $t1, 0x10\n\t" \
+          "ld.d   $t3, $t0, 0x18\n\t" \
+          "st.d   $t3, $t1, 0x18\n\t" \
+          "ld.d   $t3, $t0, 0x20\n\t" \
+          "st.d   $t3, $t1, 0x20\n\t" \
+          "ld.d   $t3, $t0, 0x28\n\t" \
+          "st.d   $t3, $t1, 0x28\n\t" \
+          "ld.d   $t3, $t0, 0x30\n\t" \
+          "st.d   $t3, $t1, 0x30\n\t" \
+          "ld.d   $t3, $t0, 0x38\n\t" \
+          "st.d   $t3, $t1, 0x38\n\t" \
+          "addi.d $t0, $t0, 64\n\t"   \
+          "addi.d $t1, $t1, 64\n\t"   \
           "addi.d $t2, $t2, -1\n\t"   \
           "b      2b\n\t"             \
           "1:\n\t"                    \
