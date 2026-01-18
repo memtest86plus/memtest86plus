@@ -329,9 +329,7 @@ static uintptr_t         smp_heap_page = 0;
 
 static uintptr_t         alloc_addr = 0;
 
-#if defined(__i386__) || defined(__x86_64__)
 static bool              apic_x2apic = false;
-#endif
 
 //------------------------------------------------------------------------------
 // Variables
