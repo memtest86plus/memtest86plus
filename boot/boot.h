@@ -14,7 +14,6 @@
 /*
  * NOTE: Increasing the value of MAX_APS would require:
  *  - relocating the stacks when the program is loaded in low memory
- *  - modifying smp.c to support the x2APIC architecture
  *  - adjusting the display if more than 3 digits are needed for CPU IDs
  */
 #define	MAX_APS		255		/* Maximum number of active APs */

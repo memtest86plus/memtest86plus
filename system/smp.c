@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
-// Copyright (C) 2004-2022 Sam Demeulemeester.
+// Copyright (C) 2004-2026 Sam Demeulemeester.
 //
 // Derived from an extract of memtest86+ smp.c:
 //
@@ -100,6 +100,7 @@
 
 #define MADT_PROCESSOR                 0
 #define MADT_LAPIC_ADDR                5
+#define MADT_PROCESSOR_X2APIC          9
 #define MADT_CORE_PIC                  17
 
 // MADT processor flag values
@@ -216,6 +217,7 @@ typedef struct {
 } madt_entry_header_t;
 
 #if defined(__i386__) || defined(__x86_64__)
+
 typedef struct {
     uint8_t     type;
     uint8_t     length;
@@ -223,7 +225,18 @@ typedef struct {
     uint8_t     apic_id;
     uint32_t    flags;
 } madt_processor_entry_t;
+
+typedef struct __attribute__((packed)) {
+    uint8_t     type;
+    uint8_t     length;
+    uint16_t    reserved;
+    uint32_t    apic_id;
+    uint32_t    flags;
+    uint32_t    acpi_id;
+} madt_processor_x2apic_entry_t;
+
 #elif defined(__loongarch_lp64)
+
 #pragma pack(1)
 typedef struct {
     uint8_t     type;
@@ -234,6 +247,7 @@ typedef struct {
     uint32_t    flags;
 } madt_processor_entry_t;
 #pragma pack ()
+
 #endif
 
 typedef struct {
@@ -300,11 +314,9 @@ typedef struct __attribute__((packed)) {
 
 static apic_register_t   *apic = NULL;
 
-static uint8_t           apic_id_to_cpu_num[MAX_APIC_IDS];
+static uint32_t          cpu_num_to_proximity_domain_idx[MAX_CPUS];
 
-static uint8_t           apic_id_to_proximity_domain_idx[MAX_APIC_IDS];
-
-static uint8_t           cpu_num_to_apic_id[MAX_CPUS];
+static uint32_t          cpu_num_to_apic_id[MAX_CPUS];
 
 static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS];
 
@@ -316,6 +328,10 @@ uint8_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 static uintptr_t         smp_heap_page = 0;
 
 static uintptr_t         alloc_addr = 0;
+
+#if defined(__i386__) || defined(__x86_64__)
+static bool              apic_x2apic = false;
+#endif
 
 //------------------------------------------------------------------------------
 // Variables
@@ -334,6 +350,11 @@ uint8_t highest_map_bit = 0;
 static int my_apic_id(void)
 {
 #if defined(__i386__) || defined(__x86_64__)
+    if (apic_x2apic) {
+        uint32_t msrl, msrh;
+        rdmsr(MSR_IA32_X2APIC_BASE + APIC_REG_ID, msrl, msrh);
+        return (int)msrl;
+    }
     return read32(&apic[APIC_REG_ID][0]) >> 24;
 #elif defined(__loongarch_lp64)
     return ((int)__csrrd_w(0x20));
@@ -343,11 +364,27 @@ static int my_apic_id(void)
 #if defined(__i386__) || defined(__x86_64__)
 static void apic_write(int reg, uint32_t val)
 {
+    if (apic_x2apic) {
+        if (reg == APIC_REG_ICRHI) {
+            return;
+        }
+        wrmsr(MSR_IA32_X2APIC_BASE + reg, val, 0);
+        return;
+    }
     write32(&apic[reg][0], val);
 }
 
 static uint32_t apic_read(int reg)
 {
+    if (apic_x2apic) {
+        uint32_t msrl, msrh;
+        if (reg == APIC_REG_ICRHI || reg == APIC_REG_ICRLO) {
+            rdmsr(MSR_IA32_X2APIC_BASE + APIC_REG_ICRLO, msrl, msrh);
+            return reg == APIC_REG_ICRHI ? msrh : msrl;
+        }
+        rdmsr(MSR_IA32_X2APIC_BASE + reg, msrl, msrh);
+        return msrl;
+    }
     return read32(&apic[reg][0]);
 }
 
@@ -370,6 +407,8 @@ static floating_pointer_struct_t *scan_for_floating_ptr_struct(uintptr_t addr, i
 
 static bool read_mp_config_table(uintptr_t addr)
 {
+    if (apic_x2apic) return false;
+
     mp_config_table_header_t *mpc = (mp_config_table_header_t *)map_region(addr, sizeof(mp_config_table_header_t), true);
     if (mpc == NULL) return false;
 
@@ -432,6 +471,8 @@ static bool read_mp_config_table(uintptr_t addr)
 
 static bool find_cpus_in_floating_mp_struct(void)
 {
+    if (apic_x2apic) return false;
+
     // Search for the Floating MP structure pointer.
     floating_pointer_struct_t *fp = scan_for_floating_ptr_struct(0x0, 0x400);
     if (fp == NULL) {
@@ -515,6 +556,22 @@ static bool find_cpus_in_madt(void)
                 found_cpus++;
             }
         }
+        else if (entry_header->type == MADT_PROCESSOR_X2APIC) {
+            if (entry_header->length != sizeof(madt_processor_x2apic_entry_t)) {
+                return false;
+            }
+            madt_processor_x2apic_entry_t *entry = (madt_processor_x2apic_entry_t *)tab_entry_ptr;
+            if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
+                if (num_available_cpus < MAX_CPUS) {
+                    cpu_num_to_apic_id[found_cpus] = entry->apic_id;
+                    // The first CPU is the BSP, don't increment.
+                    if (found_cpus > 0) {
+                        num_available_cpus++;
+                    }
+                }
+                found_cpus++;
+            }
+        }
         else if (entry_header->type == MADT_LAPIC_ADDR) {
             if (entry_header->length != sizeof(madt_lapic_addr_entry_t)) {
                 return false;
@@ -540,10 +597,12 @@ static bool find_cpus_in_madt(void)
         tab_entry_ptr += entry_header->length;
     }
 
-    apic = (volatile apic_register_t *)map_region(apic_addr, APIC_REGS_SIZE, false);
-    if (apic == NULL) {
-        num_available_cpus = 1;
-        return false;
+    if (!apic_x2apic) {
+        apic = (volatile apic_register_t *)map_region(apic_addr, APIC_REGS_SIZE, false);
+        if (apic == NULL) {
+            num_available_cpus = 1;
+            return false;
+        }
     }
     return true;
 }
@@ -667,7 +726,7 @@ find_proximity_domain:
                 // Do we know about that APIC ID ?
                 int found2 = -1;
                 for (int i = 0; i < num_available_cpus; i++) {
-                    if ((uint32_t)cpu_num_to_apic_id[i] == apic_id) {
+                    if (cpu_num_to_apic_id[i] == apic_id) {
                         found2 = i;
                         break;
                     }
@@ -678,7 +737,7 @@ find_proximity_domain:
                     return false;
                 }
 
-                apic_id_to_proximity_domain_idx[apic_id] = (uint32_t)found1;
+                cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
             }
         }
         else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
@@ -729,8 +788,13 @@ static bool parse_slit(uintptr_t slit_addr)
 static inline void send_ipi(int apic_id, int trigger __attribute__((unused)), int level __attribute__((unused)), int mode, uint8_t vector)
 {
 #if defined(__i386__) || defined(__x86_64__)
-    apic_write(APIC_REG_ICRHI, apic_id << 24);
+    if (apic_x2apic) {
+        uint64_t icr = ((uint64_t)apic_id << 32) | (uint32_t)(trigger << 15 | level << 14 | mode << 8 | vector);
+        wrmsr(MSR_IA32_X2APIC_BASE + APIC_REG_ICRLO, (uint32_t)icr, (uint32_t)(icr >> 32));
+        return;
+    }
 
+    apic_write(APIC_REG_ICRHI, apic_id << 24);
     apic_write(APIC_REG_ICRLO, trigger << 15 | level << 14 | mode << 8 | vector);
 #elif defined(__loongarch_lp64)
     if (mode == APIC_DELMODE_STARTUP) {
@@ -946,13 +1010,9 @@ void check_if_needs_to_map(void)
 
 void smp_init(bool smp_enable)
 {
-    for (int i = 0; i < (int)(ARRAY_SIZE(apic_id_to_cpu_num)); i++) {
-        apic_id_to_cpu_num[i] = 0;
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_proximity_domain_idx)); i++) {
+        cpu_num_to_proximity_domain_idx[i] = 0;
     }
-    for (int i = 0; i < (int)(ARRAY_SIZE(apic_id_to_proximity_domain_idx)); i++) {
-        apic_id_to_proximity_domain_idx[i] = 0;
-    }
-
     for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_apic_id)); i++) {
         cpu_num_to_apic_id[i] = 0;
     }
@@ -976,12 +1036,12 @@ void smp_init(bool smp_enable)
     num_proximity_domains = 0;
 
 #if defined(__i386__) || defined(__x86_64__)
+    apic_x2apic = false;
     if (cpuid_info.flags.x2apic) {
         uint32_t msrl, msrh;
         rdmsr(MSR_IA32_APIC_BASE, msrl, msrh);
         if ((msrl & IA32_APIC_ENABLED) && (msrl & IA32_APIC_EXTENDED)) {
-            // We don't currently support x2APIC mode.
-            smp_enable = false;
+            apic_x2apic = true;
         }
     }
 #endif
@@ -1000,10 +1060,6 @@ void smp_init(bool smp_enable)
 #endif
     }
 
-    for (int i = 0; i < num_available_cpus; i++) {
-        apic_id_to_cpu_num[cpu_num_to_apic_id[i]] = i;
-    }
-
     if (smp_enable) {
         if (find_numa_nodes_in_srat()) {
             check_if_needs_to_map();
@@ -1013,7 +1069,7 @@ void smp_init(bool smp_enable)
     }
 
     for (int i = 0; i < num_available_cpus; i++) {
-        uint32_t proximity_domain_idx = apic_id_to_proximity_domain_idx[i];
+        uint32_t proximity_domain_idx = cpu_num_to_proximity_domain_idx[i];
         cpus_in_proximity_domain[proximity_domain_idx]++;
     }
 
@@ -1089,12 +1145,20 @@ void smp_send_nmi(int cpu_num)
 
 int smp_my_cpu_num(void)
 {
-    return num_available_cpus > 1 ? apic_id_to_cpu_num[my_apic_id()] : 0;
+    if (num_available_cpus <= 1) return 0;
+
+    int apic_id = my_apic_id();
+    for (int i = 0; i < num_available_cpus; i++) {
+        if ((int)cpu_num_to_apic_id[i] == apic_id) {
+            return i;
+        }
+    }
+    return 0;
 }
 
 uint32_t smp_get_proximity_domain_idx(int cpu_num)
 {
-    return num_available_cpus > 1 ? apic_id_to_proximity_domain_idx[cpu_num_to_apic_id[cpu_num]] : 0;
+    return num_available_cpus > 1 ? cpu_num_to_proximity_domain_idx[cpu_num] : 0;
 }
 
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end)
