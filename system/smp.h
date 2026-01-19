@@ -26,7 +26,7 @@
 /**
  * The maximum number of APIC IDs.
  */
-#define MAX_APIC_IDS                256
+#define MAX_APIC_IDS                512
 
 /**
  * The maximum number of NUMA proximity domains.
@@ -86,10 +86,10 @@ uint32_t smp_get_proximity_domain_idx(int cpu_num);
  * "Allocates" a CPU ID in the given proximity domain, for filling in NUMA-aware chunk index.
  * Returns the nth CPU ID found so far in the proximity domain.
  */
-static inline uint8_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_domain_idx)
+static inline uint16_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_domain_idx)
 {
-    extern uint8_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
-    uint8_t chunk_index = used_cpus_in_proximity_domain[proximity_domain_idx];
+    extern uint16_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+    uint16_t chunk_index = used_cpus_in_proximity_domain[proximity_domain_idx];
     used_cpus_in_proximity_domain[proximity_domain_idx]++;
     return chunk_index;
 }

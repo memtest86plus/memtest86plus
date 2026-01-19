@@ -322,8 +322,8 @@ static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS];
 
 static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS];
 
-static uint8_t           cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
-uint8_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+static uint16_t           cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+uint16_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
 static uintptr_t         smp_heap_page = 0;
 
@@ -559,7 +559,7 @@ static bool find_cpus_in_madt(void)
                 return false;
             }
             madt_processor_x2apic_entry_t *entry = (madt_processor_x2apic_entry_t *)tab_entry_ptr;
-            if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
+            if (entry->flags & MADT_PF_ENABLED) {
                 if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[found_cpus] = entry->apic_id;
                     // The first CPU is the BSP, don't increment.

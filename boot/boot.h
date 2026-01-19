@@ -16,7 +16,7 @@
  *  - relocating the stacks when the program is loaded in low memory
  *  - adjusting the display if more than 3 digits are needed for CPU IDs
  */
-#define	MAX_APS		255		/* Maximum number of active APs */
+#define	MAX_APS		511		/* Maximum number of active APs */
 
 #define BSP_STACK_SIZE	16384		/* Stack size for the BSP */
 #ifdef __loongarch_lp64
