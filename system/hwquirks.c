@@ -79,7 +79,7 @@ static void get_m1541_l2_cache_size(void)
     if (reg == 0b10) { l2_cache = 1024; }
 }
 
-static void get_vt82c597_mb_cache_size(void)
+static void get_vt82c585_597_mb_cache_size(void)
 {
     int *const mb_cache = get_motherboard_cache();
     if (!mb_cache) {
@@ -198,14 +198,15 @@ void quirks_init(void)
         quirk.process = get_m1541_l2_cache_size;
     }
 
-    //  -----------------------------------------------
-    //  -- VIA VP3 (VT82C597), MVP3 (VT82C598) Quirk --
-    //  -----------------------------------------------
+    //  -------------------------------------------------------------------
+    //  -- VIA VP1/VPX (VT82C585), VP3 (VT82C597), MVP3 (VT82C598) Quirk --
+    //  -------------------------------------------------------------------
     // Motherboard cache detection
-    else if (quirk.root_vid == PCI_VID_VIA && (quirk.root_did == 0x0597 || quirk.root_did == 0x0598)) { // VIA VT82C597/8
-        quirk.id    = QUIRK_VIA_VP3;
+    else if (quirk.root_vid == PCI_VID_VIA && (quirk.root_did == 0x0585 // VIA VT82C585
+            || quirk.root_did == 0x0597 || quirk.root_did == 0x0598)) { // VIA VT82C597/8
+        quirk.id    = QUIRK_VIA_VP;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
-        quirk.process = get_vt82c597_mb_cache_size;
+        quirk.process = get_vt82c585_597_mb_cache_size;
     }
 
     //  ------------------------
