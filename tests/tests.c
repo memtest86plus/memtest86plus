@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2002-2026 Sam Demeulemeesrer.
 //
 // Derived from an extract of memtest86+ main.c:
-//
-// MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
 // ------------------------------------------------
 // main.c - MemTest-86  Version 3.5
 //
@@ -65,6 +62,7 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     { true,  PAR,    1,   48,    0, "[Random number sequence]               "},
     { true,  PAR,    1,    6,    0, "[Modulo 20, random pattern]            "},
     { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
+    { true,  PAR,    1,    5,    0, "[Row Hammer]                           "},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
@@ -251,6 +249,13 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
         break;
+
+      // Row Hammer.
+      case 11:
+        ticks += test_row_hammer(my_cpu, iterations);
+        BAILOUT;
+        break;
+
     }
     return ticks;
 }

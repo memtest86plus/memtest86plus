@@ -73,6 +73,7 @@ TST_OBJS = tests/addr_walk1.o \
            tests/mov_inv_random.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
+           tests/row_hammer.o \
            tests/test_helper.o \
            tests/tests.o
 

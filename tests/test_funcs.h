@@ -33,4 +33,6 @@ int test_block_move(int my_cpu, int iterations);
 
 int test_bit_fade(int my_cpu, int stage, int sleep_secs);
 
+int test_row_hammer(int my_cpu, int iterations);
+
 #endif // TEST_FUNCS_H
