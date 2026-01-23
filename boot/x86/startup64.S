@@ -257,7 +257,6 @@ flush:	movw	$KERNEL_DS, %ax
 
 	finit
 
-#if 0
 	# Enable SSE.
 
 	movq	%cr0, %rax
@@ -267,6 +266,27 @@ flush:	movw	$KERNEL_DS, %ax
 	movq	%cr4, %rax
 	orw	$0x0600, %ax		# set OSFXSR and OSXMMEXCPT
 	movq	%rax, %cr4
+
+	movq	$0x1F80, %rax		# Default MXCSR value (exceptions masked, round to nearest)
+	movq	%rax, (%rsp)
+	ldmxcsr (%rsp)
+
+#if 0
+	# Enable AVX.
+
+	movl	$1, %eax
+	cpuid
+	testl	$0x18000000, %ecx	# Check bits 27 (OSXSAVE) and 28 (AVX)
+	jz	no_avx
+	movq	%cr4, %rax
+	orl	$(1 << 18), %eax	# Set bit 18 (OSXSAVE)
+	movq	%rax, %cr4
+	xorq	%rcx, %rcx
+	xgetbv
+	orb	$0x07, %al		# Enable x87 (bit 0), XMM (bit 1) and YMM (bit 2)
+	xsetbv
+
+no_avx:
 #endif
 
 	# Call the dynamic linker to fix up the addresses in the GOT.
@@ -412,6 +432,26 @@ vec19:
 
 int_handler:
 	pushq	%rbp
+
+	subq	$256, %rsp
+	movdqa	%xmm0,	0x00(%rsp)
+	movdqa	%xmm1,	0x10(%rsp)
+	movdqa	%xmm2,	0x20(%rsp)
+	movdqa	%xmm3,	0x30(%rsp)
+	movdqa	%xmm4,	0x40(%rsp)
+	movdqa	%xmm5,	0x50(%rsp)
+	movdqa	%xmm6,	0x60(%rsp)
+	movdqa	%xmm7,	0x70(%rsp)
+	movdqa	%xmm8,	0x80(%rsp)
+	movdqa	%xmm9,	0x90(%rsp)
+	movdqa	%xmm10,	0xA0(%rsp)
+	movdqa	%xmm11,	0xB0(%rsp)
+	movdqa	%xmm12,	0xC0(%rsp)
+	movdqa	%xmm13,	0xD0(%rsp)
+	movdqa	%xmm14,	0xE0(%rsp)
+	movdqa	%xmm15,	0xF0(%rsp)
+
+	pushq	%r12
 	pushq	%r11
 	pushq	%r10
 	pushq	%r9
@@ -443,6 +483,26 @@ int_handler:
 	popq	%r9
 	popq	%r10
 	popq	%r11
+	popq	%r12
+
+	movdqa  0xF0(%rsp),	%xmm15
+	movdqa  0xE0(%rsp),	%xmm14
+	movdqa	0xD0(%rsp),	%xmm13
+	movdqa	0xC0(%rsp),	%xmm12
+	movdqa	0xB0(%rsp),	%xmm11
+	movdqa	0xA0(%rsp),	%xmm10
+	movdqa	0x90(%rsp),	%xmm9
+	movdqa	0x80(%rsp),	%xmm8
+	movdqa	0x70(%rsp),	%xmm7
+	movdqa	0x60(%rsp),	%xmm6
+	movdqa	0x50(%rsp),	%xmm5
+	movdqa	0x40(%rsp),	%xmm4
+	movdqa	0x30(%rsp),	%xmm3
+	movdqa	0x20(%rsp),	%xmm2
+	movdqa	0x10(%rsp),	%xmm1
+	movdqa	0x00(%rsp),	%xmm0
+	addq	$256, %rsp
+
 	popq	%rbp
 	addq	$16, %rsp		# discard the vector number and error code
 	iretq
