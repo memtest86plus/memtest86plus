@@ -51,6 +51,7 @@ SYS_OBJS = system/acpi.o \
            system/x86/cpuinfo.o \
            system/x86/hwctrl.o \
            system/x86/i2c.o \
+           system/x86/membw.o \
            system/x86/memctrl.o \
            system/x86/temperature.o \
            system/x86/vmem.o
