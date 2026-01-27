@@ -25,6 +25,12 @@
 // Constants
 //------------------------------------------------------------------------------
 
+#define ISR_GP_REGS_ONLY __attribute__((target( \
+  "no-mmx," \
+  "no-sse,no-sse2,no-sse3,no-ssse3,no-sse4.1,no-sse4.2," \
+  "no-avx,no-avx2," \
+)))
+
 #define INT_DIVBY0     0
 #define INT_RSV        1
 #define INT_NMI        2
@@ -84,9 +90,10 @@ static const char codes[][13] = {
 //------------------------------------------------------------------------------
 
 #ifdef __x86_64__
-
 typedef uint64_t    reg_t;
-typedef float __m128 __attribute__((__vector_size__ (16), __aligned__ (16)));
+#else
+typedef uint32_t    reg_t;
+#endif
 
 struct trap_regs {
     reg_t   ds;
@@ -98,53 +105,32 @@ struct trap_regs {
     reg_t   dx;
     reg_t   di;
     reg_t   si;
+#ifdef __x86_64__
     reg_t   r8;
     reg_t   r9;
     reg_t   r10;
     reg_t   r11;
-    reg_t   r12;
-    __m128  xmm[16];
-    reg_t   bp;
-    reg_t   vect;
-    reg_t   code;
-    reg_t   ip;
-    reg_t   cs;
-    reg_t   flags;
-    reg_t   sp;
-};
-
 #else
-
-typedef uint32_t    reg_t;
-
-struct trap_regs {
-    reg_t   ds;
-    reg_t   es;
-    reg_t   ss;
-    reg_t   ax;
-    reg_t   bx;
-    reg_t   cx;
-    reg_t   dx;
-    reg_t   di;
-    reg_t   si;
     reg_t   reserved1;
     reg_t   reserved2;
     reg_t   sp;
+#endif
     reg_t   bp;
     reg_t   vect;
     reg_t   code;
     reg_t   ip;
     reg_t   cs;
     reg_t   flags;
-};
-
+#ifdef __x86_64__
+    reg_t   sp;
 #endif
+};
 
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
-void interrupt(struct trap_regs *trap_regs)
+ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
 {
     // Get the page fault address.
     uintptr_t address = 0;
