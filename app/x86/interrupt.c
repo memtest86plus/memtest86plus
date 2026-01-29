@@ -25,6 +25,12 @@
 // Constants
 //------------------------------------------------------------------------------
 
+#define ISR_GP_REGS_ONLY __attribute__((target( \
+  "no-mmx," \
+  "no-sse,no-sse2,no-sse3,no-ssse3,no-sse4.1,no-sse4.2," \
+  "no-avx,no-avx2," \
+)))
+
 #define INT_DIVBY0     0
 #define INT_RSV        1
 #define INT_NMI        2
@@ -124,7 +130,7 @@ struct trap_regs {
 // Public Functions
 //------------------------------------------------------------------------------
 
-void interrupt(struct trap_regs *trap_regs)
+ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
 {
     // Get the page fault address.
     uintptr_t address = 0;

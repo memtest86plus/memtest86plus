@@ -11,9 +11,8 @@ else
   GIT_AVAILABLE = true
 endif
 
-CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -mno-mmx -mno-sse -mno-sse2 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector \
-         -fexcess-precision=standard -DARCH_BITS=64
+CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -DARCH_BITS=64 \
+         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -fexcess-precision=standard
 
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
@@ -52,6 +51,7 @@ SYS_OBJS = system/acpi.o \
            system/x86/cpuinfo.o \
            system/x86/hwctrl.o \
            system/x86/i2c.o \
+           system/x86/membw.o \
            system/x86/memctrl.o \
            system/x86/temperature.o \
            system/x86/vmem.o

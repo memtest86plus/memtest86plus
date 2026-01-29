@@ -257,7 +257,6 @@ flush:	movw	$KERNEL_DS, %ax
 
 	finit
 
-#if 0
 	# Enable SSE.
 
 	movq	%cr0, %rax
@@ -267,6 +266,27 @@ flush:	movw	$KERNEL_DS, %ax
 	movq	%cr4, %rax
 	orw	$0x0600, %ax		# set OSFXSR and OSXMMEXCPT
 	movq	%rax, %cr4
+
+	movq	$0x1F80, %rax		# Default MXCSR value (exceptions masked, round to nearest)
+	movq	%rax, (%rsp)
+	ldmxcsr (%rsp)
+
+#if 0
+	# Enable AVX.
+
+	movl	$1, %eax
+	cpuid
+	testl	$0x18000000, %ecx	# Check bits 27 (OSXSAVE) and 28 (AVX)
+	jz	no_avx
+	movq	%cr4, %rax
+	orl	$(1 << 18), %eax	# Set bit 18 (OSXSAVE)
+	movq	%rax, %cr4
+	xorq	%rcx, %rcx
+	xgetbv
+	orb	$0x07, %al		# Enable x87 (bit 0), XMM (bit 1) and YMM (bit 2)
+	xsetbv
+
+no_avx:
 #endif
 
 	# Call the dynamic linker to fix up the addresses in the GOT.
