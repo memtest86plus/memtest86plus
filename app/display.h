@@ -15,6 +15,7 @@
 #include <stdbool.h>
 
 #include "screen.h"
+#include "serial.h"
 
 #include "print.h"
 #include "string.h"
@@ -212,6 +213,9 @@ typedef enum {
     { \
         clear_screen_region(ROW_MESSAGE_T, 0, ROW_MESSAGE_B, SCREEN_WIDTH - 1); \
         scroll_message_row = ROW_SCROLL_T - 1; \
+        if (enable_tty) { \
+            tty_message_redraw(); \
+        } \
     }
 
 #define display_pinned_message(row, col, ...) \
@@ -221,16 +225,29 @@ typedef enum {
     printf(scroll_message_row, col, __VA_ARGS__)
 
 #define display_notice(str) \
-    prints(ROW_MESSAGE_T + 8, (SCREEN_WIDTH - strlen(str)) / 2, str)
+    { \
+        prints(ROW_MESSAGE_T + 8, (SCREEN_WIDTH - strlen(str)) / 2, str); \
+        if (enable_tty) { \
+            tty_message_redraw(); \
+        } \
+    }
 
 #define display_notice_with_args(length, ...) \
-    printf(ROW_MESSAGE_T + 8, (SCREEN_WIDTH - length) / 2, __VA_ARGS__)
+    { \
+        printf(ROW_MESSAGE_T + 8, (SCREEN_WIDTH - length) / 2, __VA_ARGS__); \
+        if (enable_tty) { \
+            tty_message_redraw(); \
+        } \
+    }
 
 #define clear_footer_message() \
     { \
         set_background_colour(palette.foreground); \
         clear_screen_region(ROW_FOOTER, 56, ROW_FOOTER, SCREEN_WIDTH - 1); \
         set_background_colour(palette.background);  \
+        if (enable_tty) { \
+            tty_footer_redraw(); \
+        } \
     }
 
 #define display_footer_message(str) \
@@ -238,6 +255,9 @@ typedef enum {
         set_foreground_colour(palette.footer_foreground);  \
         prints(ROW_FOOTER, 56, str);  \
         set_foreground_colour(palette.footer_background); \
+        if (enable_tty) { \
+            tty_footer_redraw(); \
+        } \
     }
 
 #define trace(my_cpu, ...) \

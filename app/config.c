@@ -871,9 +871,16 @@ static void cpu_selection_menu(void)
 
     display_cpu_selection(display_offset);
 
+    bool tty_update = enable_tty;
     bool exit_menu = false;
     while (!exit_menu) {
         bool changed = false;
+
+        if (tty_update) {
+            tty_send_region(POP_REGION);
+        }
+        tty_update = enable_tty;
+
         switch (get_key()) {
           case '1':
             changed = set_all_cpus(false, display_offset);
@@ -912,6 +919,7 @@ static void cpu_selection_menu(void)
             break;
           default:
             usleep(1000);
+            tty_update = false;
             break;
         }
         if (changed) {

@@ -162,6 +162,15 @@ struct serial_port {
 #define tty_error_redraw() \
     tty_send_region(10, 0, 23, 79);
 
+#define tty_footer_redraw() \
+    tty_send_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
+
+#define tty_message_redraw() \
+    tty_send_region(ROW_MESSAGE_T, 0, ROW_MESSAGE_B, SCREEN_WIDTH - 1);
+
+#define tty_scroll_redraw() \
+    tty_send_region(ROW_SCROLL_T, 0, ROW_SCROLL_B, SCREEN_WIDTH - 1);
+
 #define tty_normal() \
     serial_echo_print(TTY_NORMAL);
 
