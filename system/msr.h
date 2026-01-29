@@ -8,7 +8,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2020-2025 Sam Demeulemeester.
+ * Copyright (C) 2020-2026 Sam Demeulemeester.
  */
 
 #define MSR_PLATFORM_INFO               0xce
@@ -23,6 +23,8 @@
 #define MSR_IA32_PERF_STATUS            0x198
 #define MSR_IA32_THERM_STATUS           0x19c
 #define MSR_IA32_TEMPERATURE_TARGET     0x1a2
+
+#define MSR_IA32_X2APIC_BASE            0x800
 
 #define MSR_EFER                        0xc0000080
 

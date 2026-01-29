@@ -101,7 +101,7 @@ static int              test_stage = 0;
 
 // These are exposed in test.h.
 
-uint8_t     chunk_index[MAX_CPUS];
+uint16_t     chunk_index[MAX_CPUS];
 
 int         num_active_cpus = 0;
 int         num_enabled_cpus = 1;
