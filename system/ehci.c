@@ -437,6 +437,26 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return do_async_transfer(ws, 3);
 }
 
+static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+                             const void *buffer, size_t length)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    if (setup_pkt) {
+        build_ehci_qtd(&ws->qtd[0], &ws->qtd[2], EHCI_QTD_PID_SETUP, EHCI_QTD_DT(0), setup_pkt, sizeof(usb_setup_pkt_t));
+        build_ehci_qtd(&ws->qtd[1], &ws->qtd[2], EHCI_QTD_PID_OUT,   EHCI_QTD_DT(1), buffer, length);
+        build_ehci_qtd(&ws->qtd[2], &ws->qtd[2], EHCI_QTD_PID_IN,    EHCI_QTD_DT(1), NULL, 0);
+        build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
+        return do_async_transfer(ws, 3);
+    } else {
+        // TODO toggle per endpoint, reset on clear stall
+        static int toggle;
+        build_ehci_qtd(&ws->qtd[0], &ws->qtd[0], EHCI_QTD_PID_OUT,   EHCI_QTD_DT(toggle++ & 1), buffer, length);
+        build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
+        return do_async_transfer(ws, 1);
+    }
+}
+
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -479,6 +499,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
+    .out_data_request    = out_data_request,
     .poll_keyboards      = poll_keyboards
 };
 
@@ -664,6 +685,11 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     uint32_t first_qhd_ptr = EHCI_LP_TERMINATE;
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
+
+        save_ep(kbd_idx, kbd);
+
+        if (!IS_EP_INT(kbd))
+            continue;
 
         ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
         ehci_qtd_t *kbd_qtd = &ws->qtd[3 + kbd_idx];

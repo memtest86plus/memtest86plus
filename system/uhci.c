@@ -365,6 +365,41 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return wait_for_uhci_done(ws);
 }
 
+static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+                             const void *buffer, size_t length)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    size_t packet_size = ep->max_packet_size;
+    if (length > (MAX_PACKETS * packet_size)) {
+        return false;
+    }
+
+    write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
+    int pkt_num = 0;
+    if (setup_pkt) {
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_SETUP, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, setup_pkt, sizeof(usb_setup_pkt_t)); pkt_num++;
+        while (length > packet_size) {
+            build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(pkt_num & 1), UHCI_TD_SPD, buffer, packet_size); pkt_num++;
+            buffer = (uint8_t *)buffer + packet_size;
+            length -= packet_size;
+        }
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, buffer, length); pkt_num++;
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_IN, UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
+    } else {
+        // FIXME store toggle per endpoint
+        static int bulk_pkt_num;
+        while (length > packet_size) {
+            build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_N, buffer, packet_size); pkt_num++;
+            buffer = (uint8_t *)buffer + packet_size;
+            length -= packet_size;
+        }
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_Y, buffer, length);
+    }
+    write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
+    return wait_for_uhci_done(ws);
+}
+
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -413,6 +448,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
+    .out_data_request    = out_data_request,
     .poll_keyboards      = poll_keyboards
 };
 
@@ -548,6 +584,11 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
+        save_ep(kbd_idx, kbd);
+
+        if (!IS_EP_KEYBOARD(kbd))
+            continue;
+
         uhci_qh_t *kbd_qh = &ws->qh[1 + kbd_idx];
         uhci_td_t *kbd_td = &ws->td[2 + kbd_idx];
 
@@ -567,10 +608,11 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
     }
 
     // Re-initialise the frame list to execute the periodic schedule.
-    for (int i = 0; i < UHCI_FL_LENGTH; i++) {
+    // Leave the last slots for any control or bulk transfers
+    for (int i = 0; i < UHCI_FL_LENGTH - 96; i++) {
         write32(&fl[i], UHCI_LP_TERMINATE);
     }
-    for (int i = 0; i < UHCI_FL_LENGTH; i += min_interval) {
+    for (int i = 0; i < UHCI_FL_LENGTH - 96; i += min_interval) {
         write32(&fl[i], first_qh_ptr);
     }
 
