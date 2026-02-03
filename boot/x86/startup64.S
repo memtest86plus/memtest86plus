@@ -160,7 +160,7 @@ startup:
 
 	# Pick the correct stack.
 
-	xorq	%rax, %rax
+	xorl	%eax, %eax
 	call	smp_my_cpu_num
 	movl	$AP_STACK_SIZE, %edx
 	mul	%edx
@@ -243,7 +243,7 @@ flush:	movw	$KERNEL_DS, %ax
 
 	cmpl	$1, first_boot(%rip)
 	jne	1f
-	xorq	%rax, %rax
+	xorl	%eax, %eax
 	leaq	_bss(%rip), %rdi
 	leaq	_end(%rip), %rcx
 	subq	%rdi, %rcx
@@ -284,7 +284,7 @@ flush:	movw	$KERNEL_DS, %ax
 	# In case we return, simulate an exception.
 
 	pushfq
-	xorq	%rax, %rax
+	xorl	%eax, %eax
 	movw	%cs, %ax
 	pushq	%rax
 	call	0f
@@ -422,7 +422,7 @@ int_handler:
 	pushq	%rcx
 	pushq	%rbx
 	pushq	%rax
-	xorq	%rax, %rax
+	xorl	%eax, %eax
 	movw	%ss, %ax
 	pushq	%rax
 	movw	%es, %ax
