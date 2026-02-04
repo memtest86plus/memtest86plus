@@ -49,8 +49,8 @@ typedef enum {
 
 #define display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset) \
     { \
-        clear_screen_region(1, 18, 1, 22); \
-        printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
+        clear_screen_region(1, 18, 1, 26); \
+        printf(1, 20-offset, "%3i/%3i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
     }
 
 #define display_cpu_addr_mode(str) \
