@@ -37,7 +37,15 @@ void cpu_temp_init(void)
 
 int get_cpu_temp(void)
 {
-    return (int)(__iocsrrd_w(0x428));
+    uint32_t raw = __iocsrrd_w(0x428);
+    int8_t temp = (int8_t)(raw & 0xFF);
+
+    // Check if the Centigrade 0x428 is valid.
+    if (__iocsrrd_w(0x8) & (1 << 0)) {
+        return (int)((float)temp + cpu_temp_offset);
+    } else {
+        return -1;
+    }
 }
 
 int get_ram_temp(uint8_t slot)
