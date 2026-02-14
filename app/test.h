@@ -25,11 +25,11 @@
  * enabled cores (in the current proximity domain, when NUMA awareness is
  * enabled).
  */
-extern uint8_t chunk_index[MAX_CPUS];
+extern uint16_t chunk_index[MAX_CPUS];
 /**
  * An array where the count of used CPUs in the current proximity domain.
  */
-extern uint8_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+extern uint16_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
  /*
   * The number of CPU cores being used for the current test. This is always
