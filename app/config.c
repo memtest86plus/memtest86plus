@@ -208,27 +208,27 @@ static int parse_decimal(const char *str, const char **endptr)
 {
     int value = 0;
     const char *p = str;
-    
+
     // Skip leading whitespace
     while (*p == ' ' || *p == '\t') {
         p++;
     }
-    
+
     // Parse digits
     while (*p >= '0' && *p <= '9') {
         value = value * 10 + (*p - '0');
         p++;
     }
-    
+
     if (endptr) {
         *endptr = p;
     }
-    
+
     return value;
 }
 
 static void parse_test_list(const char *params)
-{   
+{
     // Disable all tests
     for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
         test_list[i].enabled = false;
@@ -246,25 +246,25 @@ static void parse_test_list(const char *params)
         while (*p == ' ' || *p == '\t' || *p == ',') {
             p++;
         }
-        
+
         // Null line termination
         if (*p == '\0') {
             break;
         }
-        
+
         // Parse and validate the test number
         const char *end;
-        int test_num = parse_decimal(p, &end);
-        if (test_num < 0 || test_num >= NUM_TEST_PATTERNS) {
+        int parse_test_num = parse_decimal(p, &end);
+        if (parse_test_num < 0 || parse_test_num >= NUM_TEST_PATTERNS) {
             return;
         }
-        
+
         // Enable the test
-        test_list[test_num].enabled = true;
-        
+        test_list[parse_test_num].enabled = true;
+
         // Move to next token
         p = end;
-        
+
         // Skip to comma or end
         while (*p != '\0' && *p != ',') {
             if (*p != ' ' && *p != '\t') {
