@@ -268,7 +268,7 @@ void display_cpu_topology(void)
     if (cpuid_info.topology.is_hybrid) {
         if (cpuid_info.topology.pcore_count > 1) {
 
-            if (cpuid_info.flags.htt &&
+            if (cpuid_info.flags.htt && cpuid_info.topology.thread_per_core > 1 &&
                 (cpuid_info.topology.thread_count - cpuid_info.topology.ecore_count) == cpuid_info.topology.pcore_count) {
                     cpuid_info.topology.pcore_count /= 2;
             }

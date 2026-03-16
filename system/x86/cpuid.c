@@ -126,13 +126,12 @@ void cpuid_init(void)
     }
 
     // Detect CPU Topology (Core/Thread) infos
-    cpuid_info.topology.core_count   = -1;
-    cpuid_info.topology.thread_count = -1;
-    cpuid_info.topology.is_hybrid    =  0;
-    cpuid_info.topology.ecore_count  = -1;
-    cpuid_info.topology.pcore_count  = -1;
-
-    int thread_per_core = 1;
+    cpuid_info.topology.core_count      = -1;
+    cpuid_info.topology.thread_count    = -1;
+    cpuid_info.topology.thread_per_core =  1;
+    cpuid_info.topology.is_hybrid       =  0;
+    cpuid_info.topology.ecore_count     = -1;
+    cpuid_info.topology.pcore_count     = -1;
 
     // Set correct HTT flag according to AP-485
     if (cpuid_info.max_cpuid >= 1 && cpuid_info.flags.htt) {
@@ -154,16 +153,16 @@ void cpuid_init(void)
                 cpuid(0x8000001E, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
 
                 if (((reg[1] >> 8) & 0x3) > 0) {
-                    thread_per_core = 2;
+                    cpuid_info.topology.thread_per_core  = 2;
                 }
             } else if (cpuid_info.flags.htt) {
                 if (cpuid_info.version.extendedFamily >= 8) {
-                    thread_per_core = 2;
+                    cpuid_info.topology.thread_per_core  = 2;
                 } else {
                     cpuid_info.flags.htt = 0; // Pre-ZEN never has SMT
                 }
             }
-            cpuid_info.topology.core_count = cpuid_info.topology.thread_count / thread_per_core;
+            cpuid_info.topology.core_count = cpuid_info.topology.thread_count / cpuid_info.topology.thread_per_core ;
         }
         break;
        case 'C':
@@ -192,7 +191,7 @@ void cpuid_init(void)
 
                 switch((reg[2] >> 8) & 0xFF) {
                     case 1: // SMT
-                        thread_per_core = reg[1] & 0xFF;
+                        cpuid_info.topology.thread_per_core  = reg[1] & 0xFF;
                         break;
                     case 2: // Cores
                         cpuid_info.topology.thread_count = reg[1] & 0xFFFF;
@@ -202,7 +201,7 @@ void cpuid_init(void)
                 }
             }
 
-            cpuid_info.topology.core_count = cpuid_info.topology.thread_count / thread_per_core;
+            cpuid_info.topology.core_count = cpuid_info.topology.thread_count / cpuid_info.topology.thread_per_core ;
 
         } else if (cpuid_info.max_cpuid >= 0x4) {
             cpuid(4, 0, &reg[0], &reg[1], &reg[2], &reg[3]);

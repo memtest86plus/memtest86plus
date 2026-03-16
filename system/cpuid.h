@@ -146,6 +146,7 @@ typedef union {
 typedef struct {
     int     core_count;
     int     thread_count;
+    int     thread_per_core;
     int     is_hybrid;
     int     ecore_count;
     int     pcore_count;
