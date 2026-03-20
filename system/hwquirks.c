@@ -114,6 +114,24 @@ static void get_vt82c585_597_mb_cache_size(void)
     *mb_cache = 256 << reg;
 }
 
+static void get_sis_530_mb_cache_size(void)
+{
+    mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
+        return;
+    }
+
+    // Check if cache is enabled
+    if ((pci_config_read8(0, 0, 0, 0x51) & 0x80) == 0) {
+        return;
+    }
+
+    // Get cache size
+    uint8_t sis_reg = (pci_config_read8(0, 0, 0, 0x51) >> 4) & 0x03;
+
+    *mb_cache = 256 << sis_reg;
+}
+
 static void disable_temp_reporting(void)
 {
     enable_temp_cpu = false;
@@ -224,6 +242,12 @@ void quirks_init(void)
         quirk.id    = QUIRK_VIA_VP;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
         quirk.process = get_vt82c585_597_mb_cache_size;
+    }
+
+    else if (quirk.root_vid == PCI_VID_SIS && quirk.root_did == 0x0530) {
+        quirk.id    = QUIRK_SIS_530;
+        quirk.type |= QUIRK_TYPE_MEM_SIZE;
+        quirk.process = get_sis_530_mb_cache_size;
     }
 
     //  ------------------------
