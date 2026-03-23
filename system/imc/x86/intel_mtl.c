@@ -106,7 +106,7 @@ void get_imc_config_intel_mtl(void)
     imc.tRCD = (*ptr >> 22) & 0xFF;
 
     ptr = (uintptr_t*)(mchbar_addr + offset + MTL_MMR_CH0_PRE_REG);
-    imc.tRP = (*ptr >> 10) & 0xFF;
+    imc.tRP = *ptr & 0xFF;
 
     ptr32 = (uint32_t*)((uintptr_t)mchbar_addr + offset + MTL_MMR_CH0_PRE_REG + 4);
     imc.tRAS = (*ptr32 >> 13) & 0x1FF;
