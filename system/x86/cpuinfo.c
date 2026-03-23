@@ -502,6 +502,9 @@ static void determine_imc(void)
               case 0x8:
                 imc.family = IMC_TGL;         // Core 11th Gen (Tiger Lake-U)
                 break;
+              case 0xC:
+                imc.family = IMC_PTL;         // Core Ultra Serie 3 (Panther Lake)
+                break;
               default:
                 break;
             }
@@ -517,6 +520,9 @@ static void determine_imc(void)
                 break;
               case 0x8:
                 imc.family = IMC_TGL;         // Core 11th Gen (Tiger Lake-Y)
+                break;
+              case 0xB:
+                imc.family = IMC_LNL;         // Core Ultra Serie 2 (Lunar Lake)
                 break;
               default:
                 break;
@@ -578,6 +584,29 @@ static void determine_imc(void)
         }
         return;
     }
+
+    // Check Intel IMC (Next Gen CPUID)
+    if (cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.version.family == 15 && cpuid_info.version.extendedFamily)
+    {
+        switch (cpuid_info.version.extendedFamily) {
+            case 0x3:
+              switch (cpuid_info.version.model) {
+                case 0x1:
+                  imc.family = IMC_NVL_S;      // Nova Lake-S
+                  break;
+                case 0x3:
+                  imc.family = IMC_NVL_H;      // Nova Lake-Hx
+                  break;
+                default:
+                  break;
+              }
+
+            default:
+              break;
+        }
+        return;
+    }
+
 }
 
 static void determine_cpu_model(void)

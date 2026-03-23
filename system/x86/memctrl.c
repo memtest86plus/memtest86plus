@@ -62,6 +62,8 @@ void memctrl_init(void)
         break;
       case IMC_ARL:
       case IMC_MTL:
+      case IMC_LNL:
+      case IMC_PTL:
         get_imc_config_intel_mtl();
       default:
         break;

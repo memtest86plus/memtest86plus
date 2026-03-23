@@ -48,7 +48,9 @@
 #define IMC_KBL_UY      0x3030  // Core 7/8/9th Gen (Kaby/Coffee/Comet/Amber Lake-U/Y)
 #define IMC_ICL         0x3040  // Core 10th Gen (IceLake-Y)
 #define IMC_TGL         0x3050  // Core 11th Gen (Tiger Lake-U)
-#define IMC_ADL_N       0x3061  // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
+#define IMC_ADL_N       0x3060  // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
+#define IMC_LNL         0x3070  // Core Ultra 2nd Gen (Lunar Lake)
+#define IMC_PTL         0x3080  // Core Ultra 3rd Gen (Panther Lake)
 
 #define IMC_BYT         0x4010  // Atom Bay Trail
 #define IMC_SLT         0x4020  // Atom Silverthorne / Diamondville
@@ -56,6 +58,9 @@
 #define IMC_CLT         0x4040  // Atom Clover Trail / Cloverview
 #define IMC_CDT         0x4050  // Atom Cedar Trail / Cedarview
 #define IMC_TNC         0x4060  // Atom Tunnel Creek / Lincroft
+
+#define IMC_NVL_S       0x5000  // Nova Lake-S
+#define IMC_NVL_H       0x5010  // Nova Lake-H
 
 #define IMC_K8          0x8000  // Old K8
 #define IMC_K10         0x8010  // K10 (Family 10h & 11h)
