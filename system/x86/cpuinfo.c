@@ -30,12 +30,6 @@
 #include "cpuinfo.h"
 
 //------------------------------------------------------------------------------
-// Constants
-//------------------------------------------------------------------------------
-
-#define BENCH_MIN_START_ADR 0x1000000   // 16MB
-
-//------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
 
@@ -976,6 +970,7 @@ static void determine_cpu_model(void)
     }
 }
 
+/*
 static uint32_t memspeed(uintptr_t src, uint32_t len, int iter)
 {
     uintptr_t dst;
@@ -1156,6 +1151,7 @@ static void measure_memory_bandwidth(void)
     // Measure RAM BW
     ram_speed = memspeed(bench_start_adr, mem_test_len, 25);
 }
+*/
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -1168,15 +1164,4 @@ void cpuinfo_init(void)
     determine_cache_size();
 
     determine_cpu_model();
-}
-
-void membw_init(void)
-{
-    if (quirk.type & QUIRK_TYPE_MEM_SIZE) {
-        quirk.process();
-    }
-
-    if(enable_bench) {
-        measure_memory_bandwidth();
-    }
 }
