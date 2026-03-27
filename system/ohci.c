@@ -389,6 +389,27 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return wait_for_ohci_done(ws, 3);
 }
 
+static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+                             const void *buffer, size_t length)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    if (setup_pkt) {
+        build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
+        build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, buffer, length);
+        build_ohci_td(&ws->td[2], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
+        build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[3]);
+        write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
+        return wait_for_ohci_done(ws, 3);
+    } else {
+        static int bulk_dt;
+        uint32_t dt = (bulk_dt & 1) ? OHCI_TD_DT_1 : OHCI_TD_DT_0;
+        build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | dt | OHCI_TD_DI_NO_DLY, buffer, length);
+        write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
+        return wait_for_ohci_done(ws, 1);
+    }
+}
+
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -429,6 +450,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
+    .out_data_request    = out_data_request,
     .poll_keyboards      = poll_keyboards
 };
 
@@ -606,6 +628,11 @@ bool ohci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     uint32_t intr_head_ed = 0;
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
+
+        save_ep(kbd_idx, kbd);
+
+        if (!IS_EP_INT(kbd))
+            continue;
 
         ohci_ed_t *kbd_ed = &ws->ed[1 + kbd_idx];
         ohci_td_t *kbd_td = &ws->td[3 + kbd_idx];
