@@ -132,7 +132,21 @@ startup64:
 	.globl	efi_handover
 efi_handover:
 	andq	$~0xf, %rsp
-	call	efi_setup
+#	movq	%rdi, %r8		# save EFI image handle
+
+	# Clear .bss tail when VirtualSize > RawSize.
+#	xorq	%rax, %rax
+#	leaq	_bss(%rip), %rdi
+#	leaq	_end(%rip), %rcx
+#	subq	%rdi, %rcx
+#0:	cmpq	$0, %rcx
+#	je	1f
+#	movq	%rax, (%rdi)
+#	addq	$8, %rdi
+#	subq	$8, %rcx
+#	jmp	0b
+#1:	movq	%r8, %rdi		# restore EFI image handle
+    call	efi_setup
 
 	# Disable write protection in case the boot loader has made the
 	# loaded image read-only.
