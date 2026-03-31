@@ -805,7 +805,7 @@ coff_header:
 #else
 	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
-	.word	3				# NumberOfSections
+	.word	4				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
@@ -833,14 +833,14 @@ optional_header:
 	.byte	0x14				# MinorLinkerVersion
 
 	.long	_virt_text_size			# SizeOfCode
-	.long	_virt_sbat_size			# SizeOfInitializedData
+	.long	_size_of_init_data		# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
 	.long	_virt_text_start + 0x1e0	# AddressOfEntryPoint
 
 	.long	_virt_text_start		# BaseOfCode
 #ifndef __x86_64__
-	.long	_virt_sbat_start		# BaseOfData
+	.long	_virt_data_start		# BaseOfData
 #endif
 
 extra_header_fields:
@@ -863,7 +863,7 @@ extra_header_fields:
 	.long	_file_head_size			# SizeOfHeaders
 	.long	0				# CheckSum
 	.word	10				# Subsystem (EFI application)
-	.word	0				# DllCharacteristics
+	.word	IMAGE_DLLCHARACTERISTICS_NX_COMPAT # DllCharacteristics
 #ifdef __x86_64__
 	.quad	0				# SizeOfStackReserve
 	.quad	0				# SizeOfStackCommit
@@ -906,9 +906,24 @@ section_table:
 	.word	0				# NumberOfRelocations
 	.word	0				# NumberOfLineNumbers
 	.long	IMAGE_SCN_MEM_READ		\
-	      | IMAGE_SCN_MEM_WRITE		\
 	      | IMAGE_SCN_MEM_EXECUTE		\
 	      | IMAGE_SCN_CNT_CODE		# Characteristics (section flags)
+
+	.ascii	".data"
+	.byte	0
+	.byte	0
+	.byte	0
+	.long	_virt_data_size			# VirtualSize
+	.long	_virt_data_start		# VirtualAddress
+	.long	_file_data_size			# SizeOfRawData
+	.long	_file_data_start		# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+	      | IMAGE_SCN_MEM_WRITE		\
+	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
 	.ascii	".reloc"
 	.byte	0
