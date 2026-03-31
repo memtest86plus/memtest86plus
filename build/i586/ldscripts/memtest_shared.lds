@@ -19,7 +19,6 @@ SECTIONS {
 	.dynstr     : { *(.dynstr) }
 	.hash       : { *(.hash) }
 	.gnu.hash   : { *(.gnu.hash) }
-	.dynamic    : { *(.dynamic) }
 	.shstrtab   : { *(.shstrtab) }
 
 	.rel.text    : { *(.rel.text   .rel.text.*) }
@@ -27,6 +26,14 @@ SECTIONS {
 	.rel.data    : { *(.rel.data   .rel.data.*) }
 	.rel.got     : { *(.rel.got    .rel.got.*) }
 	.rel.plt     : { *(.rel.plt    .rel.plt.*) }
+
+	/* Page-align the boundary between read-only and writable sections.
+	   PE SectionAlignment is 4096, so this ensures the split point
+	   matches the PE virtual address layout exactly. */
+	. = ALIGN(4096);
+	_etext_ro = .;
+
+	.dynamic    : { *(.dynamic) }
 
 	. = ALIGN(4);
 	.data : {
