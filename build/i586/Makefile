@@ -182,7 +182,13 @@ memtest.debug: memtest_shared
 
 mt86plus: memtest_shared.bin boot/x86/header.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/x86/header.o -b binary memtest_shared.bin -o mt86plus
+	$(eval SPLIT=$(shell printf '%d' 0x$$(nm memtest_shared | awk '/ _etext_ro$$/{print $$1}')))
+	dd if=memtest_shared.bin of=memtest_shared_text.bin bs=$(SPLIT) count=1 2>/dev/null
+	dd if=memtest_shared.bin of=memtest_shared_data.bin bs=$(SPLIT) skip=1 2>/dev/null
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 --rename-section .data=.payload.text memtest_shared_text.bin memtest_text.o
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 --rename-section .data=.payload.data memtest_shared_data.bin memtest_data.o
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) --defsym=_split_off=$(SPLIT) \
+	  -T ldscripts/memtest_efi.lds boot/x86/header.o memtest_text.o memtest_data.o -o mt86plus
 
 memtest.mbr: memtest_shared.bin boot/x86/mbr.o ldscripts/memtest_mbr.lds
 	$(LD) -T ldscripts/memtest_mbr.lds boot/x86/mbr.o -b binary memtest_shared.bin -o memtest.mbr
