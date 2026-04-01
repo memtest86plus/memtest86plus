@@ -44,11 +44,11 @@ int get_cpu_temp(void)
     if (__iocsrrd_w(0x8) & (1 << 0)) {
         return (int)((float)temp + cpu_temp_offset);
     } else {
-        return -1;
+        return CPU_TEMP_INVALID;
     }
 }
 
 int get_ram_temp(uint8_t slot)
 {
-    return 0;
+    return CPU_TEMP_INVALID;
 }

@@ -83,7 +83,7 @@ static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 
 int scroll_message_row;
 
-int max_cpu_temp = 0;
+int max_cpu_temp = CPU_TEMP_INVALID;
 
 display_mode_t display_mode = DISPLAY_MODE_NA;
 
@@ -406,14 +406,14 @@ void display_temperature(void)
         // Display CPU Temperature
         int actual_cpu_temp = get_cpu_temp();
 
-        if (actual_cpu_temp == 0) {
-            if (max_cpu_temp == 0) {
+        if (actual_cpu_temp == CPU_TEMP_INVALID) {
+            if (max_cpu_temp == CPU_TEMP_INVALID) {
                 enable_temp_cpu = false;
             }
             return;
         }
 
-        if (max_cpu_temp < actual_cpu_temp ) {
+        if (max_cpu_temp == CPU_TEMP_INVALID || max_cpu_temp < actual_cpu_temp) {
             max_cpu_temp = actual_cpu_temp;
         }
 
@@ -433,7 +433,7 @@ void display_temperature(void)
 
                 int ram_temp = get_ram_temp(i);
 
-                if (ram_temp > 0) {
+                if (ram_temp != CPU_TEMP_INVALID) {
                     display_ram_temperature(ram_temp, ram_slot_info[i].display_idx)
                 }
             }
