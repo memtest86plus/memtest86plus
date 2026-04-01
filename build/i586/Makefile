@@ -191,8 +191,7 @@ mt86plus: memtest_shared.bin boot/x86/header.o ldscripts/memtest_efi.lds
 	$(eval SPLIT=$(shell nm -t d memtest_shared | awk '/ _etext_ro$$/{print $$1+0}'))
 	dd if=memtest_shared.bin of=memtest_text.bin bs=$(SPLIT) count=1 2>/dev/null
 	dd if=memtest_shared.bin of=memtest_data.bin bs=$(SPLIT) skip=1 2>/dev/null
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) --defsym=_split_off=$(SPLIT) \
-	  -T ldscripts/memtest_efi.lds boot/x86/header.o -b binary memtest_text.bin memtest_data.bin -o mt86plus
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/x86/header.o -b binary memtest_text.bin memtest_data.bin -o mt86plus
 
 memtest.mbr: memtest_shared.bin boot/x86/mbr.o ldscripts/memtest_mbr.lds
 	$(LD) -T ldscripts/memtest_mbr.lds boot/x86/mbr.o -b binary memtest_shared.bin -o memtest.mbr

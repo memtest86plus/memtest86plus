@@ -33,9 +33,6 @@ SECTIONS {
 	. = ALIGN(4096);
 	_etext_ro = .;
 
-	.dynamic    : { *(.dynamic) }
-
-	. = ALIGN(4);
 	.data : {
 		 _data = .;
 		*(.data)
@@ -44,8 +41,9 @@ SECTIONS {
 	.got : {
 		*(.got.plt)
 		*(.got)
-		_edata = . ;
 	}
+	.dynamic    : { *(.dynamic) }
+	_edata = . ;
 	. = ALIGN(4);
 	.bss : {
 		_bss = .;

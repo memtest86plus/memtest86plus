@@ -54,7 +54,7 @@ SECTIONS {
 	_init_size = _real_text_size + _real_data_size + _bss_size;
 
 	_virt_head_size  = ((_file_head_size  + 4095) >> 12) << 12;
-	_virt_text_size  = ((_split_off       + 4095) >> 12) << 12;
+	_virt_text_size  = ((_real_text_size   + 4095) >> 12) << 12;
 	_virt_data_size  = ((_real_data_size + _bss_size + 4095) >> 12) << 12;
 	_virt_reloc_size = ((_file_reloc_size + 4095) >> 12) << 12;
 	_virt_sbat_size  = ((_file_sbat_size  + 4095) >> 12) << 12;
@@ -66,5 +66,5 @@ SECTIONS {
 
 	_virt_img_size = _virt_sbat_start + _virt_sbat_size;
 
-	_size_of_init_data = _virt_data_size + _virt_sbat_size;
+	_virt_init_size = _virt_data_size + _virt_reloc_size + _virt_sbat_size;
 }

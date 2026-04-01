@@ -192,8 +192,7 @@ mt86plus: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
 	$(eval SPLIT=$(shell nm -t d memtest_shared | awk '/ _etext_ro$$/{print $$1+0}'))
 	dd if=memtest_shared.bin of=memtest_text.bin bs=$(SPLIT) count=1 2>/dev/null
 	dd if=memtest_shared.bin of=memtest_data.bin bs=$(SPLIT) skip=1 2>/dev/null
-	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) --defsym=_split_off=$(SPLIT) \
-	  -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_text.bin memtest_data.bin -o memtest.elf
+	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_text.bin memtest_data.bin -o memtest.elf
 	$(OBJCOPY) -O binary memtest.elf mt86plus
 	rm -f memtest.elf
 

@@ -833,7 +833,7 @@ optional_header:
 	.byte	0x14				# MinorLinkerVersion
 
 	.long	_virt_text_size			# SizeOfCode
-	.long	_size_of_init_data		# SizeOfInitializedData
+	.long	_virt_init_size			# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
 	.long	_virt_text_start + 0x1e0	# AddressOfEntryPoint
