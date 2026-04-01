@@ -417,7 +417,8 @@ void display_temperature(void)
             max_cpu_temp = actual_cpu_temp;
         }
 
-        int offset = actual_cpu_temp / 100 + max_cpu_temp / 100;
+        int offset = TEMP_LEN(actual_cpu_temp) + TEMP_LEN(max_cpu_temp) + 1;
+
         display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset);
     }
 
