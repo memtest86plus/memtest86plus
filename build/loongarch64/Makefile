@@ -181,15 +181,19 @@ memtest.debug: memtest_shared
 	strip -R .eh_frame memtest_shared
 	strip -R .comment memtest_shared
 
+# Build the PE/EFI binary with W^X sections
+# The flat binary is split at the _etext_ro boundary (page-aligned in
+# memtest_shared.lds) into an RX half (.text) and an RW half (.data)
+# Both are then used by ld as raw binary inputs. The EFI linker script
+# push them into separate PE sections via filename match
+
 mt86plus: memtest_shared.bin boot/loongarch/header.o ldscripts/memtest_efi.lds
 	$(eval SIZES=$(shell size -B -d memtest_shared | grep memtest_shared))
-	$(eval SPLIT=$(shell printf '%d' 0x$$(nm memtest_shared | awk '/ _etext_ro$$/{print $$1}')))
-	dd if=memtest_shared.bin of=memtest_shared_text.bin bs=$(SPLIT) count=1 2>/dev/null
-	dd if=memtest_shared.bin of=memtest_shared_data.bin bs=$(SPLIT) skip=1 2>/dev/null
-	$(OBJCOPY) -I binary -O elf64-loongarch -B loongarch --rename-section .data=.payload.text memtest_shared_text.bin memtest_text.o
-	$(OBJCOPY) -I binary -O elf64-loongarch -B loongarch --rename-section .data=.payload.data memtest_shared_data.bin memtest_data.o
+	$(eval SPLIT=$(shell nm -t d memtest_shared | awk '/ _etext_ro$$/{print $$1+0}'))
+	dd if=memtest_shared.bin of=memtest_text.bin bs=$(SPLIT) count=1 2>/dev/null
+	dd if=memtest_shared.bin of=memtest_data.bin bs=$(SPLIT) skip=1 2>/dev/null
 	$(LD) --defsym=_bss_size=$(word 3,$(SIZES)) --defsym=_split_off=$(SPLIT) \
-	  -T ldscripts/memtest_efi.lds boot/loongarch/header.o memtest_text.o memtest_data.o -o memtest.elf
+	  -T ldscripts/memtest_efi.lds boot/loongarch/header.o -b binary memtest_text.bin memtest_data.bin -o memtest.elf
 	$(OBJCOPY) -O binary memtest.elf mt86plus
 	rm -f memtest.elf
 

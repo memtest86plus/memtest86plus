@@ -10,14 +10,14 @@ SECTIONS {
 	. = ALIGN(4096);
 	.text : {
 		_file_text_start = . ;
-		*(.payload.text)
+		*memtest_text*(.data)
 		_real_text_end = . ;
 		. = ALIGN(512);
 		_file_text_end = . ;
 	}
 	.data : {
 		_file_data_start = . ;
-		*(.payload.data)
+		*memtest_data*(.data)
 		_real_data_end = . ;
 		. = ALIGN(512);
 		_file_data_end = . ;
