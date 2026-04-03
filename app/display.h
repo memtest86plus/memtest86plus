@@ -35,6 +35,8 @@
 
 #define ERROR_LIMIT     UINT64_C(999999999999)
 
+#define TEMP_LEN(t) ((t) < 0 ? ((t) <= -10 ? 3 : 2) : ((t) >= 100 ? 3 : (t) >= 10 ? 2 : 1))
+
 typedef enum {
     DISPLAY_MODE_NA,
     DISPLAY_MODE_SPD,
@@ -49,8 +51,8 @@ typedef enum {
 
 #define display_cpu_temperature(actual_cpu_temp, max_cpu_temp, offset) \
     { \
-        clear_screen_region(1, 18, 1, 22); \
-        printf(1, 20-offset, "%2i/%2i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
+        clear_screen_region(1, 18, 1, 27); \
+        printf(1, 25 - offset, "%i/%i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
     }
 
 #define display_cpu_addr_mode(str) \

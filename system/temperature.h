@@ -33,14 +33,19 @@ extern float cpu_temp_offset;
 void cpu_temp_init(void);
 
 /**
- * Returns the current temperature of the CPU. Returns 0 if
- * the temperature cannot be read.
+ * Sentinel value returned when the temperature cannot be read.
+ */
+#define CPU_TEMP_INVALID INT32_MIN
+
+/**
+ * Returns the current temperature of the CPU. Returns
+ * CPU_TEMP_INVALID if the temperature cannot be read.
  */
 int get_cpu_temp(void);
 
 /**
- * Returns the current temperature of the RAM. Returns 0 if
- * the temperature cannot be read. Only for DDR5
+ * Returns the current temperature of the RAM. Returns
+ * CPU_TEMP_INVALID if the temperature cannot be read. Only for DDR5
  */
 int get_ram_temp(uint8_t slot);
 

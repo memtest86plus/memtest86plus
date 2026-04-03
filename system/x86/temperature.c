@@ -112,21 +112,21 @@ int get_cpu_temp(void)
             regl = pci_config_read32(0, 0, 0, AMD_SMU_INDEX_DATA_REG);
             int raw_temp = ((regl >> 21) & 0x7FF) / 8;
 
-            return (raw_temp > 0) ? raw_temp : 0;
+            return (raw_temp > 0) ? raw_temp : CPU_TEMP_INVALID;
 
         } else if (cpuid_info.version.extendedFamily > 0) { // Target K10 to K15 (Bulldozer)
 
             regl = pci_config_read32(0, 24, 3, AMD_TEMP_REG_K10);
             int raw_temp = ((regl >> 21) & 0x7FF) / 8;
 
-            return (raw_temp > 0) ? raw_temp : 0;
+            return (raw_temp > 0) ? raw_temp : CPU_TEMP_INVALID;
 
         } else {                                            // Target K8 (CPUID ExtFamily = 0)
 
             regl = pci_config_read32(0, 24, 3, AMD_TEMP_REG_K8);
             int raw_temp = ((regl >> 16) & 0xFF) - 49 + cpu_temp_offset;
 
-            return (raw_temp > 0) ? raw_temp : 0;
+            return (raw_temp > 0) ? raw_temp : CPU_TEMP_INVALID;
         }
     }
 
@@ -141,14 +141,14 @@ int get_cpu_temp(void)
         } else if (cpuid_info.version.model == 0xA || cpuid_info.version.model == 0xD) {
             msr_temp = MSR_VIA_TEMP_C7;     // C7 A/D
         } else {
-            return 0;
+            return CPU_TEMP_INVALID;
         }
 
         rdmsr(msr_temp, regl, regh);
         return (int)(regl & 0xffffff);
     }
 
-    return 0;
+    return CPU_TEMP_INVALID;
 }
 
 int get_ram_temp(uint8_t slot)
@@ -158,11 +158,11 @@ int get_ram_temp(uint8_t slot)
 
     // RAM Temperature is only supported on DDR5
     if (dmi_memory_device->type != DMI_DDR5 || slot >= MAX_SPD_SLOT)
-        return 0;
+        return CPU_TEMP_INVALID;
 
     // Check if slot has a temp sensor
     if (ram_slot_info[slot].isPopulated == false || ram_slot_info[slot].hasTempSensor == false)
-        return 0;
+        return CPU_TEMP_INVALID;
 
     temp_reg = get_spd_hub_register(slot, SPD5_HUB_TS_LSB);
     temp_reg |= get_spd_hub_register(slot, SPD5_HUB_TS_MSB) << 8;
