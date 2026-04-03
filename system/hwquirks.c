@@ -50,6 +50,8 @@ static void asus_tusl2_configure_mux(void)
     outb(0xAA, 0x2E);
 }
 
+static int *mb_cache = NULL;
+
 static int *get_motherboard_cache(void)
 {
     if (l2_cache == 0) {
@@ -60,9 +62,10 @@ static int *get_motherboard_cache(void)
     return NULL;
 }
 
-static void get_m1541_l2_cache_size(void)
+static void get_m1531_41_mb_cache_size(void)
 {
-    if (l2_cache != 0) {
+    mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
         return;
     }
 
@@ -72,16 +75,30 @@ static void get_m1541_l2_cache_size(void)
     }
 
     // Get L2 Cache Size with L2CC-1 Register[3:2]
-    uint8_t reg = (pci_config_read8(0, 0, 0, 0x41) >> 2) & 3;
+    uint8_t ali_reg = (pci_config_read8(0, 0, 0, 0x41)) ;
 
-    if (reg == 0b00) { l2_cache = 256; }
-    if (reg == 0b01) { l2_cache = 512; }
-    if (reg == 0b10) { l2_cache = 1024; }
+    if (quirk.root_did == 0x1531) {
+        ali_reg = (ali_reg >> 1) & 0x3;
+        switch (ali_reg) {
+            //case 0b00: *mb_cache = 0; break;
+            case 0b01: *mb_cache = 256; break;
+            case 0b10: *mb_cache = 512; break;
+            case 0b11: *mb_cache = 1024; break;
+        }
+    } else if (quirk.root_did == 0x1541) {
+        ali_reg = (ali_reg >> 2) & 0x3;
+        switch (ali_reg) {
+            case 0b00: *mb_cache = 256; break;
+            case 0b01: *mb_cache = 512; break;
+            case 0b10: *mb_cache = 1024; break;
+            //case 0b11: *mb_cache = 0; break;
+        }
+    }
 }
 
 static void get_vt82c585_597_mb_cache_size(void)
 {
-    int *const mb_cache = get_motherboard_cache();
+    mb_cache = get_motherboard_cache();
     if (!mb_cache) {
         return;
     }
@@ -95,6 +112,24 @@ static void get_vt82c585_597_mb_cache_size(void)
     const uint8_t reg = pci_config_read8(0, 0, 0, 0x51) & 0x03;
 
     *mb_cache = 256 << reg;
+}
+
+static void get_sis_530_mb_cache_size(void)
+{
+    mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
+        return;
+    }
+
+    // Check if cache is enabled
+    if ((pci_config_read8(0, 0, 0, 0x51) & 0x80) == 0) {
+        return;
+    }
+
+    // Get cache size
+    uint8_t sis_reg = (pci_config_read8(0, 0, 0, 0x51) >> 4) & 0x03;
+
+    *mb_cache = 256 << sis_reg;
 }
 
 static void disable_temp_reporting(void)
@@ -188,14 +223,14 @@ void quirks_init(void)
     quirk.process   = NULL;
 
     //  -------------------------
-    //  -- ALi Aladdin V Quirk --
+    //  -- ALi Aladdin IV (M1531), V (M1541) Quirk --
     //  -------------------------
     // As on many Socket 7 Motherboards, the L2 cache is external and must
     // be detected by a proprietary way based on chipset registers
-    if (quirk.root_vid == PCI_VID_ALI && quirk.root_did == 0x1541) {    // ALi Aladdin V (M1541)
-        quirk.id    = QUIRK_ALI_ALADDIN_V;
+    if (quirk.root_vid == PCI_VID_ALI && (quirk.root_did == 0x1531 || quirk.root_did == 0x1541)) {
+        quirk.id    = QUIRK_ALI_ALADDIN_IV_V;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
-        quirk.process = get_m1541_l2_cache_size;
+        quirk.process = get_m1531_41_mb_cache_size;
     }
 
     //  -------------------------------------------------------------------
@@ -207,6 +242,12 @@ void quirks_init(void)
         quirk.id    = QUIRK_VIA_VP;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
         quirk.process = get_vt82c585_597_mb_cache_size;
+    }
+
+    else if (quirk.root_vid == PCI_VID_SIS && quirk.root_did == 0x0530) {
+        quirk.id    = QUIRK_SIS_530;
+        quirk.type |= QUIRK_TYPE_MEM_SIZE;
+        quirk.process = get_sis_530_mb_cache_size;
     }
 
     //  ------------------------
