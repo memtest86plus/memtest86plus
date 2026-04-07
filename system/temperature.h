@@ -35,7 +35,7 @@ void cpu_temp_init(void);
 /**
  * Sentinel value returned when the temperature cannot be read.
  */
-#define CPU_TEMP_INVALID INT32_MIN
+#define TEMP_INVALID INT32_MIN
 
 /**
  * Returns the current temperature of the CPU. Returns
