@@ -6,7 +6,7 @@
  *
  * Provides functions for reading SMBIOS tables
  *
- * Copyright (C) 2004-2022 Samuel Demeulemeester.
+ * Copyright (C) 2004-2026 Samuel Demeulemeester.
  */
 
 #define DMI_SDR         0x0F
@@ -133,6 +133,12 @@ extern struct mem_dev *dmi_memory_device;
  */
 
 int smbios_init(void);
+
+/**
+ * Retrieve board manufacturer and product name strings.
+ * Sets output pointers to NULL if unavailable.
+ */
+void get_smbios_board_info(const char **manufacturer, const char **product);
 
 /**
  * Print DMI

@@ -7,7 +7,7 @@
  *
  * Provides access to SPD parsing and printing functions.
  *
- * Copyright (C) 2004-2025 Sam Demeulemeester.
+ * Copyright (C) 2004-2026 Sam Demeulemeester.
  */
 
 #define MAX_SPD_SLOT    8
@@ -67,8 +67,10 @@ typedef struct {
 
 extern ram_info_t ram;
 extern ram_slot_info_t ram_slot_info[MAX_SPD_SLOT];
+extern spd_info spd_slot_cache[MAX_SPD_SLOT];
 
 void print_spdi(spd_info spdi, uint8_t lidx);
 void parse_spd(spd_info *spdi, uint8_t slot_idx);
+const char *jedec_manufacturer_name(uint16_t jedec_code);
 
 #endif // SPD_H

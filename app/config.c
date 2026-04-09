@@ -34,6 +34,7 @@
 #include "unistd.h"
 
 #include "display.h"
+#include "reports.h"
 #include "test.h"
 
 #include "tests.h"
@@ -982,7 +983,16 @@ void config_menu(bool initial)
             prints(POP_R+11, POP_LI, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
-            prints(POP_R+8 , POP_LI, "<F10> Exit menu");
+            if (usb_mass_storage_found) {
+                if (usb_msd_name[0]) {
+                    printf(POP_R+8,  POP_LI, "<F6>  Save to %s", usb_msd_name);
+                } else {
+                    prints(POP_R+8,  POP_LI, "<F6>  Save results to USB");
+                }
+                prints(POP_R+9,  POP_LI, "<F10> Exit menu");
+            } else {
+                prints(POP_R+8,  POP_LI, "<F10> Exit menu");
+            }
         }
 
         if (tty_update) {
@@ -1017,6 +1027,8 @@ void config_menu(bool initial)
           case '6':
             if (initial) {
                 enable_temp_cpu = !enable_temp_cpu;
+            } else if (usb_mass_storage_found) {
+                save_results_to_usb();
             }
             break;
           case '7':
