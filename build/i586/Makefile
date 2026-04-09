@@ -31,6 +31,7 @@ INC_DIRS = -I../../boot -I../../system -I../../system/imc -I../../system/x86 -I.
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
+           system/fat32.o \
            system/font.o \
            system/heap.o \
            system/hwquirks.o \
@@ -47,6 +48,7 @@ SYS_OBJS = system/acpi.o \
            system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
+           system/usbmsd.o \
            system/xhci.o \
            system/x86/cpuid.o \
            system/x86/cpuinfo.o \
@@ -83,6 +85,7 @@ APP_OBJS = app/badram.o \
            app/display.o \
            app/error.o \
            app/main.o \
+           app/reports.o \
            app/x86/interrupt.o
 
 OBJS = boot/x86/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)

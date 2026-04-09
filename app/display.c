@@ -68,7 +68,7 @@ static int test_ticks = 0;      // current value (ticks_per_test is final value)
 static int pass_bar_length = 0; // currently displayed length
 static int test_bar_length = 0; // currently displayed length
 
-static uint64_t run_start_time = 0; // TSC time stamp
+uint64_t run_start_time = 0; // TSC time stamp
 static uint64_t next_spin_time = 0; // TSC time stamp
 
 static int prev_sec = -1;               // previous second

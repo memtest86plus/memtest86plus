@@ -29,6 +29,7 @@ INC_DIRS = -I../../boot -I../../system -I ../../system/imc -I../../system/loonga
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
+           system/fat32.o \
            system/font.o \
            system/heap.o \
            system/hwquirks.o \
@@ -45,6 +46,7 @@ SYS_OBJS = system/acpi.o \
            system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
+           system/usbmsd.o \
            system/xhci.o \
            system/loongarch/i2c.o \
            system/loongarch/cpuid.o \
@@ -79,6 +81,7 @@ APP_OBJS = app/badram.o \
            app/display.o \
            app/error.o \
            app/main.o \
+           app/reports.o \
            app/loongarch/interrupt.o
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)

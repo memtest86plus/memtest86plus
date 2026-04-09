@@ -250,6 +250,8 @@ typedef enum {
 
 extern int scroll_message_row;
 
+extern uint64_t run_start_time;
+
 extern display_mode_t display_mode;
 
 extern screen_palette_t palette;

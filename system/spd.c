@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2025 Sam Demeulemeester
+// Copyright (C) 2004-2026 Sam Demeulemeester
 
 #include "stdbool.h"
 #include "stdint.h"
@@ -21,6 +21,7 @@
 
 ram_info_t ram = { 0, 0, 0, 0, 0, 0, "N/A"};
 ram_slot_info_t ram_slot_info[MAX_SPD_SLOT];
+spd_info spd_slot_cache[MAX_SPD_SLOT];
 
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
@@ -30,7 +31,6 @@ static inline uint8_t bcd_to_ui8(uint8_t bcd)
 void print_spdi(spd_info spdi, uint8_t row)
 {
     uint8_t curcol;
-    uint16_t i;
 
     // Print Slot Index, Module Size, type & Max frequency (Jedec or XMP)
     curcol = printf(row, 0, " - Slot %i: %kB %s-%i",
@@ -52,17 +52,12 @@ void print_spdi(spd_info spdi, uint8_t row)
     }
 
     // Print Manufacturer from JEDEC106
-    for (i = 0; i < JEP106_CNT; i++) {
-        if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(row, ++curcol, "- %s", jep106[i].name);
-            break;
-        }
-    }
-
-    // If not present in JEDEC106, display raw JEDEC ID
-    if (spdi.jedec_code == 0) {
+    const char *mfg_name = jedec_manufacturer_name(spdi.jedec_code);
+    if (mfg_name) {
+        curcol = printf(row, ++curcol, "- %s", mfg_name);
+    } else if (spdi.jedec_code == 0) {
         curcol = prints(row, ++curcol, "- Noname");
-    } else if (i == JEP106_CNT) {
+    } else {
         curcol = printf(row, ++curcol, "- Unknown (0x%x)", spdi.jedec_code);
     }
 
@@ -94,6 +89,16 @@ void print_spdi(spd_info spdi, uint8_t row)
         ram.tRP     = spdi.tRP;
         ram.tRAS    = spdi.tRAS;
     }
+}
+
+const char *jedec_manufacturer_name(uint16_t jedec_code)
+{
+    for (uint16_t i = 0; i < JEP106_CNT; i++) {
+        if (jep106[i].jedec_code == jedec_code) {
+            return jep106[i].name;
+        }
+    }
+    return NULL;
 }
 
 static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len)
