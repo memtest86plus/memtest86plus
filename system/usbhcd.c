@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2021-2022 Martin Whitaker.
+// Copyright (C) 2026 Sam Demeulemeester.
 
 #include "keyboard.h"
 #include "memrw.h"
@@ -15,6 +16,7 @@
 #include "xhci.h"
 
 #include "print.h"
+#include "string.h"
 #include "unistd.h"
 
 #include "usbhcd.h"
@@ -68,7 +70,10 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = NULL,
     .get_data_request    = NULL,
-    .poll_keyboards      = NULL
+    .poll_keyboards      = NULL,
+    .rearm_keyboards     = NULL,
+    .configure_bulk_ep   = NULL,
+    .bulk_transfer       = NULL
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.
@@ -88,11 +93,17 @@ static int num_hcd = 0;
 static int print_row = 0;
 static int print_col = 0;
 
+static usb_msd_t usb_msd_info;
+
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
 
 usb_init_options_t usb_init_options = USB_DEFAULT_INIT;
+
+bool usb_mass_storage_found = false;
+
+char usb_msd_name[64] = "";
 
 //------------------------------------------------------------------------------
 // Macro Functions
@@ -291,6 +302,10 @@ static bool configure_keyboard(const usb_hcd_t *hcd, const usb_ep_t *ep0, int in
     return true;
 }
 
+static bool get_msd_info_from_descriptors(const uint8_t *desc_buffer, int desc_length,
+                                          usb_ep_t *ep_in, usb_ep_t *ep_out,
+                                          uint8_t *alt_setting);
+
 static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_devices,
                            usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {
@@ -312,8 +327,8 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
 
     // Scan the ports, looking for hubs and keyboards.
     for (int port_num = 1; port_num <= hub->num_ports; port_num++) {
-        // If we've filled the keyboard info table, abort now.
-        if (*num_keyboards >= max_keyboards) break;
+        // If we've filled the keyboard info table and found a USB drive, abort now.
+        if (*num_keyboards >= max_keyboards && usb_mass_storage_found) break;
 
         uint32_t port_status;
 
@@ -334,8 +349,11 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
         if (~port_status & HUB_PORT_ENABLED)   continue;
 
         // Now the port has been enabled, we can determine the device speed.
+        // USB 3.0 hubs only carry SuperSpeed traffic (all downstream devices are SuperSpeed).
         usb_speed_t device_speed;
-        if        (port_status & HUB_PORT_LOW_SPEED) {
+        if (hub->ep0->device_speed == USB_SPEED_SUPER) {
+            device_speed = USB_SPEED_SUPER;
+        } else if (port_status & HUB_PORT_LOW_SPEED) {
             device_speed = USB_SPEED_LOW;
         } else if (port_status & HUB_PORT_HIGH_SPEED) {
             device_speed = USB_SPEED_HIGH;
@@ -360,6 +378,8 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
             keyboard_found = true;
             continue;
         }
+
+        if (usb_mass_storage_found) continue;
 
         if (hub->quirks & USB_HUB_DONT_DISABLE_PORTS) continue;
 
@@ -556,7 +576,7 @@ static void probe_usb_controller(hci_type_t controller_type, uintptr_t pm_base_a
       default:
         break;
     }
-    if (keyboards_found) {
+    if (keyboards_found || usb_mass_storage_found) {
         num_hcd++;
     }
 }
@@ -736,6 +756,38 @@ bool assign_usb_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num
     return true;
 }
 
+static void fetch_usb_string(const usb_hcd_t *hcd, const usb_ep_t *ep0, uint8_t str_index, char *out, int out_size)
+{
+    out[0] = '\0';
+    if (str_index == 0 || out_size < 2) return;
+
+    usb_setup_pkt_t setup_pkt;
+    uint8_t *buf = hcd->ws->data_buffer;
+
+    // Fetch the string descriptor.
+    build_setup_packet(&setup_pkt, USB_REQ_FROM_DEVICE, USB_GET_DESCRIPTOR,
+                       USB_DESC_STRING << 8 | str_index, USB_DESC_LANG_EN, HCD_DATA_BUFFER_SIZE);
+    if (!hcd->methods->get_data_request(hcd, ep0, &setup_pkt, buf, HCD_DATA_BUFFER_SIZE)) {
+        return;
+    }
+
+    // String descriptor: buf[0] = length, buf[1] = type (3), buf[2..] = UTF-16LE chars.
+    int desc_len = buf[0];
+    if (desc_len < 4 || buf[1] != USB_DESC_STRING) return;
+
+    int num_chars = (desc_len - 2) / 2;
+    int j = 0;
+    for (int i = 0; i < num_chars && j < out_size - 1; i++) {
+        uint16_t ch = buf[2 + i * 2] | (buf[3 + i * 2] << 8);
+        if (ch >= 0x20 && ch < 0x7F) {
+            out[j++] = (char)ch;
+        }
+    }
+    // Trim trailing spaces.
+    while (j > 0 && out[j - 1] == ' ') j--;
+    out[j] = '\0';
+}
+
 bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_num,
                                  usb_speed_t device_speed, int device_id, int *num_devices,
                                  usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
@@ -750,6 +802,8 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     }
     usb_device_desc_t *device = (usb_device_desc_t *)hcd->ws->data_buffer;
     bool is_hub = (device->class == USB_CLASS_HUB);
+    uint8_t product_str_index = device->product_str;
+    uint8_t num_configs = device->num_configs;
 
     // Fetch the descriptors for the first configuration into the data transfer buffer. In theory a keyboard device
     // may have more than one configuration and may only support the boot protocol in another configuration, but
@@ -786,6 +840,80 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         get_keyboard_info_from_descriptors(hcd->ws->data_buffer, hcd->ws->data_length,
                                            keyboards, max_keyboards, &new_num_keyboards);
         if (new_num_keyboards == old_num_keyboards) {
+            // No keyboard interfaces found, check for mass storage.
+            if (!usb_mass_storage_found && hcd->methods->configure_bulk_ep != NULL) {
+                usb_ep_t ep_in, ep_out;
+                uint8_t msd_alt_setting = 0;
+                bool found_bot = false;
+
+                // Try all configurations looking for a BOT interface. UAS-only devices (protocol 0x62)
+                // may have BOT in a different configuration or as an alternate setting.
+                for (int cfg_idx = 0; cfg_idx < num_configs && !found_bot; cfg_idx++) {
+                    if (cfg_idx > 0) {
+                        config_num = get_configuration_descriptors(hcd, &ep0, cfg_idx);
+                        if (config_num == 0) continue;
+                    }
+                    memset(&ep_in, 0, sizeof(ep_in));
+                    memset(&ep_out, 0, sizeof(ep_out));
+                    msd_alt_setting = 0;
+                    found_bot = get_msd_info_from_descriptors(hcd->ws->data_buffer, hcd->ws->data_length,
+                                                              &ep_in, &ep_out, &msd_alt_setting);
+                }
+
+                if (found_bot) {
+                    if (!configure_device(hcd, &ep0, config_num)) {
+                        return false;
+                    }
+
+                    // If the BOT interface is an alternate setting (common on UAS devices that
+                    // expose BOT as a fallback), select it.
+                    if (msd_alt_setting != 0) {
+                        usb_setup_pkt_t set_ifc;
+                        build_setup_packet(&set_ifc, USB_REQ_TO_INTERFACE, USB_SET_INTERFACE,
+                                           msd_alt_setting, ep_in.interface_num, 0);
+                        if (!hcd->methods->setup_request(hcd, &ep0, &set_ifc)) {
+                            return false;
+                        }
+                        usleep(1*MILLISEC);
+                    }
+
+                    ep_in.device_speed  = device_speed;
+                    ep_in.device_id     = device_id;
+                    ep_in.driver_data   = ep0.driver_data;
+                    ep_out.device_speed = device_speed;
+                    ep_out.device_id    = device_id;
+                    ep_out.driver_data  = ep0.driver_data;
+
+                    int ep_in_id = 2 * ep_in.endpoint_num + 1;
+                    if (!hcd->methods->configure_bulk_ep(hcd, &ep_in, ep_in_id, false)) {
+                        return false;
+                    }
+                    ep_in.driver_data = *(uintptr_t *)hcd->ws->data_buffer;
+
+                    int ep_out_id = 2 * ep_out.endpoint_num;
+                    if (!hcd->methods->configure_bulk_ep(hcd, &ep_out, ep_out_id, true)) {
+                        return false;
+                    }
+                    ep_out.driver_data = *(uintptr_t *)hcd->ws->data_buffer;
+
+                    usb_msd_info.hcd     = hcd;
+                    usb_msd_info.ep0     = ep0;
+                    usb_msd_info.ep_in   = ep_in;
+                    usb_msd_info.ep_out  = ep_out;
+                    usb_msd_info.tag     = 1;
+                    usb_mass_storage_found = true;
+
+                    fetch_usb_string(hcd, &ep0, product_str_index,
+                                     usb_msd_name, sizeof(usb_msd_name));
+
+                    if (usb_msd_name[0]) {
+                        print_usb_info(" USB drive found on port %i (%s)", port_num, usb_msd_name);
+                    } else {
+                        print_usb_info(" USB drive found on port %i", port_num);
+                    }
+                    return true;
+                }
+            }
             return false;
         }
         if (!configure_device(hcd, &ep0, config_num)) {
@@ -854,7 +982,7 @@ bool process_usb_keyboard_report(const usb_hcd_t *hcd, const hid_kbd_rpt_t *repo
 void find_usb_keyboards(bool pause_if_none)
 {
     clear_screen();
-    print_usb_info("Scanning for USB keyboards...");
+    print_usb_info("Scanning for USB keyboards & Mass Storage Devices...");
 
     hci_info_t hci_list[MAX_HCI];
 
@@ -916,4 +1044,84 @@ uint8_t get_usb_keycode(void)
         }
     }
     return 0;
+}
+
+static bool get_msd_info_from_descriptors(const uint8_t *desc_buffer, int desc_length,
+                                          usb_ep_t *ep_in, usb_ep_t *ep_out,
+                                          uint8_t *alt_setting)
+{
+    bool found_ifc = false;
+    bool found_in = false;
+    bool found_out = false;
+
+    const uint8_t *curr_ptr = desc_buffer + sizeof(usb_config_desc_t);
+    const uint8_t *tail_ptr = desc_buffer + desc_length;
+    while (curr_ptr < tail_ptr) {
+        const usb_desc_header_t *header = (const usb_desc_header_t *)curr_ptr;
+        const uint8_t *next_ptr = curr_ptr + header->length;
+
+        if (next_ptr < (curr_ptr + 2) || next_ptr > tail_ptr) break;
+
+        if (header->type == USB_DESC_INTERFACE && header->length == sizeof(usb_interface_desc_t)) {
+            const usb_interface_desc_t *ifc = (const usb_interface_desc_t *)curr_ptr;
+            if (ifc->class == USB_CLASS_MASS_STORAGE
+            &&  ifc->subclass == USB_MSC_SUBCLASS_SCSI
+            &&  ifc->protocol == USB_MSC_PROTOCOL_BOT) {
+                found_ifc = true;
+                found_in = false;
+                found_out = false;
+                ep_in->interface_num = ifc->interface_num;
+                ep_out->interface_num = ifc->interface_num;
+                *alt_setting = ifc->alt_setting;
+            } else {
+                // Stop collecting endpoints for non-BOT interfaces. UAS devices (protocol 0x62)
+                // often also expose a BOT fallback interface elsewhere in the descriptor list.
+                found_ifc = false;
+            }
+        } else if (found_ifc && header->type == USB_DESC_ENDPOINT
+               &&  header->length == sizeof(usb_endpoint_desc_t)) {
+            usb_endpoint_desc_t *endpoint = (usb_endpoint_desc_t *)curr_ptr;
+            // Check for bulk endpoint (attributes bits 1:0 == 0x02)
+            if ((endpoint->attributes & 0x3) == 0x02) {
+                if (endpoint->address & 0x80) {
+                    // Bulk IN
+                    ep_in->endpoint_num    = endpoint->address & 0xf;
+                    ep_in->max_packet_size = endpoint->max_packet_size;
+                    ep_in->interval        = 0;
+                    found_in = true;
+                } else {
+                    // Bulk OUT
+                    ep_out->endpoint_num    = endpoint->address & 0xf;
+                    ep_out->max_packet_size = endpoint->max_packet_size;
+                    ep_out->interval        = 0;
+                    found_out = true;
+                }
+            }
+            // Once we have both bulk endpoints for a BOT interface, we're done.
+            if (found_in && found_out) return true;
+        }
+        curr_ptr = next_ptr;
+    }
+    return found_ifc && found_in && found_out;
+}
+
+void usb_rearm_keyboards(void)
+{
+    for (int i = 0; i < num_hcd; i++) {
+        const usb_hcd_t *hcd = &hcd_list[i];
+        if (hcd->methods->rearm_keyboards != NULL) {
+            hcd->methods->rearm_keyboards(hcd);
+        }
+    }
+}
+
+bool find_usb_mass_storage(usb_msd_t *msd)
+{
+    if (!usb_mass_storage_found) {
+        return false;
+    }
+    *msd = usb_msd_info;
+    msd->block_count = 0;
+    msd->block_size  = 512;
+    return true;
 }

@@ -62,15 +62,24 @@
 
 #define USB_DESC_DEVICE         1
 #define USB_DESC_CONFIGURATION  2
+#define USB_DESC_STRING         3
 #define USB_DESC_INTERFACE      4
 #define USB_DESC_ENDPOINT       5
 
 #define HUB_DESC_DEVICE         0x29
 
+#define USB_DESC_LANG_EN        0x0409
+
 // Class codes.
 
 #define USB_CLASS_HID           3
+#define USB_CLASS_MASS_STORAGE  8
 #define USB_CLASS_HUB           9
+
+// Mass Storage subclass and protocol codes.
+
+#define USB_MSC_SUBCLASS_SCSI   6
+#define USB_MSC_PROTOCOL_BOT    0x50
 
 // Hub feature selectors.
 

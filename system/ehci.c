@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2021-2022 Martin Whitaker.
+// Copyright (C) 2026 Sam Demeulemeester.
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -201,6 +202,11 @@ typedef volatile struct {
 } ehci_qhd_t  __attribute__ ((aligned (32)));
 
 // Data structures specific to this implementation.
+
+typedef struct {
+    uintptr_t           hs_parent_data;
+    uint8_t             data_toggle;
+} ehci_bulk_ep_t;
 
 typedef struct {
     hcd_workspace_t     base_ws;
@@ -466,6 +472,70 @@ static void poll_keyboards(const usb_hcd_t *hcd)
     }
 }
 
+static bool configure_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id, bool is_out)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+    (void)ep_id;
+    (void)is_out;
+
+    // Allocate a small metadata struct to track HS parent info and data toggle.
+    // The actual QH/QTD are rebuilt in ws->qhd[0]/qtd[0] for each transfer
+    // (same slots used by control transfers), avoiding stale QH cache issues.
+    uintptr_t bulk_addr = heap_alloc(HEAP_TYPE_LM_1, sizeof(ehci_bulk_ep_t), 64);
+    if (bulk_addr == 0) return false;
+
+    ehci_bulk_ep_t *bulk_ep = (ehci_bulk_ep_t *)bulk_addr;
+    bulk_ep->hs_parent_data = ep->driver_data;
+    bulk_ep->data_toggle = 0;
+
+    // Store the pointer in data_buffer for the caller.
+    *(uintptr_t *)ws->base_ws.data_buffer = bulk_addr;
+
+    return true;
+}
+
+static bool bulk_transfer(const usb_hcd_t *hcd, const usb_ep_t *ep, void *buffer, size_t length, bool is_out)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+    ehci_bulk_ep_t *bulk_ep = (ehci_bulk_ep_t *)ep->driver_data;
+
+    uint8_t pid = is_out ? EHCI_QTD_PID_OUT : EHCI_QTD_PID_IN;
+
+    // Build QTD in workspace slot 0, with software-tracked data toggle.
+    build_ehci_qtd(&ws->qtd[0], &ws->qtd[0], pid,
+                   EHCI_QTD_DT(bulk_ep->data_toggle), buffer, length);
+
+    // Fill in additional buffer page pointers if the transfer spans page boundaries.
+    if (length > 0) {
+        uintptr_t start = (uintptr_t)buffer;
+        uintptr_t end = start + length - 1;
+        for (int i = 1; i < 5; i++) {
+            uintptr_t page = (start & ~0xFFFUL) + ((uintptr_t)i * 0x1000);
+            if (page > end) break;
+            ws->qtd[0].buffer_ptr[i] = page;
+        }
+    }
+
+    // Build a fresh QH in workspace slot 0 (same slot as control transfers).
+    // This avoids stale QH cache issues => the controller always reads a clean QH.
+    usb_ep_t tmp_ep = *ep;
+    tmp_ep.driver_data = bulk_ep->hs_parent_data;
+    build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], &tmp_ep, false);
+
+    // Set the data toggle in the QH overlay (DTC=1 means HW uses overlay DT)
+    ws->qhd[0].data_length = EHCI_QTD_DT(bulk_ep->data_toggle);
+
+    // Execute via the existing async schedule
+    bool ok = do_async_transfer(ws, 1);
+
+    if (ok) {
+        // Read next data toggle from the QH overlay (updated by hardware)
+        bulk_ep->data_toggle = (ws->qhd[0].data_length >> 15) & 1;
+    }
+
+    return ok;
+}
+
 //------------------------------------------------------------------------------
 // Driver Method Table
 //------------------------------------------------------------------------------
@@ -479,7 +549,10 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
-    .poll_keyboards      = poll_keyboards
+    .poll_keyboards      = poll_keyboards,
+    .rearm_keyboards     = NULL,
+    .configure_bulk_ep   = configure_bulk_ep,
+    .bulk_transfer       = bulk_transfer
 };
 
 //------------------------------------------------------------------------------
@@ -596,8 +669,8 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     int num_ls_devices = 0;
     int num_hs_devices = 0;
     for (int port_idx = 0; port_idx < root_hub.num_ports; port_idx++) {
-        // If we've filled the keyboard info table, abort now.
-        if (num_keyboards >= MAX_KEYBOARDS) break;
+        // If we've filled the keyboard info table and found a USB drive, abort now.
+        if (num_keyboards >= MAX_KEYBOARDS && usb_mass_storage_found) break;
 
         uint32_t port_status = read32(&op_regs->port_sc[port_idx]);
 
@@ -634,58 +707,69 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
         num_hs_devices++;
 
-        // Look for keyboards attached directly or indirectly to this port.
+        // Look for keyboards and USB drives attached directly or indirectly to this port.
         if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, USB_SPEED_HIGH, num_hs_devices,
                                         &num_hs_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
             continue;
         }
 
-        // If we didn't find any keyboard interfaces, we can disable the port.
-        disable_ehci_port(op_regs, port_idx);
+        // If we didn't find any keyboard interfaces or a USB drive, we can disable the port.
+        if (!usb_mass_storage_found) {
+            disable_ehci_port(op_regs, port_idx);
+        }
     }
 
-    print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s",
-                   num_ls_devices, num_ls_devices != 1 ? "s" : "",
-                   num_hs_devices, num_hs_devices != 1 ? "s" : "",
-                   num_keyboards,  num_keyboards  != 1 ? "s" : "");
+    if (usb_mass_storage_found) {
+        print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s, 1 USB drive",
+                       num_ls_devices, num_ls_devices != 1 ? "s" : "",
+                       num_hs_devices, num_hs_devices != 1 ? "s" : "",
+                       num_keyboards,  num_keyboards  != 1 ? "s" : "");
+    } else {
+        print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s",
+                       num_ls_devices, num_ls_devices != 1 ? "s" : "",
+                       num_hs_devices, num_hs_devices != 1 ? "s" : "",
+                       num_keyboards,  num_keyboards  != 1 ? "s" : "");
+    }
     if (num_ls_devices > 0 && i_have_companions) {
         print_usb_info(" Handed over low/full speed devices to companion controllers");
     }
 
-    if (num_keyboards == 0) {
+    if (num_keyboards == 0 && !usb_mass_storage_found) {
         (void)halt_host_controller(op_regs);
         goto no_keyboards_found;
     }
 
     ws->num_keyboards = num_keyboards;
 
-    // Initialise the interrupt QHD and QTD for each keyboard interface and find the minimum interval.
-    int min_interval = EHCI_MAX_PFL_LENGTH;
-    uint32_t first_qhd_ptr = EHCI_LP_TERMINATE;
-    for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
-        usb_ep_t *kbd = &keyboards[kbd_idx];
+    if (num_keyboards > 0) {
+        // Initialise the interrupt QHD and QTD for each keyboard interface and find the minimum interval.
+        int min_interval = EHCI_MAX_PFL_LENGTH;
+        uint32_t first_qhd_ptr = EHCI_LP_TERMINATE;
+        for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
+            usb_ep_t *kbd = &keyboards[kbd_idx];
 
-        ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
-        ehci_qtd_t *kbd_qtd = &ws->qtd[3 + kbd_idx];
+            ehci_qhd_t *kbd_qhd = &ws->qhd[1 + kbd_idx];
+            ehci_qtd_t *kbd_qtd = &ws->qtd[3 + kbd_idx];
 
-        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+            hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-        build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
-        build_ehci_qhd(kbd_qhd, kbd_qtd, kbd, true);
+            build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, EHCI_QTD_DT(0), kbd_rpt, sizeof(hid_kbd_rpt_t));
+            build_ehci_qhd(kbd_qhd, kbd_qtd, kbd, true);
 
-        kbd_qhd->next_qhd_ptr = first_qhd_ptr;
-        first_qhd_ptr = (uintptr_t)kbd_qhd | EHCI_LP_TYPE_QH;
+            kbd_qhd->next_qhd_ptr = first_qhd_ptr;
+            first_qhd_ptr = (uintptr_t)kbd_qhd | EHCI_LP_TYPE_QH;
 
-        if (kbd->interval < min_interval) {
-            min_interval = kbd->interval;
+            if (kbd->interval < min_interval) {
+                min_interval = kbd->interval;
+            }
         }
-    }
 
-    // Initialise the periodic frame list and enable the periodic schedule.
-    for (int i = 0; i < EHCI_MAX_PFL_LENGTH; i += min_interval) {
-        pfl[i] = first_qhd_ptr;
+        // Initialise the periodic frame list and enable the periodic schedule.
+        for (int i = 0; i < EHCI_MAX_PFL_LENGTH; i += min_interval) {
+            pfl[i] = first_qhd_ptr;
+        }
+        enable_periodic_schedule(op_regs);
     }
-    enable_periodic_schedule(op_regs);
 
     return true;
 
