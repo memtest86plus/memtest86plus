@@ -21,7 +21,7 @@ SECTIONS {
 		*(.text.*)
 		*(.plt)
 		_etext = . ;
-	} = 0x00004003 :text
+	} :text = 0x00004003
 	.rodata : {
 		*(.rodata)
 		*(.rodata.*)
