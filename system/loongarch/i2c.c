@@ -207,6 +207,10 @@ void print_spd_startup_info(void)
     for (spdidx = 0; spdidx < max_mc_nu * 2; spdidx++) {
         parse_spd(&curspd, spdidx);
 
+        if (spdidx < MAX_SPD_SLOT) {
+            spd_slot_cache[spdidx] = curspd;
+        }
+
         if (!curspd.isValid)
             continue;
 

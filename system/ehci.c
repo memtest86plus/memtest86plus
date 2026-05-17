@@ -719,17 +719,11 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         }
     }
 
-    if (usb_mass_storage_found) {
-        print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s, 1 USB drive",
-                       num_ls_devices, num_ls_devices != 1 ? "s" : "",
-                       num_hs_devices, num_hs_devices != 1 ? "s" : "",
-                       num_keyboards,  num_keyboards  != 1 ? "s" : "");
-    } else {
-        print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s",
-                       num_ls_devices, num_ls_devices != 1 ? "s" : "",
-                       num_hs_devices, num_hs_devices != 1 ? "s" : "",
-                       num_keyboards,  num_keyboards  != 1 ? "s" : "");
-    }
+    print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s%s",
+                   num_ls_devices, num_ls_devices != 1 ? "s" : "",
+                   num_hs_devices, num_hs_devices != 1 ? "s" : "",
+                   num_keyboards,  num_keyboards  != 1 ? "s" : "",
+                   usb_mass_storage_found ? ", 1 USB drive" : "");
     if (num_ls_devices > 0 && i_have_companions) {
         print_usb_info(" Handed over low/full speed devices to companion controllers");
     }

@@ -1291,15 +1291,10 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         }
     }
 
-    if (usb_mass_storage_found) {
-        print_usb_info(" Found %i device%s, %i keyboard%s, 1 USB drive",
-                       num_devices,   num_devices   != 1 ? "s" : "",
-                       num_keyboards, num_keyboards != 1 ? "s" : "");
-    } else {
-        print_usb_info(" Found %i device%s, %i keyboard%s",
-                       num_devices,   num_devices   != 1 ? "s" : "",
-                       num_keyboards, num_keyboards != 1 ? "s" : "");
-    }
+    print_usb_info(" Found %i device%s, %i keyboard%s%s",
+                   num_devices,   num_devices   != 1 ? "s" : "",
+                   num_keyboards, num_keyboards != 1 ? "s" : "",
+                   usb_mass_storage_found ? ", 1 USB drive" : "");
 
     if (num_keyboards == 0 && !usb_mass_storage_found) {
         (void)halt_host_controller(op_regs);

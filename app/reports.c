@@ -43,7 +43,9 @@
 //------------------------------------------------------------------------------
 
 // RTC (CMOS) register reading. Ports 0x70/0x71 BCD format.
+// ISA-only; LoongArch has no equivalent fixed-port RTC.
 
+#if defined(__i386__) || defined(__x86_64__)
 static uint8_t rtc_read(uint8_t reg)
 {
     outb(reg, 0x70);
@@ -54,6 +56,7 @@ static uint8_t bcd_to_bin(uint8_t bcd)
 {
     return (bcd >> 4) * 10 + (bcd & 0x0F);
 }
+#endif
 
 // Minimal buffer printf supporting %s, %i, %u, %x with field width.
 
@@ -165,10 +168,11 @@ static int format_results(char *buf, int bufsize)
     buf_end = buf + bufsize - 1;
     char *pos = buf;
 
-    pos = buf_printf(pos, "Memtest86+ v%s Report\r\n", MT_VERSION);
+    pos = buf_printf(pos, "Memtest86+ v" MT_VERSION " Report\r\n");
     pos = buf_printf(pos, "=======================\r\n\r\n");
 
-    // Date & time from RTC.
+    // Date & time from RTC (x86 ISA CMOS only).
+#if defined(__i386__) || defined(__x86_64__)
     uint8_t rtc_sec  = bcd_to_bin(rtc_read(0x00));
     uint8_t rtc_min  = bcd_to_bin(rtc_read(0x02));
     uint8_t rtc_hour = bcd_to_bin(rtc_read(0x04));
@@ -180,6 +184,7 @@ static int format_results(char *buf, int bufsize)
     pos = buf_printf(pos, "Date: %04i-%02i-%02i %02i:%02i:%02i\r\n",
                      full_year, rtc_mon, rtc_day, rtc_hour, rtc_min, rtc_sec);
     pos = buf_printf(pos, "\r\n");
+#endif
 
     // System info.
     if (cpu_model) {
@@ -375,9 +380,7 @@ void save_results_to_usb(void)
 
     // Build display filename with dot: "MT86P_NN.TXT"
     char display_name[16];
-    memcpy(display_name, filename, 6);
-    display_name[6] = filename[6];
-    display_name[7] = filename[7];
+    memcpy(display_name, filename, 8);
     display_name[8] = '.';
     display_name[9] = 'T';
     display_name[10] = 'X';

@@ -26,6 +26,13 @@
 #define SCSI_READ_CAPACITY_10   0x25
 #define SCSI_READ_10            0x28
 #define SCSI_WRITE_10           0x2A
+#define SCSI_READ_16            0x88
+#define SCSI_WRITE_16           0x8A
+#define SCSI_READ_CAPACITY_16   0x9E
+#define SCSI_SAI_READ_CAPACITY_16   0x10    // Service action for SCSI_READ_CAPACITY_16
+
+// LBA returned by READ CAPACITY (10) when the disk is too large to address with 32 bits.
+#define READ_CAP_10_OVERFLOW    0xFFFFFFFFu
 
 #define MILLISEC                1000    // in microseconds
 
@@ -59,15 +66,15 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
 {
     const usb_hcd_t *hcd = msd->hcd;
 
-    // Build Command Block Wrapper.
-    usb_cbw_t cbw;
-    memset(&cbw, 0, sizeof(cbw));
-    cbw.signature            = CBW_SIGNATURE;
-    cbw.tag                  = msd->tag++;
-    cbw.data_transfer_length = data_len;
-    cbw.flags                = data_in ? CBW_FLAG_DATA_IN : CBW_FLAG_DATA_OUT;
-    cbw.lun                  = 0;
-    cbw.cb_length            = cdb_len;
+    // Build Command Block Wrapper. cb[] not in the initializer is zero-padded.
+    usb_cbw_t cbw = {
+        .signature            = CBW_SIGNATURE,
+        .tag                  = msd->tag++,
+        .data_transfer_length = data_len,
+        .flags                = data_in ? CBW_FLAG_DATA_IN : CBW_FLAG_DATA_OUT,
+        .lun                  = 0,
+        .cb_length            = cdb_len,
+    };
     memcpy(cbw.cb, cdb, cdb_len);
 
     // Send CBW via bulk OUT.
@@ -88,9 +95,8 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
         }
     }
 
-    // Receive CSW via bulk IN.
+    // Receive CSW via bulk IN. bulk_transfer fills the struct in full.
     usb_csw_t csw;
-    memset(&csw, 0, sizeof(csw));
     if (!hcd->methods->bulk_transfer(hcd, &msd->ep_in, &csw, sizeof(csw), false)) {
         return false;
     }
@@ -107,15 +113,40 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
 // Public Functions
 //------------------------------------------------------------------------------
 
+static bool read_capacity_16(usb_msd_t *msd)
+{
+    uint8_t cdb[16] = {
+        SCSI_READ_CAPACITY_16,
+        SCSI_SAI_READ_CAPACITY_16,
+        0, 0, 0, 0, 0, 0, 0, 0,         // 8-byte LBA (0 for service action 0x10)
+        0, 0, 0, 32,                    // allocation length = 32
+        0, 0
+    };
+    uint8_t cap_data[32];
+    if (!msd_bot_command(msd, cdb, 16, cap_data, sizeof(cap_data), true)) {
+        return false;
+    }
+
+    uint64_t last_lba = 0;
+    for (int i = 0; i < 8; i++) {
+        last_lba = (last_lba << 8) | cap_data[i];
+    }
+    msd->block_count = last_lba + 1;
+
+    msd->block_size = ((uint32_t)cap_data[8]  << 24) | ((uint32_t)cap_data[9]  << 16)
+                    | ((uint32_t)cap_data[10] << 8)  | (uint32_t)cap_data[11];
+
+    return msd->block_size != 0;
+}
+
 bool msd_init(usb_msd_t *msd)
 {
-    uint8_t cdb[10];
+    msd->use_16 = false;
 
     // TEST UNIT READY — retry a few times since the device may need time to spin up.
-    memset(cdb, 0, 6);
-    cdb[0] = SCSI_TEST_UNIT_READY;
+    uint8_t cdb_tur[6] = { SCSI_TEST_UNIT_READY };
     for (int retry = 0; retry < 5; retry++) {
-        if (msd_bot_command(msd, cdb, 6, NULL, 0, false)) {
+        if (msd_bot_command(msd, cdb_tur, 6, NULL, 0, false)) {
             break;
         }
         usleep(500 * MILLISEC);
@@ -123,52 +154,75 @@ bool msd_init(usb_msd_t *msd)
     }
 
     // READ CAPACITY (10) — returns 8 bytes: last LBA (4 bytes BE) + block size (4 bytes BE).
-    memset(cdb, 0, 10);
-    cdb[0] = SCSI_READ_CAPACITY_10;
+    uint8_t cdb_cap[10] = { SCSI_READ_CAPACITY_10 };
 
     uint8_t cap_data[8];
-    if (!msd_bot_command(msd, cdb, 10, cap_data, 8, true)) {
-        return false;
+    if (!msd_bot_command(msd, cdb_cap, 10, cap_data, 8, true)) {
+        // Some larger drives reject 10-byte commands; try the 16-byte variant.
+        if (!read_capacity_16(msd)) return false;
+        msd->use_16 = true;
+        return true;
     }
 
-    msd->block_count = ((uint32_t)cap_data[0] << 24) | ((uint32_t)cap_data[1] << 16)
-                      | ((uint32_t)cap_data[2] << 8)  | (uint32_t)cap_data[3];
-    msd->block_count += 1; // READ CAPACITY returns last LBA, not count.
+    uint32_t last_lba_10 = ((uint32_t)cap_data[0] << 24) | ((uint32_t)cap_data[1] << 16)
+                         | ((uint32_t)cap_data[2] << 8)  | (uint32_t)cap_data[3];
 
     msd->block_size = ((uint32_t)cap_data[4] << 24) | ((uint32_t)cap_data[5] << 16)
                      | ((uint32_t)cap_data[6] << 8)  | (uint32_t)cap_data[7];
 
     if (msd->block_size == 0) return false;
 
+    // Drive >= 2 TiB: last LBA saturates to 0xFFFFFFFF; query READ CAPACITY (16) for the real value.
+    if (last_lba_10 == READ_CAP_10_OVERFLOW) {
+        if (!read_capacity_16(msd)) return false;
+        msd->use_16 = true;
+    } else {
+        msd->block_count = (uint64_t)last_lba_10 + 1;
+    }
+
     return true;
 }
 
-bool msd_read_sectors(usb_msd_t *msd, uint32_t lba, uint32_t count, void *buffer)
+bool msd_read_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, void *buffer)
 {
-    uint8_t cdb[10];
-    memset(cdb, 0, 10);
-    cdb[0] = SCSI_READ_10;
-    cdb[2] = (lba >> 24) & 0xFF;
-    cdb[3] = (lba >> 16) & 0xFF;
-    cdb[4] = (lba >> 8)  & 0xFF;
-    cdb[5] =  lba        & 0xFF;
-    cdb[7] = (count >> 8) & 0xFF;
-    cdb[8] =  count       & 0xFF;
+    if (msd->use_16 || (lba >> 32) != 0) {
+        uint8_t cdb[16] = {
+            SCSI_READ_16, 0,
+            (uint8_t)(lba >> 56), (uint8_t)(lba >> 48), (uint8_t)(lba >> 40), (uint8_t)(lba >> 32),
+            (uint8_t)(lba >> 24), (uint8_t)(lba >> 16), (uint8_t)(lba >> 8),  (uint8_t)lba,
+            (uint8_t)(count >> 24), (uint8_t)(count >> 16), (uint8_t)(count >> 8), (uint8_t)count,
+            0, 0
+        };
+        return msd_bot_command(msd, cdb, 16, buffer, count * msd->block_size, true);
+    }
 
+    uint8_t cdb[10] = {
+        SCSI_READ_10, 0,
+        (uint8_t)(lba >> 24), (uint8_t)(lba >> 16), (uint8_t)(lba >> 8), (uint8_t)lba,
+        0,
+        (uint8_t)(count >> 8), (uint8_t)count, 0
+    };
     return msd_bot_command(msd, cdb, 10, buffer, count * msd->block_size, true);
 }
 
-bool msd_write_sectors(usb_msd_t *msd, uint32_t lba, uint32_t count, const void *buffer)
+bool msd_write_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, const void *buffer)
 {
-    uint8_t cdb[10];
-    memset(cdb, 0, 10);
-    cdb[0] = SCSI_WRITE_10;
-    cdb[2] = (lba >> 24) & 0xFF;
-    cdb[3] = (lba >> 16) & 0xFF;
-    cdb[4] = (lba >> 8)  & 0xFF;
-    cdb[5] =  lba        & 0xFF;
-    cdb[7] = (count >> 8) & 0xFF;
-    cdb[8] =  count       & 0xFF;
+    if (msd->use_16 || (lba >> 32) != 0) {
+        uint8_t cdb[16] = {
+            SCSI_WRITE_16, 0,
+            (uint8_t)(lba >> 56), (uint8_t)(lba >> 48), (uint8_t)(lba >> 40), (uint8_t)(lba >> 32),
+            (uint8_t)(lba >> 24), (uint8_t)(lba >> 16), (uint8_t)(lba >> 8),  (uint8_t)lba,
+            (uint8_t)(count >> 24), (uint8_t)(count >> 16), (uint8_t)(count >> 8), (uint8_t)count,
+            0, 0
+        };
+        return msd_bot_command(msd, cdb, 16, (void *)buffer, count * msd->block_size, false);
+    }
 
+    uint8_t cdb[10] = {
+        SCSI_WRITE_10, 0,
+        (uint8_t)(lba >> 24), (uint8_t)(lba >> 16), (uint8_t)(lba >> 8), (uint8_t)lba,
+        0,
+        (uint8_t)(count >> 8), (uint8_t)count, 0
+    };
     return msd_bot_command(msd, cdb, 10, (void *)buffer, count * msd->block_size, false);
 }

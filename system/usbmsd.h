@@ -35,7 +35,7 @@ bool msd_init(usb_msd_t *msd);
  *
  * \returns true if all sectors were read successfully.
  */
-bool msd_read_sectors(usb_msd_t *msd, uint32_t lba, uint32_t count, void *buffer);
+bool msd_read_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, void *buffer);
 
 /**
  * Writes one or more sectors to the mass storage device.
@@ -47,6 +47,6 @@ bool msd_read_sectors(usb_msd_t *msd, uint32_t lba, uint32_t count, void *buffer
  *
  * \returns true if all sectors were written successfully.
  */
-bool msd_write_sectors(usb_msd_t *msd, uint32_t lba, uint32_t count, const void *buffer);
+bool msd_write_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, const void *buffer);
 
 #endif // USBMSD_H

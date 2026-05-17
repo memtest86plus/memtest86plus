@@ -354,8 +354,9 @@ typedef struct {
     usb_ep_t        ep_in;
     usb_ep_t        ep_out;
     uint32_t        tag;
-    uint32_t        block_count;
+    uint64_t        block_count;
     uint32_t        block_size;
+    bool            use_16;     // true if device requires/needs 16-byte SCSI commands
 } usb_msd_t;
 
 /**

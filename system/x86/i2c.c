@@ -62,6 +62,8 @@ void print_spd_startup_info(void)
         ram_slot_info[spdidx].isPopulated = curspd.isValid;
         ram_slot_info[spdidx].hasTempSensor = false;
 
+        spd_slot_cache[spdidx] = curspd;
+
         if (!curspd.isValid)
             continue;
 
