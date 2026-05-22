@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2025 Sam Demeulemeester
+// Copyright (C) 2004-2026 Sam Demeulemeester
 //
 // ------------------------
 // This file is used to detect quirks on specific hardware
@@ -11,6 +11,7 @@
 #include "hwquirks.h"
 #include "io.h"
 #include "pci.h"
+#include "string.h"
 #include "unistd.h"
 #include "cpuinfo.h"
 #include "cpuid.h"
@@ -156,6 +157,46 @@ static void amd_k8_revfg_temp(void)
         return;
 
     cpu_temp_offset = 21.0f;
+}
+
+// AMD Zen Tctl -> Tdie offset table.
+typedef struct {
+    uint8_t      ext_family;
+    uint8_t      ext_model;
+    const char  *brand_prefix;
+    float        tctl_offset;
+} amd_tctl_offset_t;
+
+static const amd_tctl_offset_t amd_tctl_offset_table[] = {
+    { 0x8, 0x0, "AMD Ryzen 5 1600X",         -20.0f },  // Summit Ridge
+    { 0x8, 0x0, "AMD Ryzen 7 1700X",         -20.0f },  // Summit Ridge
+    { 0x8, 0x0, "AMD Ryzen 7 1800X",         -20.0f },  // Summit Ridge
+    { 0x8, 0x0, "AMD Ryzen 7 2700X",         -10.0f },  // Pinnacle Ridge
+    { 0x8, 0x0, "AMD Ryzen Threadripper 19", -27.0f },  // Whitehaven (1900X/1920X/1950X)
+    { 0x8, 0x0, "AMD Ryzen Threadripper 29", -27.0f },  // Colfax (29x0X/29x0WX)
+    { 0x8, 0x0, "AMD EPYC 7",                -27.0f },  // Naples (Family 17h, Model 01h)
+    // Rome/Milan/Genoa/Turin EPYC parts report Tdie directly using the
+    // bit-19 (T_OFFSET_PRESENT) path; no additional table entry needed.
+};
+
+static void amd_zen_apply_tctl_offset(void)
+{
+    const char *brand = cpuid_info.brand_id.str;
+    uint8_t ext_family = cpuid_info.version.extendedFamily;
+    uint8_t ext_model  = cpuid_info.version.extendedModel;
+
+    for (size_t i = 0; i < sizeof(amd_tctl_offset_table) / sizeof(amd_tctl_offset_table[0]); i++) {
+        const amd_tctl_offset_t *e = &amd_tctl_offset_table[i];
+
+        if (e->ext_family != ext_family || e->ext_model != ext_model) {
+            continue;
+        }
+
+        if (strncmp(brand, e->brand_prefix, strlen(e->brand_prefix)) == 0) {
+            cpu_temp_offset += e->tctl_offset;
+            return;
+        }
+    }
 }
 
 static void loongson_7a00_ehci_workaround(void)
@@ -325,6 +366,17 @@ void quirks_init(void)
                 quirk.process = disable_temp_reporting;
             }
         }
+    }
+
+    //  -----------------------------------------------------------
+    //  -- AMD Zen-class Tctl -> Tdie offset for affected SKUs   --
+    //  -----------------------------------------------------------
+    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
+        && cpuid_info.version.extendedFamily >= 8) {
+
+        quirk.id    = QUIRK_AMD_ZEN_TCTL_OFFSET;
+        quirk.type |= QUIRK_TYPE_TEMP;
+        quirk.process = amd_zen_apply_tctl_offset;
     }
 
     //  -----------------------------------------------------------

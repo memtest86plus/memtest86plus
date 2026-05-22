@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2025 Sam Demeulemeester
+// Copyright (C) 2004-2026 Sam Demeulemeester
 #ifndef _QUIRK_H_
 #define _QUIRK_H_
 /**
@@ -29,6 +29,7 @@ typedef enum {
     QUIRK_K8_BSTEP_NOTEMP,
     QUIRK_K8_REVFG_TEMP,
     QUIRK_AMD_ERRATA_319,
+    QUIRK_AMD_ZEN_TCTL_OFFSET,
     QUIRK_VIA_VP,
     QUIRK_SIS_530,
     QUIRK_LOONGSON7A00_EHCI_WORKARD,
