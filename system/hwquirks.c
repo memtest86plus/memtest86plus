@@ -163,18 +163,18 @@ static void amd_k8_revfg_temp(void)
 typedef struct {
     uint8_t      ext_family;
     uint8_t      ext_model;
-    const char  *brand_prefix;
     float        tctl_offset;
+    char         brand_prefix[CPUID_BRAND_STR_LENGTH];
 } amd_tctl_offset_t;
 
 static const amd_tctl_offset_t amd_tctl_offset_table[] = {
-    { 0x8, 0x0, "AMD Ryzen 5 1600X",         -20.0f },  // Summit Ridge
-    { 0x8, 0x0, "AMD Ryzen 7 1700X",         -20.0f },  // Summit Ridge
-    { 0x8, 0x0, "AMD Ryzen 7 1800X",         -20.0f },  // Summit Ridge
-    { 0x8, 0x0, "AMD Ryzen 7 2700X",         -10.0f },  // Pinnacle Ridge
-    { 0x8, 0x0, "AMD Ryzen Threadripper 19", -27.0f },  // Whitehaven (1900X/1920X/1950X)
-    { 0x8, 0x0, "AMD Ryzen Threadripper 29", -27.0f },  // Colfax (29x0X/29x0WX)
-    { 0x8, 0x0, "AMD EPYC 7",                -27.0f },  // Naples (Family 17h, Model 01h)
+    { 0x8, 0x0, -20.0f, "AMD Ryzen 5 1600X"         },  // Summit Ridge
+    { 0x8, 0x0, -20.0f, "AMD Ryzen 7 1700X"         },  // Summit Ridge
+    { 0x8, 0x0, -20.0f, "AMD Ryzen 7 1800X"         },  // Summit Ridge
+    { 0x8, 0x0, -10.0f, "AMD Ryzen 7 2700X"         },  // Pinnacle Ridge
+    { 0x8, 0x0, -27.0f, "AMD Ryzen Threadripper 19" },  // Whitehaven (1900X/1920X/1950X)
+    { 0x8, 0x0, -27.0f, "AMD Ryzen Threadripper 29" },  // Colfax (29x0X/29x0WX)
+    { 0x8, 0x0, -27.0f, "AMD EPYC 7"                },  // Naples (Family 17h, Model 01h)
     // Rome/Milan/Genoa/Turin EPYC parts report Tdie directly using the
     // bit-19 (T_OFFSET_PRESENT) path; no additional table entry needed.
 };
