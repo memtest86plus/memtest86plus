@@ -175,8 +175,10 @@ static const amd_tctl_offset_t amd_tctl_offset_table[] = {
     { 0x8, 0x0, -27.0f, "AMD Ryzen Threadripper 19" },  // Whitehaven (1900X/1920X/1950X)
     { 0x8, 0x0, -27.0f, "AMD Ryzen Threadripper 29" },  // Colfax (29x0X/29x0WX)
     { 0x8, 0x0, -27.0f, "AMD EPYC 7"                },  // Naples (Family 17h, Model 01h)
-    // Rome/Milan/Genoa/Turin EPYC parts report Tdie directly using the
-    // bit-19 (T_OFFSET_PRESENT) path; no additional table entry needed.
+    //{ 0xA, 0xA, -49.0f, "AMD EPYC 8"                },  // Siena (Maybe needed)
+    //{ 0xA, 0x1, -49.0f, "AMD EPYC 9"                },  // Genoa (Maybe needed)
+    { 0xB, 0x0, -49.0f, "AMD EPYC 9"                },  // Turin (Family 19h, Model 11h)
+    // Other EPYC parts report Tdie directly using the bit-19 (T_OFFSET_PRESENT) path.
 };
 
 static void amd_zen_apply_tctl_offset(void)
