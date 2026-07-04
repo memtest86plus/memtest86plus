@@ -108,7 +108,6 @@ uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size
 /** Finds a platform USB host controller with fixed MMIO, such as DWC3/XHCI.
  *  Returns true and stores its base address if the given index exists. */
 bool platform_usb_controller(int index, uintptr_t *base_addr);
-#endifform_usb_controller(int index, uintptr_t *base_addr);
 #endif
 
 /**
