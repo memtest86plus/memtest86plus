@@ -16,6 +16,9 @@
 // LoongArch GCC builtin function
 #include <larchintrin.h>
 #endif
+#if defined(__aarch64__)
+#include "cpuinfo.h"
+#endif
 
 #define rdtsc(low, high)            \
     __asm__ __volatile__("rdtsc"    \
@@ -59,6 +62,31 @@ static inline uint64_t get_tsc(void)
       );
 
     return (val * (clks_per_msec / stable_count_freq));
+}
+#elif defined(__aarch64__)
+static inline uint64_t get_tsc(void)
+{
+    uint64_t count;
+    static uint64_t timer_freq_khz = 0;
+
+    if (!timer_freq_khz) {
+        uint64_t freq;
+        __asm__ __volatile__ ("mrs %0, cntfrq_el0" : "=r" (freq));
+        timer_freq_khz = freq / 1000;
+        if (!timer_freq_khz) {
+            timer_freq_khz = 1;
+        }
+    }
+
+    // Scale the generic timer count to CPU clock cycles, so that intervals
+    // measured with get_tsc() can be converted to time using clks_per_msec.
+    __asm__ __volatile__ (
+        "isb                    \n\t"
+        "mrs %0, cntvct_el0     \n\t"
+        : "=r" (count)
+    );
+
+    return count * (clks_per_msec / timer_freq_khz);
 }
 #endif
 
