@@ -8,7 +8,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
- * Copyright (C) 2004-2023 Sam Demeulemeester.
+ * Copyright (C) 2004-2026 Sam Demeulemeester.
  */
 
 #include <stdbool.h>
@@ -135,6 +135,12 @@ extern uint32_t ram_speed;
  * The TSC clock speed in kHz. Assumed to be the nominal CPU clock speed.
  */
 extern uint32_t clks_per_msec;
+
+/**
+ * The measured CPU clock speed in MHz, on architectures where the timebase
+ * used by get_tsc() does not run at the CPU clock frequency. 0 if unknown.
+ */
+extern uint32_t cpu_clk_mhz;
 
 /**
  * Determines the CPU info and stores it in the exported variables.
