@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (C) 2004-2026 Sam Demeulemeester
+//
+// ------------------------
+//
+// Platform-specific code for IMC configuration, ECC support, etc.
+//
+
+#include <stdbool.h>
+
+#include "config.h"
+#include "cpuinfo.h"
+
+#include "memctrl.h"
+#include "imc/imc.h"
+
+#include "display.h"
+
+imc_info_t imc = {"UNDEF", 0, 0, 0, 0, 0, 0, 0, 0};
+
+ecc_info_t ecc_status = {false, ECC_ERR_NONE, 0, 0, 0, 0};
+
+// ---------------------
+// -- Public function --
+// ---------------------
+
+void memctrl_init(void)
+{
+    // Memory controller detection and ECC are not supported yet on ARM64.
+    ecc_status.ecc_enabled = false;
+}
+
+void memctrl_poll_ecc(void)
+{
+    // Nothing to do.
+}
