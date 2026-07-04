@@ -8,6 +8,7 @@
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
+ * Copyright (C) 2026 Sam Demeulemeester.
  */
 
 #ifdef __loongarch_lp64
@@ -19,6 +20,31 @@
     :                         \
     : "i" (op), "ZC" (*(unsigned char *)(addr)))
 static inline void cache_flush(void);
+#endif
+
+#ifdef __aarch64__
+#include <stdbool.h>
+#include <stdint.h>
+#include "registers.h"
+static inline void cache_flush(void);
+
+/**
+ * Cleans the D-cache by virtual address to the point of coherency over the
+ * given range. Needed before starting other CPUs (they come up with their
+ * MMU and caches disabled!)
+ */
+static inline void cache_clean_range(const void *start, const void *end)
+{
+    uint64_t ctr = read_sysreg(ctr_el0);
+    uintptr_t line_size = UINT64_C(4) << ((ctr >> 16) & 0xF);   // DminLine
+
+    uintptr_t addr = (uintptr_t)start & ~(line_size - 1);
+    while (addr < (uintptr_t)end) {
+        __asm__ __volatile__ ("dc cvac, %0" : : "r" (addr) : "memory");
+        addr += line_size;
+    }
+    __asm__ __volatile__ ("dsb sy" ::: "memory");
+}
 #endif
 
 /**
@@ -49,6 +75,12 @@ static inline void cache_off(void)
 #elif defined(__loongarch_lp64)
     cache_flush();
     __csrxchg_d(0, 3 << 4, 0x181);
+#elif defined(__aarch64__)
+    uint64_t sctlr = read_sysreg(sctlr_el1);
+    sctlr &= ~(UINT64_C(1) << 2);   /* Clear C */
+    write_sysreg(sctlr, sctlr_el1);
+    __asm__ __volatile__ ("isb" ::: "memory");
+    cache_flush();
 #endif
 }
 
@@ -78,6 +110,11 @@ static inline void cache_on(void)
 #elif defined(__loongarch_lp64)
     cache_flush();
     __csrxchg_d(1 << 4, 3 << 4, 0x181);
+#elif defined(__aarch64__)
+    uint64_t sctlr = read_sysreg(sctlr_el1);
+    sctlr |= (UINT64_C(1) << 2) | (UINT64_C(1) << 12);  /* Set C and I */
+    write_sysreg(sctlr, sctlr_el1);
+    __asm__ __volatile__ ("isb" ::: "memory");
 #endif
 }
 
@@ -146,6 +183,49 @@ static inline void cache_flush(void)
             va += line_size;
         }
     }
+#elif defined(__aarch64__)
+    // Clean and invalidate the whole D-cache hierarchy by set/way.
+    __asm__ __volatile__ ("dsb sy" ::: "memory");
+
+    uint64_t clidr = read_sysreg(clidr_el1);
+    bool has_ccidx = ((read_sysreg(id_aa64mmfr2_el1) >> 20) & 0xF) != 0;
+
+    for (int level = 0; level < 7; level++) {
+        int cache_type = (clidr >> (3 * level)) & 0x7;
+        if (cache_type == 0) {
+            break;      // no more cache levels
+        }
+        if (cache_type < 2) {
+            continue;   // no data or unified cache at this level
+        }
+
+        // Select the data or unified cache at this level.
+        write_sysreg(level << 1, csselr_el1);
+        __asm__ __volatile__ ("isb");
+        uint64_t ccsidr = read_sysreg(ccsidr_el1);
+
+        uint32_t line_shift = (ccsidr & 0x7) + 4;
+        uint32_t max_way, max_set;
+        if (has_ccidx) {
+            max_way = (ccsidr >>  3) & 0x1FFFFF;
+            max_set = (ccsidr >> 32) & 0xFFFFFF;
+        } else {
+            max_way = (ccsidr >>  3) & 0x3FF;
+            max_set = (ccsidr >> 13) & 0x7FFF;
+        }
+        uint32_t way_shift = max_way ? __builtin_clz(max_way) : 0;
+
+        for (uint32_t set = 0; set <= max_set; set++) {
+            for (uint32_t way = 0; way <= max_way; way++) {
+                uint64_t set_way = ((uint64_t)way << way_shift)
+                                 | ((uint64_t)set << line_shift)
+                                 | (level << 1);
+                __asm__ __volatile__ ("dc cisw, %0" : : "r" (set_way) : "memory");
+            }
+        }
+    }
+
+    __asm__ __volatile__ ("dsb sy; isb" ::: "memory");
 #endif
 }
 
