@@ -84,10 +84,17 @@ void heap_init(void)
     uintptr_t max_segment_size = 0;
 #if defined(__i386__) || defined (__x86_64__)
     uintptr_t low_memory_heap = PAGE_C(1, MB);
+    uintptr_t heap_limit = PAGE_C(4,GB);
 #elif defined(__loongarch_lp64)
     uintptr_t low_memory_heap = PAGE_C(256, MB);
+    uintptr_t heap_limit = PAGE_C(4,GB);
+#elif defined(__aarch64__)
+    // RAM may start well above 0, so make the heap limits relative to the
+    // start of RAM.
+    uintptr_t low_memory_heap = pm_map[0].start + PAGE_C(256, MB);
+    uintptr_t heap_limit = pm_map[0].start + PAGE_C(4,GB);
 #endif
-    for (int i = 0; i < pm_map_size && pm_map[i].end <= PAGE_C(4,GB); i++) {
+    for (int i = 0; i < pm_map_size && pm_map[i].end <= heap_limit; i++) {
         uintptr_t try_heap_start = pm_map[i].start;
         uintptr_t try_heap_end   = pm_map[i].end;
         if (program_start >= try_heap_start && program_end <= try_heap_end) {
@@ -106,4 +113,13 @@ void heap_init(void)
             heaps[HEAP_TYPE_HM_1].end     = try_heap_end;
         }
     }
+
+#if defined(__aarch64__)
+    // There is no low-memory addressing constraint on this architecture, so
+    // if no segment small enough for the low-memory heap was found (RAM is
+    // typically one big contiguous region), just use the high-memory heap.
+    if (heaps[HEAP_TYPE_LM_1].segment < 0) {
+        heaps[HEAP_TYPE_LM_1] = heaps[HEAP_TYPE_HM_1];
+    }
+#endif
 }

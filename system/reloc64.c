@@ -34,6 +34,8 @@
 #define R_X86_64_RELATIVE  8
 #define R_LARCH_NONE       0
 #define R_LARCH_RELATIVE   3
+#define R_AARCH64_NONE     0
+#define R_AARCH64_RELATIVE 1027
 
 //------------------------------------------------------------------------------
 // Types
@@ -86,6 +88,14 @@ static inline Elf64_Addr __attribute__ ((unused)) get_load_address(void)
         :
         : "memory"
     );
+#elif defined(__aarch64__)
+    __asm__ __volatile__ (
+        "adrp %0, _start            \n\t"
+        "add  %0, %0, :lo12:_start"
+        : "=r" (addr)
+        :
+        : "memory"
+    );
 #endif
     return addr;
 }
@@ -112,6 +122,27 @@ static inline Elf64_Addr __attribute__ ((unused)) get_dynamic_section_offset(voi
         :
         : "$t0", "memory"
     );
+#elif defined(__aarch64__)
+    // On AArch64 the GOT[0] convention is not reliable (the entry itself
+    // needs a dynamic relocation), so compute the link-time offset of
+    // _DYNAMIC PC-relatively instead. The program is linked at address 0,
+    // so the offset is basically the distance from _start
+    Elf64_Addr start_addr;
+    __asm__ __volatile__ (
+        "adrp %0, _DYNAMIC          \n\t"
+        "add  %0, %0, :lo12:_DYNAMIC"
+        : "=r" (offs)
+        :
+        : "memory"
+    );
+    __asm__ __volatile__ (
+        "adrp %0, _start            \n\t"
+        "add  %0, %0, :lo12:_start"
+        : "=r" (start_addr)
+        :
+        : "memory"
+    );
+    offs -= start_addr;
 #endif
     return offs;
 }
@@ -142,7 +173,8 @@ static void do_relocation(Elf64_Addr load_addr, Elf64_Addr load_offs, const Elf6
 {
     Elf64_Addr *target_addr = (Elf64_Addr *)(load_addr + rel->r_offset);
     if ((ELF64_R_TYPE(rel->r_info) == R_X86_64_RELATIVE) ||
-        (ELF64_R_TYPE(rel->r_info) == R_LARCH_RELATIVE)) {
+        (ELF64_R_TYPE(rel->r_info) == R_LARCH_RELATIVE)  ||
+        (ELF64_R_TYPE(rel->r_info) == R_AARCH64_RELATIVE)) {
         if (load_offs == load_addr) {
             *target_addr = load_addr + rel->r_addend;
         } else {
@@ -193,7 +225,9 @@ void reloc(void)
 
     do_relocations(load_addr, load_offs, dyn_info[DT_RELA]->d_un.d_ptr, dyn_info[DT_RELASZ]->d_un.d_val);
 
-    if (dyn_info[DT_PLTREL]->d_un.d_val == DT_RELA) {
+    // The PLT-related tags are absent if there are no PLT relocations
+    // (e.g. on AArch64).
+    if (dyn_info[DT_PLTREL] != NULL && dyn_info[DT_PLTREL]->d_un.d_val == DT_RELA) {
         do_relocations(load_addr, load_offs, dyn_info[DT_JMPREL]->d_un.d_ptr, dyn_info[DT_PLTRELSZ]->d_un.d_val);
     }
 }
