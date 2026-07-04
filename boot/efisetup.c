@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (C) 2020-2024 Martin Whitaker.
+// Copyright 2011 Intel Corporation; author Matt Fleming
 //
 // Derived from Linux 5.6 arch/x86/boot/compressed/eboot.c and extracts
 // from drivers/firmware/efi/libstub:
 //
-//   Copyright 2011 Intel Corporation; author Matt Fleming
 
 #include <stdbool.h>
 
@@ -179,6 +179,10 @@ static int get_cmd_line_length(efi_loaded_image_t *image)
     efi_char16_t *cmd_line = (efi_char16_t *)image->load_options;
     int max_length = image->load_options_size / sizeof(efi_char16_t);
     int length = 0;
+    // When booted directly by the firmware there are no load options.
+    if (cmd_line == NULL || max_length == 0) {
+        return 0;
+    }
     // Skip Unicode byte order mark if present
     if (cmd_line[0] == u'\uFEFF') {
         cmd_line = &cmd_line[1];
@@ -193,6 +197,10 @@ static int get_cmd_line_length(efi_loaded_image_t *image)
 static void get_cmd_line(efi_loaded_image_t *image, int num_chars, char *buffer)
 {
     efi_char16_t *cmd_line = (efi_char16_t *)image->load_options;
+    if (cmd_line == NULL || num_chars == 0) {
+        buffer[0] = '\0';
+        return;
+    }
     if (cmd_line[0] == u'\uFEFF') {
         cmd_line = &cmd_line[1];
     }
@@ -810,6 +818,8 @@ fail:
         __asm__("hlt");
 #elif defined(__loongarch_lp64)
         __asm__("idle 0");
+#elif defined(__aarch64__)
+        __asm__("wfi");
 #endif
     }
 }
