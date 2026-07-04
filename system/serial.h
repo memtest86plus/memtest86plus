@@ -23,6 +23,7 @@ static const uint16_t serial_io_ports[] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 struct serial_port {
     bool enable;
     bool is_mmio;
+    bool is_pl011;
     int parity;
     int bits;
     int baudrate;
@@ -31,6 +32,16 @@ struct serial_port {
     int refclk;
     uintptr_t base_addr;
 };
+
+/*
+ * Definitions for the ARM PL011 UART registers
+ */
+
+#define PL011_DR        0x00    /* Data Register */
+#define PL011_FR        0x18    /* Flag Register */
+
+#define PL011_FR_TXFF   0x20    /* Transmit FIFO full */
+#define PL011_FR_RXFE   0x10    /* Receive FIFO empty */
 
 /*
  * Definitions for VT100 commands

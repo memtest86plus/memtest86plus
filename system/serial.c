@@ -18,6 +18,11 @@
 #include <larchintrin.h>
 #endif
 
+#ifdef __aarch64__
+#include "mmio.h"
+#include "vmem.h"
+#endif
+
 static struct serial_port console_serial;
 
 //------------------------------------------------------------------------------
@@ -76,6 +81,13 @@ static void serial_echo_print(const char *p)
     /* Now, do each character */
     while (*p) {
         /* Send the character out. */
+#ifdef __aarch64__
+        if (port->is_pl011) {
+            while (mmio_read32((uint32_t *)(port->base_addr + PL011_FR)) & PL011_FR_TXFF) { }
+            mmio_write32((uint32_t *)(port->base_addr + PL011_DR), *p++);
+            continue;
+        }
+#endif
         serial_wait_for_xmit(port);
         serial_write_reg(port, UART_TX, *p++);
     }
@@ -110,6 +122,9 @@ void tty_init(void)
     console_serial.base_addr    = map_region(tty_address, 0x0, false);
     // By default, CPU UART0 is used, which uses the stable counter as the clock.
     tty_mmio_ref_clk            = (__cpucfg(0x4) * (__cpucfg(0x5) & 0xFFFF)) / ((__cpucfg(0x5) >> 16) & 0xFFFF);
+#elif defined(__aarch64__)
+    console_serial.base_addr    = map_region(tty_address, 0x1000, false);
+    console_serial.is_pl011     = tty_pl011;
 #else
     console_serial.base_addr    = tty_address;
 #endif
@@ -129,6 +144,14 @@ void tty_init(void)
         console_serial.is_mmio      = false;
         console_serial.reg_width    = 1;
         console_serial.refclk       = UART_REF_CLK_IO;
+    }
+
+    if (console_serial.is_pl011) {
+        // The PL011 has already been configured by the firmware; just use
+        // it as-is.
+        tty_clear_screen();
+        tty_disable_cursor();
+        return;
     }
 
     /* read the Divisor Latch */
@@ -249,6 +272,16 @@ char tty_get_char(int max_wait_frames)
 {
     int wait_time = max_wait_frames * console_serial.frame_time;
     do {
+#ifdef __aarch64__
+        if (console_serial.is_pl011) {
+            if (!(mmio_read32((uint32_t *)(console_serial.base_addr + PL011_FR)) & PL011_FR_RXFE)) {
+                return mmio_read32((uint32_t *)(console_serial.base_addr + PL011_DR)) & 0xFF;
+            }
+            usleep(10);
+            wait_time -= 10;
+            continue;
+        }
+#endif
         int uart_status = serial_read_reg(&console_serial, UART_LSR);
         if (uart_status & UART_LSR_DR) {
             return serial_read_reg(&console_serial, UART_RX);
