@@ -32,10 +32,12 @@ void usleep(unsigned int usec)
               "nop \n\t" \
               "nop \n\t" \
             );
+#elif defined(__aarch64__)
+            __asm__ __volatile__ ("yield");
 #endif
         } while ((get_tsc() - t0) < cycles);
     } else {
-        // This will be highly inaccurate, but should give at least the requested delay.
+        // Highly inaccurate, but should give *at least* the requested delay
         volatile uint64_t count = (uint64_t)usec * 1000;
         while (count > 0) {
             count--;

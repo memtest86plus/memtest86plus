@@ -58,6 +58,8 @@ void barrier_spin_wait(barrier_t *barrier)
               "nop \n\t" \
               "nop \n\t" \
             );
+#elif defined(__aarch64__)
+            __asm__ __volatile__ ("yield");
 #endif
         }
         return;
@@ -119,6 +121,16 @@ void barrier_halt_wait(barrier_t *barrier)
         : "$t0", "t1", "$t2"
         : end
     );
+#elif defined(__aarch64__)
+    // On ARM64, use event instead of an interrupt. The event register is sticky,
+    // so SEV before WFE still wakes immediately, avoiding missed wakeups.
+    if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
+        volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
+        while (*i_am_blocked) {
+            __asm__ __volatile__ ("wfe" ::: "memory");
+        }
+        goto end;
+    }
 #endif
     // Last one here, so reset the barrier and wake the others.
     barrier->count = barrier->num_threads;

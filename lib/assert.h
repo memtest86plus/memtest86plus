@@ -22,6 +22,8 @@ static inline void assert(int expr)
         __asm__ __volatile__ ("int $3");
 #elif defined(__loongarch_lp64)
         __asm__ __volatile__ ("break 0");
+#elif defined(__aarch64__)
+        __asm__ __volatile__ ("brk #0");
 #endif
     }
 }
