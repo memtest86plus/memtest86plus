@@ -9,6 +9,7 @@
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  * Copyright (C) 2024 Loongson Technology Corporation Limited. All rights reserved.
+ * Copyright (C) 2026 Sam Demeulemeester.
  */
 
 #include <stdint.h>
@@ -99,6 +100,16 @@ void pci_config_write16(int bus, int dev, int func, int reg, uint16_t value);
  */
 void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value);
 
+#if defined(__aarch64__)
+/** Allocates MMIO space for an unassigned memory BAR and writes it to the BAR.
+ *  Returns the allocated base address, or 0 if no suitable range exists. */
+uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size);
+
+/** Finds a platform USB host controller with fixed MMIO, such as DWC3/XHCI.
+ *  Returns true and stores its base address if the given index exists. */
+bool platform_usb_controller(int index, uintptr_t *base_addr);
+#endifform_usb_controller(int index, uintptr_t *base_addr);
+#endif
 
 /**
  * Basic LPC Functions

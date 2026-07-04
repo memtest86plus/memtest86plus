@@ -125,6 +125,7 @@
 // Event Completion Code values
 
 #define	XHCI_EVENT_CC_SUCCESS		1
+#define	XHCI_EVENT_CC_SHORT_PACKET	13
 #define	XHCI_EVENT_CC_TIMEOUT		191     // specific to this driver
 
 // Values specific to this driver.
@@ -310,7 +311,16 @@ typedef struct {
     // Keyboard data transfer rings
     ep_tr_t             kbd_tr  [MAX_KEYBOARDS];
 
-    // Keyboard data transfer buffers.
+    // Keyboard data transfer buffers. Sized for the largest full-speed interrupt
+    // packet: some keyboards send packets longer than the 8 byte boot protocol report,
+    // and a transfer shorter than the packet cause a babble error that halts the endpoint.
+    // Only the first 8 bytes (boot report) are used.
+    uint8_t             kbd_xfer[MAX_KEYBOARDS][64] __attribute__ ((aligned (64)));
+
+    // Requested transfer length for each keyboard endpoint.
+    uint8_t             kbd_xfer_len[MAX_KEYBOARDS];
+
+    // Last received keyboard reports.
     hid_kbd_rpt_t       kbd_rpt [MAX_KEYBOARDS];
 
     // Saved keyboard reports.
@@ -851,6 +861,17 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
     ws->kbd_slot_id[kbd_idx] = ep->device_id;
     ws->kbd_ep_id  [kbd_idx] = 2 * ep->endpoint_num + 1;  // EP <N> IN
 
+    // Request whole packets, as some devices send packets longer than the
+    // boot protocol report (a shorter request would cause a babble error).
+    size_t xfer_len = ep->max_packet_size;
+    if (xfer_len < sizeof(hid_kbd_rpt_t)) {
+        xfer_len = sizeof(hid_kbd_rpt_t);
+    }
+    if (xfer_len > sizeof(ws->kbd_xfer[kbd_idx])) {
+        xfer_len = sizeof(ws->kbd_xfer[kbd_idx]);
+    }
+    ws->kbd_xfer_len[kbd_idx] = xfer_len;
+
     // Configure the controller.
     return configure_interrupt_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), sizeof(hid_kbd_rpt_t));
 }
@@ -872,12 +893,30 @@ static void poll_keyboards(const usb_hcd_t *hcd)
     xhci_trb_t event;
 
     while (get_xhci_event(ws, &event)) {
-        if (event_type(&event) != XHCI_TRB_TRANSFER_EVENT || event_cc(&event) != XHCI_EVENT_CC_SUCCESS) continue;
+        if (event_type(&event) != XHCI_TRB_TRANSFER_EVENT) continue;
+
+        // A short packet is normal: the transfer requests a whole packet,
+        // but boot protocol reports may be shorter.
+        int cc = event_cc(&event);
+        if (cc != XHCI_EVENT_CC_SUCCESS && cc != XHCI_EVENT_CC_SHORT_PACKET) {
+#if defined(USB_DEBUG_HOLD)
+            // Diagnostic builds: make discarded transfer errors (e.g. a
+            // babble error, which halts the endpoint) visible.
+            static int error_prints = 0;
+            if (error_prints < 5) {
+                print_usb_info(" kbd transfer event error cc %i", cc);
+                error_prints++;
+            }
+#endif
+            continue;
+        }
 
         int kbd_idx = identify_keyboard(ws, event_slot_id(&event), event_ep_id(&event));
         if (kbd_idx < 0) continue;
 
+        // Only the first 8 bytes hold the boot protocol report.
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+        *kbd_rpt = *(hid_kbd_rpt_t *)ws->kbd_xfer[kbd_idx];
 
         hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
         if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
@@ -885,7 +924,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
         }
 
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
-        issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));
+        issue_normal_trb(kbd_tr, ws->kbd_xfer[kbd_idx], XHCI_TRB_DIR_IN, ws->kbd_xfer_len[kbd_idx]);
         ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
     }
 }
@@ -1189,8 +1228,7 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
         kbd_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
 
-        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
-        issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));
+        issue_normal_trb(kbd_tr, ws->kbd_xfer[kbd_idx], XHCI_TRB_DIR_IN, ws->kbd_xfer_len[kbd_idx]);
         ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
     }
 
