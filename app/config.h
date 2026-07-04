@@ -78,6 +78,7 @@ extern bool         tty_new_line;
 
 extern uint32_t     tty_mmio_ref_clk;
 extern int          tty_mmio_stride;
+extern bool         tty_pl011;
 
 extern bool err_banner_redraw;
 

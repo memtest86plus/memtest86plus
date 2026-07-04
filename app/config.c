@@ -117,6 +117,7 @@ bool            tty_new_line       = false;
 
 uint32_t        tty_mmio_ref_clk   = UART_REF_CLK_MMIO; // Reference clock for MMIO (in Hz)
 int             tty_mmio_stride    = 4;                 // Stride for MMIO (register width in bytes)
+bool            tty_pl011          = false;             // UART is an ARM PL011 rather than a 16550
 
 bool            err_banner_redraw  = false;             // Redraw banner on new errors
 
@@ -130,6 +131,18 @@ static void parse_serial_params(const char *params)
 
     // No parameters passed (only "console"), use default
      if (params == NULL) {
+        return;
+    }
+
+    // Check for an ARM PL011 UART ("console=ttyAMA,0x9000000")
+    if (strncmp(params, "ttyAMA,0x", 9) == 0) {
+        uintptr_t pl011_adr = hexstr2int(params+9);
+        if (pl011_adr > 0xFFFF) {
+            tty_pl011   = true;
+            tty_address = pl011_adr;
+        } else {
+            enable_tty = false;
+        }
         return;
     }
 
@@ -278,6 +291,9 @@ static void parse_test_list(const char *params)
 static void parse_option(const char *option, const char *params)
 {
     if (option[0] == '\0') return;
+
+    // Options may be given without parameters.
+    if (params == NULL) params = "";
 
     if (strncmp(option, "console", 8) == 0) {
         parse_serial_params(params);
