@@ -184,6 +184,8 @@ void display_init(void)
     prints(ROW_FOOTER, 74, ".x32");
 #elif defined (__loongarch_lp64)
     prints(ROW_FOOTER, 74, ".la64");
+#elif defined (__aarch64__)
+    prints(ROW_FOOTER, 74, ".arm64");
 #endif
 
     set_foreground_colour(palette.foreground);
@@ -192,9 +194,16 @@ void display_init(void)
     if (cpu_model) {
         display_cpu_model(cpu_model);
     }
+#if defined(__aarch64__)
+    // Generic timer does not run at CPU clock. Use the PMU instead
+    if (cpu_clk_mhz) {
+        display_cpu_clk((int)cpu_clk_mhz);
+    }
+#else
     if (clks_per_msec) {
         display_cpu_clk((int)(clks_per_msec / 1000));
     }
+#endif
 #if TESTWORD_WIDTH < 64
     if (cpuid_info.flags.lm) {
         display_cpu_addr_mode(" [LM]");
@@ -424,7 +433,7 @@ void display_temperature(void)
 
     if (enable_temp_ram) {
         // Display RAM Temperature (DDR5+ Only) - LA64 unsupported yet
-        if (dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
+        if (dmi_memory_device != NULL && dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
 
             for (int i = 0; i < MAX_SPD_SLOT; i++) {
 
