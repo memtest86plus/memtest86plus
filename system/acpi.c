@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
-// Copyright (C) 2004-2022 Sam Demeulemeester.
+// Copyright (C) 2004-2026 Sam Demeulemeester.
 
 #include "boot.h"
 #include "bootparams.h"
@@ -41,6 +41,8 @@
 #define SLITSignature   ('S' | ('L' << 8) | ('I' << 16) | ('T' << 24)) // System Locality Information Table (NUMA)
 #define SRATSignature   ('S' | ('R' << 8) | ('A' << 16) | ('T' << 24)) // System Resource Affinity Table (NUMA)
 
+#define MCFGSignature   ('M' | ('C' << 8) | ('F' << 16) | ('G' << 24)) // PCIe ECAM Description Table
+
 //------------------------------------------------------------------------------
 // Types
 //------------------------------------------------------------------------------
@@ -78,7 +80,7 @@ static const efi_guid_t EFI_ACPI_2_RDSP_GUID = { 0x8868e871, 0xe4f1, 0x11d3, {0x
 
 const char *rsdp_source = "";
 
-acpi_t acpi_config = {0, 0, 0, 0, 0, /*0,*/ 0, 0, 0, false};
+acpi_t acpi_config = {0, 0, 0, 0, 0, /*0,*/ 0, 0, 0, 0, 0, false};
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -284,6 +286,14 @@ static bool parse_fadt(uintptr_t fadt_addr)
     acpi_config.pm_addr  = *(uint32_t *)(fadt_addr+FADT_PM_TMR_BLK_OFFSET);
     acpi_config.pm_is_io = true;
 
+#if defined(__aarch64__)
+    // Get the ARM boot architecture flags (PSCI availability and conduit).
+    if (fadt->length > FADT_ARM_BOOT_ARCH_OFFSET + 1) {
+        acpi_config.arm_boot_arch = *(uint8_t *)(fadt_addr+FADT_ARM_BOOT_ARCH_OFFSET)
+                                  | *(uint8_t *)(fadt_addr+FADT_ARM_BOOT_ARCH_OFFSET+1) << 8;
+    }
+#endif
+
 #if (ARCH_BITS == 64)
     acpi_gen_addr_struct *rt;
 
@@ -336,6 +346,8 @@ void acpi_init(void)
     acpi_config.hpet_addr = find_acpi_table(HPETSignature);
 
     acpi_config.srat_addr = find_acpi_table(SRATSignature);
+
+    acpi_config.mcfg_addr = find_acpi_table(MCFGSignature);
 
     //acpi_config.slit_addr = find_acpi_table(SLITSignature);
 }
