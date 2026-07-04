@@ -95,6 +95,19 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 : "memory"
             );
             p = pe;
+#elif defined(__aarch64__)
+            uint64_t length = pe - p + 1;
+            testword_t *dst = p;
+            __asm__  __volatile__ ("\t"
+                "0:                  \n\t"
+                "str %2, [%1], #8    \n\t"
+                "subs %0, %0, #1     \n\t"
+                "b.ne 0b             \n\t"
+                : "+r" (length), "+r" (dst)
+                : "r" (pattern1)
+                : "memory", "cc"
+            );
+            p = pe;
 #endif
 #else
             do {

@@ -243,6 +243,42 @@ int test_block_move(int my_cpu, int iterations)
                     :: "r" (p), "r" (pm), "r" (half_length)
                     : "$t0", "$t1", "$t2", "$t3"
                 );
+#elif defined(__aarch64__)
+                __asm__ __volatile__ (
+
+                    // Move first half to second half
+                    "mov  x0, %0            \n\t"   // Source, p (start point)
+                    "mov  x1, %1            \n\t"   // Destination, pm (mid point)
+                    "mov  x2, %2            \n\t"   // Length, half_length (size of a half in words)
+                    "0:                     \n\t"
+                    "ldr  x3, [x0], #8      \n\t"
+                    "str  x3, [x1], #8      \n\t"
+                    "subs x2, x2, #1        \n\t"
+                    "b.ne 0b                \n\t"
+
+                    // Move the second half, less the last 64 bytes, to the first half, offset plus 64 bytes
+                    "mov  x0, %1            \n\t"   // Source, pm (mid point)
+                    "add  x1, %0, #64       \n\t"   // Destination, p (start point) plus 64 bytes
+                    "sub  x2, %2, #8        \n\t"   // Length, half_length minus 8 words (64 bytes)
+                    "1:                     \n\t"
+                    "ldr  x3, [x0], #8      \n\t"
+                    "str  x3, [x1], #8      \n\t"
+                    "subs x2, x2, #1        \n\t"
+                    "b.ne 1b                \n\t"
+
+                    // Move the last 8 words (64 bytes) of the second half to the start of the first half
+                    "mov  x1, %0            \n\t"   // Destination, p (start point)
+                                                    // Source, the 8 words of the second half left over by the last loop
+                    "mov  x2, #8            \n\t"
+                    "2:                     \n\t"
+                    "ldr  x3, [x0], #8      \n\t"
+                    "str  x3, [x1], #8      \n\t"
+                    "subs x2, x2, #1        \n\t"
+                    "b.ne 2b                \n\t"
+
+                    :: "r" (p), "r" (pm), "r" (half_length)
+                    : "x0", "x1", "x2", "x3", "memory", "cc"
+                );
 #endif
                 do_tick(my_cpu);
                 BAILOUT;

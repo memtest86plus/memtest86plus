@@ -94,12 +94,22 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     if (my_cpu == master_cpu) {
         if (window_num == 0) {
             // First window, so we need to test all selected lower memory.
-            vm_map[0].start = first_word_mapping(pm_limit_lower);
+            uintptr_t *first_word = first_word_mapping(pm_limit_lower);
 
             // For USB_WORKAROUND.
-            if (vm_map[0].start < (uintptr_t *)0x500) {
-                vm_map[0].start = (uintptr_t *)0x500;
+            if (first_word < (uintptr_t *)0x500) {
+                first_word = (uintptr_t *)0x500;
             }
+
+#if defined(__aarch64__)
+            // RAM starts well above physical address 0, so never move the
+            // start below the first mapped RAM page.
+            if (first_word > vm_map[0].start) {
+                vm_map[0].start = first_word;
+            }
+#else
+            vm_map[0].start = first_word;
+#endif
         }
 
         /* Update display of memory segments being tested */
