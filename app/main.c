@@ -63,9 +63,16 @@
 #define TEST_INTERRUPT      0
 #endif
 
+#if defined(__aarch64__)
+// RAM may start well above physical address 0, so the load limits are
+// computed at run time, relative to the start of RAM (check global_init)
+#define LOW_LOAD_LIMIT      low_load_limit
+#define HIGH_LOAD_LIMIT     high_load_limit
+#else
 #define LOW_LOAD_LIMIT      SIZE_C(4,MB)  // must be a multiple of the page size
 
 #define HIGH_LOAD_LIMIT     (VM_PINNED_SIZE << PAGE_SHIFT)
+#endif
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -509,7 +516,13 @@ static void test_all_windows(int my_cpu)
                 break;
               case 1:
                 window_start = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
+#if defined(__aarch64__)
+                // LOW_LOAD_LIMIT may be above VM_WINDOW_SIZE. End the window
+                // at the next window boundary to avoid recheck the region containing the low copy.
+                window_end   = (window_start + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
+#else
                 window_end   = VM_WINDOW_SIZE;
+#endif
                 break;
               default:
                 window_start = window_end;

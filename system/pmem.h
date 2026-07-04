@@ -25,6 +25,13 @@ extern int          pm_map_size;
 
 extern size_t       num_pm_pages;
 
+#if defined(__aarch64__)
+// Load limits computed at run time from the start of physical RAM, which may
+// begin well above address 0. Set by pmem_init().
+extern uintptr_t    low_load_limit;
+extern uintptr_t    high_load_limit;
+#endif
+
 void pmem_init(void);
 
 #endif /* PMEM_H */
