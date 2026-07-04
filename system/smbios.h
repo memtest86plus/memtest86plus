@@ -6,7 +6,7 @@
  *
  * Provides functions for reading SMBIOS tables
  *
- * Copyright (C) 2004-2022 Samuel Demeulemeester.
+ * Copyright (C) 2004-2026 Samuel Demeulemeester.
  */
 
 #define DMI_SDR         0x0F
@@ -40,6 +40,19 @@ typedef struct {
     uint8_t SMBIOSrev;
 } smbiosv2_t;
 
+typedef struct {
+    uint8_t anchor[5];  // "_SM3_"
+    int8_t checksum;
+    uint8_t length;
+    uint8_t majorversion;
+    uint8_t minorversion;
+    uint8_t docrev;
+    uint8_t revision;
+    uint8_t reserved;
+    uint32_t maxsize;
+    uint64_t tableaddress;
+} __attribute__((packed)) smbiosv3_t;
+
 struct tstruct_header {
     uint8_t type;
     uint8_t length;
@@ -70,6 +83,28 @@ struct baseboard_info {
     uint16_t chassis_handle;
     uint8_t  board_type;
     uint16_t number_contained_object_handles;*/
+} __attribute__((packed));
+
+struct cpu_info {
+    struct tstruct_header header;
+    uint8_t  socket_designation;
+    uint8_t  cpu_type;
+    uint8_t  family;
+    uint8_t  manufacturer;
+    uint8_t  cpuid[8];
+    uint8_t  version;
+    uint8_t  voltage;
+    uint16_t ext_clock;
+    uint16_t max_speed;
+    uint16_t cur_speed;
+    uint8_t  status;
+    uint8_t  upgrade; // Last field defined by SMBIOS 2.0.
+    /*uint16_t l1_handle;
+    uint16_t l2_handle;
+    uint16_t l3_handle;
+    uint8_t  serialnumber;
+    uint8_t  asset_tag;
+    uint8_t  partnumber;*/
 } __attribute__((packed));
 
 struct mem_module {
@@ -127,6 +162,12 @@ struct mem_dev {
  */
 
 extern struct mem_dev *dmi_memory_device;
+
+/**
+ * Processor Information Structure (SMBIOS type 4)
+ */
+
+extern struct cpu_info *dmi_cpu_info;
 
 /**
  * Initialize SMBIOS/DMI (locate struct)
