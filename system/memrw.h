@@ -35,6 +35,23 @@
 #define __MEMRW_WRITE_INSTRUCTIONS(bitwidth) "st." __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0"
 #define __MEMRW_FLUSH_INSTRUCTIONS(bitwidth) "st." __MEMRW_SUFFIX_##bitwidth##BIT " %1, %0; dbar 0"
 
+#elif defined(__aarch64__)
+
+#define __MEMRW_SUFFIX_8BIT  "b"
+#define __MEMRW_SUFFIX_16BIT "h"
+#define __MEMRW_SUFFIX_32BIT ""
+#define __MEMRW_SUFFIX_64BIT ""
+#define __MEMRW_REG_8BIT  "w"
+#define __MEMRW_REG_16BIT "w"
+#define __MEMRW_REG_32BIT "w"
+#define __MEMRW_REG_64BIT "x"
+#define __MEMRW_READ_INSTRUCTIONS(bitwidth) \
+    "ldr" __MEMRW_SUFFIX_##bitwidth##BIT " %" __MEMRW_REG_##bitwidth##BIT "0, %1"
+#define __MEMRW_WRITE_INSTRUCTIONS(bitwidth) \
+    "str" __MEMRW_SUFFIX_##bitwidth##BIT " %" __MEMRW_REG_##bitwidth##BIT "1, %0"
+#define __MEMRW_FLUSH_INSTRUCTIONS(bitwidth) \
+    "str" __MEMRW_SUFFIX_##bitwidth##BIT " %" __MEMRW_REG_##bitwidth##BIT "1, %0; dsb sy"
+
 #endif
 
 #define __MEMRW_READ_FUNC(bitwidth) \

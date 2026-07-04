@@ -10,6 +10,7 @@
  * memory spaces.
  *//*
  * Copyright (C) 2024 Loongson Technology Corporation Limited. All rights reserved.
+ * Copyright (C) 2026 Sam Demeulemeester
  *
  */
 
@@ -29,6 +30,29 @@
 "li.d $t0, 0x28; csrwr $t0, 0x0;" "st." __MMIORW_SUFFIX_##bitwidth##BIT " %1, %0; csrwr $t0, 0x0"
 
 #define __MMIORW_READ_WRITE_CLOBBER "$t0", "memory"
+
+#elif defined(__aarch64__)
+
+#define __MMIORW_SUFFIX_8BIT  "b"
+#define __MMIORW_SUFFIX_16BIT "h"
+#define __MMIORW_SUFFIX_32BIT ""
+#define __MMIORW_SUFFIX_64BIT ""
+
+#define __MMIORW_REG_8BIT  "w"
+#define __MMIORW_REG_16BIT "w"
+#define __MMIORW_REG_32BIT "w"
+#define __MMIORW_REG_64BIT "x"
+
+// The barriers order device accesses relative to normal memory accesses
+// (e.g. DMA buffer setup before ringing a doorbell register).
+
+#define __MMIORW_READ_INSTRUCTIONS(bitwidth) \
+"ldr" __MMIORW_SUFFIX_##bitwidth##BIT " %" __MMIORW_REG_##bitwidth##BIT "0, %1; dmb sy"
+
+#define __MMIORW_WRITE_INSTRUCTIONS(bitwidth) \
+"dmb sy; str" __MMIORW_SUFFIX_##bitwidth##BIT " %" __MMIORW_REG_##bitwidth##BIT "1, %0"
+
+#define __MMIORW_READ_WRITE_CLOBBER "memory"
 
 #endif
 

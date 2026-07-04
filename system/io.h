@@ -202,6 +202,28 @@ __OUT(l, "w");
 #define outl(val,port) __outl(val,port)
 #define inl(port) __inl(port)
 
+#elif defined(__aarch64__)
+
+// There is no port-mapped I/O on ARM64. These stubs make legacy device
+// probes (PS/2 keyboard, port-mapped UARTs, PIT) fail gracefully.
+
+#include <stdint.h>
+
+static inline uint8_t  __inb(unsigned short port) { (void)port; return 0xFF; }
+static inline uint16_t __inw(unsigned short port) { (void)port; return 0xFFFF; }
+static inline uint32_t __inl(unsigned short port) { (void)port; return 0xFFFFFFFF; }
+
+static inline void __outb(uint8_t  value, unsigned short port) { (void)value; (void)port; }
+static inline void __outw(uint16_t value, unsigned short port) { (void)value; (void)port; }
+static inline void __outl(uint32_t value, unsigned short port) { (void)value; (void)port; }
+
+#define outb(val,port) __outb(val,port)
+#define inb(port) __inb(port)
+#define outw(val,port) __outw(val,port)
+#define inw(port) __inw(port)
+#define outl(val,port) __outl(val,port)
+#define inl(port) __inl(port)
+
 #endif
 
 #endif // IO_H
