@@ -216,8 +216,8 @@ startup:
 	bl	reloc
 
 	// If this copy of the program doesnt own the current page tables,
-	// rebuild them in this copys memory (safe: we are still running on
-	// the previous copys tables, which identity-map everything)
+	// rebuild them in this copy's memory (safe: we are still running on
+	// the previous copy's tables, which identity-map everything)
 	adrp	x0, _start
 	add	x0, x0, :lo12:_start
 	adrp	x9, tables_for_base
@@ -227,7 +227,7 @@ startup:
 	str	x0, [x9, :lo12:tables_for_base]
 	bl	paging_init
 1:
-	// Every CPU (re)loads TTBR0 with *this copy* page tables
+	// Every CPU (re)loads TTBR0 with *this copy's* page tables
 	adrp	x0, ttbr0_table
 	add	x0, x0, :lo12:ttbr0_table
 	msr	ttbr0_el1, x0
@@ -236,7 +236,7 @@ startup:
 	dsb	nsh
 	isb
 
-	// Point VBAR at *this copy* exception vectors.
+	// Point VBAR at *this copy's* exception vectors.
 	adrp	x0, vectors
 	add	x0, x0, :lo12:vectors
 	msr	vbar_el1, x0
@@ -247,7 +247,7 @@ startup:
 	add	x9, x9, :lo12:startup_mutex
 	stlr	wzr, [x9]
 
-	// Run MEmtest86+.
+	// Run Memtest86+.
 	bl	main
 2:	wfi
 	b	2b

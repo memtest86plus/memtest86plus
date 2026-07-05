@@ -647,8 +647,8 @@ static bool find_cpus_in_madt(void)
         }
 #elif defined(__aarch64__)
         if (entry_header->type == MADT_GICC) {
-            // GICC entries are 76 or 80 bytes long, depending on the ACPI
-            // revision. Both variants have the MPIDR at the same offset.
+            // GICC entries are 76 bytes or longer, depending on the ACPI
+            // revision. All variants have the MPIDR at the same offset.
             if (entry_header->length < 76) {
                 return false;
             }
