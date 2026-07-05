@@ -576,7 +576,9 @@ static void probe_usb_controller(hci_type_t controller_type, uintptr_t pm_base_a
       default:
         break;
     }
-    if (keyboards_found || usb_mass_storage_found) {
+    // Register only on probe success: a failed probe has freed its workspace, and the
+    // probes already return true when the mass storage device is on this controller.
+    if (keyboards_found) {
         num_hcd++;
     }
 }
