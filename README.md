@@ -631,12 +631,18 @@ inversions algorithm with patterns of all ones and all zeros.
 In each memory region in turn, and for each pattern in turn, uses the moving
 inversions algorithm with patterns of 8-bit wide walking ones and walking zeros.
 
-### Test 5 : Moving inversions, random pattern
+### Test 5 : Moving inversions, random sequence
 
-In each memory region in turn, and for each pattern in turn, uses the moving
-inversions algorithm with patterns of a random number and its complement. The
-random number is different on each test pass so multiple passes increase
-effectiveness.
+In each memory region in turn, uses the moving inversions algorithm with a
+vector-wide pseudo-random sequence and its complement. On x86_64 the fill and
+check loops use AVX2 (256-bit) or SSE2 (128-bit) instructions, selected
+automatically at boot and shown in the test name, with each vector lane
+running an independent pseudo-random stream. Writes use non-temporal stores,
+which bypass the cache and maximise the stress on the memory bus. Every
+fourth round a single random value is broadcast to all lanes, reproducing the
+uniform-background fault model of the classic random pattern test. The random
+sequences are different on each round and each test pass, so multiple passes
+increase effectiveness.
 
 ### Test 6 : Moving inversions, 32/64 bit pattern
 
@@ -658,20 +664,14 @@ it is not possible to know where the error occurred. The addresses reported
 are only for where the bad pattern was found. In consequence, errors from this
 test do not contribute to BadRAM patterns, memmap regions, or bad page regions.
 
-### Test 8 : Random number sequence
-
-In each memory region in turn, each address is written with a random number,
-then each address is checked for consistency and written with the complement
-of the original data, then each address is again checked for consistency.
-
-### Test 9 : Modulo 20, random pattern
+### Test 8 : Modulo 20, random pattern
 
 In each memory region in turn, and for each pattern in turn, uses the
 Modulo-20 algorithm with patterns of a random number and its complement.
 The random number is different on each test pass so multiple passes increase
 effectiveness.
 
-### Test 10 : Bit fade test, 2 patterns
+### Test 9 : Bit fade test, 2 patterns
 
 Across all memory regions, and for each pattern in turn, initialises each
 memory location with a pattern, sleeps for a period of time, then checks

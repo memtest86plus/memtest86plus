@@ -53,6 +53,7 @@ SYS_OBJS = system/acpi.o \
            system/x86/i2c.o \
            system/x86/membw.o \
            system/x86/memctrl.o \
+           system/x86/simd.o \
            system/x86/temperature.o \
            system/x86/vmem.o
 
@@ -70,7 +71,9 @@ TST_OBJS = tests/addr_walk1.o \
            tests/block_move.o \
            tests/modulo_n.o \
            tests/mov_inv_fixed.o \
-           tests/mov_inv_random.o \
+           tests/mov_inv_rng.o \
+           tests/x86/mov_inv_rng_avx2.o \
+           tests/x86/mov_inv_rng_sse2.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
            tests/test_helper.o \
@@ -135,6 +138,10 @@ system/x86/%.o: ../../system/x86/%.c
 lib/%.o: ../../lib/%.c
 	@mkdir -p lib
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+tests/x86/%.o: ../../tests/x86/%.c
+	@mkdir -p tests/x86
+	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 tests/%.o: ../../tests/%.c
 	@mkdir -p tests

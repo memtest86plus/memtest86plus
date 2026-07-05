@@ -14,7 +14,7 @@
 
 #include "config.h"
 
-#define NUM_TEST_PATTERNS   11
+#define NUM_TEST_PATTERNS   10
 
 typedef struct {
     bool            enabled;
@@ -33,5 +33,11 @@ extern int ticks_per_pass[NUM_PASS_TYPES];
 extern int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
 
 int run_test(int my_cpu, int test, int stage, int iterations);
+
+/**
+ * Patches the test descriptions that depend on the platform capabilities.
+ * Must be called after simd_init().
+ */
+void test_list_init(void);
 
 #endif // TESTS_H

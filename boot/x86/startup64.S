@@ -285,13 +285,16 @@ flush:	movw	$KERNEL_DS, %ax
 	movq	%rax, (%rsp)
 	ldmxcsr (%rsp)
 
-#if 0
-	# Enable AVX.
+	# Enable AVX if supported. CPUID.1:ECX.OSXSAVE (bit 27) only mirrors
+	# CR4.OSXSAVE, which is not set yet, so test XSAVE (bit 26) and AVX
+	# (bit 28) instead.
 
 	movl	$1, %eax
+	xorl	%ecx, %ecx
 	cpuid
-	testl	$0x18000000, %ecx	# Check bits 27 (OSXSAVE) and 28 (AVX)
-	jz	no_avx
+	andl	$0x14000000, %ecx	# Check bits 26 (XSAVE) and 28 (AVX)
+	cmpl	$0x14000000, %ecx
+	jne	no_avx
 	movq	%cr4, %rax
 	orl	$(1 << 18), %eax	# Set bit 18 (OSXSAVE)
 	movq	%rax, %cr4
@@ -301,7 +304,6 @@ flush:	movw	$KERNEL_DS, %ax
 	xsetbv
 
 no_avx:
-#endif
 
 	# Call the dynamic linker to fix up the addresses in the GOT.
 

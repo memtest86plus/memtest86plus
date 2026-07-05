@@ -20,6 +20,7 @@
 #include "cache.h"
 #include "cpuid.h"
 #include "memsize.h"
+#include "simd.h"
 #include "tsc.h"
 #include "vmem.h"
 
@@ -44,6 +45,9 @@
 
 #define MODULO_N            20
 
+// The test whose description is patched with the SIMD tier by test_list_init().
+#define MOV_INV_RNG_TEST    5
+
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
@@ -55,14 +59,13 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
     { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
     { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
-    { true,  PAR,    1,   30,    0, "[Moving inversions, random pattern]    "},
+    { true,  PAR,    1,   24,    0, "[Moving inversions, random sequence]   "},
 #if TESTWORD_WIDTH > 32
     { true,  PAR,    1,    3,    0, "[Moving inversions, 64 bit pattern]    "},
 #else
     { true,  PAR,    1,    3,    0, "[Moving inversions, 32 bit pattern]    "},
 #endif
     { true,  PAR,    1,   81,    0, "[Block move]                           "},
-    { true,  PAR,    1,   48,    0, "[Random number sequence]               "},
     { true,  PAR,    1,    6,    0, "[Modulo 20, random pattern]            "},
     { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
 };
@@ -88,6 +91,36 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
             trace(my_cpu, "Run barrier wait end at %s line %i", __FILE__, __LINE__); \
         } \
     }
+
+void test_list_init(void)
+{
+    const char *tier_name = simd_tier_name();
+
+    if (tier_name == NULL) {
+        // Keep the generic description from the table.
+        return;
+    }
+
+    // Rewrite the description to show the SIMD tier used by the test,
+    // e.g. "[Moving inversions, random (AVX2)]".
+    const char *prefix = "[Moving inversions, random (";
+    char *desc = test_list[MOV_INV_RNG_TEST].description;
+
+    int i = 0;
+    while (prefix[i] != '\0') {
+        desc[i] = prefix[i];
+        i++;
+    }
+    for (int j = 0; tier_name[j] != '\0'; j++) {
+        desc[i++] = tier_name[j];
+    }
+    desc[i++] = ')';
+    desc[i++] = ']';
+    while (i < (int)sizeof(test_list[MOV_INV_RNG_TEST].description) - 1) {
+        desc[i++] = ' ';
+    }
+    desc[i] = '\0';
+}
 
 int run_test(int my_cpu, int test, int stage, int iterations)
 {
@@ -170,23 +203,14 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
       } break;
 
-        // Moving inversions, fixed random pattern.
+        // Moving inversions, pseudo-random sequence (SIMD where available).
+        // Every fourth round broadcasts a single random value to all vector
+        // lanes, preserving the uniform-background model of the classic
+        // random pattern test.
       case 5:
-        if (cpuid_info.flags.rdtsc) {
-            prsg_state = get_tsc();
-        } else {
-            prsg_state = 1 + pass_num;
-        }
-        prsg_state *= 0x12345678;
-
         for (int i = 0; i < iterations; i++) {
-            prsg_state = prsg(prsg_state);
-
-            testword_t pattern1 = prsg_state;
-            testword_t pattern2 = ~pattern1;
-
             BARRIER;
-            ticks += test_mov_inv_fixed(my_cpu, 2, pattern1, pattern2);
+            ticks += test_mov_inv_rng(my_cpu, (i & 3) == 3);
             BAILOUT;
         }
         break;
@@ -210,17 +234,8 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         BAILOUT;
         break;
 
-        // Moving inversions, fully random patterns.
-      case 8:
-        for (int i = 0; i < iterations; i++) {
-            BARRIER;
-            ticks += test_mov_inv_random(my_cpu);
-            BAILOUT;
-        }
-        break;
-
         // Modulo 20 check, fixed random pattern.
-      case 9:
+      case 8:
         if (cpuid_info.flags.rdtsc) {
             prsg_state = get_tsc();
         } else {
@@ -247,7 +262,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         break;
 
         // Bit fade test.
-      case 10:
+      case 9:
         ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
         break;

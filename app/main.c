@@ -33,6 +33,7 @@
 #include "pci.h"
 #include "screen.h"
 #include "serial.h"
+#include "simd.h"
 #include "smbios.h"
 #include "smp.h"
 #include "temperature.h"
@@ -208,6 +209,10 @@ static void global_init(void)
     floppy_off();
 
     cpuid_init();
+
+    simd_init();
+
+    test_list_init();
 
     // Nothing before this should access the boot parameters, in case they are located above 4GB.
     // This is the first region we map, so it is guaranteed not to fail.

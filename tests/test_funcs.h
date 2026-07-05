@@ -25,7 +25,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
 
 int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse);
 
-int test_mov_inv_random(int my_cpu);
+int test_mov_inv_rng(int my_cpu, bool splat_round);
 
 int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pattern2, int n, int offset);
 
