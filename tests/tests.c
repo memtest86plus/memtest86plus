@@ -67,7 +67,7 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
 #else
     { true,  PAR,    1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
 #endif
-    { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
+    { true,  PAR,   12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
@@ -272,7 +272,8 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
       } break;
 
-        // Bit fade test.
+        // Bit fade test: four fill/fade/check rounds - solid zeros, solid ones, then an
+        // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
       case 9:
         ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
