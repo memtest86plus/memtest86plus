@@ -58,9 +58,9 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
     { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
     { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
-    { true,  PAR,    1,   96,    0, "[Moving inversions, random sequence]   "},
+    { true,  PAR,    1,  128,    0, "[Moving inversions, random sequence]   "},
     { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
-    { true,  PAR,    1,    9,    0, "[Modulo 20, random pattern]            "},
+    { true,  PAR,    1,    8,    0, "[Modulo 20, random pattern]            "},
     { true,  PAR,    1,   81,    0, "[Block move]                           "},
 #if TESTWORD_WIDTH > 32
     { true,  PAR,    1,    1,    0, "[Moving inversions, 64 bit pattern]    "},
