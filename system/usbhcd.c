@@ -380,8 +380,6 @@ static bool scan_hub_ports(const usb_hcd_t *hcd, const usb_hub_t *hub, int *num_
             continue;
         }
 
-        if (usb_mass_storage_found) continue;
-
         if (hub->quirks & USB_HUB_DONT_DISABLE_PORTS) continue;
 
         // If we didn't find any keyboards, we can disable the port and release the slot.

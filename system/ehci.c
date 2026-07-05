@@ -378,20 +378,25 @@ static void build_ehci_qhd(ehci_qhd_t *qhd, const ehci_qtd_t *qtd, const usb_ep_
 
 static bool do_async_transfer(const workspace_t *ws, int num_tds)
 {
-    // Rely on the controller to timeout if the device doesn't respond.
-
+    // The controller only detects device errors; a device that NAKs forever would
+    // hang us, so also enforce a software timeout.
     bool ok = true;
     enable_async_schedule(ws->op_regs);
-    for (int td_idx = 0; td_idx < num_tds; td_idx++) {
+    for (int td_idx = 0; td_idx < num_tds && ok; td_idx++) {
         const ehci_qtd_t *qtd = &ws->qtd[td_idx];
+        int timer = 5000 * MILLISEC / 10;
         while (qtd->status & EHCI_QTD_ACTIVE) {
+            if (timer-- == 0) {
+                ok = false;
+                break;
+            }
             usleep(10);
         }
         if (qtd->status & (EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS)) {
             ok = false;
-            break;
         }
     }
+    // This waits for the schedule to go idle, so it also stops a timed-out transfer.
     disable_async_schedule(ws->op_regs);
     return ok;
 }
@@ -498,6 +503,11 @@ static bool bulk_transfer(const usb_hcd_t *hcd, const usb_ep_t *ep, void *buffer
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
     ehci_bulk_ep_t *bulk_ep = (ehci_bulk_ep_t *)ep->driver_data;
+
+    // A single qTD can address at most 5 buffer pages; reject anything larger.
+    if (length > 5 * 0x1000 - ((uintptr_t)buffer & 0xFFF)) {
+        return false;
+    }
 
     uint8_t pid = is_out ? EHCI_QTD_PID_OUT : EHCI_QTD_PID_IN;
 
@@ -680,6 +690,7 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     int num_keyboards = 0;
     int num_ls_devices = 0;
     int num_hs_devices = 0;
+    bool msd_found_before = usb_mass_storage_found;
     for (int port_idx = 0; port_idx < root_hub.num_ports; port_idx++) {
         // If we've filled the keyboard info table and found a USB drive, abort now.
         if (num_keyboards >= MAX_KEYBOARDS && usb_mass_storage_found) break;
@@ -725,22 +736,24 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
             continue;
         }
 
-        // If we didn't find any keyboard interfaces or a USB drive, we can disable the port.
-        if (!usb_mass_storage_found) {
-            disable_ehci_port(op_regs, port_idx);
-        }
+        // If we didn't find any keyboard interfaces or a USB drive on this port
+        // (find_attached_usb_keyboards returns true for both), we can disable it.
+        disable_ehci_port(op_regs, port_idx);
     }
+
+    // True only if the drive was found on this controller during the scan above.
+    bool msd_on_this_hcd = usb_mass_storage_found && !msd_found_before;
 
     print_usb_info(" Found %i low/full speed device%s, %i high speed device%s, %i keyboard%s%s",
                    num_ls_devices, num_ls_devices != 1 ? "s" : "",
                    num_hs_devices, num_hs_devices != 1 ? "s" : "",
                    num_keyboards,  num_keyboards  != 1 ? "s" : "",
-                   usb_mass_storage_found ? ", 1 USB drive" : "");
+                   msd_on_this_hcd ? ", 1 USB drive" : "");
     if (num_ls_devices > 0 && i_have_companions) {
         print_usb_info(" Handed over low/full speed devices to companion controllers");
     }
 
-    if (num_keyboards == 0 && !usb_mass_storage_found) {
+    if (num_keyboards == 0 && !msd_on_this_hcd) {
         (void)halt_host_controller(op_regs);
         goto no_keyboards_found;
     }

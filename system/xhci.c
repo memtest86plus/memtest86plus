@@ -352,6 +352,10 @@ typedef struct {
     // Number of active keyboards
     int                 num_keyboards;
 
+    // Keyboards whose interrupt TRB was consumed on behalf of another wait
+    // and must be re-issued by rearm_keyboards().
+    bool                kbd_rearm_needed[MAX_KEYBOARDS];
+
     // Raw xHCI port speed for the device currently being enumerated.
     int                 port_speed;
 } workspace_t  __attribute__ ((aligned (64)));
@@ -496,6 +500,20 @@ static int event_ep_id(const xhci_trb_t *event)
     return (event->control >> 16) & 0x1f;
 }
 
+static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id);
+
+// Records a keyboard completion consumed on behalf of another wait, so that
+// rearm_keyboards() knows which endpoints need a fresh transfer.
+static void note_discarded_event(workspace_t *ws, const xhci_trb_t *event)
+{
+    if (event_type(event) != XHCI_TRB_TRANSFER_EVENT) return;
+
+    int kbd_idx = identify_keyboard(ws, event_slot_id(event), event_ep_id(event));
+    if (kbd_idx >= 0) {
+        ws->kbd_rearm_needed[kbd_idx] = true;
+    }
+}
+
 static uint32_t enqueue_trb(xhci_trb_t *trb_ring, uint32_t ring_size, uint32_t enqueue_state,
                             uint32_t control, uint64_t params1, uint32_t params2)
 {
@@ -560,12 +578,17 @@ static bool get_xhci_event(workspace_t *ws, xhci_trb_t *event)
 static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int max_time, xhci_trb_t *event)
 {
     int timer = max_time >> 3;
-    while (!get_xhci_event(ws, event) || event_type(event) != wanted_type) {
+    while (true) {
+        while (get_xhci_event(ws, event)) {
+            if (event_type(event) == wanted_type) {
+                return event_cc(event);
+            }
+            note_discarded_event(ws, event);
+        }
         if (timer == 0) return XHCI_EVENT_CC_TIMEOUT;
         usleep(8);
         timer--;
     }
-    return event_cc(event);
 }
 
 // Waits for a transfer event from a specific endpoint, discarding unrelated events
@@ -580,6 +603,7 @@ static uint32_t wait_for_ep_transfer_event(workspace_t *ws, int slot_id, int ep_
             &&  event_ep_id(event) == ep_id) {
                 return event_cc(event);
             }
+            note_discarded_event(ws, event);
         }
         usleep(8);
         timer--;
@@ -1009,14 +1033,17 @@ static void rearm_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    // Drain any stale events from the event ring.
+    // Drain any stale events from the event ring, noting keyboard completions.
     xhci_trb_t event;
     while (get_xhci_event(ws, &event)) {
-        // discard
+        note_discarded_event(ws, &event);
     }
 
-    // Re-issue NORMAL TRBs for all keyboard endpoints.
+    // Re-issue a NORMAL TRB only where one was consumed; the others are still armed.
     for (int kbd_idx = 0; kbd_idx < ws->num_keyboards; kbd_idx++) {
+        if (!ws->kbd_rearm_needed[kbd_idx]) continue;
+        ws->kbd_rearm_needed[kbd_idx] = false;
+
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
         issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));
@@ -1295,6 +1322,7 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     usb_ep_t keyboards[MAX_KEYBOARDS];
     int num_keyboards = 0;
     int num_devices = 0;
+    bool msd_found_before = usb_mass_storage_found;
     for (int port_idx = 0; port_idx < root_hub.num_ports; port_idx++) {
         // If we've filled the keyboard info table, abort now.
         if (num_keyboards >= MAX_KEYBOARDS && usb_mass_storage_found) break;
@@ -1338,19 +1366,21 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
             continue;
         }
 
-        // If we didn't find any keyboard interfaces or a USB drive, we disable the port and free the slot.
-        if (!usb_mass_storage_found) {
-            disable_xhci_port(op_regs, port_idx);
-            release_slot(hcd, slot_id);
-        }
+        // If we didn't find any keyboard interfaces or a USB drive on this port
+        // (find_attached_usb_keyboards returns true for both), disable it and free the slot.
+        disable_xhci_port(op_regs, port_idx);
+        release_slot(hcd, slot_id);
     }
+
+    // True only if the drive was found on this controller during the scan above.
+    bool msd_on_this_hcd = usb_mass_storage_found && !msd_found_before;
 
     print_usb_info(" Found %i device%s, %i keyboard%s%s",
                    num_devices,   num_devices   != 1 ? "s" : "",
                    num_keyboards, num_keyboards != 1 ? "s" : "",
-                   usb_mass_storage_found ? ", 1 USB drive" : "");
+                   msd_on_this_hcd ? ", 1 USB drive" : "");
 
-    if (num_keyboards == 0 && !usb_mass_storage_found) {
+    if (num_keyboards == 0 && !msd_on_this_hcd) {
         (void)halt_host_controller(op_regs);
         goto no_keyboards_found;
     }
