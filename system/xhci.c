@@ -127,6 +127,7 @@
 // Event Completion Code values
 
 #define	XHCI_EVENT_CC_SUCCESS		1
+#define	XHCI_EVENT_CC_SHORT_PACKET	13
 #define	XHCI_EVENT_CC_TIMEOUT		191     // specific to this driver
 
 // Values specific to this driver.
@@ -564,6 +565,25 @@ static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int m
     return event_cc(event);
 }
 
+// Waits for a transfer event from a specific endpoint, discarding unrelated events
+// (e.g. keyboard interrupt completions, which share the same event ring).
+static uint32_t wait_for_ep_transfer_event(workspace_t *ws, int slot_id, int ep_id, int max_time, xhci_trb_t *event)
+{
+    int timer = max_time >> 3;
+    while (timer > 0) {
+        while (get_xhci_event(ws, event)) {
+            if (event_type(event) == XHCI_TRB_TRANSFER_EVENT
+            &&  event_slot_id(event) == slot_id
+            &&  event_ep_id(event) == ep_id) {
+                return event_cc(event);
+            }
+        }
+        usleep(8);
+        timer--;
+    }
+    return XHCI_EVENT_CC_TIMEOUT;
+}
+
 static void issue_setup_stage_trb(ep_tr_t *ep_tr, const usb_setup_pkt_t *setup_pkt)
 {
     uint64_t params1 = *(const uint64_t *)setup_pkt;
@@ -939,7 +959,11 @@ static bool bulk_transfer(const usb_hcd_t *hcd, const usb_ep_t *ep, void *buffer
     issue_normal_trb(ep_tr, buffer, dir, length);
     ring_device_doorbell(ws->db_regs, ep->device_id, ep_id);
 
-    return (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    uint32_t cc = wait_for_ep_transfer_event(ws, ep->device_id, ep_id, 5000*MILLISEC, &event);
+    if (cc == XHCI_EVENT_CC_SUCCESS) return true;
+
+    // A short packet is a valid completion for IN transfers (device sent less than requested).
+    return !is_out && cc == XHCI_EVENT_CC_SHORT_PACKET;
 }
 
 static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id)
