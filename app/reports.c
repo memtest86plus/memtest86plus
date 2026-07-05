@@ -173,13 +173,37 @@ static int format_results(char *buf, int bufsize)
 
     // Date & time from RTC (x86 ISA CMOS only).
 #if defined(__i386__) || defined(__x86_64__)
-    uint8_t rtc_sec  = bcd_to_bin(rtc_read(0x00));
-    uint8_t rtc_min  = bcd_to_bin(rtc_read(0x02));
-    uint8_t rtc_hour = bcd_to_bin(rtc_read(0x04));
-    uint8_t rtc_day  = bcd_to_bin(rtc_read(0x07));
-    uint8_t rtc_mon  = bcd_to_bin(rtc_read(0x08));
-    uint8_t rtc_year = bcd_to_bin(rtc_read(0x09));
-    uint8_t rtc_cent = bcd_to_bin(rtc_read(0x32));
+    // Wait for any update in progress to complete (UIP bit, status register A).
+    for (int i = 0; i < 20000 && (rtc_read(0x0A) & 0x80); i++) {}
+
+    uint8_t rtc_stb  = rtc_read(0x0B);
+    uint8_t rtc_sec  = rtc_read(0x00);
+    uint8_t rtc_min  = rtc_read(0x02);
+    uint8_t rtc_hour = rtc_read(0x04);
+    uint8_t rtc_day  = rtc_read(0x07);
+    uint8_t rtc_mon  = rtc_read(0x08);
+    uint8_t rtc_year = rtc_read(0x09);
+    uint8_t rtc_cent = rtc_read(0x32);
+
+    bool rtc_pm = rtc_hour & 0x80;
+    rtc_hour &= 0x7F;
+
+    // Registers are BCD unless the RTC is in binary mode (status register B, DM bit).
+    if (!(rtc_stb & 0x04)) {
+        rtc_sec  = bcd_to_bin(rtc_sec);
+        rtc_min  = bcd_to_bin(rtc_min);
+        rtc_hour = bcd_to_bin(rtc_hour);
+        rtc_day  = bcd_to_bin(rtc_day);
+        rtc_mon  = bcd_to_bin(rtc_mon);
+        rtc_year = bcd_to_bin(rtc_year);
+        rtc_cent = bcd_to_bin(rtc_cent);
+    }
+
+    // Convert 12-hour mode (hour bit 7 = PM) to 24-hour.
+    if (!(rtc_stb & 0x02)) {
+        rtc_hour = rtc_hour % 12 + (rtc_pm ? 12 : 0);
+    }
+
     int full_year = (rtc_cent ? rtc_cent * 100 : 2000) + rtc_year;
     pos = buf_printf(pos, "Date: %04i-%02i-%02i %02i:%02i:%02i\r\n",
                      full_year, rtc_mon, rtc_day, rtc_hour, rtc_min, rtc_sec);

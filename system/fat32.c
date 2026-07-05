@@ -39,16 +39,17 @@ static const uint8_t gpt_basic_data_guid[16] = {
 // Private Functions
 //------------------------------------------------------------------------------
 
-static bool is_eoc(const fat32_fs_t *fs, uint32_t cluster)
-{
-    if (fs->fat_type == 16) return cluster >= 0xFFF8;
-    return cluster >= 0x0FFFFFF8;
-}
-
 static uint32_t eoc_value(const fat32_fs_t *fs)
 {
     if (fs->fat_type == 16) return 0xFFFF;
     return 0x0FFFFFFF;
+}
+
+// Validates a cluster number read from the FAT before using it to address the disk;
+// EOC marks and out-of-range values (corrupt FAT) both fail this check.
+static bool is_valid_cluster(const fat32_fs_t *fs, uint32_t cluster)
+{
+    return cluster >= 2 && cluster < fs->max_cluster;
 }
 
 static bool is_fat_partition(uint8_t type)
@@ -180,10 +181,11 @@ static bool find_free_dir_entry(fat32_fs_t *fs,
         return false;
     }
 
-    // FAT32: root directory is a cluster chain.
+    // FAT32: root directory is a cluster chain. Validate each link and cap the
+    // walk length to guard against corrupt or cyclic FATs.
     uint32_t cluster = fs->root_cluster;
 
-    while (cluster >= 2 && !is_eoc(fs, cluster)) {
+    for (uint32_t n = 0; n < fs->max_cluster && is_valid_cluster(fs, cluster); n++) {
         uint32_t lba = cluster_to_lba(fs, cluster);
 
         for (int s = 0; s < fs->sectors_per_cluster; s++) {
@@ -329,17 +331,31 @@ bool fat32_mount(fat32_fs_t *fs, usb_msd_t *msd, uint8_t *buf)
         if (entry_size < 128 || entry_count == 0) return false;
 
         // Scan partition entries for a Basic Data Partition with a FAT VBR.
-        uint32_t entries_per_sector = msd->block_size / entry_size;
-        if (entries_per_sector == 0) entries_per_sector = 1;
+        // The EFI System Partition is deliberately never used: writing to the
+        // ESP risks breaking the boot setup, so it is not an acceptable target.
+        // block_size is a power of two (validated in msd_init), so use shift/mask to
+        // avoid 64-bit division, which needs libgcc support on i586.
+        uint32_t bs_shift = 0;
+        while ((1u << bs_shift) < msd->block_size) bs_shift++;
+
+        uint32_t loaded_sector = 0;
+        bool     loaded = false;
 
         for (uint32_t i = 0; i < entry_count; i++) {
-            // Read the sector containing this entry.
-            uint32_t sector = (uint32_t)entry_lba + i / entries_per_sector;
-            if (i % entries_per_sector == 0) {
+            uint64_t byte_off = (uint64_t)i * entry_size;
+            uint32_t sector   = (uint32_t)(entry_lba + (byte_off >> bs_shift));
+            uint32_t offset   = (uint32_t)byte_off & (msd->block_size - 1);
+
+            // The fields we need (GUID + start LBA) must lie within the loaded sector.
+            if (offset + 40 > msd->block_size) continue;
+
+            if (!loaded || sector != loaded_sector) {
                 if (!msd_read_sectors(msd, sector, 1, buf)) break;
+                loaded_sector = sector;
+                loaded = true;
             }
 
-            uint8_t *ent = buf + (i % entries_per_sector) * entry_size;
+            const uint8_t *ent = buf + offset;
 
             // Check for Basic Data Partition GUID.
             if (memcmp(ent, gpt_basic_data_guid, 16) != 0) continue;
@@ -351,7 +367,8 @@ bool fat32_mount(fat32_fs_t *fs, usb_msd_t *msd, uint8_t *buf)
 
             fs->partition_lba = (uint32_t)start_lba;
 
-            // Read the VBR and try to parse as FAT.
+            // Read the VBR and try to parse as FAT; this clobbers the entries in buf.
+            loaded = false;
             if (!msd_read_sectors(msd, (uint32_t)start_lba, 1, buf)) continue;
             if (parse_fat_bpb(fs, buf)) return true;
         }
@@ -415,7 +432,7 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
     uint32_t remaining = size;
     uint32_t cluster = first_cluster;
 
-    while (remaining > 0 && cluster >= 2 && !is_eoc(fs, cluster)) {
+    while (remaining > 0 && is_valid_cluster(fs, cluster)) {
         uint32_t lba = cluster_to_lba(fs, cluster);
 
         for (int s = 0; s < fs->sectors_per_cluster && remaining > 0; s++) {
@@ -506,9 +523,9 @@ bool fat32_next_filename(fat32_fs_t *fs, char *name_out)
             }
         }
     } else {
-        // FAT32: root directory is a cluster chain.
+        // FAT32: root directory is a cluster chain (validated and capped as above).
         uint32_t cluster = fs->root_cluster;
-        while (cluster >= 2 && !is_eoc(fs, cluster)) {
+        for (uint32_t n = 0; n < fs->max_cluster && is_valid_cluster(fs, cluster); n++) {
             uint32_t lba = cluster_to_lba(fs, cluster);
 
             for (int s = 0; s < fs->sectors_per_cluster; s++) {

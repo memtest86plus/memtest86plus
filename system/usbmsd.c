@@ -161,6 +161,12 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
 // Public Functions
 //------------------------------------------------------------------------------
 
+// The block size is device-reported and sizes host buffers; only accept sane values.
+static bool valid_block_size(uint32_t size)
+{
+    return size == 512 || size == 1024 || size == 2048 || size == 4096;
+}
+
 static bool read_capacity_16(usb_msd_t *msd)
 {
     uint8_t cdb[16] = {
@@ -184,7 +190,7 @@ static bool read_capacity_16(usb_msd_t *msd)
     msd->block_size = ((uint32_t)cap_data[8]  << 24) | ((uint32_t)cap_data[9]  << 16)
                     | ((uint32_t)cap_data[10] << 8)  | (uint32_t)cap_data[11];
 
-    return msd->block_size != 0;
+    return valid_block_size(msd->block_size);
 }
 
 bool msd_init(usb_msd_t *msd)
@@ -218,7 +224,7 @@ bool msd_init(usb_msd_t *msd)
     msd->block_size = ((uint32_t)cap_data[4] << 24) | ((uint32_t)cap_data[5] << 16)
                      | ((uint32_t)cap_data[6] << 8)  | (uint32_t)cap_data[7];
 
-    if (msd->block_size == 0) return false;
+    if (!valid_block_size(msd->block_size)) return false;
 
     // Drive >= 2 TiB: last LBA saturates to 0xFFFFFFFF; query READ CAPACITY (16) for the real value.
     if (last_lba_10 == READ_CAP_10_OVERFLOW) {
