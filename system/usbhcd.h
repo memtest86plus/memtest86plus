@@ -115,6 +115,7 @@ typedef struct {
     void    (*rearm_keyboards)      (usb_hcd_r);
     bool    (*configure_bulk_ep)    (usb_hcd_r, const usb_ep_t *, int, bool);
     bool    (*bulk_transfer)        (usb_hcd_r, const usb_ep_t *, void *, size_t, bool);
+    bool    (*reset_bulk_ep)        (usb_hcd_r, const usb_ep_t *, int);
 } hcd_methods_t;
 
 /**

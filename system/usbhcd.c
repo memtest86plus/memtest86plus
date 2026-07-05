@@ -73,7 +73,8 @@ static const hcd_methods_t methods = {
     .poll_keyboards      = NULL,
     .rearm_keyboards     = NULL,
     .configure_bulk_ep   = NULL,
-    .bulk_transfer       = NULL
+    .bulk_transfer       = NULL,
+    .reset_bulk_ep       = NULL
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.

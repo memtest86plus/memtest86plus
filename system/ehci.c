@@ -536,6 +536,17 @@ static bool bulk_transfer(const usb_hcd_t *hcd, const usb_ep_t *ep, void *buffer
     return ok;
 }
 
+static bool reset_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id)
+{
+    (void)hcd;
+    (void)ep_id;
+
+    // A cleared halt resets the device to DATA0; resync the software toggle.
+    ehci_bulk_ep_t *bulk_ep = (ehci_bulk_ep_t *)ep->driver_data;
+    bulk_ep->data_toggle = 0;
+    return true;
+}
+
 //------------------------------------------------------------------------------
 // Driver Method Table
 //------------------------------------------------------------------------------
@@ -552,7 +563,8 @@ static const hcd_methods_t methods = {
     .poll_keyboards      = poll_keyboards,
     .rearm_keyboards     = NULL,
     .configure_bulk_ep   = configure_bulk_ep,
-    .bulk_transfer       = bulk_transfer
+    .bulk_transfer       = bulk_transfer,
+    .reset_bulk_ep       = reset_bulk_ep
 };
 
 //------------------------------------------------------------------------------

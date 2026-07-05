@@ -45,6 +45,10 @@
 #define USB_GET_INTERFACE       10
 #define USB_SET_INTERFACE       11
 
+// Standard feature selectors.
+
+#define USB_ENDPOINT_HALT       0
+
 #define HID_GET_REPORT          1
 #define HID_GET_IDLE            2
 #define HID_GET_PROTOCOL        3

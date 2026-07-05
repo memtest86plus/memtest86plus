@@ -19,6 +19,14 @@
 #define CBW_FLAG_DATA_IN    0x80
 #define CBW_FLAG_DATA_OUT   0x00
 
+// Bulk-Only Mass Storage Reset class request.
+#define BOT_RESET           0xFF
+
+// CSW status values.
+#define CSW_STATUS_PASSED       0
+#define CSW_STATUS_FAILED       1
+#define CSW_STATUS_PHASE_ERR    2
+
 // SCSI command opcodes.
 #define SCSI_TEST_UNIT_READY    0x00
 #define SCSI_REQUEST_SENSE      0x03
@@ -61,6 +69,42 @@ typedef struct __attribute__((packed)) {
 // Private Functions
 //------------------------------------------------------------------------------
 
+// Clears a halted bulk endpoint on both the device and the controller side.
+static bool msd_clear_stall(usb_msd_t *msd, const usb_ep_t *ep, bool is_in)
+{
+    const usb_hcd_t *hcd = msd->hcd;
+
+    usb_setup_pkt_t setup_pkt;
+    build_setup_packet(&setup_pkt, USB_REQ_TO_ENDPOINT, USB_CLR_FEATURE,
+                       USB_ENDPOINT_HALT, ep->endpoint_num | (is_in ? 0x80 : 0), 0);
+    if (!hcd->methods->setup_request(hcd, &msd->ep0, &setup_pkt)) {
+        return false;
+    }
+
+    if (hcd->methods->reset_bulk_ep != NULL) {
+        int ep_id = 2 * ep->endpoint_num + (is_in ? 1 : 0);
+        return hcd->methods->reset_bulk_ep(hcd, ep, ep_id);
+    }
+    return true;
+}
+
+// BOT Reset Recovery (BOT spec 5.3.4): class reset, then clear both bulk endpoints.
+static bool msd_reset_recovery(usb_msd_t *msd)
+{
+    const usb_hcd_t *hcd = msd->hcd;
+
+    usb_setup_pkt_t setup_pkt;
+    build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_CLASS, BOT_RESET,
+                       0, msd->ep_in.interface_num, 0);
+    if (!hcd->methods->setup_request(hcd, &msd->ep0, &setup_pkt)) {
+        return false;
+    }
+    usleep(10 * MILLISEC);
+
+    bool ok = msd_clear_stall(msd, &msd->ep_in, true);
+    return msd_clear_stall(msd, &msd->ep_out, false) && ok;
+}
+
 static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
                             void *data, uint32_t data_len, bool data_in)
 {
@@ -77,36 +121,40 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
     };
     memcpy(cbw.cb, cdb, cdb_len);
 
-    // Send CBW via bulk OUT.
+    // Send CBW via bulk OUT. A failure here means the transport is broken.
     if (!hcd->methods->bulk_transfer(hcd, &msd->ep_out, &cbw, sizeof(cbw), true)) {
+        msd_reset_recovery(msd);
         return false;
     }
 
-    // Data phase (if any).
+    // Data phase (if any). On failure (usually a STALL on a rejected command),
+    // clear the endpoint so the CSW can still be read (BOT spec 6.7.2/6.7.3).
+    bool data_ok = true;
     if (data_len > 0 && data != NULL) {
-        if (data_in) {
-            if (!hcd->methods->bulk_transfer(hcd, &msd->ep_in, data, data_len, false)) {
-                return false;
-            }
-        } else {
-            if (!hcd->methods->bulk_transfer(hcd, &msd->ep_out, data, data_len, true)) {
-                return false;
-            }
+        const usb_ep_t *ep = data_in ? &msd->ep_in : &msd->ep_out;
+        data_ok = hcd->methods->bulk_transfer(hcd, ep, data, data_len, !data_in);
+        if (!data_ok) {
+            msd_clear_stall(msd, ep, data_in);
         }
     }
 
-    // Receive CSW via bulk IN. bulk_transfer fills the struct in full.
+    // Receive CSW via bulk IN; retry once after clearing a stalled IN endpoint.
     usb_csw_t csw;
     if (!hcd->methods->bulk_transfer(hcd, &msd->ep_in, &csw, sizeof(csw), false)) {
+        if (!msd_clear_stall(msd, &msd->ep_in, true)
+        ||  !hcd->methods->bulk_transfer(hcd, &msd->ep_in, &csw, sizeof(csw), false)) {
+            msd_reset_recovery(msd);
+            return false;
+        }
+    }
+
+    // Validate the CSW; a bad CSW or a phase error requires a full reset recovery.
+    if (csw.signature != CSW_SIGNATURE || csw.tag != cbw.tag || csw.status == CSW_STATUS_PHASE_ERR) {
+        msd_reset_recovery(msd);
         return false;
     }
 
-    // Validate CSW.
-    if (csw.signature != CSW_SIGNATURE) return false;
-    if (csw.tag != cbw.tag) return false;
-    if (csw.status != 0) return false;
-
-    return true;
+    return data_ok && csw.status == CSW_STATUS_PASSED;
 }
 
 //------------------------------------------------------------------------------
