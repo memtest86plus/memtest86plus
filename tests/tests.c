@@ -46,7 +46,7 @@
 #define MODULO_N            20
 
 // The test whose description is patched with the SIMD tier by test_list_init().
-#define MOV_INV_RNG_TEST    5
+#define MOV_INV_RNG_TEST    4
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -58,15 +58,15 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
     { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
     { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
+    { true,  PAR,    1,   96,    0, "[Moving inversions, random sequence]   "},
     { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
-    { true,  PAR,    1,   24,    0, "[Moving inversions, random sequence]   "},
-#if TESTWORD_WIDTH > 32
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 64 bit pattern]    "},
-#else
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 32 bit pattern]    "},
-#endif
+    { true,  PAR,    1,    9,    0, "[Modulo 20, random pattern]            "},
     { true,  PAR,    1,   81,    0, "[Block move]                           "},
-    { true,  PAR,    1,    6,    0, "[Modulo 20, random pattern]            "},
+#if TESTWORD_WIDTH > 32
+    { true,  PAR,    1,    1,    0, "[Moving inversions, 64 bit pattern]    "},
+#else
+    { true,  PAR,    1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
+#endif
     { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
 };
 
@@ -181,8 +181,21 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         BAILOUT;
       } break;
 
+        // Moving inversions, pseudo-random sequence (SIMD where available).
+        // Every fourth round broadcasts a single random value to all vector
+        // lanes, preserving the uniform-background model of the classic
+        // random pattern test. Runs early: it has the highest fault
+        // detection rate per second, so this minimises time to first fault.
+      case 4:
+        for (int i = 0; i < iterations; i++) {
+            BARRIER;
+            ticks += test_mov_inv_rng(my_cpu, (i & 3) == 3);
+            BAILOUT;
+        }
+        break;
+
         // Moving inversions, 8 bit walking ones and zeros.
-      case 4: {
+      case 5: {
 #if TESTWORD_WIDTH > 32
             testword_t pattern1 = UINT64_C(0x8080808080808080);
 #else
@@ -203,39 +216,10 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
       } break;
 
-        // Moving inversions, pseudo-random sequence (SIMD where available).
-        // Every fourth round broadcasts a single random value to all vector
-        // lanes, preserving the uniform-background model of the classic
-        // random pattern test.
-      case 5:
-        for (int i = 0; i < iterations; i++) {
-            BARRIER;
-            ticks += test_mov_inv_rng(my_cpu, (i & 3) == 3);
-            BAILOUT;
-        }
-        break;
-
-        // Moving inversions, 32/64 bit shifting pattern.
+        // Modulo 20 check, fixed random pattern. Runs before the long
+        // shifting pattern test: it is the only test immune to cache
+        // masking, so every fault class has been probed early in the pass.
       case 6:
-        for (int offset = 0; offset < TESTWORD_WIDTH; offset++) {
-            BARRIER;
-            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, false);
-            BAILOUT;
-
-            BARRIER;
-            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, true);
-            BAILOUT;
-        }
-        break;
-
-        // Block move.
-      case 7:
-        ticks += test_block_move(my_cpu, iterations);
-        BAILOUT;
-        break;
-
-        // Modulo 20 check, fixed random pattern.
-      case 8:
         if (cpuid_info.flags.rdtsc) {
             prsg_state = get_tsc();
         } else {
@@ -260,6 +244,33 @@ int run_test(int my_cpu, int test, int stage, int iterations)
             }
         }
         break;
+
+        // Block move.
+      case 7:
+        ticks += test_block_move(my_cpu, iterations);
+        BAILOUT;
+        break;
+
+        // Moving inversions, 32/64 bit shifting pattern. A single iteration
+        // per pass suffices: the patterns are deterministic, so repeating
+        // them within a pass adds nothing that the next pass doesn't. On the
+        // fast first pass only every other offset is walked; full coverage
+        // is restored on every full pass.
+      case 8: {
+        if (iterations < 1) {
+            iterations = 1;     // the first pass divides the table value by 3
+        }
+        int offset_step = (pass_num == 0) ? 2 : 1;
+        for (int offset = 0; offset < TESTWORD_WIDTH; offset += offset_step) {
+            BARRIER;
+            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, false);
+            BAILOUT;
+
+            BARRIER;
+            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, true);
+            BAILOUT;
+        }
+      } break;
 
         // Bit fade test.
       case 9:

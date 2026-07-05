@@ -626,12 +626,7 @@ available CPU, regardless of the CPU sequencing mode selected by the user.
 In each memory region in turn, and for each pattern in turn, uses the moving
 inversions algorithm with patterns of all ones and all zeros.
 
-### Test 4 : Moving inversions, 8 bit pattern
-
-In each memory region in turn, and for each pattern in turn, uses the moving
-inversions algorithm with patterns of 8-bit wide walking ones and walking zeros.
-
-### Test 5 : Moving inversions, random sequence
+### Test 4 : Moving inversions, random sequence
 
 In each memory region in turn, uses the moving inversions algorithm with a
 vector-wide pseudo-random sequence and its complement. On x86_64 the fill and
@@ -644,12 +639,19 @@ uniform-background fault model of the classic random pattern test. The random
 sequences are different on each round and each test pass, so multiple passes
 increase effectiveness.
 
-### Test 6 : Moving inversions, 32/64 bit pattern
+### Test 5 : Moving inversions, 8 bit pattern
 
 In each memory region in turn, and for each pattern in turn, uses the moving
-inversions algorithm with patterns of 32-bit wide (on 32-bit builds) or 64-bit
-wide (on 64-bit builds) walking ones and walking zeros. Unlike previous tests,
-the pattern is rotated 1 bit on each successive address.
+inversions algorithm with patterns of 8-bit wide walking ones and walking zeros.
+
+### Test 6 : Modulo 20, random pattern
+
+In each memory region in turn, and for each pattern in turn, uses the
+Modulo-20 algorithm with patterns of a random number and its complement.
+The random number is different on each test pass so multiple passes increase
+effectiveness. Unlike the moving inversions tests, this addressing scheme is
+not affected by cache masking, so it runs before the long shifting pattern
+test to probe every fault class early in the pass.
 
 ### Test 7 : Block move, 64 moves
 
@@ -664,12 +666,14 @@ it is not possible to know where the error occurred. The addresses reported
 are only for where the bad pattern was found. In consequence, errors from this
 test do not contribute to BadRAM patterns, memmap regions, or bad page regions.
 
-### Test 8 : Modulo 20, random pattern
+### Test 8 : Moving inversions, 32/64 bit pattern
 
-In each memory region in turn, and for each pattern in turn, uses the
-Modulo-20 algorithm with patterns of a random number and its complement.
-The random number is different on each test pass so multiple passes increase
-effectiveness.
+In each memory region in turn, and for each pattern in turn, uses the moving
+inversions algorithm with patterns of 32-bit wide (on 32-bit builds) or 64-bit
+wide (on 64-bit builds) walking ones and walking zeros. Unlike previous tests,
+the pattern is rotated 1 bit on each successive address. On the fast first
+pass only every other bit position is walked; every full pass walks all of
+them.
 
 ### Test 9 : Bit fade test, 2 patterns
 
