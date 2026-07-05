@@ -159,6 +159,17 @@ static uint32_t fat_alloc_cluster(fat32_fs_t *fs)
     return 0; // Disk full.
 }
 
+// Frees a cluster chain (best effort - used to undo a failed file write).
+static void fat_free_chain(fat32_fs_t *fs, uint32_t first_cluster)
+{
+    uint32_t cluster = first_cluster;
+    for (uint32_t n = 0; n < fs->max_cluster && is_valid_cluster(fs, cluster); n++) {
+        uint32_t next = fat_read_entry(fs, cluster);
+        if (!fat_write_entry(fs, cluster, FAT_FREE)) return;
+        cluster = next;
+    }
+}
+
 // Scan the root directory for a free 32-byte entry.
 // Returns the LBA and byte offset of the free entry using out parameters.
 static bool find_free_dir_entry(fat32_fs_t *fs,
@@ -414,7 +425,7 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
 
     for (uint32_t i = 0; i < num_clusters; i++) {
         uint32_t cluster = fat_alloc_cluster(fs);
-        if (cluster == 0) return false;
+        if (cluster == 0) goto fail;
 
         if (first_cluster == 0) {
             first_cluster = cluster;
@@ -422,7 +433,7 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
 
         // Chain to previous cluster.
         if (prev_cluster != 0) {
-            if (!fat_write_entry(fs, prev_cluster, cluster)) return false;
+            if (!fat_write_entry(fs, prev_cluster, cluster)) goto fail;
         }
         prev_cluster = cluster;
     }
@@ -444,7 +455,7 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
             }
             memcpy(fs->sector_buf, src, to_write);
 
-            if (!write_sector(fs, lba + s)) return false;
+            if (!write_sector(fs, lba + s)) goto fail;
 
             src += to_write;
             remaining -= to_write;
@@ -453,14 +464,18 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
         cluster = fat_read_entry(fs, cluster);
     }
 
+    // A chain shorter than expected (read error / corrupt FAT) must not be
+    // reported as success with a directory entry claiming the full size.
+    if (remaining != 0) goto fail;
+
     // Create directory entry in root directory.
     uint32_t entry_lba, entry_offset;
     if (!find_free_dir_entry(fs, &entry_lba, &entry_offset)) {
-        return false;
+        goto fail;
     }
 
     // Read the sector containing the directory entry.
-    if (!read_sector(fs, entry_lba)) return false;
+    if (!read_sector(fs, entry_lba)) goto fail;
 
     // Build the 32-byte directory entry.
     uint8_t *entry = fs->sector_buf + entry_offset;
@@ -484,9 +499,16 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
     memcpy(entry + 28, &size, 4);
 
     // Write back the directory sector.
-    if (!write_sector(fs, entry_lba)) return false;
+    if (!write_sector(fs, entry_lba)) goto fail;
 
     return true;
+
+fail:
+    // Release any clusters allocated for this file so they aren't leaked.
+    if (first_cluster != 0) {
+        fat_free_chain(fs, first_cluster);
+    }
+    return false;
 }
 
 // Check a directory entry against the MT86P_XX.TXT pattern and mark used slots.

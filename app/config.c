@@ -985,7 +985,14 @@ void config_menu(bool initial)
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
             if (usb_mass_storage_found) {
                 if (usb_msd_name[0]) {
-                    printf(POP_R+8,  POP_LI, "<F6>  Save to %s", usb_msd_name);
+                    // Truncate the drive name so the line stays inside the popup.
+                    char name[20];
+                    int ni;
+                    for (ni = 0; ni < (int)sizeof(name) - 1 && usb_msd_name[ni]; ni++) {
+                        name[ni] = usb_msd_name[ni];
+                    }
+                    name[ni] = '\0';
+                    printf(POP_R+8,  POP_LI, "<F6>  Save to %s", name);
                 } else {
                     prints(POP_R+8,  POP_LI, "<F6>  Save results to USB");
                 }

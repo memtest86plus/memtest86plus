@@ -59,6 +59,8 @@ static uint8_t bcd_to_bin(uint8_t bcd)
 #endif
 
 // Minimal buffer printf supporting %s, %i, %u, %x with field width.
+// %u and %x consume a uintptr_t argument - cast at every call site: on x86_64
+// the upper half of a default-promoted 32-bit vararg register is undefined.
 
 static char *buf_end;
 
@@ -228,22 +230,26 @@ static int format_results(char *buf, int bufsize)
     if (imc.freq) {
         if (imc.type[3] == '5') {
             pos = buf_printf(pos, "IMC: %s-%u / CAS %u%s-%u-%u-%u\r\n",
-                             imc.type, imc.freq, imc.tCL, imc.tCL_dec ? ".5" : "",
-                             imc.tRCD, imc.tRP, imc.tRAS);
+                             imc.type, (uintptr_t)imc.freq, (uintptr_t)imc.tCL,
+                             imc.tCL_dec ? ".5" : "",
+                             (uintptr_t)imc.tRCD, (uintptr_t)imc.tRP, (uintptr_t)imc.tRAS);
         } else {
             pos = buf_printf(pos, "IMC: %uMHz (%s-%u) CAS %u%s-%u-%u-%u\r\n",
-                             imc.freq / 2, imc.type, imc.freq, imc.tCL,
-                             imc.tCL_dec ? ".5" : "", imc.tRCD, imc.tRP, imc.tRAS);
+                             (uintptr_t)(imc.freq / 2), imc.type, (uintptr_t)imc.freq,
+                             (uintptr_t)imc.tCL, imc.tCL_dec ? ".5" : "",
+                             (uintptr_t)imc.tRCD, (uintptr_t)imc.tRP, (uintptr_t)imc.tRAS);
         }
     } else if (ram.freq > 0 && ram.tCL > 0) {
         if (ram.freq <= 166) {
             pos = buf_printf(pos, "RAM: %uMHz (%s PC%u) CAS %u-%u-%u-%u\r\n",
-                             ram.freq, ram.type, ram.freq, ram.tCL,
-                             ram.tRCD, ram.tRP, ram.tRAS);
+                             (uintptr_t)ram.freq, ram.type, (uintptr_t)ram.freq,
+                             (uintptr_t)ram.tCL,
+                             (uintptr_t)ram.tRCD, (uintptr_t)ram.tRP, (uintptr_t)ram.tRAS);
         } else {
             pos = buf_printf(pos, "RAM: %uMHz (%s-%u) CAS %u%s-%u-%u-%u\r\n",
-                             ram.freq / 2, ram.type, ram.freq, ram.tCL,
-                             ram.tCL_dec ? ".5" : "", ram.tRCD, ram.tRP, ram.tRAS);
+                             (uintptr_t)(ram.freq / 2), ram.type, (uintptr_t)ram.freq,
+                             (uintptr_t)ram.tCL, ram.tCL_dec ? ".5" : "",
+                             (uintptr_t)ram.tRCD, (uintptr_t)ram.tRP, (uintptr_t)ram.tRAS);
         }
     }
 
@@ -258,7 +264,8 @@ static int format_results(char *buf, int bufsize)
 
         found_spd = true;
         pos = buf_printf(pos, "  Slot %i: %u MB %s-%u",
-                         spdi->slot_num, spdi->module_size, spdi->type, spdi->freq);
+                         spdi->slot_num, (uintptr_t)spdi->module_size,
+                         spdi->type, (uintptr_t)spdi->freq);
 
         if (spdi->hasECC) {
             pos = buf_printf(pos, " ECC");
