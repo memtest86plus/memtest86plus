@@ -74,6 +74,7 @@ TST_OBJS = tests/addr_walk1.o \
            tests/vec_prsg.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
+           tests/rowhammer.o \
            tests/test_helper.o \
            tests/tests.o
 

@@ -415,6 +415,8 @@ address test (test 0) and the block move test (test 7) do not contribute to
 the BadRAM patterns as these tests do not allow the exact address of the
 fault to be determined. The bus stress test (test 9) also does not contribute,
 as its errors are typically transient interface faults rather than bad cells.
+The rowhammer test (test 11) likewise does not contribute, as a hammer-induced
+flip does not mean the address is a defective cell under normal use.
 
 ### Linux memmap
 
@@ -433,7 +435,9 @@ address test (test 0) and the block move test (test 7) do not contribute to
 the faulty memory regions as these tests do not allow the exact address of
 the fault to be determined. The bus stress test (test 9) also does not
 contribute, as its errors are typically transient interface faults rather
-than bad cells.
+than bad cells. The rowhammer test (test 11) likewise does not contribute, as
+a hammer-induced flip does not mean the address is a defective cell under
+normal use.
 
 ### Bad Pages
 
@@ -451,6 +455,8 @@ address test (test 0) and the block move test (test 7) do not contribute to
 the faulty page numbers as these tests do not allow the exact address of the
 fault to be determined. The bus stress test (test 9) also does not contribute,
 as its errors are typically transient interface faults rather than bad cells.
+The rowhammer test (test 11) likewise does not contribute, as a hammer-induced
+flip does not mean the address is a defective cell under normal use.
 
 ## Trouble-shooting Memory Errors
 
@@ -705,6 +711,31 @@ per pass: solid zeros, solid ones, then an address-seeded random pattern and
 its complement, probing both fade polarities in each delay, stressing cells
 with opposing-charge neighbours and testing a fresh, reproducible charge
 configuration on every pass.
+
+### Test 11 : Rowhammer
+
+Disabled by default. Repeatedly activating ("hammering") a DRAM row can leak
+charge from physically adjacent rows and flip bits in them without those rows
+ever being accessed. This test hammers a time-boxed sample of sites across
+memory with Blacksmith-style patterns: many-sided, non-uniform bursts of
+activations synchronised to the DRAM refresh, designed to defeat the in-DRAM
+Target Row Refresh (TRR) mitigations of modern (2020+) modules that the classic
+double-sided hammer no longer bypasses. Each aggressor access is forced to reach
+the DRAM array (a cache-line flush on x86, a coarse whole-cache flush on other
+targets), and the neighbouring victim rows are then checked for flips. Because
+the physical-address-to-DRAM-row mapping is not known, the test first tries to
+recover the adjacent-row stride from row-buffer-conflict timing, falling back to
+a blind stride sweep where that timing is not observable (for example under
+virtualisation). It runs on a single core, so activation timing and refresh
+synchronisation stay clean, and hammers each memory window for a fixed time
+budget; its total runtime therefore scales with the amount of memory installed.
+
+Rowhammer is an adversarial stress test rather than a routine data test: a flip
+it induces does not mean the address is a defective cell under normal use, so
+its errors are reported but do not contribute to BadRAM patterns, memmap
+regions, or bad page regions. On DDR5 and ECC modules, on-die ECC may silently
+correct single-bit flips, so the absence of reported errors does not by itself
+prove a module is immune.
 
 ## Known Limitations and Bugs
 

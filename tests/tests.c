@@ -65,6 +65,7 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
 #endif
     { true,  PAR,    1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
     { true,  PAR,   12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
+    {false,  ONE,    1,   24,    0, "[Rowhammer, Blacksmith-style]          "},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
@@ -286,6 +287,17 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
       case 10:
         ticks += test_bit_fade(my_cpu, stage, iterations);
+        BAILOUT;
+        break;
+
+        // Rowhammer test: Blacksmith-style non-uniform, REFRESH-synchronised,
+        // many-sided hammering of a time-boxed sample of sites. Disabled by
+        // default. Runs on a single core (ONE): the DRAM flips regardless of
+        // which core hammers, so per-core repetition would only multiply the
+        // runtime, and a lone core keeps activation timing clean.
+        // `iterations` = seconds budget. See tests/rowhammer.c.
+      case 11:
+        ticks += test_rowhammer(my_cpu, iterations);
         BAILOUT;
         break;
     }

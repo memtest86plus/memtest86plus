@@ -35,4 +35,6 @@ int test_bus_stress(int my_cpu, int iteration);
 
 int test_bit_fade(int my_cpu, int stage, int sleep_secs);
 
+int test_rowhammer(int my_cpu, int time_budget_secs);
+
 #endif // TEST_FUNCS_H
