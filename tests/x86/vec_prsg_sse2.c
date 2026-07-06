@@ -9,8 +9,9 @@
 // SIMD support and no intrinsics headers are required.
 //
 // Forward xorshift:  x ^= x << 13;  x ^= x >> 7;  x ^= x << 17;
-// The backward step inverts each stage in reverse order, using the identity
-// that y = x ^ (x << s) is undone by x = y ^ (y << s) ^ (y << 2s) ^ ...
+// The backward step inverts each stage in reverse order by repeated squaring:
+// y = x ^ (x << s) is undone by x = y; x ^= x << s; x ^= x << 2s; x ^= x << 4s;
+// ... doubling the shift until it exceeds the word width.
 
 #if defined(__x86_64__)
 
@@ -30,17 +31,21 @@
         "psllq    $17, " t "           \n\t"    \
         "pxor     " t ", " s "         \n\t"
 
-#define SSE2_UNDO_SHIFT(s, t, op, shift, terms) \
+#define SSE2_UNDO_STEP(s, t, op, shift)         \
         "movdqa   " s ", " t "         \n\t"    \
-        ".rept " #terms "              \n\t"    \
         op "      $" #shift ", " t "   \n\t"    \
-        "pxor     " t ", " s "         \n\t"    \
-        ".endr                         \n\t"
+        "pxor     " t ", " s "         \n\t"
 
 #define SSE2_STEP_BACK(s, t)                    \
-        SSE2_UNDO_SHIFT(s, t, "psllq", 17, 3)   \
-        SSE2_UNDO_SHIFT(s, t, "psrlq", 7,  9)   \
-        SSE2_UNDO_SHIFT(s, t, "psllq", 13, 4)
+        SSE2_UNDO_STEP(s, t, "psllq", 17)       \
+        SSE2_UNDO_STEP(s, t, "psllq", 34)       \
+        SSE2_UNDO_STEP(s, t, "psrlq", 7)        \
+        SSE2_UNDO_STEP(s, t, "psrlq", 14)       \
+        SSE2_UNDO_STEP(s, t, "psrlq", 28)       \
+        SSE2_UNDO_STEP(s, t, "psrlq", 56)       \
+        SSE2_UNDO_STEP(s, t, "psllq", 13)       \
+        SSE2_UNDO_STEP(s, t, "psllq", 26)       \
+        SSE2_UNDO_STEP(s, t, "psllq", 52)
 
 void vec_fill_sse2(vec_state_t *st, testword_t *p, size_t nblocks, bool splat)
 {

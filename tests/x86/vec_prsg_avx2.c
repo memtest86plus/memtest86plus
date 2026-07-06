@@ -10,8 +10,9 @@
 // vzeroupper itself before returning to legacy SSE code.
 //
 // Forward xorshift:  x ^= x << 13;  x ^= x >> 7;  x ^= x << 17;
-// The backward step inverts each stage in reverse order, using the identity
-// that y = x ^ (x << s) is undone by x = y ^ (y << s) ^ (y << 2s) ^ ...
+// The backward step inverts each stage in reverse order by repeated squaring:
+// y = x ^ (x << s) is undone by x = y; x ^= x << s; x ^= x << 2s; x ^= x << 4s;
+// ... doubling the shift until it exceeds the word width.
 
 #if defined(__x86_64__)
 
@@ -19,6 +20,13 @@
 #include <stddef.h>
 
 #include "vec_prsg.h"
+
+// The kernels end with vzeroupper, which zeroes the upper half of ALL ymm
+// registers, not just those in the clobber lists. This is only safe because
+// the compiler cannot hold values there when AVX code generation is disabled.
+#ifdef __AVX__
+#error "vec_prsg_avx2.c must be compiled without -mavx*"
+#endif
 
 #define AVX2_STEP_FWD(s, t)                             \
         "vpsllq   $13, " s ", " t "            \n\t"    \
@@ -28,18 +36,20 @@
         "vpsllq   $17, " s ", " t "            \n\t"    \
         "vpxor    " t ", " s ", " s "          \n\t"
 
-#define AVX2_UNDO_SHIFT(s, t, op, shift, terms)         \
+#define AVX2_UNDO_STEP(s, t, op, shift)                 \
         op "      $" #shift ", " s ", " t "    \n\t"    \
-        "vpxor    " t ", " s ", " s "          \n\t"    \
-        ".rept " #terms "                      \n\t"    \
-        op "      $" #shift ", " t ", " t "    \n\t"    \
-        "vpxor    " t ", " s ", " s "          \n\t"    \
-        ".endr                                 \n\t"
+        "vpxor    " t ", " s ", " s "          \n\t"
 
 #define AVX2_STEP_BACK(s, t)                            \
-        AVX2_UNDO_SHIFT(s, t, "vpsllq", 17, 2)          \
-        AVX2_UNDO_SHIFT(s, t, "vpsrlq", 7,  8)          \
-        AVX2_UNDO_SHIFT(s, t, "vpsllq", 13, 3)
+        AVX2_UNDO_STEP(s, t, "vpsllq", 17)              \
+        AVX2_UNDO_STEP(s, t, "vpsllq", 34)              \
+        AVX2_UNDO_STEP(s, t, "vpsrlq", 7)               \
+        AVX2_UNDO_STEP(s, t, "vpsrlq", 14)              \
+        AVX2_UNDO_STEP(s, t, "vpsrlq", 28)              \
+        AVX2_UNDO_STEP(s, t, "vpsrlq", 56)              \
+        AVX2_UNDO_STEP(s, t, "vpsllq", 13)              \
+        AVX2_UNDO_STEP(s, t, "vpsllq", 26)              \
+        AVX2_UNDO_STEP(s, t, "vpsllq", 52)
 
 void vec_fill_avx2(vec_state_t *st, testword_t *p, size_t nblocks, bool splat)
 {
