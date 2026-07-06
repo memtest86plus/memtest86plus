@@ -14,7 +14,7 @@
 
 #include "config.h"
 
-#define NUM_TEST_PATTERNS   10
+#define NUM_TEST_PATTERNS   11
 
 typedef struct {
     bool            enabled;

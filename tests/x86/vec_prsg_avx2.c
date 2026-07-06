@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2004-2026 Sam Demeulemeester.
 //
-// AVX2 kernels for the moving inversions RNG-sequence test. See
-// tests/mov_inv_rng.h for the kernel contract and tests/mov_inv_rng.c for
-// the test itself.
+// AVX2 kernels for the PRSG vector fill/check primitives. See
+// tests/vec_prsg.h for the kernel contract and tests/vec_prsg.c for the
+// dispatch wrappers and scalar fallbacks.
 //
 // The kernels are written in inline assembly, so the compiler needs no
 // AVX support and no intrinsics headers are required. Each kernel issues
@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "mov_inv_rng.h"
+#include "vec_prsg.h"
 
 #define AVX2_STEP_FWD(s, t)                             \
         "vpsllq   $13, " s ", " t "            \n\t"    \

@@ -31,6 +31,8 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
 
 int test_block_move(int my_cpu, int iterations);
 
+int test_bus_stress(int my_cpu, int iteration);
+
 int test_bit_fade(int my_cpu, int stage, int sleep_secs);
 
 #endif // TEST_FUNCS_H

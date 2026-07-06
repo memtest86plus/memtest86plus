@@ -413,7 +413,8 @@ results.
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
 address test (test 0) and the block move test (test 7) do not contribute to
 the BadRAM patterns as these tests do not allow the exact address of the
-fault to be determined.
+fault to be determined. The bus stress test (test 9) also does not contribute,
+as its errors are typically transient interface faults rather than bad cells.
 
 ### Linux memmap
 
@@ -430,7 +431,9 @@ will try to minimise the number of non-faulty locations that are included.
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
 address test (test 0) and the block move test (test 7) do not contribute to
 the faulty memory regions as these tests do not allow the exact address of
-the fault to be determined.
+the fault to be determined. The bus stress test (test 9) also does not
+contribute, as its errors are typically transient interface faults rather
+than bad cells.
 
 ### Bad Pages
 
@@ -446,7 +449,8 @@ the number of non-faulty pages that are included.
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
 address test (test 0) and the block move test (test 7) do not contribute to
 the faulty page numbers as these tests do not allow the exact address of the
-fault to be determined.
+fault to be determined. The bus stress test (test 9) also does not contribute,
+as its errors are typically transient interface faults rather than bad cells.
 
 ## Trouble-shooting Memory Errors
 
@@ -675,12 +679,32 @@ the pattern is rotated 1 bit on each successive address. On the fast first
 pass only every other bit position is walked; every full pass walks all of
 them.
 
-### Test 9 : Bit fade test, 2 patterns
+### Test 9 : Bus stress, read/write turnaround
 
-Across all memory regions, and for each pattern in turn, initialises each
-memory location with a pattern, sleeps for a period of time, then checks
-each memory location for consistency. The test is performed with patterns
-of all zeros and all ones.
+In each memory region in turn, each CPU splits its chunk of memory into two
+halves and alternates, in short bursts, between filling one half with a fresh
+pseudo-random sequence using non-temporal writes and read-verifying the other
+half against the sequence written on the previous round. The two streams stay
+about half a chunk apart, forcing frequent write-to-read turnarounds and
+row/bank conflicts at the memory controller, the tightest timing corners of
+the memory interface. The burst length changes on every round, and every other
+round inserts short idle gaps into the traffic to generate load transients in
+the module power delivery. This targets DDR5-era interface faults that on-die
+ECC cannot correct: link signal-integrity errors, marginal XMP/EXPO training
+and PMIC voltage droop. On x86_64 the bursts use the same non-temporal
+SIMD kernels as test 4; other builds fall back to cached scalar accesses, which
+exercise the interface less aggressively. Errors from this test are typically
+transient and will not necessarily repeat at the same address; they do not
+contribute to BadRAM patterns, memmap regions, or bad page regions.
+
+### Test 10 : Bit fade test, solid and random patterns
+
+Across all memory regions, memory is filled with a pattern, left to fade for
+a number of seconds, then checked for consistency. Four rounds are performed
+per pass: solid zeros, solid ones, then an address-seeded random pattern and
+its complement, probing both fade polarities in each delay, stressing cells
+with opposing-charge neighbours and testing a fresh, reproducible charge
+configuration on every pass.
 
 ## Known Limitations and Bugs
 

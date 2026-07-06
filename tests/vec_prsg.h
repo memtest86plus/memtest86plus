@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
-#ifndef MOV_INV_RNG_H
-#define MOV_INV_RNG_H
+#ifndef VEC_PRSG_H
+#define VEC_PRSG_H
 /**
  * \file
  *
- * Provides the interface between the moving inversions RNG-sequence test
- * and its architecture-specific SIMD kernels.
+ * Provides vector-wide pseudo-random sequence primitives shared by the
+ * memory tests: per-lane xorshift streams filled and checked through the
+ * best available SIMD tier, with scalar fallbacks.
  *
  *//*
  * Copyright (C) 2004-2026 Sam Demeulemeester.
@@ -36,7 +37,7 @@ typedef struct {
 
 #if defined(__x86_64__)
 /*
- * SIMD kernels (see tests/x86/mov_inv_rng_*.c). All kernels start from the
+ * SIMD kernels (see tests/x86/vec_prsg_*.c). All kernels start from the
  * lane states in *st, leave the updated states back in *st, and end with an
  * sfence so no non-temporal write is left buffered.
  *
@@ -61,4 +62,37 @@ size_t vec_scan_fwd_avx2(vec_state_t *st, testword_t *p, size_t nblocks, bool sp
 size_t vec_scan_rev_avx2(vec_state_t *st, testword_t *q, size_t nblocks, bool splat);
 #endif
 
-#endif // MOV_INV_RNG_H
+/**
+ * Initialises the lane states from seed. For splat rounds all lanes hold the
+ * same value and are never stepped, giving a uniform background pattern.
+ */
+void seed_lanes(vec_state_t *st, testword_t seed, bool splat);
+
+/**
+ * Fills nblocks vector blocks ascending from p with the lane sequences,
+ * dispatching to the best SIMD tier (non-temporal stores) or the scalar
+ * fallback. The SIMD kernels process at least one block, so nblocks must
+ * be greater than zero.
+ */
+void vec_fill(vec_state_t *st, testword_t *p, size_t nblocks, bool splat);
+
+/**
+ * Checks nblocks vector blocks ascending from p against the lane sequences,
+ * writing the complement behind itself (non-temporal on the SIMD tiers).
+ * Mismatches are reported via data_error(..., use_for_badram) and fixed up.
+ * The SIMD kernels process at least one block, so nblocks must be greater
+ * than zero.
+ */
+void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram);
+
+/**
+ * Checks nblocks vector blocks descending from p against the complement of
+ * the lane sequences, stepping the states backwards and restoring the
+ * original pattern behind itself (non-temporal on the SIMD tiers).
+ * Mismatches are reported via data_error(..., use_for_badram) and fixed up.
+ * The SIMD kernels process at least one block, so nblocks must be greater
+ * than zero.
+ */
+void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram);
+
+#endif // VEC_PRSG_H

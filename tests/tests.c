@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2004-2026 Sam Demeulemeester.
 //
-// Derived from an extract of memtest86+ main.c:
-//
-// MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
 // ------------------------------------------------
 // main.c - MemTest-86  Version 3.5
 //
@@ -67,6 +63,7 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
 #else
     { true,  PAR,    1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
 #endif
+    { true,  PAR,    1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
     { true,  PAR,   12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
 };
 
@@ -272,9 +269,22 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
       } break;
 
+        // Bus stress: NT-write/read burst interleave between two half-chunk streams, duty-cycled
+        // on odd rounds to provoke PMIC load steps. Runs before bit fade so the DIMMs enter it hot.
+      case 9:
+        if (iterations < 1) {
+            iterations = 1;     // the first pass divides the table value by 3
+        }
+        for (int i = 0; i < iterations; i++) {
+            BARRIER;
+            ticks += test_bus_stress(my_cpu, i);
+            BAILOUT;
+        }
+        break;
+
         // Bit fade test: four fill/fade/check rounds - solid zeros, solid ones, then an
         // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
-      case 9:
+      case 10:
         ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
         break;
