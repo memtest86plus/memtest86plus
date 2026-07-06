@@ -303,7 +303,11 @@ void display_cpu_topology(void)
 void post_display_init(void)
 {
     print_smbios_startup_info();
-    print_spd_startup_info();
+
+    if (print_spd_startup_info() == 0) {
+        // No SPD data, fall back to SMBIOS Type 17 info.
+        print_dmi_memory_info();
+    }
 
     if (imc.freq) {
         // Try to get RAM information from IMC

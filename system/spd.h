@@ -71,4 +71,12 @@ extern ram_slot_info_t ram_slot_info[MAX_SPD_SLOT];
 void print_spdi(spd_info spdi, uint8_t lidx);
 void parse_spd(spd_info *spdi, uint8_t slot_idx);
 
+/**
+ * Return the JEP-106 manufacturer name for a jedec code composed as
+ * (bank << 8 | id), where bank is the number of 0x7F continuation codes
+ * and id is the manufacturer byte with the parity bit stripped.
+ * Return NULL if the code is not in the table.
+ */
+const char *get_jep106_name(uint16_t jedec_code);
+
 #endif // SPD_H

@@ -4,6 +4,7 @@
 
 #include "stdint.h"
 #include "string.h"
+#include "ctype.h"
 #include "display.h"
 
 #include "boot.h"
@@ -11,6 +12,7 @@
 #include "cpuinfo.h"
 #include "efi.h"
 #include "vmem.h"
+#include "spd.h"
 #include "smbios.h"
 
 #define LINE_DMI 23
@@ -23,10 +25,17 @@ static const efi_guid_t SMBIOS2_GUID = { 0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16
 // Some firmware (e.g. QEMU virt, ARM laptops) only publishes the 64-bit SMBIOS v3 entry point.
 static const efi_guid_t SMBIOS3_GUID = { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} };
 
+// Consumers of dmi_memory_device read ->type without a NULL check, so point
+// it at an all-zero struct (type 0 = undefined) until a real one is found.
+static struct mem_dev null_mem_dev;
+
 struct system_info *dmi_system_info;
 struct baseboard_info *dmi_baseboard_info;
-struct mem_dev *dmi_memory_device;
+struct mem_dev *dmi_memory_device = &null_mem_dev;
 struct cpu_info *dmi_cpu_info;
+
+struct mem_dev *dmi_memory_devices[MAX_DMI_MEM_DEVICES];
+int dmi_num_memory_devices = 0;
 
 static char *get_tstruct_string(struct tstruct_header *header, uint16_t maxlen, int n)
 {
@@ -158,11 +167,17 @@ static int parse_dmi(uint16_t numstructs)
         }
         // Type 17 - Memory Device
         else if (header->type == 17 && header->length > offsetof(struct mem_dev, partnum)) {
+            struct mem_dev *mdev = (struct mem_dev *) dmi;
             // Multiple type 17 structs are allowed, with unpopulated slots sometimes
             // reported as type 2 (unknown). If type is 0 (uninitialized) or 1/2 (previously
             // initialized with unknown value) => set or overwrite the struct
-            if (dmi_memory_device == NULL || dmi_memory_device->type <= 2) {
-                dmi_memory_device = (struct mem_dev *) dmi;
+            if (dmi_memory_device->type <= 2) {
+                dmi_memory_device = mdev;
+            }
+            // Collect every populated device (size 0 means empty socket,
+            // 0xFFFF means populated with unknown size, so keep the latter).
+            if (mdev->size != 0 && dmi_num_memory_devices < MAX_DMI_MEM_DEVICES) {
+                dmi_memory_devices[dmi_num_memory_devices++] = mdev;
             }
         }
 
@@ -172,6 +187,7 @@ static int parse_dmi(uint16_t numstructs)
             dmi_system_info = NULL;
             dmi_baseboard_info = NULL;
             dmi_cpu_info = NULL;
+            dmi_num_memory_devices = 0;
             return -1;
         }
 
@@ -185,6 +201,7 @@ static int parse_dmi(uint16_t numstructs)
             dmi_system_info = NULL;
             dmi_baseboard_info = NULL;
             dmi_cpu_info = NULL;
+            dmi_num_memory_devices = 0;
             return -1;
         }
     }
@@ -365,5 +382,298 @@ void print_smbios_startup_info(void)
                 }
             }
         }
+    }
+}
+
+// ---------------------------------------------------
+// DMI Type 17 fallback display (used when SPD fails)
+// ---------------------------------------------------
+
+#define DMI_MANUF_LEN   20
+#define DMI_PART_LEN    26
+
+// Type 17 structs are variable-length: fields beyond SMBIOS 2.3 are only
+// present when the struct is long enough to contain them.
+#define MEMDEV_HAS_FIELD(md, field) \
+    ((md)->header.length >= offsetof(struct mem_dev, field) + sizeof((md)->field))
+
+typedef struct {
+    uint64_t    size_kb;                        // 0 = unknown
+    uint32_t    speed;                          // MT/s, 0 = unknown
+    uint8_t     type;                           // raw DMI memory type byte
+    const char *manuf;                          // JEP-106 name, manuf_str or NULL
+    char        manuf_str[DMI_MANUF_LEN + 1];
+    char        part_num[DMI_PART_LEN + 1];
+    int         count;
+} dmi_mem_group_t;
+
+static uint64_t memdev_size_kb(const struct mem_dev *md)
+{
+    if (md->size == 0 || md->size == 0xFFFF) {
+        return 0;                               // empty socket / unknown size
+    }
+    if (md->size == 0x7FFF) {
+        // Real size is in ext_size (SMBIOS 2.7+), in MB, bits 30:0.
+        if (!MEMDEV_HAS_FIELD(md, ext_size)) {
+            return 0;
+        }
+        return (uint64_t)(md->ext_size & 0x7FFFFFFF) * 1024;
+    }
+    if (md->size & 0x8000) {
+        return md->size & 0x7FFF;               // value is in KB
+    }
+    return (uint64_t)md->size * 1024;           // value is in MB
+}
+
+static uint32_t memdev_speed_mts(const struct mem_dev *md)
+{
+    // Prefer the configured (actual) speed (SMBIOS 2.7+).
+    if (MEMDEV_HAS_FIELD(md, conf_ram_speed)) {
+        uint16_t conf = md->conf_ram_speed;
+        if (conf == 0xFFFF) {
+            if (MEMDEV_HAS_FIELD(md, extended_conf_speed) && md->extended_conf_speed != 0) {
+                return md->extended_conf_speed;
+            }
+        } else if (conf != 0) {
+            return conf;
+        }
+    }
+    // Fall back to the maximum rated speed.
+    if (md->speed == 0xFFFF) {
+        if (MEMDEV_HAS_FIELD(md, extended_speed)) {
+            return md->extended_speed;
+        }
+        return 0;
+    }
+    return md->speed;
+}
+
+static const char *memdev_type_str(uint8_t type)
+{
+    switch (type) {
+      case DMI_SDR:
+        return "SDRAM";
+      case DMI_RDRAM:
+        return "RDRAM";
+      case DMI_DDR:
+        return "DDR";
+      case DMI_DDR2:
+      case DMI_DDR2_FBDIMM:
+        return "DDR2";
+      case DMI_DDR3:
+        return "DDR3";
+      case DMI_DDR4:
+        return "DDR4";
+      case DMI_LPDDR:
+        return "LPDDR";
+      case DMI_LPDDR2:
+        return "LPDDR2";
+      case DMI_LPDDR3:
+        return "LPDDR3";
+      case DMI_LPDDR4:
+        return "LPDDR4";
+      case DMI_DDR5:
+        return "DDR5";
+      case DMI_LPDDR5:
+        return "LPDDR5";
+      default:
+        return NULL;                            // "Unknown", "Other", "RAM", ...
+    }
+}
+
+static const char *memdev_jep106_name(const struct mem_dev *md)
+{
+    if (!MEMDEV_HAS_FIELD(md, module_manufacturer_id)) {
+        return NULL;
+    }
+    // SMBIOS 3.2+: the two SPD manufacturer bytes, LSB first. The low byte
+    // of the (little-endian) word is the continuation-code count, the high
+    // byte the manufacturer code, each with an odd-parity bit 7.
+    uint16_t id = md->module_manufacturer_id;
+    if (id == 0 || id == 0xFFFF) {
+        return NULL;
+    }
+    uint8_t cont = id & 0x7F;
+    uint8_t code = (id >> 8) & 0x7F;
+    if (code == 0 || code == 0x7F) {
+        return NULL;
+    }
+    return get_jep106_name(((uint16_t)(cont & 0x1F) << 8) | code);
+}
+
+static bool dmi_string_is_junk(const char *s, size_t len)
+{
+    static const char *const junk[] = {
+        "Unknown", "Not Specified", "Not Available", "To Be Filled By O.E.M.",
+        "NO DIMM", "No Module Installed", "None", "N/A", "Undefined",
+        "Default string", "Part Num", "PartNum", "Manufacturer", "Module Manufacturer"
+    };
+
+    if (len == 0) {
+        return true;
+    }
+    for (size_t i = 0; i < sizeof(junk) / sizeof(junk[0]); i++) {
+        const char *b = junk[i];
+        size_t k = 0;
+        while (k < len && b[k] != '\0'
+               && toupper((unsigned char)s[k]) == toupper((unsigned char)b[k])) {
+            k++;
+        }
+        if (k == len && b[k] == '\0') {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool copy_dmi_string(char *dst, size_t dst_size, struct mem_dev *md, uint8_t string_idx)
+{
+    dst[0] = '\0';
+
+    uint32_t remaining = table_length - (uint32_t)((const uint8_t *)md - table_start);
+    uint16_t maxlen = remaining > UINT16_MAX ? UINT16_MAX : remaining;
+
+    const char *src = get_tstruct_string(&md->header, maxlen, string_idx);
+    if (src == NULL) {
+        return false;
+    }
+    while (*src == ' ') {                       // skip leading spaces
+        src++;
+    }
+    size_t src_len = strlen(src);
+    while (src_len > 0 && src[src_len - 1] == ' ') {  // ignore trailing spaces
+        src_len--;
+    }
+
+    // Filter placeholders on the full string, before any truncation.
+    if (dmi_string_is_junk(src, src_len)) {
+        return false;
+    }
+
+    size_t len = src_len < dst_size - 1 ? src_len : dst_size - 1;
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+    return true;
+}
+
+static bool dmi_manuf_match(const char *a, const char *b)
+{
+    if (a == NULL || b == NULL) {
+        return a == b;
+    }
+    return strncmp(a, b, DMI_MANUF_LEN + 1) == 0;
+}
+
+static void print_dmi_mem_group(const dmi_mem_group_t *group, int row)
+{
+    int col = prints(row, 0, " -");
+
+    if (group->count > 1) {
+        col = printf(row, col + 1, "%ix", group->count);
+    }
+    if (group->size_kb != 0) {
+        col = printf(row, col + 1, "%kB", (uintptr_t)group->size_kb);
+    }
+
+    const char *tstr = memdev_type_str(group->type);
+    if (tstr != NULL && group->speed != 0) {
+        col = printf(row, col + 1, "%s-%i", tstr, group->speed);
+    } else if (tstr != NULL) {
+        col = prints(row, col + 1, tstr);
+    } else if (group->speed != 0) {
+        col = printf(row, col + 1, "%i MT/s", group->speed);
+    }
+
+    if (group->manuf != NULL) {
+        col = printf(row, col + 1, "- %s", group->manuf);
+    }
+    if (group->part_num[0] != '\0' && col + 1 + (int)strlen(group->part_num) < SCREEN_WIDTH) {
+        prints(row, col + 1, group->part_num);
+    }
+}
+
+void print_dmi_memory_info(void)
+{
+    // Static: called once at startup, single-threaded; keeps ~2 kB off the stack.
+    static dmi_mem_group_t groups[MAX_DMI_MEM_DEVICES];
+    int num_groups = 0;
+
+    for (int i = 0; i < dmi_num_memory_devices; i++) {
+        struct mem_dev *md = dmi_memory_devices[i];
+        dmi_mem_group_t g;
+
+        memset(&g, 0, sizeof(g));
+        g.size_kb = memdev_size_kb(md);
+        g.speed   = memdev_speed_mts(md);
+        g.type    = md->type;
+        g.manuf   = memdev_jep106_name(md);
+        if (g.manuf == NULL && copy_dmi_string(g.manuf_str, sizeof(g.manuf_str), md, md->manufacturer)) {
+            g.manuf = g.manuf_str;
+        }
+        if (!copy_dmi_string(g.part_num, sizeof(g.part_num), md, md->partnum)) {
+            g.part_num[0] = '\0';
+        }
+
+        // Skip devices carrying no usable info at all.
+        if (g.size_kb == 0 && g.speed == 0 && memdev_type_str(g.type) == NULL
+            && g.manuf == NULL && g.part_num[0] == '\0') {
+            continue;
+        }
+
+        // Collapse identical modules into a single group.
+        int j;
+        for (j = 0; j < num_groups; j++) {
+            if (groups[j].size_kb == g.size_kb && groups[j].speed == g.speed
+                && groups[j].type == g.type && dmi_manuf_match(groups[j].manuf, g.manuf)
+                && strncmp(groups[j].part_num, g.part_num, DMI_PART_LEN + 1) == 0) {
+                groups[j].count++;
+                break;
+            }
+        }
+        if (j == num_groups) {
+            g.count = 1;
+            groups[num_groups] = g;
+            if (g.manuf == g.manuf_str) {
+                groups[num_groups].manuf = groups[num_groups].manuf_str;
+            }
+            num_groups++;
+        }
+    }
+
+    if (num_groups == 0) {
+        return;
+    }
+
+    // Header, with the common type and max speed when all groups agree.
+    const char *tstr = memdev_type_str(groups[0].type);
+    uint32_t max_speed = 0;
+    bool same_type = true;
+    for (int i = 0; i < num_groups; i++) {
+        if (groups[i].type != groups[0].type) {
+            same_type = false;
+        }
+        if (groups[i].speed > max_speed) {
+            max_speed = groups[i].speed;
+        }
+    }
+
+    int hdr_len;
+    if (same_type && tstr != NULL && max_speed != 0) {
+        hdr_len = printf(ROW_SPD - 2, 0, "Memory DMI Information (%s-%i)", tstr, max_speed);
+    } else {
+        hdr_len = prints(ROW_SPD - 2, 0, "Memory DMI Information");
+    }
+
+    char dashes[SCREEN_WIDTH];
+    if (hdr_len >= SCREEN_WIDTH) {
+        hdr_len = SCREEN_WIDTH - 1;
+    }
+    memset(dashes, '-', hdr_len);
+    dashes[hdr_len] = '\0';
+    prints(ROW_SPD - 1, 0, dashes);
+
+    // Same row budget as the SPD display.
+    for (int i = 0; i < num_groups && i < MAX_SPD_SLOT; i++) {
+        print_dmi_mem_group(&groups[i], ROW_SPD + i);
     }
 }

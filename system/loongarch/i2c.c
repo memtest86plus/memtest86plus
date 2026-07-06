@@ -192,7 +192,7 @@ uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
     return i2c_read_byte(i2c_info.i2c_mc[mc].i2c_base, device_id, spd_adr);
 }
 
-void print_spd_startup_info(void)
+int print_spd_startup_info(void)
 {
     uint8_t spdidx = 0, spd_line_idx = 0;
 
@@ -201,7 +201,7 @@ void print_spd_startup_info(void)
     curspd.isValid = false;
 
     if (!determine_i2c_address()) {
-        return;
+        return 0;
     }
 
     for (spdidx = 0; spdidx < max_mc_nu * 2; spdidx++) {
@@ -218,4 +218,6 @@ void print_spd_startup_info(void)
         print_spdi(curspd, ROW_SPD+spd_line_idx);
         spd_line_idx++;
     }
+
+    return spd_line_idx;
 }

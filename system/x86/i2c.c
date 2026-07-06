@@ -41,7 +41,7 @@ static uint8_t nf_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 static uint8_t ali_m1563_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 static uint8_t ali_m1543_read_spd_byte(uint8_t smbus_adr, uint8_t spd_adr);
 
-void print_spd_startup_info(void)
+int print_spd_startup_info(void)
 {
     uint8_t spdidx = 0, spd_line_idx = 0;
 
@@ -52,7 +52,7 @@ void print_spd_startup_info(void)
     }
 
     if (!setup_smb_controller() || smbusbase == 0) {
-        return;
+        return 0;
     }
 
     for (spdidx = 0; spdidx < MAX_SPD_SLOT; spdidx++) {
@@ -76,6 +76,8 @@ void print_spd_startup_info(void)
         print_spdi(curspd, ROW_SPD+spd_line_idx);
         spd_line_idx++;
     }
+
+    return spd_line_idx;
 }
 
 // --------------------------

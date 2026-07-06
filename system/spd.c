@@ -27,10 +27,19 @@ static inline uint8_t bcd_to_ui8(uint8_t bcd)
     return bcd - 6 * (bcd >> 4);
 }
 
+const char *get_jep106_name(uint16_t jedec_code)
+{
+    for (uint16_t i = 0; i < JEP106_CNT; i++) {
+        if (jedec_code == jep106[i].jedec_code) {
+            return jep106[i].name;
+        }
+    }
+    return NULL;
+}
+
 void print_spdi(spd_info spdi, uint8_t row)
 {
     uint8_t curcol;
-    uint16_t i;
 
     // Print Slot Index, Module Size, type & Max frequency (Jedec or XMP)
     curcol = printf(row, 0, " - Slot %i: %kB %s-%i",
@@ -51,18 +60,14 @@ void print_spdi(spd_info spdi, uint8_t row)
         curcol = prints(row, ++curcol, "EPP");
     }
 
-    // Print Manufacturer from JEDEC106
-    for (i = 0; i < JEP106_CNT; i++) {
-        if (spdi.jedec_code == jep106[i].jedec_code) {
-            curcol = printf(row, ++curcol, "- %s", jep106[i].name);
-            break;
-        }
-    }
+    // Print Manufacturer from JEDEC106, or the raw JEDEC ID if not in the table
+    const char *manufacturer = get_jep106_name(spdi.jedec_code);
 
-    // If not present in JEDEC106, display raw JEDEC ID
-    if (spdi.jedec_code == 0) {
+    if (manufacturer != NULL) {
+        curcol = printf(row, ++curcol, "- %s", manufacturer);
+    } else if (spdi.jedec_code == 0) {
         curcol = prints(row, ++curcol, "- Noname");
-    } else if (i == JEP106_CNT) {
+    } else {
         curcol = printf(row, ++curcol, "- Unknown (0x%x)", spdi.jedec_code);
     }
 
