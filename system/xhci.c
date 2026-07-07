@@ -136,6 +136,7 @@
 // Values specific to this driver.
 
 #define PORT_TYPE_PST_MASK              0x1f    // Protocol Slot Type mask
+#define PORT_TYPE_IN_USE                0x20    // set when a device found by a scan owns the port
 #define PORT_TYPE_USB2                  0x40
 #define PORT_TYPE_USB3                  0x80
 
@@ -358,6 +359,10 @@ typedef struct {
 
     // Raw xHCI port speed for the device currently being enumerated.
     int                 port_speed;
+
+    // State needed to rescan the root ports after initialisation.
+    uint8_t             num_ports;
+    uint8_t             port_type[XHCI_MAX_PORTS];
 } workspace_t  __attribute__ ((aligned (64)));
 
 //------------------------------------------------------------------------------
@@ -1046,6 +1051,15 @@ static void rearm_keyboards(const usb_hcd_t *hcd)
 
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+
+        // The discarded transfer completed, so its report is already in the buffer.
+        // Process it, otherwise a key release goes unnoticed and the next press of
+        // the same key is treated as a repeat and dropped.
+        hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
+        if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+            *prev_kbd_rpt = *kbd_rpt;
+        }
+
         issue_normal_trb(kbd_tr, kbd_rpt, XHCI_TRB_DIR_IN, sizeof(hid_kbd_rpt_t));
         ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
     }
@@ -1076,6 +1090,77 @@ static void poll_keyboards(const usb_hcd_t *hcd)
     }
 }
 
+static bool scan_for_msd(const usb_hcd_t *hcd)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    xhci_op_regs_t *op_regs = ws->op_regs;
+
+    // Record the heap state to allow us to free memory if the scan fails.
+    uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
+
+    // Construct a hub descriptor for the root hub.
+    usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
+    root_hub.ep0       = NULL;
+    root_hub.num_ports = ws->num_ports;
+
+    usleep(100*MILLISEC);  // USB maximum device attach time.
+
+    // Scan the ports that are not already in use, looking for a USB drive.
+    usb_ep_t keyboards[1];
+    for (int port_idx = 0; port_idx < ws->num_ports; port_idx++) {
+        // Skip ports that are neither USB2 or USB3.
+        if (!(ws->port_type[port_idx] & (PORT_TYPE_USB2 | PORT_TYPE_USB3))) continue;
+
+        uint32_t port_status = read32(&op_regs->port_regs[port_idx].sc);
+
+        // Skip ports owned by a device found during a previous scan, unless it was unplugged.
+        if (ws->port_type[port_idx] & PORT_TYPE_IN_USE) {
+            if (port_status & XHCI_PORT_SC_CCS) continue;
+            ws->port_type[port_idx] &= ~PORT_TYPE_IN_USE;
+        }
+
+        // Check if anything is connected to this port.
+        if (~port_status & XHCI_PORT_SC_CCS) continue;
+
+        // Reset the port.
+        if (!reset_xhci_port(op_regs, port_idx)) continue;
+
+        usleep(10*MILLISEC);  // USB reset recovery time
+
+        port_status = read32(&op_regs->port_regs[port_idx].sc);
+
+        // Check the port is active.
+        if (~port_status & XHCI_PORT_SC_CCS) continue;
+        if (~port_status & XHCI_PORT_SC_PED) continue;
+
+        // Now the port has been enabled, we can determine the device speed.
+        ws->port_speed = get_xhci_device_speed(op_regs, port_idx);
+        usb_speed_t device_speed = xhci_to_usb_speed(ws->port_speed);
+
+        // Allocate a controller slot for this device.
+        int slot_id = allocate_slot(hcd);
+        if (slot_id == 0) break;
+
+        // With max_keyboards = 0 only the mass storage path can succeed, so a true
+        // return value means the USB drive was found on this port.
+        int num_devices = 0;
+        int num_keyboards = 0;
+        if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, device_speed, slot_id,
+                                        &num_devices, keyboards, 0, &num_keyboards)) {
+            ws->port_type[port_idx] |= PORT_TYPE_IN_USE;
+            return true;
+        }
+
+        disable_xhci_port(op_regs, port_idx);
+        release_slot(hcd, slot_id);
+    }
+
+    heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
+    return false;
+}
+
 //------------------------------------------------------------------------------
 // Driver Method Table
 //------------------------------------------------------------------------------
@@ -1093,7 +1178,8 @@ static const hcd_methods_t methods = {
     .rearm_keyboards     = rearm_keyboards,
     .configure_bulk_ep   = configure_bulk_ep,
     .bulk_transfer       = bulk_transfer,
-    .reset_bulk_ep       = reset_bulk_ep
+    .reset_bulk_ep       = reset_bulk_ep,
+    .scan_for_msd        = scan_for_msd
 };
 
 //------------------------------------------------------------------------------
@@ -1275,6 +1361,9 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     ws->rt_regs = rt_regs;
     ws->db_regs = db_regs;
 
+    // Record the port types to allow us to rescan the root ports later.
+    memcpy(ws->port_type, port_type, sizeof(ws->port_type));
+
     ws->device_context_index = device_context_index;
 
     ws->context_size = cap_regs->hcc_params1 & 0x4 ? 64 : 32;
@@ -1315,6 +1404,8 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     memset(&root_hub, 0, sizeof(root_hub));
     root_hub.ep0            = NULL;
     root_hub.num_ports      = cap_regs->hcs_params1 & 0xff;
+
+    ws->num_ports = root_hub.num_ports;
 
     usleep(100*MILLISEC);  // USB maximum device attach time.
 
@@ -1363,6 +1454,7 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         // Look for keyboards attached directly or indirectly to this port.
         if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, device_speed, slot_id,
                                         &num_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
+            ws->port_type[port_idx] |= PORT_TYPE_IN_USE;
             continue;
         }
 
@@ -1380,10 +1472,8 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
                    num_keyboards, num_keyboards != 1 ? "s" : "",
                    msd_on_this_hcd ? ", 1 USB drive" : "");
 
-    if (num_keyboards == 0 && !msd_on_this_hcd) {
-        (void)halt_host_controller(op_regs);
-        goto no_keyboards_found;
-    }
+    // Even if no device was found, keep the controller registered so its root ports
+    // can be rescanned later by usb_scan_for_msd().
 
     // Initialise the interrupt TRB ring for each keyboard interface.
     ws->num_keyboards = num_keyboards;

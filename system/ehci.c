@@ -139,6 +139,8 @@
 
 #define MAX_KEYBOARDS           8                   // per host controller
 
+#define EHCI_MAX_PORTS          15                  // HCSPARAMS N_PORTS is a 4-bit field
+
 #define WS_QHD_SIZE             (1 + MAX_KEYBOARDS) // Queue Head Descriptors
 #define WS_QTD_SIZE             (3 + MAX_KEYBOARDS) // Queue Transfer Descriptors
 
@@ -226,6 +228,12 @@ typedef struct {
 
     // Number of keyboards detected.
     int                 num_keyboards;
+
+    // State needed to rescan the root ports after initialisation.
+    int                 num_hs_devices;
+    uint8_t             num_ports;
+    bool                i_have_companions;
+    bool                port_in_use[EHCI_MAX_PORTS];
 } workspace_t  __attribute__ ((aligned (256)));
 
 //------------------------------------------------------------------------------
@@ -557,6 +565,84 @@ static bool reset_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id)
     return true;
 }
 
+static bool scan_for_msd(const usb_hcd_t *hcd)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    ehci_op_regs_t *op_regs = ws->op_regs;
+
+    // Record the heap state to allow us to free memory if the scan fails.
+    uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
+
+    // Construct a hub descriptor for the root hub.
+    usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
+    root_hub.ep0            = NULL;
+    root_hub.num_ports      = ws->num_ports;
+    root_hub.power_up_delay = 10;  // 20ms
+
+    usleep(100*MILLISEC);  // USB maximum device attach time
+
+    // Scan the ports that are not already in use, looking for a USB drive.
+    usb_ep_t keyboards[1];
+    for (int port_idx = 0; port_idx < ws->num_ports; port_idx++) {
+        uint32_t port_status = read32(&op_regs->port_sc[port_idx]);
+
+        // Check the port is powered up.
+        if (~port_status & EHCI_PORT_SC_PP) continue;
+
+        // Skip ports owned by a device found during a previous scan, unless it was unplugged.
+        if (ws->port_in_use[port_idx]) {
+            if ((port_status & (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) == (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) {
+                continue;
+            }
+            ws->port_in_use[port_idx] = false;
+        }
+
+        // Check if anything is connected to this port.
+        if (~port_status & EHCI_PORT_SC_CCS) continue;
+
+        // Low and full speed devices are handled by the companion controllers, which we don't rescan.
+        if ((port_status & EHCI_PORT_SC_LS_MASK) == EHCI_PORT_SC_LS_K) {
+            if (ws->i_have_companions) {
+                release_ehci_port(op_regs, port_idx);
+            }
+            continue;
+        }
+
+        // Reset the port.
+        if (!reset_ehci_port(op_regs, port_idx)) continue;
+
+        usleep(10*MILLISEC);  // USB reset recovery time
+
+        port_status = read32(&op_regs->port_sc[port_idx]);
+
+        // Check for full speed device.
+        if (~port_status & EHCI_PORT_SC_PED) {
+            if (ws->i_have_companions) {
+                release_ehci_port(op_regs, port_idx);
+            }
+            continue;
+        }
+
+        ws->num_hs_devices++;
+
+        // With max_keyboards = 0 only the mass storage path can succeed, so a true
+        // return value means the USB drive was found on this port.
+        int num_keyboards = 0;
+        if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, USB_SPEED_HIGH, ws->num_hs_devices,
+                                        &ws->num_hs_devices, keyboards, 0, &num_keyboards)) {
+            ws->port_in_use[port_idx] = true;
+            return true;
+        }
+
+        disable_ehci_port(op_regs, port_idx);
+    }
+
+    heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
+    return false;
+}
+
 //------------------------------------------------------------------------------
 // Driver Method Table
 //------------------------------------------------------------------------------
@@ -574,7 +660,8 @@ static const hcd_methods_t methods = {
     .rearm_keyboards     = NULL,
     .configure_bulk_ep   = configure_bulk_ep,
     .bulk_transfer       = bulk_transfer,
-    .reset_bulk_ep       = reset_bulk_ep
+    .reset_bulk_ep       = reset_bulk_ep,
+    .scan_for_msd        = scan_for_msd
 };
 
 //------------------------------------------------------------------------------
@@ -685,6 +772,10 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
     bool i_have_companions = (num_ehci_companions(hcs_params) > 0);
 
+    // Record the state needed to rescan the root ports later.
+    ws->num_ports         = root_hub.num_ports;
+    ws->i_have_companions = i_have_companions;
+
     // Scan the ports, looking for hubs and keyboards.
     usb_ep_t keyboards[MAX_KEYBOARDS];
     int num_keyboards = 0;
@@ -733,6 +824,7 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         // Look for keyboards and USB drives attached directly or indirectly to this port.
         if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, USB_SPEED_HIGH, num_hs_devices,
                                         &num_hs_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
+            ws->port_in_use[port_idx] = true;
             continue;
         }
 
@@ -753,12 +845,10 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         print_usb_info(" Handed over low/full speed devices to companion controllers");
     }
 
-    if (num_keyboards == 0 && !msd_on_this_hcd) {
-        (void)halt_host_controller(op_regs);
-        goto no_keyboards_found;
-    }
-
-    ws->num_keyboards = num_keyboards;
+    // Even if no device was found, keep the controller registered so its root ports
+    // can be rescanned later by usb_scan_for_msd().
+    ws->num_hs_devices = num_hs_devices;
+    ws->num_keyboards  = num_keyboards;
 
     if (num_keyboards > 0) {
         // Initialise the interrupt QHD and QTD for each keyboard interface and find the minimum interval.

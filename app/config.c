@@ -983,11 +983,11 @@ void config_menu(bool initial)
             prints(POP_R+11, POP_LI, "<F10> Exit menu");
         } else {
             prints(POP_R+7,  POP_LI, "<F5>  Skip current test");
-            if (usb_mass_storage_found) {
-                if (usb_msd_name[0]) {
+            if (usb_mass_storage_found || usb_hcd_available()) {
+                if (usb_mass_storage_found && usb_msd_name[0]) {
                     // Truncate the drive name so the line stays inside the popup.
                     usb_msd_name[19] = '\0';
-                    printf(POP_R+8,  POP_LI, "<F6>  Save to %s", usb_msd_name);
+                    printf(POP_R+8,  POP_LI, "<F6>  Save to %s           ", usb_msd_name);
                 } else {
                     prints(POP_R+8,  POP_LI, "<F6>  Save results to USB");
                 }
@@ -1029,7 +1029,7 @@ void config_menu(bool initial)
           case '6':
             if (initial) {
                 enable_temp_cpu = !enable_temp_cpu;
-            } else if (usb_mass_storage_found) {
+            } else if (usb_mass_storage_found || usb_hcd_available()) {
                 save_results_to_usb();
             }
             break;

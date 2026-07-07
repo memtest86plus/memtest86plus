@@ -116,6 +116,7 @@ typedef struct {
     bool    (*configure_bulk_ep)    (usb_hcd_r, const usb_ep_t *, int, bool);
     bool    (*bulk_transfer)        (usb_hcd_r, const usb_ep_t *, void *, size_t, bool);
     bool    (*reset_bulk_ep)        (usb_hcd_r, const usb_ep_t *, int);
+    bool    (*scan_for_msd)         (usb_hcd_r);
 } hcd_methods_t;
 
 /**
@@ -377,5 +378,22 @@ extern char usb_msd_name[64];
  * If found, populates msd and returns true.
  */
 bool find_usb_mass_storage(usb_msd_t *msd);
+
+/**
+ * Returns true if at least one USB host controller driver is active.
+ *
+ * Used by config.c to decide whether to offer saving results to USB.
+ */
+bool usb_hcd_available(void);
+
+/**
+ * Rescans the root ports of the active host controllers for a newly attached
+ * mass storage device, allowing a USB drive to be plugged in after boot.
+ * Returns true if a mass storage device is available, whether found by this
+ * scan or by a previous one.
+ *
+ * Used by reports.c when the user requests a report save.
+ */
+bool usb_scan_for_msd(void);
 
 #endif // USBHCD_H

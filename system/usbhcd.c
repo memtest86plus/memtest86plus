@@ -74,7 +74,8 @@ static const hcd_methods_t methods = {
     .rearm_keyboards     = NULL,
     .configure_bulk_ep   = NULL,
     .bulk_transfer       = NULL,
-    .reset_bulk_ep       = NULL
+    .reset_bulk_ep       = NULL,
+    .scan_for_msd        = NULL
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.
@@ -91,8 +92,12 @@ static usb_hcd_t hcd_list[MAX_HCD] = {
 
 static int num_hcd = 0;
 
+static int num_usb_keyboards = 0;
+
 static int print_row = 0;
 static int print_col = 0;
+
+static bool usb_runtime_scan = false;
 
 static usb_msd_t usb_msd_info;
 
@@ -726,26 +731,27 @@ static void probe_usb_controller(hci_type_t controller_type, uintptr_t pm_base_a
     print_usb_info("Probing %s controller at %08x", hci_name[controller_type], pm_base_addr);
 
     // Probe the device according to its type.
-    bool keyboards_found = false;
+    bool registered = false;
     switch (controller_type) {
       case UHCI:
-        keyboards_found = uhci_probe(vm_base_addr, &hcd_list[num_hcd]);
+        registered = uhci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       case OHCI:
-        keyboards_found = ohci_probe(vm_base_addr, &hcd_list[num_hcd]);
+        registered = ohci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       case EHCI:
-        keyboards_found = ehci_probe(vm_base_addr, &hcd_list[num_hcd]);
+        registered = ehci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       case XHCI:
-        keyboards_found = xhci_probe(vm_base_addr, &hcd_list[num_hcd]);
+        registered = xhci_probe(vm_base_addr, &hcd_list[num_hcd]);
         break;
       default:
         break;
     }
-    // Register only on probe success: a failed probe has freed its workspace, and the
-    // probes already return true when the mass storage device is on this controller.
-    if (keyboards_found) {
+    // Register only on probe success: a failed probe has freed its workspace. EHCI and
+    // xHCI probes succeed whenever the controller itself initialises, even if no device
+    // was found, so their root ports can be rescanned later by usb_scan_for_msd().
+    if (registered) {
         num_hcd++;
     }
 }
@@ -805,6 +811,11 @@ bool wait_until_set(const volatile uint32_t *reg, uint32_t bit_mask, int max_tim
 
 void print_usb_info(const char *fmt, ...)
 {
+    // During a runtime rescan the test display is live and must not be disturbed.
+    if (usb_runtime_scan) {
+        return;
+    }
+
     if (print_row == SCREEN_HEIGHT) {
         scroll_screen_region(0, 0, SCREEN_HEIGHT - 1, SCREEN_WIDTH - 1);
         print_row--;
@@ -1005,6 +1016,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
 
             keyboard_found = true;
             *num_keyboards += 1;
+            num_usb_keyboards++;
         }
     }
 
@@ -1088,7 +1100,7 @@ void find_usb_keyboards(bool pause_if_none)
     if (usb_init_options & USB_DEBUG) {
         print_usb_info("Press any key to continue...");
         while (get_key() == 0) {}
-    } else if (pause_if_none && num_hcd == 0) {
+    } else if (pause_if_none && num_usb_keyboards == 0) {
         for (int i = PAUSE_IF_NONE_TIME; i > 0; i--) {
             print_usb_info("No USB keyboards found. Continuing in %i second%c ", i, i == 1 ? ' ' : 's');
             sleep(1);
@@ -1132,4 +1144,25 @@ bool find_usb_mass_storage(usb_msd_t *msd)
     msd->block_count = 0;
     msd->block_size  = 512;
     return true;
+}
+
+bool usb_hcd_available(void)
+{
+    return num_hcd > 0;
+}
+
+bool usb_scan_for_msd(void)
+{
+    if (usb_mass_storage_found) {
+        return true;
+    }
+    usb_runtime_scan = true;
+    for (int i = 0; i < num_hcd && !usb_mass_storage_found; i++) {
+        const usb_hcd_t *hcd = &hcd_list[i];
+        if (hcd->methods->scan_for_msd != NULL) {
+            (void)hcd->methods->scan_for_msd(hcd);
+        }
+    }
+    usb_runtime_scan = false;
+    return usb_mass_storage_found;
 }

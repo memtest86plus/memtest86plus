@@ -352,23 +352,31 @@ static int format_results(char *buf, int bufsize)
 
 void save_results_to_usb(void)
 {
+    // The drive may have been plugged in after boot - scan for it now. This must be
+    // done before the heap mark below is recorded, so that anything allocated for a
+    // newly found drive is not freed when the save completes.
+    if (!usb_mass_storage_found) {
+        prints(POP_R+14, POP_LI, "Scanning for USB drive...   ");
+        (void)usb_scan_for_msd();
+    }
+
     // Save heap state so we can free everything when done.
     uintptr_t heap_lm_mark = heap_mark(HEAP_TYPE_LM_1);
 
-    prints(POP_R+14, POP_LI, "Searching for USB drive...");
+    prints(POP_R+14, POP_LI, "Searching for USB drive...  ");
 
     // Find a mass storage device.
     usb_msd_t msd;
     if (!find_usb_mass_storage(&msd)) {
-        prints(POP_R+14, POP_LI, "No USB drive found.      ");
+        prints(POP_R+14, POP_LI, "No USB drive found.         ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
 
-    prints(POP_R+14, POP_LI, "Initializing USB drive...");
+    prints(POP_R+14, POP_LI, "Initializing USB drive...   ");
 
     if (!msd_init(&msd)) {
-        prints(POP_R+14, POP_LI, "USB drive init failed.   ");
+        prints(POP_R+14, POP_LI, "USB drive init failed.      ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
@@ -376,7 +384,7 @@ void save_results_to_usb(void)
     // Allocate a sector buffer.
     uintptr_t sec_buf_addr = heap_alloc(HEAP_TYPE_LM_1, msd.block_size, 64);
     if (sec_buf_addr == 0) {
-        prints(POP_R+14, POP_LI, "Memory allocation failed.");
+        prints(POP_R+14, POP_LI, "Memory allocation failed.   ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
@@ -385,7 +393,7 @@ void save_results_to_usb(void)
 
     fat32_fs_t fs;
     if (!fat32_mount(&fs, &msd, (uint8_t *)sec_buf_addr)) {
-        prints(POP_R+14, POP_LI, "No FAT32 filesystem found.");
+        prints(POP_R+14, POP_LI, "No FAT32 filesystem found.  ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
@@ -393,7 +401,7 @@ void save_results_to_usb(void)
     // Generate filename.
     char filename[12];
     if (!fat32_next_filename(&fs, filename)) {
-        prints(POP_R+14, POP_LI, "All filename slots full. ");
+        prints(POP_R+14, POP_LI, "All filename slots full.    ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
@@ -401,7 +409,7 @@ void save_results_to_usb(void)
     // Format results into a buffer.
     uintptr_t res_buf_addr = heap_alloc(HEAP_TYPE_LM_1, RESULTS_BUF_SIZE, 64);
     if (res_buf_addr == 0) {
-        prints(POP_R+14, POP_LI, "Memory allocation failed.");
+        prints(POP_R+14, POP_LI, "Memory allocation failed.   ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
@@ -418,10 +426,10 @@ void save_results_to_usb(void)
     display_name[11] = 'T';
     display_name[12] = '\0';
 
-    printf(POP_R+14, POP_LI, "Writing %s...   ", display_name);
+    printf(POP_R+14, POP_LI, "Writing %s...        ", display_name);
 
     if (!fat32_write_file(&fs, filename, results_buf, results_len)) {
-        prints(POP_R+14, POP_LI, "Write failed!            ");
+        prints(POP_R+14, POP_LI, "Write failed!               ");
         usleep(2000 * MILLISEC);
         goto cleanup;
     }
