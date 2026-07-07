@@ -68,7 +68,6 @@ static int test_ticks = 0;      // current value (ticks_per_test is final value)
 static int pass_bar_length = 0; // currently displayed length
 static int test_bar_length = 0; // currently displayed length
 
-uint64_t run_start_time = 0; // TSC time stamp
 static uint64_t next_spin_time = 0; // TSC time stamp
 
 static int prev_sec = -1;               // previous second
@@ -82,6 +81,8 @@ static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 //------------------------------------------------------------------------------
 
 int scroll_message_row;
+
+uint64_t run_start_time = 0; // TSC time stamp
 
 int max_cpu_temp = TEMP_INVALID;
 
