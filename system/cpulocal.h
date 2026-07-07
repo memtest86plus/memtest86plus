@@ -43,4 +43,21 @@ static inline local_flag_t *local_flags(int flag_num)
     return (local_flag_t *)(_stacks + BSP_STACK_SIZE - LOCALS_SIZE + flag_num);
 }
 
+/**
+ * Writes a canary value at the bottom of the given CPU's stack slot and
+ * marks it as armed. Must be called again after each program relocation.
+ */
+void stack_canary_arm(int cpu_num);
+
+/**
+ * Marks all stack canaries as no longer valid.
+ */
+void stack_canary_disarm_all(void);
+
+/**
+ * Checks all armed stack canaries. Returns the number of the first CPU
+ * whose canary has been overwritten, or -1 if all are intact.
+ */
+int stack_canary_check(void);
+
 #endif // CPULOCAL_H

@@ -71,6 +71,18 @@ static inline void spin_lock(spinlock_t *lock)
 }
 
 /**
+ * Locks the mutex if it is not currently locked, without waiting. Returns
+ * true if the mutex was locked by this call, false if it was already held.
+ */
+static inline bool spin_trylock(spinlock_t *lock)
+{
+    if (lock) {
+        return __sync_bool_compare_and_swap(lock, false, true);
+    }
+    return true;
+}
+
+/**
  * Unlocks the mutex.
  */
 static inline void spin_unlock(spinlock_t *lock)

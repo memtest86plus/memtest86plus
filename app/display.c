@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "cpuid.h"
+#include "cpulocal.h"
 #include "cpuinfo.h"
 #include "hwctrl.h"
 #include "i2c_x86.h"
@@ -15,6 +16,7 @@
 #include "serial.h"
 #include "pmem.h"
 #include "smbios.h"
+#include "smp.h"
 #include "spd.h"
 #include "temperature.h"
 #include "tsc.h"
@@ -539,16 +541,20 @@ void scroll(void)
     if (scroll_message_row < ROW_SCROLL_B) {
         scroll_message_row++;
     } else {
-        if (scroll_lock) {
-            display_footer_message("<Enter> Single step     ");
-        }
-        scroll_wait = true;
-        do {
-            check_input();
-        } while (scroll_wait && scroll_lock);
+        // Only the master CPU may poll the keyboard, so the scroll-lock
+        // single-step wait is only available to it.
+        if (smp_my_cpu_num() == master_cpu) {
+            if (scroll_lock) {
+                display_footer_message("<Enter> Single step     ");
+            }
+            scroll_wait = true;
+            do {
+                check_input();
+            } while (scroll_wait && scroll_lock);
 
-        scroll_wait = false;
-        clear_footer_message();
+            scroll_wait = false;
+            clear_footer_message();
+        }
         scroll_screen_region(ROW_SCROLL_T, 0, ROW_SCROLL_B, SCREEN_WIDTH - 1);
     }
 }
@@ -631,6 +637,15 @@ void do_tick(int my_cpu)
 
     // This only tick one time per second
     if (!timed_update_done) {
+
+        // A corrupted stack canary means a CPU overran its stack slot and may
+        // have corrupted the thread-local barrier flags below it (see boot.h).
+        static int last_overflow_cpu = -1;
+        int overflow_cpu = stack_canary_check();
+        if (overflow_cpu >= 0 && overflow_cpu != last_overflow_cpu) {
+            last_overflow_cpu = overflow_cpu;
+            do_trace(overflow_cpu, "CPU stack overflow detected - test results are unreliable");
+        }
 
         // Display FAIL banner if (new) errors detected
         if (err_banner_redraw && !big_status_displayed && error_count > 1) {
