@@ -21,6 +21,7 @@
 #include "acpi.h"
 #include "cache.h"
 #include "cpuid.h"
+#include "cpulocal.h"
 #include "cpuinfo.h"
 #include "heap.h"
 #include "hwctrl.h"
@@ -447,6 +448,10 @@ static void test_all_windows(int my_cpu)
         }
     }
     if (i_am_master) {
+        // CPUs not taking part in this test won't re-arm their stack
+        // canaries, and the coming relocations will invalidate them.
+        stack_canary_disarm_all();
+
         num_active_cpus = 1;
         if (!dummy_run) {
             if (parallel_test) {

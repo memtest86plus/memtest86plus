@@ -19,11 +19,16 @@
 #define	MAX_APS		511		/* Maximum number of active APs */
 
 #define BSP_STACK_SIZE	16384		/* Stack size for the BSP */
-#ifdef __loongarch_lp64
-#define AP_STACK_SIZE	2048		/* Stack size for each AP */
-#else
-#define AP_STACK_SIZE	1024		/* Stack size for each AP */
-#endif
+
+/*
+ * Stack size for each AP. Each CPU's thread-local storage (the barrier
+ * waiting flags) occupies the top LOCALS_SIZE bytes of its own stack slot,
+ * directly below the bottom of the next CPU's stack: an AP overrunning its
+ * stack silently corrupts its neighbour's flags and freezes the whole test.
+ * 1024 bytes proved too small for the error reporting path; the canary in
+ * system/cpulocal.c turns any future overrun into a visible report.
+ */
+#define AP_STACK_SIZE	2048
 
 #define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
