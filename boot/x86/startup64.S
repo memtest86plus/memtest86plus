@@ -253,13 +253,17 @@ flush:	movw	$KERNEL_DS, %ax
 
 	lidt	idt_descr(%rip)
 
-	# Zero the BSS (if first boot).
+	# Zero the BSS (if first boot). The stack area is excluded: it doesn't
+	# need initialising (the thread-local storage it contains is always
+	# written before use), and when loaded in low memory it can extend
+	# beyond the end of usable RAM, into the video/ROM region, where the
+	# ACPI and SMBIOS structures would be destroyed by the write sweep.
 
 	cmpl	$1, first_boot(%rip)
 	jne	1f
 	xorq	%rax, %rax
 	leaq	_bss(%rip), %rdi
-	leaq	_end(%rip), %rcx
+	leaq	_stacks(%rip), %rcx
 	subq	%rdi, %rcx
 0:	movq	%rax, (%rdi)
 	addq	$8, %rdi
