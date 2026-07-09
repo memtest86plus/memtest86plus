@@ -68,6 +68,7 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = NULL,
     .setup_request       = NULL,
     .get_data_request    = NULL,
+    .out_data_request    = NULL,
     .poll_keyboards      = NULL
 };
 
@@ -87,6 +88,10 @@ static int num_hcd = 0;
 
 static int print_row = 0;
 static int print_col = 0;
+
+static int print_idx = -1;
+static usb_ep_t print_ep = {0};
+static const usb_hcd_t *print_hcd = &hcd_list[0];
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -216,7 +221,8 @@ static int get_configuration_descriptors(const usb_hcd_t *hcd, const usb_ep_t *e
 }
 
 static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int desc_length, usb_ep_t keyboards[],
-                                               int max_keyboards, int *num_keyboards)
+                                               int max_keyboards, int *num_keyboards,
+                                               usb_device_type_t *device_type)
 {
     usb_ep_t *kbd = NULL;
     const uint8_t *curr_ptr = desc_buffer + sizeof(usb_config_desc_t);
@@ -239,6 +245,10 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
                 sleep(1);
             }
             if (ifc->class == 3 && ifc->subclass == 1 && ifc->protocol == 1) {
+                *device_type = DEV_KEYBOARD;
+            }
+
+            if (*device_type != DEV_UNKNOWN) {
                 kbd = &keyboards[*num_keyboards];
                 kbd->interface_num = ifc->interface_num;
             } else {
@@ -251,12 +261,25 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
                                (uintptr_t)endpoint->address, (uintptr_t)endpoint->attributes);
                 sleep(1);
             }
-            if (kbd && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
+            if (!kbd) {
+                // next
+            } else if (*device_type == DEV_KEYBOARD && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
+                // register first endpoint that is IN and interrupt
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
                 kbd->interval        = endpoint->interval;
+                kbd->reserved        = (uint8_t) *device_type;
                 kbd = NULL;
 
+                *num_keyboards += 1;
+            } else if (*device_type >= DEV_SERIAL && !(endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x2) {
+                // register first endpoint that is OUT and bulk
+                kbd->endpoint_num    = endpoint->address & 0xf;
+                kbd->max_packet_size = endpoint->max_packet_size;
+                kbd->interval        = 0; // not interrupt endpoint
+                kbd->reserved        = (uint8_t) *device_type;
+
+                kbd = NULL;
                 *num_keyboards += 1;
             }
         }
@@ -285,6 +308,98 @@ static bool configure_keyboard(const usb_hcd_t *hcd, const usb_ep_t *ep0, int in
     // Select the boot protocol.
     build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_CLASS, HID_SET_PROTOCOL, 0, interface_num, 0);
     if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
+    return true;
+}
+
+#define CH341_REQ_SERIAL_INIT 0xA1
+#define CH341_REQ_WRITE_REG   0x9A
+
+static bool configure_ch341(const usb_hcd_t *hcd, const usb_ep_t *ep0)
+{
+    usb_setup_pkt_t setup_pkt;
+
+    // Set up serial line
+    build_setup_packet(&setup_pkt, USB_REQ_TO_DEVICE | USB_REQ_VENDOR, CH341_REQ_SERIAL_INIT, 0, 0, 0);
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
+    // div/prescale F3 07 gives 923077 baud, set bit 7 for non-buffered
+    build_setup_packet(&setup_pkt, USB_REQ_TO_DEVICE | USB_REQ_VENDOR, CH341_REQ_WRITE_REG, 0x1312, 0xf387, 0);
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
+    return true;
+}
+
+#define CP210X_IFC_ENABLE       0x00
+#define CP210X_SET_BAUDRATE     0x1E
+#define CP210X_UART_ENABLE      0x0001
+#define CP210X_UART_DISABLE     0x0000
+
+static bool configure_cp210x(const usb_hcd_t *hcd, const usb_ep_t *ep0, int interface_num)
+{
+    usb_setup_pkt_t setup_pkt;
+
+    build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_VENDOR, CP210X_IFC_ENABLE, CP210X_UART_ENABLE, interface_num, 0);
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) {
+        return false;
+    }
+
+    const uint32_t baud_le = 921600; // really 923076 on CP2104, CP2105, CP2110
+    build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_VENDOR, CP210X_SET_BAUDRATE, 0, interface_num, 4);
+    if (!hcd->methods->out_data_request(hcd, ep0, &setup_pkt, &baud_le, 4)) {
+        return false;
+    }
+
+    return true;
+}
+
+#define pl2303_vendor_read(value) do { \
+    build_setup_packet(&setup_pkt, 0xc0, 0x01, value, 0, 1); \
+    if (!hcd->methods->get_data_request(hcd, ep0, &setup_pkt, &buf1, 1)) { \
+        return false; \
+    } \
+  } while (0)
+
+#define pl2303_vendor_write(value, index) do { \
+    build_setup_packet(&setup_pkt, 0x40, 0x01, value, index, 0); \
+    if (!hcd->methods->setup_request(hcd, ep0, &setup_pkt)) { \
+        return false; \
+    } \
+  } while (0)
+
+static bool configure_pl2303(const usb_hcd_t *hcd, const usb_ep_t *ep0)
+{
+    usb_setup_pkt_t setup_pkt;
+    uint8_t buf1;
+
+    // Magic sequence
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_write(0x0404, 0);
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_read(0x8383);
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_write(0x0404, 1);
+    pl2303_vendor_read(0x8484);
+    pl2303_vendor_read(0x8383);
+    pl2303_vendor_write(0, 1);
+    pl2303_vendor_write(1, 0);
+
+    // For non-legacy variants
+    pl2303_vendor_write(2, 0x44);
+    pl2303_vendor_write(8, 0);
+    pl2303_vendor_write(9, 0);
+
+    // 921600 baud, 1 stop bit, parity none, 8 bits
+    uint8_t setline[7] = {0, 0x10, 0x0e, 0, 0, 0, 8};
+
+    build_setup_packet(&setup_pkt, 0x21, 0x20, 0, 0, 7);
+    if (!hcd->methods->out_data_request(hcd, ep0, &setup_pkt, setline, 7)) {
         return false;
     }
 
@@ -741,6 +856,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                                  usb_ep_t keyboards[], int max_keyboards, int *num_keyboards)
 {
     bool keyboard_found = false;
+    usb_device_type_t device_type;
 
     // Set the USB device address. If successful, this also fills in the descriptor for the default control endpoint
     // (ep0) and leaves the device descriptor in the data transfer buffer.
@@ -750,6 +866,21 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     }
     usb_device_desc_t *device = (usb_device_desc_t *)hcd->ws->data_buffer;
     bool is_hub = (device->class == USB_CLASS_HUB);
+
+#if 0
+    print_usb_info("device %04x:%04x bcdDevice %02x.%02x",
+                   device->vendor_id, device->product_id, device->device_major, device->device_minor);
+#endif
+
+    if (device->vendor_id == 0x1a86 && device->product_id == 0x7523) {
+        device_type = DEV_SERIAL_CH341;
+    } else if (device->vendor_id == 0x10c4) {
+        device_type = DEV_SERIAL_CP210X;
+    } else if (device->vendor_id == 0x067b) {
+        device_type = DEV_SERIAL_PL2303;
+    } else {
+        device_type = DEV_UNKNOWN;
+    }
 
     // Fetch the descriptors for the first configuration into the data transfer buffer. In theory a keyboard device
     // may have more than one configuration and may only support the boot protocol in another configuration, but
@@ -784,7 +915,8 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         int old_num_keyboards = *num_keyboards;
         int new_num_keyboards = *num_keyboards;
         get_keyboard_info_from_descriptors(hcd->ws->data_buffer, hcd->ws->data_length,
-                                           keyboards, max_keyboards, &new_num_keyboards);
+                                           keyboards, max_keyboards, &new_num_keyboards,
+                                           &device_type);
         if (new_num_keyboards == old_num_keyboards) {
             return false;
         }
@@ -803,10 +935,36 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                     return false;
                 }
             }
-            if (!configure_keyboard(hcd, &ep0, kbd->interface_num)) break;
+            if (IS_EP_KEYBOARD(kbd)) {
+                if (!configure_keyboard(hcd, &ep0, kbd->interface_num)) break;
 
-            print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
-                           port_num, kbd->interface_num, kbd->endpoint_num);
+                print_usb_info(" Keyboard found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+
+            } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CH341) {
+                if (!configure_ch341(hcd, &ep0)) break;
+                print_hcd = hcd;
+                print_idx = kbd_idx;
+
+                print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+
+            } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CP210X) {
+                if (!configure_cp210x(hcd, &ep0, kbd->interface_num)) break;
+                print_hcd = hcd;
+                print_idx = kbd_idx;
+
+                print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+
+            } else if (kbd->reserved == (uint8_t) DEV_SERIAL_PL2303) {
+                if (!configure_pl2303(hcd, &ep0)) break;
+                print_hcd = hcd;
+                print_idx = kbd_idx;
+
+                print_usb_info(" PL2303 serial adapter found on port %i interface %i endpoint %i",
+                               port_num, kbd->interface_num, kbd->endpoint_num);
+            }
 
             keyboard_found = true;
             *num_keyboards += 1;
@@ -814,6 +972,13 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
     }
 
     return keyboard_found;
+}
+
+void save_ep(int kbd_idx, usb_ep_t *ep)
+{
+    if (kbd_idx == print_idx) {
+        print_ep = *ep;
+    }
 }
 
 bool process_usb_keyboard_report(const usb_hcd_t *hcd, const hid_kbd_rpt_t *report, const hid_kbd_rpt_t *prev_report)
@@ -916,4 +1081,31 @@ uint8_t get_usb_keycode(void)
         }
     }
     return 0;
+}
+
+bool usb_serial_print(const char *str)
+{
+    const char *packet = str;
+
+    if (print_ep.max_packet_size == 0)
+        return false;
+
+    if (print_ep.reserved == (uint8_t) DEV_UNKNOWN)
+        return false;
+
+    // OUT data method not implemented for all controller types yet
+    if (!print_hcd->methods->out_data_request)
+        return false;
+
+    while (*packet != '\0') {
+        int i;
+
+        for (i = 0; packet[i] != '\0' && i < print_ep.max_packet_size; i++)
+            ;
+        if (!print_hcd->methods->out_data_request(print_hcd, &print_ep, NULL, packet, i)) {
+            return false;
+        }
+        packet = &packet[i];
+    }
+    return true;
 }

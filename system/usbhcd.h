@@ -39,6 +39,18 @@
 #define HCD_KC_BUFFER_SIZE      8  // keycodes
 
 /**
+ * Device types that we recognize
+ */
+typedef enum {
+    DEV_UNKNOWN,
+    DEV_KEYBOARD,
+    DEV_SERIAL,
+    DEV_SERIAL_CH341,
+    DEV_SERIAL_CP210X,
+    DEV_SERIAL_PL2303,
+} usb_device_type_t;
+
+/**
  * A USB device speed (used internally by the various HCI drivers).
  */
 typedef enum  __attribute__ ((packed)) {
@@ -62,6 +74,8 @@ typedef struct __attribute__ ((packed)) {
     uint8_t         reserved;
 } usb_ep_t;
 
+#define IS_EP_INT(ep) ((ep)->interval != 0)
+#define IS_EP_KEYBOARD(ep) ((ep)->reserved == (uint8_t) DEV_KEYBOARD)
 /**
  * A USB parent device descriptor (used internally by the various HCI drivers).
  */
@@ -110,6 +124,7 @@ typedef struct {
     bool    (*configure_kbd_ep)     (usb_hcd_r, const usb_ep_t *, int);
     bool    (*setup_request)        (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *);
     bool    (*get_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
+    bool    (*out_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
     void    (*poll_keyboards)       (usb_hcd_r);
 } hcd_methods_t;
 
@@ -327,5 +342,17 @@ void find_usb_keyboards(bool pause_if_none);
  * Used internally by keyboard.c.
  */
 uint8_t get_usb_keycode(void);
+
+/**
+ * Copies endpoint data after initialization
+ *
+ * For USB controller code to hand out endpoints
+ */
+void save_ep(int kbd_idx, usb_ep_t *ep);
+
+/**
+ * Prints a string to the USB-serial adapter discovered by find_usb_keyboards.
+ */
+bool usb_serial_print(const char *str);
 
 #endif // USBHCD_H

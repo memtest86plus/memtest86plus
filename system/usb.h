@@ -31,6 +31,7 @@
 #define USB_REQ_FROM_HUB_PORT   0x83
 
 #define USB_REQ_CLASS           0x20
+#define USB_REQ_VENDOR          0x40
 
 // Request codes.
 

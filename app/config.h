@@ -71,6 +71,7 @@ extern bool         dark_mode;
 
 extern power_save_t power_save;
 
+extern bool         tty_usb;
 extern uintptr_t    tty_address;
 extern int          tty_baud_rate;
 extern int          tty_update_period;
