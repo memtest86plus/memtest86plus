@@ -411,9 +411,9 @@ output in address printing mode may, in exceptional cases, yield better
 results.
 
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
-address test (test 0) and the block move test (test 7) do not contribute to
+address test (test 0) and the block move test (test 8) do not contribute to
 the BadRAM patterns as these tests do not allow the exact address of the
-fault to be determined. The bus stress test (test 9) also does not contribute,
+fault to be determined. The bus stress test (test 3) also does not contribute,
 as its errors are typically transient interface faults rather than bad cells.
 The rowhammer test (test 11) likewise does not contribute, as a hammer-induced
 flip does not mean the address is a defective cell under normal use.
@@ -431,9 +431,9 @@ merged, which will mean some regions include non-faulty locations. The program
 will try to minimise the number of non-faulty locations that are included.
 
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
-address test (test 0) and the block move test (test 7) do not contribute to
+address test (test 0) and the block move test (test 8) do not contribute to
 the faulty memory regions as these tests do not allow the exact address of
-the fault to be determined. The bus stress test (test 9) also does not
+the fault to be determined. The bus stress test (test 3) also does not
 contribute, as its errors are typically transient interface faults rather
 than bad cells. The rowhammer test (test 11) likewise does not contribute, as
 a hammer-induced flip does not mean the address is a defective cell under
@@ -451,9 +451,9 @@ mean some ranges include non-faulty pages. The program will try to minimise
 the number of non-faulty pages that are included.
 
 **NOTE** As mentioned in the individual test descriptions, the walking-ones
-address test (test 0) and the block move test (test 7) do not contribute to
+address test (test 0) and the block move test (test 8) do not contribute to
 the faulty page numbers as these tests do not allow the exact address of the
-fault to be determined. The bus stress test (test 9) also does not contribute,
+fault to be determined. The bus stress test (test 3) also does not contribute,
 as its errors are typically transient interface faults rather than bad cells.
 The rowhammer test (test 11) likewise does not contribute, as a hammer-induced
 flip does not mean the address is a defective cell under normal use.
@@ -631,61 +631,7 @@ catches any errors in the high order address bits that would be missed when
 testing each window in turn. This test is performed sequentially with each
 available CPU, regardless of the CPU sequencing mode selected by the user.
 
-### Test 3 : Moving inversions, ones & zeros
-
-In each memory region in turn, and for each pattern in turn, uses the moving
-inversions algorithm with patterns of all ones and all zeros.
-
-### Test 4 : Moving inversions, random sequence
-
-In each memory region in turn, uses the moving inversions algorithm with a
-vector-wide pseudo-random sequence and its complement. On x86_64 the fill and
-check loops use AVX2 (256-bit) or SSE2 (128-bit) instructions, selected
-automatically at boot and shown in the test name, with each vector lane
-running an independent pseudo-random stream. Writes use non-temporal stores,
-which bypass the cache and maximise the stress on the memory bus. Every
-fourth round a single random value is broadcast to all lanes, reproducing the
-uniform-background fault model of the classic random pattern test. The random
-sequences are different on each round and each test pass, so multiple passes
-increase effectiveness.
-
-### Test 5 : Moving inversions, 8 bit pattern
-
-In each memory region in turn, and for each pattern in turn, uses the moving
-inversions algorithm with patterns of 8-bit wide walking ones and walking zeros.
-
-### Test 6 : Modulo 20, random pattern
-
-In each memory region in turn, and for each pattern in turn, uses the
-Modulo-20 algorithm with patterns of a random number and its complement.
-The random number is different on each test pass so multiple passes increase
-effectiveness. Unlike the moving inversions tests, this addressing scheme is
-not affected by cache masking, so it runs before the long shifting pattern
-test to probe every fault class early in the pass.
-
-### Test 7 : Block move, 64 moves
-
-This test stresses memory by using block move (movs) instructions and is based
-on Robert Redelmeier's burnBX test.
-
-In each memory region in turn, memory is initialized with shifting patterns
-that are inverted every 8 bytes. Then blocks of memory are moved around using
-the movs instruction. After the moves are completed the data patterns are
-checked. Because the data is checked only after the memory moves are completed
-it is not possible to know where the error occurred. The addresses reported
-are only for where the bad pattern was found. In consequence, errors from this
-test do not contribute to BadRAM patterns, memmap regions, or bad page regions.
-
-### Test 8 : Moving inversions, 32/64 bit pattern
-
-In each memory region in turn, and for each pattern in turn, uses the moving
-inversions algorithm with patterns of 32-bit wide (on 32-bit builds) or 64-bit
-wide (on 64-bit builds) walking ones and walking zeros. Unlike previous tests,
-the pattern is rotated 1 bit on each successive address. On the fast first
-pass only every other bit position is walked; every full pass walks all of
-them.
-
-### Test 9 : Bus stress, read/write turnaround
+### Test 3 : Bus stress, read/write turnaround
 
 In each memory region in turn, each CPU splits its chunk of memory into two
 halves and alternates, in short bursts, between filling one half with a fresh
@@ -698,10 +644,64 @@ round inserts short idle gaps into the traffic to generate load transients in
 the module power delivery. This targets DDR5-era interface faults that on-die
 ECC cannot correct: link signal-integrity errors, marginal XMP/EXPO training
 and PMIC voltage droop. On x86_64 the bursts use the same non-temporal
-SIMD kernels as test 4; other builds fall back to cached scalar accesses, which
+SIMD kernels as test 5; other builds fall back to cached scalar accesses, which
 exercise the interface less aggressively. Errors from this test are typically
 transient and will not necessarily repeat at the same address; they do not
 contribute to BadRAM patterns, memmap regions, or bad page regions.
+
+### Test 4 : Moving inversions, ones & zeros
+
+In each memory region in turn, and for each pattern in turn, uses the moving
+inversions algorithm with patterns of all ones and all zeros.
+
+### Test 5 : Moving inversions, random sequence
+
+In each memory region in turn, uses the moving inversions algorithm with a
+vector-wide pseudo-random sequence and its complement. On x86_64 the fill and
+check loops use AVX2 (256-bit) or SSE2 (128-bit) instructions, selected
+automatically at boot and shown in the test name, with each vector lane
+running an independent pseudo-random stream. Writes use non-temporal stores,
+which bypass the cache and maximise the stress on the memory bus. Every
+fourth round a single random value is broadcast to all lanes, reproducing the
+uniform-background fault model of the classic random pattern test. The random
+sequences are different on each round and each test pass, so multiple passes
+increase effectiveness.
+
+### Test 6 : Moving inversions, 8 bit pattern
+
+In each memory region in turn, and for each pattern in turn, uses the moving
+inversions algorithm with patterns of 8-bit wide walking ones and walking zeros.
+
+### Test 7 : Modulo 20, random pattern
+
+In each memory region in turn, and for each pattern in turn, uses the
+Modulo-20 algorithm with patterns of a random number and its complement.
+The random number is different on each test pass so multiple passes increase
+effectiveness. Unlike the moving inversions tests, this addressing scheme is
+not affected by cache masking, so it runs before the long shifting pattern
+test to probe every fault class early in the pass.
+
+### Test 8 : Block move, 64 moves
+
+This test stresses memory by using block move (movs) instructions and is based
+on Robert Redelmeier's burnBX test.
+
+In each memory region in turn, memory is initialized with shifting patterns
+that are inverted every 8 bytes. Then blocks of memory are moved around using
+the movs instruction. After the moves are completed the data patterns are
+checked. Because the data is checked only after the memory moves are completed
+it is not possible to know where the error occurred. The addresses reported
+are only for where the bad pattern was found. In consequence, errors from this
+test do not contribute to BadRAM patterns, memmap regions, or bad page regions.
+
+### Test 9 : Moving inversions, 32/64 bit pattern
+
+In each memory region in turn, and for each pattern in turn, uses the moving
+inversions algorithm with patterns of 32-bit wide (on 32-bit builds) or 64-bit
+wide (on 64-bit builds) walking ones and walking zeros. Unlike previous tests,
+the pattern is rotated 1 bit on each successive address. On the fast first
+pass only every other bit position is walked; every full pass walks all of
+them.
 
 ### Test 10 : Bit fade test, solid and random patterns
 

@@ -42,7 +42,7 @@
 #define MODULO_N            20
 
 // The test whose description is patched with the SIMD tier by test_list_init().
-#define MOV_INV_RNG_TEST    4
+#define MOV_INV_RNG_TEST    5
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -53,6 +53,7 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     { true,  ONE,    1,    6,    0, "[Address test, walking ones, no cache] "},
     {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
     { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
+    { true,  PAR,    1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
     { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
     { true,  PAR,    1,  128,    0, "[Moving inversions, random sequence]   "},
     { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
@@ -63,7 +64,6 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
 #else
     { true,  PAR,    1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
 #endif
-    { true,  PAR,    1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
     { true,  PAR,   12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
     {false,  ONE,    1,   24,    0, "[Rowhammer, Blacksmith-style]          "},
 };
@@ -165,8 +165,21 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         BAILOUT;
         break;
 
+        // Bus stress: NT-write/read burst interleave between two half-chunk streams, duty-cycled
+        // on odd rounds to provoke PMIC load steps.
+      case 3:
+        if (iterations < 1) {
+            iterations = 1;     // the first pass divides the table value by 3
+        }
+        for (int i = 0; i < iterations; i++) {
+            BARRIER;
+            ticks += test_bus_stress(my_cpu, i);
+            BAILOUT;
+        }
+        break;
+
         // Moving inversions, all ones and zeros.
-      case 3: {
+      case 4: {
         testword_t pattern1 = 0;
         testword_t pattern2 = ~pattern1;
 
@@ -183,8 +196,9 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         // Every fourth round broadcasts a single random value to all vector
         // lanes, preserving the uniform-background model of the classic
         // random pattern test. Runs early: it has the highest fault
-        // detection rate per second, so this minimises time to first fault.
-      case 4:
+        // detection rate per second of the cell tests, so this minimises
+        // time to first fault.
+      case 5:
         for (int i = 0; i < iterations; i++) {
             BARRIER;
             ticks += test_mov_inv_rng(my_cpu, (i & 3) == 3);
@@ -193,7 +207,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         break;
 
         // Moving inversions, 8 bit walking ones and zeros.
-      case 5: {
+      case 6: {
 #if TESTWORD_WIDTH > 32
             testword_t pattern1 = UINT64_C(0x8080808080808080);
 #else
@@ -217,7 +231,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         // Modulo 20 check, fixed random pattern. Runs before the long
         // shifting pattern test: it is the only test immune to cache
         // masking, so every fault class has been probed early in the pass.
-      case 6:
+      case 7:
         if (cpuid_info.flags.rdtsc) {
             prsg_state = get_tsc();
         } else {
@@ -244,7 +258,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         break;
 
         // Block move.
-      case 7:
+      case 8:
         ticks += test_block_move(my_cpu, iterations);
         BAILOUT;
         break;
@@ -253,8 +267,9 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         // per pass suffices: the patterns are deterministic, so repeating
         // them within a pass adds nothing that the next pass doesn't. On the
         // fast first pass only every other offset is walked; full coverage
-        // is restored on every full pass.
-      case 8: {
+        // is restored on every full pass. Runs last before bit fade so the
+        // DIMMs enter the retention test warm.
+      case 9: {
         if (iterations < 1) {
             iterations = 1;     // the first pass divides the table value by 3
         }
@@ -269,19 +284,6 @@ int run_test(int my_cpu, int test, int stage, int iterations)
             BAILOUT;
         }
       } break;
-
-        // Bus stress: NT-write/read burst interleave between two half-chunk streams, duty-cycled
-        // on odd rounds to provoke PMIC load steps. Runs before bit fade so the DIMMs enter it hot.
-      case 9:
-        if (iterations < 1) {
-            iterations = 1;     // the first pass divides the table value by 3
-        }
-        for (int i = 0; i < iterations; i++) {
-            BARRIER;
-            ticks += test_bus_stress(my_cpu, i);
-            BAILOUT;
-        }
-        break;
 
         // Bit fade test: four fill/fade/check rounds - solid zeros, solid ones, then an
         // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
