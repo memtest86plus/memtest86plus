@@ -589,8 +589,14 @@ static bool find_cpus_in_madt(void)
 
     uint8_t *tab_entry_ptr = (uint8_t *)mpc + sizeof(*mpc);
     uint8_t *mpc_table_end = (uint8_t *)mpc + mpc->h.length;
-    while (tab_entry_ptr < mpc_table_end) {
+    while (tab_entry_ptr + sizeof(madt_entry_header_t) <= mpc_table_end) {
         madt_entry_header_t *entry_header = (madt_entry_header_t *)tab_entry_ptr;
+        // Reject malformed entries that could make us read past the end of
+        // the table or loop forever.
+        if (entry_header->length < sizeof(madt_entry_header_t)
+         || tab_entry_ptr + entry_header->length > mpc_table_end) {
+            return false;
+        }
 #if defined(__i386__) || defined(__x86_64__)
         if (entry_header->type == MADT_PROCESSOR) {
             if (entry_header->length != sizeof(madt_processor_entry_t)) {
