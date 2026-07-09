@@ -1228,9 +1228,10 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 void smp_send_nmi(int cpu_num __attribute__((unused)))
 {
 #if defined(__aarch64__)
-    // Wake up all CPUs waiting in WFE. The waiters recheck their wakeup
-    // flag, so waking more CPUs than necessary is harmless.
-    __asm__ __volatile__ ("sev");
+    // Wake up all CPUs waiting in WFE. The waiters recheck their wakeup flag,
+    // so waking more CPUs than necessary is harmless. The DSB ensures the flag
+    // update is visible before the event, or the wakeup could be missed.
+    __asm__ __volatile__ ("dsb ish; sev" ::: "memory");
 #else
 #if defined(__i386__) || defined(__x86_64__)
     while (apic_read(APIC_REG_ICRLO) & APIC_ICR_BUSY) {

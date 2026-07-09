@@ -45,6 +45,38 @@ static inline void cache_clean_range(const void *start, const void *end)
     }
     __asm__ __volatile__ ("dsb sy" ::: "memory");
 }
+
+/**
+ * Makes newly written code in the given range visible to instruction fetch,
+ * which is not coherent with the data caches on this architecture. Each CPU
+ * must still execute an ISB before executing the new code.
+ */
+static inline void cache_sync_code_range(const void *start, const void *end)
+{
+    uint64_t ctr = read_sysreg(ctr_el0);
+
+    // Clean the D-cache to the point of unification, unless CTR_EL0.IDC says this is unneeded.
+    if (!(ctr & (UINT64_C(1) << 28))) {
+        uintptr_t line_size = UINT64_C(4) << ((ctr >> 16) & 0xF);   // DminLine
+        uintptr_t addr = (uintptr_t)start & ~(line_size - 1);
+        while (addr < (uintptr_t)end) {
+            __asm__ __volatile__ ("dc cvau, %0" : : "r" (addr) : "memory");
+            addr += line_size;
+        }
+    }
+    __asm__ __volatile__ ("dsb ish" ::: "memory");
+
+    // Invalidate the I-cache (broadcast), unless CTR_EL0.DIC says this is unneeded.
+    if (!(ctr & (UINT64_C(1) << 29))) {
+        uintptr_t line_size = UINT64_C(4) << (ctr & 0xF);           // IminLine
+        uintptr_t addr = (uintptr_t)start & ~(line_size - 1);
+        while (addr < (uintptr_t)end) {
+            __asm__ __volatile__ ("ic ivau, %0" : : "r" (addr) : "memory");
+            addr += line_size;
+        }
+    }
+    __asm__ __volatile__ ("dsb ish; isb" ::: "memory");
+}
 #endif
 
 /**

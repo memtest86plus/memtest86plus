@@ -170,6 +170,10 @@ static void run_at(uintptr_t addr, int my_cpu)
             memcpy((void *)(addr + locals_offset), (void *)(_start + locals_offset), LOCALS_SIZE);
             locals_offset += AP_STACK_SIZE;
         }
+#if defined(__aarch64__)
+        // Make the copied code visible to instruction fetch.
+        cache_sync_code_range((void *)addr, (void *)(addr + (_stacks - _start)));
+#endif
     }
     LONG_BARRIER;
 
@@ -178,6 +182,10 @@ static void run_at(uintptr_t addr, int my_cpu)
     // The 32-bit startup code needs to know where it is located.
     __asm__ __volatile__("movl %0, %%edi; jmp *%0" : : "r" (new_start_addr));
     __builtin_unreachable();
+#elif defined(__aarch64__)
+    // Discard any instructions speculatively fetched before the I-cache invalidation.
+    __asm__ __volatile__("isb");
+    ((void (*)(void))new_start_addr)();
 #else
     ((void (*)(void))new_start_addr)(); // Formerly a non-portable construct: goto *new_start_addr;
 #endif
