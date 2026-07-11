@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2022 Martin Whitaker.
+// Copyright (C) 2004-2026 Sam Demeulemeester.
 //
-// Derived from an extract of memtest86+ main.c:
-//
-// MemTest86+ V5 Specific code (GPL V2.0)
-// By Samuel DEMEULEMEESTER, sdemeule@memtest.org
-// http://www.canardpc.com - http://www.memtest.org
 // ------------------------------------------------
 // main.c - MemTest-86  Version 3.5
 //
@@ -19,7 +15,9 @@
 
 #include "cache.h"
 #include "cpuid.h"
+#include "cpulocal.h"
 #include "memsize.h"
+#include "simd.h"
 #include "tsc.h"
 #include "vmem.h"
 
@@ -44,6 +42,9 @@
 
 #define MODULO_N            20
 
+// The test whose description is patched with the SIMD tier by test_list_init().
+#define MOV_INV_RNG_TEST    5
+
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
@@ -53,18 +54,19 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
     { true,  ONE,    1,    6,    0, "[Address test, walking ones, no cache] "},
     {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
     { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
+    { true,  PAR,    1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
     { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
+    { true,  PAR,    1,  128,    0, "[Moving inversions, random sequence]   "},
     { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
-    { true,  PAR,    1,   30,    0, "[Moving inversions, random pattern]    "},
-#if TESTWORD_WIDTH > 32
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 64 bit pattern]    "},
-#else
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 32 bit pattern]    "},
-#endif
+    { true,  PAR,    1,    8,    0, "[Modulo 20, random pattern]            "},
     { true,  PAR,    1,   81,    0, "[Block move]                           "},
-    { true,  PAR,    1,   48,    0, "[Random number sequence]               "},
-    { true,  PAR,    1,    6,    0, "[Modulo 20, random pattern]            "},
-    { true,  ONE,    6,  240,    0, "[Bit fade test, 2 patterns]            "},
+#if TESTWORD_WIDTH > 32
+    { true,  PAR,    1,    1,    0, "[Moving inversions, 64 bit pattern]    "},
+#else
+    { true,  PAR,    1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
+#endif
+    { true,  PAR,   12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
+    {false,  ONE,    1,   24,    0, "[Rowhammer, Blacksmith-style]          "},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
@@ -89,8 +91,42 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
         } \
     }
 
+void test_list_init(void)
+{
+    const char *tier_name = simd_tier_name();
+
+    if (tier_name == NULL) {
+        // Keep the generic description from the table.
+        return;
+    }
+
+    // Rewrite the description to show the SIMD tier used by the test,
+    // e.g. "[Moving inversions, random (AVX2)]".
+    const char *prefix = "[Moving inversions, random (";
+    char *desc = test_list[MOV_INV_RNG_TEST].description;
+
+    int i = 0;
+    while (prefix[i] != '\0') {
+        desc[i] = prefix[i];
+        i++;
+    }
+    for (int j = 0; tier_name[j] != '\0'; j++) {
+        desc[i++] = tier_name[j];
+    }
+    desc[i++] = ')';
+    desc[i++] = ']';
+    while (i < (int)sizeof(test_list[MOV_INV_RNG_TEST].description) - 1) {
+        desc[i++] = ' ';
+    }
+    desc[i] = '\0';
+}
+
 int run_test(int my_cpu, int test, int stage, int iterations)
 {
+    // (Re)arm the canary guarding against this CPU overrunning its stack.
+    // Needed on every call: relocation invalidates the stack area.
+    stack_canary_arm(my_cpu);
+
     if (my_cpu == master_cpu) {
         if (window_num == 0) {
             // First window, so we need to test all selected lower memory.
@@ -144,8 +180,21 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         BAILOUT;
         break;
 
+        // Bus stress: NT-write/read burst interleave between two half-chunk streams, duty-cycled
+        // on odd rounds to provoke PMIC load steps.
+      case 3:
+        if (iterations < 1) {
+            iterations = 1;     // the first pass divides the table value by 3
+        }
+        for (int i = 0; i < iterations; i++) {
+            BARRIER;
+            ticks += test_bus_stress(my_cpu, i);
+            BAILOUT;
+        }
+        break;
+
         // Moving inversions, all ones and zeros.
-      case 3: {
+      case 4: {
         testword_t pattern1 = 0;
         testword_t pattern2 = ~pattern1;
 
@@ -158,8 +207,22 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         BAILOUT;
       } break;
 
+        // Moving inversions, pseudo-random sequence (SIMD where available).
+        // Every fourth round broadcasts a single random value to all vector
+        // lanes, preserving the uniform-background model of the classic
+        // random pattern test. Runs early: it has the highest fault
+        // detection rate per second of the cell tests, so this minimises
+        // time to first fault.
+      case 5:
+        for (int i = 0; i < iterations; i++) {
+            BARRIER;
+            ticks += test_mov_inv_rng(my_cpu, (i & 3) == 3);
+            BAILOUT;
+        }
+        break;
+
         // Moving inversions, 8 bit walking ones and zeros.
-      case 4: {
+      case 6: {
 #if TESTWORD_WIDTH > 32
             testword_t pattern1 = UINT64_C(0x8080808080808080);
 #else
@@ -180,57 +243,10 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
       } break;
 
-        // Moving inversions, fixed random pattern.
-      case 5:
-        if (cpuid_info.flags.rdtsc) {
-            prsg_state = get_tsc();
-        } else {
-            prsg_state = 1 + pass_num;
-        }
-        prsg_state *= 0x12345678;
-
-        for (int i = 0; i < iterations; i++) {
-            prsg_state = prsg(prsg_state);
-
-            testword_t pattern1 = prsg_state;
-            testword_t pattern2 = ~pattern1;
-
-            BARRIER;
-            ticks += test_mov_inv_fixed(my_cpu, 2, pattern1, pattern2);
-            BAILOUT;
-        }
-        break;
-
-        // Moving inversions, 32/64 bit shifting pattern.
-      case 6:
-        for (int offset = 0; offset < TESTWORD_WIDTH; offset++) {
-            BARRIER;
-            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, false);
-            BAILOUT;
-
-            BARRIER;
-            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, true);
-            BAILOUT;
-        }
-        break;
-
-        // Block move.
+        // Modulo 20 check, fixed random pattern. Runs before the long
+        // shifting pattern test: it is the only test immune to cache
+        // masking, so every fault class has been probed early in the pass.
       case 7:
-        ticks += test_block_move(my_cpu, iterations);
-        BAILOUT;
-        break;
-
-        // Moving inversions, fully random patterns.
-      case 8:
-        for (int i = 0; i < iterations; i++) {
-            BARRIER;
-            ticks += test_mov_inv_random(my_cpu);
-            BAILOUT;
-        }
-        break;
-
-        // Modulo 20 check, fixed random pattern.
-      case 9:
         if (cpuid_info.flags.rdtsc) {
             prsg_state = get_tsc();
         } else {
@@ -256,9 +272,49 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         }
         break;
 
-        // Bit fade test.
+        // Block move.
+      case 8:
+        ticks += test_block_move(my_cpu, iterations);
+        BAILOUT;
+        break;
+
+        // Moving inversions, 32/64 bit shifting pattern. A single iteration
+        // per pass suffices: the patterns are deterministic, so repeating
+        // them within a pass adds nothing that the next pass doesn't. On the
+        // fast first pass only every other offset is walked; full coverage
+        // is restored on every full pass. Runs last before bit fade so the
+        // DIMMs enter the retention test warm.
+      case 9: {
+        if (iterations < 1) {
+            iterations = 1;     // the first pass divides the table value by 3
+        }
+        int offset_step = (pass_num == 0) ? 2 : 1;
+        for (int offset = 0; offset < TESTWORD_WIDTH; offset += offset_step) {
+            BARRIER;
+            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, false);
+            BAILOUT;
+
+            BARRIER;
+            ticks += test_mov_inv_walk1(my_cpu, iterations, offset, true);
+            BAILOUT;
+        }
+      } break;
+
+        // Bit fade test: four fill/fade/check rounds - solid zeros, solid ones, then an
+        // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
       case 10:
         ticks += test_bit_fade(my_cpu, stage, iterations);
+        BAILOUT;
+        break;
+
+        // Rowhammer test: Blacksmith-style non-uniform, REFRESH-synchronised,
+        // many-sided hammering of a time-boxed sample of sites. Disabled by
+        // default. Runs on a single core (ONE): the DRAM flips regardless of
+        // which core hammers, so per-core repetition would only multiply the
+        // runtime, and a lone core keeps activation timing clean.
+        // `iterations` = seconds budget. See tests/rowhammer.c.
+      case 11:
+        ticks += test_rowhammer(my_cpu, iterations);
         BAILOUT;
         break;
     }

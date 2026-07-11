@@ -29,6 +29,7 @@ INC_DIRS = -I../../boot -I../../system -I ../../system/imc -I../../system/loonga
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
+           system/fat32.o \
            system/font.o \
            system/heap.o \
            system/hwquirks.o \
@@ -45,12 +46,14 @@ SYS_OBJS = system/acpi.o \
            system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
+           system/usbmsd.o \
            system/xhci.o \
            system/loongarch/i2c.o \
            system/loongarch/cpuid.o \
            system/loongarch/cpuinfo.o \
            system/loongarch/hwctrl.o \
            system/loongarch/memctrl.o \
+           system/loongarch/simd.o \
            system/loongarch/temperature.o \
            system/loongarch/vmem.o
 
@@ -66,11 +69,14 @@ LIB_OBJS = lib/barrier.o \
 TST_OBJS = tests/addr_walk1.o \
            tests/bit_fade.o \
            tests/block_move.o \
+           tests/bus_stress.o \
            tests/modulo_n.o \
            tests/mov_inv_fixed.o \
-           tests/mov_inv_random.o \
+           tests/mov_inv_rng.o \
+           tests/vec_prsg.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
+           tests/rowhammer.o \
            tests/test_helper.o \
            tests/tests.o
 
@@ -79,6 +85,7 @@ APP_OBJS = app/badram.o \
            app/display.o \
            app/error.o \
            app/main.o \
+           app/reports.o \
            app/loongarch/interrupt.o
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)

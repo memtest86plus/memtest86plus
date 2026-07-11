@@ -45,7 +45,8 @@ typedef enum  __attribute__ ((packed)) {
     USB_SPEED_UNKNOWN   = 0,
     USB_SPEED_LOW       = 1,
     USB_SPEED_FULL      = 2,
-    USB_SPEED_HIGH      = 3
+    USB_SPEED_HIGH      = 3,
+    USB_SPEED_SUPER     = 4
 } usb_speed_t;
 
 /**
@@ -111,6 +112,11 @@ typedef struct {
     bool    (*setup_request)        (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *);
     bool    (*get_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
     void    (*poll_keyboards)       (usb_hcd_r);
+    void    (*rearm_keyboards)      (usb_hcd_r);
+    bool    (*configure_bulk_ep)    (usb_hcd_r, const usb_ep_t *, int, bool);
+    bool    (*bulk_transfer)        (usb_hcd_r, const usb_ep_t *, void *, size_t, bool);
+    bool    (*reset_bulk_ep)        (usb_hcd_r, const usb_ep_t *, int);
+    bool    (*scan_for_msd)         (usb_hcd_r);
 } hcd_methods_t;
 
 /**
@@ -181,6 +187,8 @@ static inline int default_max_packet_size(usb_speed_t device_speed)
         return 64;
       case USB_SPEED_HIGH:
         return 64;
+      case USB_SPEED_SUPER:
+        return 512;
       default:
         return 0;
     }
@@ -194,6 +202,8 @@ static inline int default_max_packet_size(usb_speed_t device_speed)
  */
 static inline bool valid_usb_max_packet_size(int size, usb_speed_t speed)
 {
+    // USB 3.0 encodes bMaxPacketSize0 as an exponent (9 = 2^9 = 512 bytes).
+    if (speed == USB_SPEED_SUPER) return (size == 9);
     return (size == 8) || ((speed != USB_SPEED_LOW) && (size == 16 || size == 32 || size == 64));
 }
 
@@ -327,5 +337,63 @@ void find_usb_keyboards(bool pause_if_none);
  * Used internally by keyboard.c.
  */
 uint8_t get_usb_keycode(void);
+
+/**
+ * Re-arms keyboard interrupt TRBs on all active USB controllers.
+ * Must be called after bulk transfers to restore keyboard polling,
+ * as bulk transfer event handling may consume keyboard events.
+ *
+ * Used by reports.c after saving results to USB.
+ */
+void usb_rearm_keyboards(void);
+
+/**
+ * A USB mass storage device descriptor returned by find_usb_mass_storage.
+ */
+typedef struct {
+    const usb_hcd_t *hcd;
+    usb_ep_t        ep0;
+    usb_ep_t        ep_in;
+    usb_ep_t        ep_out;
+    uint32_t        tag;
+    uint64_t        block_count;
+    uint32_t        block_size;
+    bool            use_16;     // true if device requires/needs 16-byte SCSI commands
+} usb_msd_t;
+
+/**
+ * Set to true during USB enumeration if a mass storage device was found.
+ *
+ * Used internally by the various HCI drivers.
+ */
+extern bool usb_mass_storage_found;
+
+/**
+ * The product name of the USB mass storage device found during enumeration.
+ */
+extern char usb_msd_name[64];
+
+/**
+ * Returns the mass storage device discovered during the initial USB scan.
+ * If found, populates msd and returns true.
+ */
+bool find_usb_mass_storage(usb_msd_t *msd);
+
+/**
+ * Returns true if at least one USB host controller driver is active.
+ *
+ * Used by config.c to decide whether to offer saving results to USB.
+ */
+bool usb_hcd_available(void);
+
+/**
+ * Rescans the root ports of the active host controllers for a newly attached
+ * mass storage device, allowing a USB drive to be plugged in after boot.
+ * Returns true if a mass storage device is available, whether found by this
+ * scan or by a previous one.
+ *
+ * Used by reports.c when the user requests a report save.
+ */
+bool usb_scan_for_msd(void);
 
 #endif // USBHCD_H

@@ -224,6 +224,10 @@ void cpuid_init(void)
 
     cpuid_info.flags.htt             = false;
 
+    // CNTVCT_EL0 (read by get_tsc()) is always available, so advertise a TSC;
+    // this lets the random-pattern tests seed their PRSG from a live counter.
+    cpuid_info.flags.rdtsc           = true;
+
     cpuid_info.topology.core_count   = -1;
     cpuid_info.topology.thread_count = -1;
     cpuid_info.topology.is_hybrid    =  0;

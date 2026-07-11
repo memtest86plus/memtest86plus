@@ -108,10 +108,10 @@ struct pci_smbus_controller {
 };
 
 /**
- * Print SPD Info
+ * Print SPD Info. Return the number of modules found.
  */
 
-void print_spd_startup_info(void);
+int print_spd_startup_info(void);
 
 uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr);
 uint8_t get_spd_hub_register(uint8_t slot_idx, uint8_t spd_hub_adr);

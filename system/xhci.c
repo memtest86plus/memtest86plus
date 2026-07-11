@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2021-2022 Martin Whitaker.
+// Copyright (C) 2026 Sam Demeulemeester.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -87,6 +88,9 @@
 #define XHCI_TRB_ADDRESS_DEVICE         (11 << 10)
 #define XHCI_TRB_CONFIGURE_ENDPOINT     (12 << 10)
 #define XHCI_TRB_EVALUATE_CONTEXT       (13 << 10)
+#define XHCI_TRB_RESET_ENDPOINT         (14 << 10)
+#define XHCI_TRB_STOP_ENDPOINT          (15 << 10)
+#define XHCI_TRB_SET_TR_DEQUEUE         (16 << 10)
 #define XHCI_TRB_NOOP                   (23 << 10)
 #define XHCI_TRB_TRANSFER_EVENT         (32 << 10)
 #define XHCI_TRB_COMMAND_COMPLETE       (33 << 10)
@@ -110,6 +114,7 @@
 #define XHCI_FULL_SPEED                 1
 #define XHCI_LOW_SPEED                  2
 #define XHCI_HIGH_SPEED                 3
+#define XHCI_SUPER_SPEED                4
 
 // Endpoint Type values
 
@@ -131,6 +136,7 @@
 // Values specific to this driver.
 
 #define PORT_TYPE_PST_MASK              0x1f    // Protocol Slot Type mask
+#define PORT_TYPE_IN_USE                0x20    // set when a device found by a scan owns the port
 #define PORT_TYPE_USB2                  0x40
 #define PORT_TYPE_USB3                  0x80
 
@@ -352,6 +358,20 @@ typedef struct {
 
     // Keyboard endpoint ID lookup table
     uint8_t             kbd_ep_id   [MAX_KEYBOARDS];
+
+    // Number of active keyboards
+    int                 num_keyboards;
+
+    // Keyboards whose interrupt TRB was consumed on behalf of another wait
+    // and must be re-issued by rearm_keyboards().
+    bool                kbd_rearm_needed[MAX_KEYBOARDS];
+
+    // Raw xHCI port speed for the device currently being enumerated.
+    int                 port_speed;
+
+    // State needed to rescan the root ports after initialisation.
+    uint8_t             num_ports;
+    uint8_t             port_type[XHCI_MAX_PORTS];
 } workspace_t  __attribute__ ((aligned (64)));
 
 //------------------------------------------------------------------------------
@@ -401,21 +421,10 @@ static usb_speed_t xhci_to_usb_speed(int xhci_speed)
       case XHCI_HIGH_SPEED:
         return USB_SPEED_HIGH;
       default:
+        // Speed 4 = SuperSpeed (5 Gbps), speed 5+ = SuperSpeedPlus (10+ Gbps).
+        // Treat all SS variants the same for USB-level protocol purposes.
+        if (xhci_speed >= XHCI_SUPER_SPEED) return USB_SPEED_SUPER;
         return USB_SPEED_UNKNOWN;
-    }
-}
-
-static int usb_to_xhci_speed(usb_speed_t usb_speed)
-{
-    switch (usb_speed) {
-      case USB_SPEED_LOW:
-        return XHCI_LOW_SPEED;
-      case USB_SPEED_FULL:
-        return XHCI_FULL_SPEED;
-      case USB_SPEED_HIGH:
-        return XHCI_HIGH_SPEED;
-      default:
-        return 0;
     }
 }
 
@@ -505,6 +514,20 @@ static int event_ep_id(const xhci_trb_t *event)
     return (event->control >> 16) & 0x1f;
 }
 
+static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id);
+
+// Records a keyboard completion consumed on behalf of another wait, so that
+// rearm_keyboards() knows which endpoints need a fresh transfer.
+static void note_discarded_event(workspace_t *ws, const xhci_trb_t *event)
+{
+    if (event_type(event) != XHCI_TRB_TRANSFER_EVENT) return;
+
+    int kbd_idx = identify_keyboard(ws, event_slot_id(event), event_ep_id(event));
+    if (kbd_idx >= 0) {
+        ws->kbd_rearm_needed[kbd_idx] = true;
+    }
+}
+
 static uint32_t enqueue_trb(xhci_trb_t *trb_ring, uint32_t ring_size, uint32_t enqueue_state,
                             uint32_t control, uint64_t params1, uint32_t params2)
 {
@@ -569,19 +592,48 @@ static bool get_xhci_event(workspace_t *ws, xhci_trb_t *event)
 static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int max_time, xhci_trb_t *event)
 {
     int timer = max_time >> 3;
-    while (!get_xhci_event(ws, event) || event_type(event) != wanted_type) {
+    while (true) {
+        while (get_xhci_event(ws, event)) {
+            if (event_type(event) == wanted_type) {
+                return event_cc(event);
+            }
+            note_discarded_event(ws, event);
+        }
         if (timer == 0) return XHCI_EVENT_CC_TIMEOUT;
         usleep(8);
         timer--;
     }
-    return event_cc(event);
+}
+
+// Waits for a transfer event from a specific endpoint, discarding unrelated events
+// (e.g. keyboard interrupt completions, which share the same event ring).
+static uint32_t wait_for_ep_transfer_event(workspace_t *ws, int slot_id, int ep_id, int max_time, xhci_trb_t *event)
+{
+    int timer = max_time >> 3;
+    while (timer > 0) {
+        while (get_xhci_event(ws, event)) {
+            if (event_type(event) == XHCI_TRB_TRANSFER_EVENT
+            &&  event_slot_id(event) == slot_id
+            &&  event_ep_id(event) == ep_id) {
+                return event_cc(event);
+            }
+            note_discarded_event(ws, event);
+        }
+        usleep(8);
+        timer--;
+    }
+    return XHCI_EVENT_CC_TIMEOUT;
 }
 
 static void issue_setup_stage_trb(ep_tr_t *ep_tr, const usb_setup_pkt_t *setup_pkt)
 {
     uint64_t params1 = *(const uint64_t *)setup_pkt;
     uint32_t params2 = sizeof(usb_setup_pkt_t);
-    uint32_t control = XHCI_TRB_SETUP_STAGE | XHCI_TRB_TRT_IN | XHCI_TRB_IDT;
+    // TRT must match the actual transfer: no-data OUT (0), OUT data (2), IN data (3).
+    uint32_t trt = (setup_pkt->length == 0) ? XHCI_TRB_TRT_NO_DATA
+                 : (setup_pkt->type & 0x80)  ? XHCI_TRB_TRT_IN
+                 :                             XHCI_TRB_TRT_OUT;
+    uint32_t control = XHCI_TRB_SETUP_STAGE | trt | XHCI_TRB_IDT;
     ep_tr->enqueue_state = enqueue_trb(ep_tr->tr, EP_TR_SIZE, ep_tr->enqueue_state, control, params1, params2);
 }
 
@@ -622,7 +674,7 @@ static bool setup_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_se
     issue_setup_stage_trb(ep_tr, setup_pkt);
     issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_IN);
     ring_device_doorbell(ws->db_regs, ep->device_id, 1);
-    return (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    return (wait_for_ep_transfer_event(ws, ep->device_id, 1, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
 static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
@@ -638,7 +690,7 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     issue_data_stage_trb(ep_tr, buffer, XHCI_TRB_DIR_IN, length);
     issue_status_stage_trb(ep_tr, XHCI_TRB_DIR_OUT);
     ring_device_doorbell(ws->db_regs, ep->device_id, 1);
-    return (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    return (wait_for_ep_transfer_event(ws, ep->device_id, 1, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
 static bool reset_root_hub_port(const usb_hcd_t *hcd, int port_num)
@@ -734,7 +786,21 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
     ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(1);
 
     xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
-    slot_context->params1 = 1 << 27 | usb_to_xhci_speed(device_speed) << 20;
+    // For root hub devices, use the raw port speed (preserves SS/SS+ variants).
+    // For hub-connected devices, derive from the USB speed enum.
+    int slot_speed;
+    if (hub->level == 0) {
+        slot_speed = ws->port_speed;
+    } else {
+        static const int speed_map[] = {
+            [USB_SPEED_LOW]   = XHCI_LOW_SPEED,
+            [USB_SPEED_FULL]  = XHCI_FULL_SPEED,
+            [USB_SPEED_HIGH]  = XHCI_HIGH_SPEED,
+            [USB_SPEED_SUPER] = XHCI_SUPER_SPEED
+        };
+        slot_speed = (device_speed <= USB_SPEED_SUPER) ? speed_map[device_speed] : XHCI_SUPER_SPEED;
+    }
+    slot_context->params1 = 1 << 27 | slot_speed << 20;
     if (hub->level > 0) {
         uint32_t route = usb_route(hub, port_num);
         slot_context->params1 |= route & 0xfffff;
@@ -797,7 +863,10 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
                 return false;
             }
         }
-        ep_context->max_packet_size = device->max_packet_size;
+        // For SS, bMaxPacketSize0 is an exponent (2^N bytes); expand it here.
+        ep_context->max_packet_size = (device_speed == USB_SPEED_SUPER)
+                                    ? (1 << device->max_packet_size)
+                                    : device->max_packet_size;
         ep_context->tr_dequeue_ptr += 3 * sizeof(xhci_trb_t);
 
         fetch_length  = sizeof(usb_device_desc_t);
@@ -876,6 +945,105 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
     return configure_interrupt_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), sizeof(hid_kbd_rpt_t));
 }
 
+static bool configure_bulk_endpoint(workspace_t *ws, const usb_ep_t *ep, int ep_id, bool is_out)
+{
+    xhci_trb_t event;
+
+    int xhci_ep_type = is_out ? XHCI_EP_BULK_OUT : XHCI_EP_BULK_IN;
+
+    // Allocate a transfer ring for this endpoint.
+    uintptr_t tr_addr = heap_alloc(HEAP_TYPE_LM_1, sizeof(ep_tr_t), 64);
+    if (tr_addr == 0) return false;
+
+    ep_tr_t *ep_tr = (ep_tr_t *)tr_addr;
+    memset((void *)ep_tr, 0, sizeof(ep_tr_t));
+    ep_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0
+
+    xhci_ctrl_context_t *ctrl_context = (xhci_ctrl_context_t *)ws->input_context_addr;
+    ctrl_context->add_context_flags = XHCI_CONTEXT_A(0) | XHCI_CONTEXT_A(ep_id);
+
+    xhci_slot_context_t *slot_context = (xhci_slot_context_t *)(ws->input_context_addr + ws->context_size);
+    int current_max_ep_id = slot_context->params1 >> 27;
+    if (ep_id > current_max_ep_id) {
+        slot_context->params1 = (slot_context->params1 & 0x07ffffff) | (ep_id << 27);
+    }
+
+    xhci_ep_context_t *ep_context = (xhci_ep_context_t *)(ws->input_context_addr + (1 + ep_id) * ws->context_size);
+    ep_context->params1             = 0;
+    ep_context->params2             = xhci_ep_type << 3 | 3 << 1; // EP Type | CErr
+    ep_context->interval            = 0;
+    ep_context->max_burst_size      = 0;
+    ep_context->max_packet_size     = ep->max_packet_size;
+    ep_context->tr_dequeue_ptr      = tr_addr | 1;
+    ep_context->average_trb_length  = ep->max_packet_size;
+    ep_context->max_esit_payload_l  = 0;
+    ep_context->max_esit_payload_h  = 0;
+
+    enqueue_xhci_command(ws, XHCI_TRB_CONFIGURE_ENDPOINT | ep->device_id << 24, ws->input_context_addr, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+        return false;
+    }
+
+    // Store the transfer ring address in the data_buffer so the caller can retrieve it.
+    *(uintptr_t *)ws->base_ws.data_buffer = tr_addr;
+
+    return true;
+}
+
+static bool configure_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id, bool is_out)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+    return configure_bulk_endpoint(ws, ep, ep_id, is_out);
+}
+
+static bool bulk_transfer(const usb_hcd_t *hcd, const usb_ep_t *ep, void *buffer, size_t length, bool is_out)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    ep_tr_t *ep_tr = (ep_tr_t *)ep->driver_data;
+    int ep_id = is_out ? (2 * ep->endpoint_num) : (2 * ep->endpoint_num + 1);
+
+    xhci_trb_t event;
+
+    // Issue a NORMAL TRB for the bulk transfer.
+    uint32_t dir = is_out ? XHCI_TRB_DIR_OUT : XHCI_TRB_DIR_IN;
+    issue_normal_trb(ep_tr, buffer, dir, length);
+    ring_device_doorbell(ws->db_regs, ep->device_id, ep_id);
+
+    uint32_t cc = wait_for_ep_transfer_event(ws, ep->device_id, ep_id, 5000*MILLISEC, &event);
+    if (cc == XHCI_EVENT_CC_SUCCESS) return true;
+
+    // A short packet is a valid completion for IN transfers (device sent less than requested).
+    return !is_out && cc == XHCI_EVENT_CC_SHORT_PACKET;
+}
+
+static bool reset_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+    ep_tr_t *ep_tr = (ep_tr_t *)ep->driver_data;
+
+    xhci_trb_t event;
+
+    // Stop then reset the endpoint. One of the two completes with a context state
+    // error depending on whether the endpoint was Running or Halted - ignore that.
+    enqueue_xhci_command(ws, XHCI_TRB_STOP_ENDPOINT | ep_id << 16 | ep->device_id << 24, 0, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    (void)wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event);
+
+    enqueue_xhci_command(ws, XHCI_TRB_RESET_ENDPOINT | ep_id << 16 | ep->device_id << 24, 0, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    (void)wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event);
+
+    // Re-sync the controller's dequeue pointer (and cycle state) with our enqueue state.
+    uint32_t cycle = ep_tr->enqueue_state / EP_TR_SIZE;
+    uint32_t index = ep_tr->enqueue_state % EP_TR_SIZE;
+    uint64_t dequeue_ptr = (uintptr_t)&ep_tr->tr[index] | cycle;
+    enqueue_xhci_command(ws, XHCI_TRB_SET_TR_DEQUEUE | ep_id << 16 | ep->device_id << 24, dequeue_ptr, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    return (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+}
+
 static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id)
 {
     for (int kbd_idx = 0; kbd_idx < MAX_KEYBOARDS; kbd_idx++) {
@@ -884,6 +1052,39 @@ static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id)
         }
     }
     return -1;
+}
+
+static void rearm_keyboards(const usb_hcd_t *hcd)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    // Drain any stale events from the event ring, noting keyboard completions.
+    xhci_trb_t event;
+    while (get_xhci_event(ws, &event)) {
+        note_discarded_event(ws, &event);
+    }
+
+    // Re-issue a NORMAL TRB only where one was consumed; the others are still armed.
+    for (int kbd_idx = 0; kbd_idx < ws->num_keyboards; kbd_idx++) {
+        if (!ws->kbd_rearm_needed[kbd_idx]) continue;
+        ws->kbd_rearm_needed[kbd_idx] = false;
+
+        ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
+
+        // The discarded transfer's report is already in the DMA buffer; copy out
+        // the 8-byte boot report and process it so a key release is not missed.
+        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+        *kbd_rpt = *(hid_kbd_rpt_t *)ws->kbd_xfer[kbd_idx];
+
+        hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
+        if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+            *prev_kbd_rpt = *kbd_rpt;
+        }
+
+        // Re-arm into the whole-packet buffer to avoid babble errors on >8-byte reports.
+        issue_normal_trb(kbd_tr, ws->kbd_xfer[kbd_idx], XHCI_TRB_DIR_IN, ws->kbd_xfer_len[kbd_idx]);
+        ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
+    }
 }
 
 static void poll_keyboards(const usb_hcd_t *hcd)
@@ -929,6 +1130,77 @@ static void poll_keyboards(const usb_hcd_t *hcd)
     }
 }
 
+static bool scan_for_msd(const usb_hcd_t *hcd)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    xhci_op_regs_t *op_regs = ws->op_regs;
+
+    // Record the heap state to allow us to free memory if the scan fails.
+    uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
+
+    // Construct a hub descriptor for the root hub.
+    usb_hub_t root_hub;
+    memset(&root_hub, 0, sizeof(root_hub));
+    root_hub.ep0       = NULL;
+    root_hub.num_ports = ws->num_ports;
+
+    usleep(100*MILLISEC);  // USB maximum device attach time.
+
+    // Scan the ports that are not already in use, looking for a USB drive.
+    usb_ep_t keyboards[1];
+    for (int port_idx = 0; port_idx < ws->num_ports; port_idx++) {
+        // Skip ports that are neither USB2 or USB3.
+        if (!(ws->port_type[port_idx] & (PORT_TYPE_USB2 | PORT_TYPE_USB3))) continue;
+
+        uint32_t port_status = read32(&op_regs->port_regs[port_idx].sc);
+
+        // Skip ports owned by a device found during a previous scan, unless it was unplugged.
+        if (ws->port_type[port_idx] & PORT_TYPE_IN_USE) {
+            if (port_status & XHCI_PORT_SC_CCS) continue;
+            ws->port_type[port_idx] &= ~PORT_TYPE_IN_USE;
+        }
+
+        // Check if anything is connected to this port.
+        if (~port_status & XHCI_PORT_SC_CCS) continue;
+
+        // Reset the port.
+        if (!reset_xhci_port(op_regs, port_idx)) continue;
+
+        usleep(10*MILLISEC);  // USB reset recovery time
+
+        port_status = read32(&op_regs->port_regs[port_idx].sc);
+
+        // Check the port is active.
+        if (~port_status & XHCI_PORT_SC_CCS) continue;
+        if (~port_status & XHCI_PORT_SC_PED) continue;
+
+        // Now the port has been enabled, we can determine the device speed.
+        ws->port_speed = get_xhci_device_speed(op_regs, port_idx);
+        usb_speed_t device_speed = xhci_to_usb_speed(ws->port_speed);
+
+        // Allocate a controller slot for this device.
+        int slot_id = allocate_slot(hcd);
+        if (slot_id == 0) break;
+
+        // With max_keyboards = 0 only the mass storage path can succeed, so a true
+        // return value means the USB drive was found on this port.
+        int num_devices = 0;
+        int num_keyboards = 0;
+        if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, device_speed, slot_id,
+                                        &num_devices, keyboards, 0, &num_keyboards)) {
+            ws->port_type[port_idx] |= PORT_TYPE_IN_USE;
+            return true;
+        }
+
+        disable_xhci_port(op_regs, port_idx);
+        release_slot(hcd, slot_id);
+    }
+
+    heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
+    return false;
+}
+
 //------------------------------------------------------------------------------
 // Driver Method Table
 //------------------------------------------------------------------------------
@@ -942,7 +1214,12 @@ static const hcd_methods_t methods = {
     .configure_kbd_ep    = configure_kbd_ep,
     .setup_request       = setup_request,
     .get_data_request    = get_data_request,
-    .poll_keyboards      = poll_keyboards
+    .poll_keyboards      = poll_keyboards,
+    .rearm_keyboards     = rearm_keyboards,
+    .configure_bulk_ep   = configure_bulk_ep,
+    .bulk_transfer       = bulk_transfer,
+    .reset_bulk_ep       = reset_bulk_ep,
+    .scan_for_msd        = scan_for_msd
 };
 
 //------------------------------------------------------------------------------
@@ -1124,6 +1401,9 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     ws->rt_regs = rt_regs;
     ws->db_regs = db_regs;
 
+    // Record the port types to allow us to rescan the root ports later.
+    memcpy(ws->port_type, port_type, sizeof(ws->port_type));
+
     ws->device_context_index = device_context_index;
 
     ws->context_size = cap_regs->hcc_params1 & 0x4 ? 64 : 32;
@@ -1165,18 +1445,24 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     root_hub.ep0            = NULL;
     root_hub.num_ports      = cap_regs->hcs_params1 & 0xff;
 
+    ws->num_ports = root_hub.num_ports;
+
     usleep(100*MILLISEC);  // USB maximum device attach time.
 
-    // Scan the ports, looking for hubs and keyboards.
+    // Scan the ports, looking for hubs, keyboards, and mass storage devices.
     usb_ep_t keyboards[MAX_KEYBOARDS];
     int num_keyboards = 0;
     int num_devices = 0;
+    bool msd_found_before = usb_mass_storage_found;
     for (int port_idx = 0; port_idx < root_hub.num_ports; port_idx++) {
         // If we've filled the keyboard info table, abort now.
-        if (num_keyboards >= MAX_KEYBOARDS) break;
+        if (num_keyboards >= MAX_KEYBOARDS && usb_mass_storage_found) break;
 
-        // We only expect to find keyboards on USB2 ports.
-        if (~port_type[port_idx] & PORT_TYPE_USB2) continue;
+        // Skip ports that are neither USB2 or USB3.
+        if (!(port_type[port_idx] & (PORT_TYPE_USB2 | PORT_TYPE_USB3))) continue;
+
+        // USB3 ports only need scanning for MSDs.
+        if ((port_type[port_idx] & PORT_TYPE_USB3) && usb_mass_storage_found) continue;
 
         uint32_t port_status = read32(&op_regs->port_regs[port_idx].sc);
 
@@ -1195,7 +1481,9 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         if (~port_status & XHCI_PORT_SC_PED) continue;
 
         // Now the port has been enabled, we can determine the device speed.
-        usb_speed_t device_speed = xhci_to_usb_speed(get_xhci_device_speed(ws->op_regs, port_idx));
+        int raw_speed = get_xhci_device_speed(ws->op_regs, port_idx);
+        ws->port_speed = raw_speed;
+        usb_speed_t device_speed = xhci_to_usb_speed(raw_speed);
 
         num_devices++;
 
@@ -1206,24 +1494,29 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
         // Look for keyboards attached directly or indirectly to this port.
         if (find_attached_usb_keyboards(hcd, &root_hub, 1 + port_idx, device_speed, slot_id,
                                         &num_devices, keyboards, MAX_KEYBOARDS, &num_keyboards)) {
+            ws->port_type[port_idx] |= PORT_TYPE_IN_USE;
             continue;
         }
 
-        // If we didn't find any keyboard interfaces, we disable the port and free the slot.
+        // If we didn't find any keyboard interfaces or a USB drive on this port
+        // (find_attached_usb_keyboards returns true for both), disable it and free the slot.
         disable_xhci_port(op_regs, port_idx);
         release_slot(hcd, slot_id);
     }
 
-    print_usb_info(" Found %i device%s, %i keyboard%s",
-                   num_devices,   num_devices   != 1 ? "s" : "",
-                   num_keyboards, num_keyboards != 1 ? "s" : "");
+    // True only if the drive was found on this controller during the scan above.
+    bool msd_on_this_hcd = usb_mass_storage_found && !msd_found_before;
 
-    if (num_keyboards == 0) {
-        (void)halt_host_controller(op_regs);
-        goto no_keyboards_found;
-    }
+    print_usb_info(" Found %i device%s, %i keyboard%s%s",
+                   num_devices,   num_devices   != 1 ? "s" : "",
+                   num_keyboards, num_keyboards != 1 ? "s" : "",
+                   msd_on_this_hcd ? ", 1 USB drive" : "");
+
+    // Even if no device was found, keep the controller registered so its root ports
+    // can be rescanned later by usb_scan_for_msd().
 
     // Initialise the interrupt TRB ring for each keyboard interface.
+    ws->num_keyboards = num_keyboards;
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
         kbd_tr->enqueue_state = EP_TR_SIZE;  // cycle = 1, index = 0

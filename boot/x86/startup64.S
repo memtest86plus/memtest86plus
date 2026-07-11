@@ -253,13 +253,17 @@ flush:	movw	$KERNEL_DS, %ax
 
 	lidt	idt_descr(%rip)
 
-	# Zero the BSS (if first boot).
+	# Zero the BSS (if first boot). The stack area is excluded: it doesn't
+	# need initialising (the thread-local storage it contains is always
+	# written before use), and when loaded in low memory it can extend
+	# beyond the end of usable RAM, into the video/ROM region, where the
+	# ACPI and SMBIOS structures would be destroyed by the write sweep.
 
 	cmpl	$1, first_boot(%rip)
 	jne	1f
 	xorq	%rax, %rax
 	leaq	_bss(%rip), %rdi
-	leaq	_end(%rip), %rcx
+	leaq	_stacks(%rip), %rcx
 	subq	%rdi, %rcx
 0:	movq	%rax, (%rdi)
 	addq	$8, %rdi
@@ -285,13 +289,16 @@ flush:	movw	$KERNEL_DS, %ax
 	movq	%rax, (%rsp)
 	ldmxcsr (%rsp)
 
-#if 0
-	# Enable AVX.
+	# Enable AVX if supported. CPUID.1:ECX.OSXSAVE (bit 27) only mirrors
+	# CR4.OSXSAVE, which is not set yet, so test XSAVE (bit 26) and AVX
+	# (bit 28) instead.
 
 	movl	$1, %eax
+	xorl	%ecx, %ecx
 	cpuid
-	testl	$0x18000000, %ecx	# Check bits 27 (OSXSAVE) and 28 (AVX)
-	jz	no_avx
+	andl	$0x14000000, %ecx	# Check bits 26 (XSAVE) and 28 (AVX)
+	cmpl	$0x14000000, %ecx
+	jne	no_avx
 	movq	%cr4, %rax
 	orl	$(1 << 18), %eax	# Set bit 18 (OSXSAVE)
 	movq	%rax, %cr4
@@ -301,7 +308,6 @@ flush:	movw	$KERNEL_DS, %ax
 	xsetbv
 
 no_avx:
-#endif
 
 	# Call the dynamic linker to fix up the addresses in the GOT.
 

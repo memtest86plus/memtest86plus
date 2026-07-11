@@ -317,7 +317,7 @@ void badram_display(void)
     int col = 0;
     switch (error_mode) {
       case ERROR_MODE_BADRAM:
-        display_pinned_message(0, 0, "BadRAM Patterns (excludes test 0 and test 7)");
+        display_pinned_message(0, 0, "BadRAM Patterns (excludes tests 0, 3, 8, 11)");
         display_pinned_message(1, 0, "--------------------------------------------");
         scroll();
         col = display_scrolled_message(col, "badram=");
@@ -332,7 +332,7 @@ void badram_display(void)
         }
         break;
       case ERROR_MODE_MEMMAP:
-        display_pinned_message(0, 0, "Linux memmap (excludes test 0 and test 7)");
+        display_pinned_message(0, 0, "Linux memmap (excludes tests 0, 3, 8, 11)");
         display_pinned_message(1, 0, "-----------------------------------------");
         scroll();
         col = display_scrolled_message(0, "memmap=");
@@ -348,7 +348,7 @@ void badram_display(void)
         }
         break;
       case ERROR_MODE_PAGES:
-        display_pinned_message(0, 0, "Bad pages (excludes test 0 and test 7)");
+        display_pinned_message(0, 0, "Bad pages (excludes tests 0, 3, 8, 11)");
         display_pinned_message(1, 0, "--------------------------------------");
         scroll();
         for (int i = 0; i < num_patterns; i++) {

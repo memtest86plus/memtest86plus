@@ -261,4 +261,59 @@ static inline void cache_flush(void)
 #endif
 }
 
+/**
+ * Flushes the single cache line containing addr from all levels of the CPU
+ * cache hierarchy, so the next access to that line reaches DRAM.
+ *
+ * Only defined on x86, where CLFLUSH is part of the SSE2 baseline. Used by the
+ * rowhammer test (test #11) to force a DRAM row activation on every aggressor
+ * access. On 32-bit x86 the caller must first confirm CLFLUSH is supported
+ * (cpuid_info.flags.cflush); on x86-64 it is always present. The faster,
+ * unordered CLFLUSHOPT variant is selected separately inside the x86-64 hammer
+ * engine (tests/x86/rowhammer_x86.c) when the CPU supports it.
+ */
+#if defined(__i386__) || defined(__x86_64__)
+static inline void cache_line_flush(const volatile void *addr)
+{
+    __asm__ __volatile__ (
+        "clflush %0"
+        : "+m" (*(volatile char *)addr)
+        : /* no inputs */
+        : "memory"
+    );
+}
+#endif
+
+/**
+ * A full memory barrier ordering all prior loads and stores before any that
+ * follow. On x86 this is MFENCE (SSE2 baseline), so only execute it once SSE2
+ * is known to be present; on LoongArch it is a full data barrier; on AArch64 a
+ * DSB ISH (stronger than DMB) also drains any preceding DC CIVAC maintenance.
+ */
+static inline void mem_barrier(void)
+{
+#if defined(__i386__) || defined(__x86_64__)
+    __asm__ __volatile__ ("mfence" : : : "memory");
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__ ("dbar 0" : : : "memory");
+#elif defined(__aarch64__)
+    __asm__ __volatile__ ("dsb ish" : : : "memory");
+#endif
+}
+
+/**
+ * A load fence used to bracket rdtsc timing so reads are not reordered across
+ * the measurement. On x86 this is LFENCE (SSE2 baseline); on AArch64 a DSB LD.
+ */
+static inline void load_fence(void)
+{
+#if defined(__i386__) || defined(__x86_64__)
+    __asm__ __volatile__ ("lfence" : : : "memory");
+#elif defined(__loongarch_lp64)
+    __asm__ __volatile__ ("dbar 0" : : : "memory");
+#elif defined(__aarch64__)
+    __asm__ __volatile__ ("dsb ld" : : : "memory");
+#endif
+}
+
 #endif // CACHE_H

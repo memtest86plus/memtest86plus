@@ -21,6 +21,7 @@
 #include "acpi.h"
 #include "cache.h"
 #include "cpuid.h"
+#include "cpulocal.h"
 #include "cpuinfo.h"
 #include "heap.h"
 #include "hwctrl.h"
@@ -33,6 +34,7 @@
 #include "pci.h"
 #include "screen.h"
 #include "serial.h"
+#include "simd.h"
 #include "smbios.h"
 #include "smp.h"
 #include "temperature.h"
@@ -191,10 +193,58 @@ static void run_at(uintptr_t addr, int my_cpu)
 #endif
 }
 
+// A BSP-only version of run_at(), used before the APs have been started. The
+// thread-local storage is zeroed, as its original copy may not be backed by RAM.
+static void relocate_to(uintptr_t addr)
+{
+    uintptr_t *new_start_addr = (uintptr_t *)(addr + startup - _start);
+
+    // Copy the program code and all data except the stacks.
+    memmove((void *)addr, (void *)_start, _stacks - _start);
+    // Zero the thread-local storage.
+    size_t locals_offset = _stacks - _start + BSP_STACK_SIZE - LOCALS_SIZE;
+    for (int cpu_num = 0; cpu_num < num_available_cpus; cpu_num++) {
+        memset((void *)(addr + locals_offset), 0, LOCALS_SIZE);
+        locals_offset += AP_STACK_SIZE;
+    }
+#if defined(__aarch64__)
+    // Make the copied code visible to instruction fetch.
+    cache_sync_code_range((void *)addr, (void *)(addr + (_stacks - _start)));
+#endif
+
+    // Jump to new_start_addr.
+#ifdef __i386__
+    // The 32-bit startup code needs to know where it is located.
+    __asm__ __volatile__("movl %0, %%edi; jmp *%0" : : "r" (new_start_addr));
+    __builtin_unreachable();
+#elif defined(__aarch64__)
+    // Discard any instructions speculatively fetched before the I-cache invalidation.
+    __asm__ __volatile__("isb");
+    ((void (*)(void))new_start_addr)();
+#else
+    ((void (*)(void))new_start_addr)();
+#endif
+}
+
+// Checks that the given address range lies entirely within a single region of
+// usable RAM (the BIOS bootloader may have loaded us straddling the VGA/ROM hole).
+static bool addr_range_is_usable(uintptr_t start, size_t size)
+{
+    for (int i = 0; i < pm_map_size; i++) {
+        uintptr_t region_start = pm_map[i].start << PAGE_SHIFT;
+        uintptr_t region_end   = pm_map[i].end   << PAGE_SHIFT;
+        if (start >= region_start && (start + size) <= region_end) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t lower_limit, uintptr_t upper_limit)
 {
     uintptr_t current_start = (uintptr_t)_start;
-    if (current_start >= lower_limit && (current_start + program_size) <= upper_limit) {
+    if (current_start >= lower_limit && (current_start + program_size) <= upper_limit
+        && addr_range_is_usable(current_start, program_size)) {
         *load_addr = current_start;
         return true;
     }
@@ -220,9 +270,20 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
 
 static void global_init(void)
 {
+    // Set once initialisation is complete; the early relocation below
+    // restarts the program and re-enters here.
+    static bool init_complete = false;
+    if (init_complete) {
+        return;
+    }
+
     floppy_off();
 
     cpuid_init();
+
+    simd_init();
+
+    test_list_init();
 
     // Nothing before this should access the boot parameters, in case they are located above 4GB.
     // This is the first region we map, so it is guaranteed not to fail.
@@ -345,6 +406,20 @@ static void global_init(void)
     start_run = true;
     dummy_run = true;
     restart = false;
+
+    init_complete = true;
+
+    // If the bootloader placed us so that the stack area extends beyond usable RAM,
+    // move before the APs start; avoid a target that overlaps the running code.
+    uintptr_t current_start = (uintptr_t)_start;
+    if (!addr_range_is_usable(current_start, program_size)) {
+        uintptr_t target = low_load_addr;
+        if (target < (current_start + program_size) && current_start < (target + program_size)) {
+            target = high_load_addr;
+        }
+        trace(0, "relocating to %0*x before starting CPUs", 2*sizeof(uintptr_t), target);
+        relocate_to(target);
+    }
 }
 
 static void ap_enumerate(int my_cpu)
@@ -462,6 +537,10 @@ static void test_all_windows(int my_cpu)
         }
     }
     if (i_am_master) {
+        // CPUs not taking part in this test won't re-arm their stack
+        // canaries, and the coming relocations will invalidate them.
+        stack_canary_disarm_all();
+
         num_active_cpus = 1;
         if (!dummy_run) {
             if (parallel_test) {

@@ -39,6 +39,7 @@ INC_DIRS = -I../../boot -I../../system -I ../../system/imc -I../../system/aarch6
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
+           system/fat32.o \
            system/font.o \
            system/heap.o \
            system/hwquirks.o \
@@ -54,12 +55,14 @@ SYS_OBJS = system/acpi.o \
            system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
+           system/usbmsd.o \
            system/xhci.o \
            system/aarch64/i2c.o \
            system/aarch64/cpuid.o \
            system/aarch64/cpuinfo.o \
            system/aarch64/hwctrl.o \
            system/aarch64/memctrl.o \
+           system/aarch64/simd.o \
            system/aarch64/pci.o \
            system/aarch64/psci.o \
            system/aarch64/temperature.o \
@@ -77,11 +80,14 @@ LIB_OBJS = lib/barrier.o \
 TST_OBJS = tests/addr_walk1.o \
            tests/bit_fade.o \
            tests/block_move.o \
+           tests/bus_stress.o \
            tests/modulo_n.o \
            tests/mov_inv_fixed.o \
-           tests/mov_inv_random.o \
+           tests/mov_inv_rng.o \
+           tests/vec_prsg.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
+           tests/rowhammer.o \
            tests/test_helper.o \
            tests/tests.o
 
@@ -90,6 +96,7 @@ APP_OBJS = app/badram.o \
            app/display.o \
            app/error.o \
            app/main.o \
+           app/reports.o \
            app/aarch64/interrupt.o
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)

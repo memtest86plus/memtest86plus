@@ -98,4 +98,10 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
  */
 void flush_caches(int my_cpu);
 
+/**
+ * Flushes the caches on every active CPU, for when each CPU's own writes must
+ * reach DRAM (the flush instruction only affects the executing CPU's caches).
+ */
+void flush_caches_all(int my_cpu);
+
 #endif // TEST_HELPER_H

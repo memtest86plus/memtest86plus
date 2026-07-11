@@ -13,7 +13,8 @@ uint8_t get_spd(uint8_t slot_idx __attribute__((unused)), uint16_t spd_adr __att
     return 0;
 }
 
-void print_spd_startup_info(void)
+int print_spd_startup_info(void)
 {
-    // Nothing to do.
+    // No SPD access on ARM64; return 0 so the caller uses the SMBIOS Type 17 info.
+    return 0;
 }

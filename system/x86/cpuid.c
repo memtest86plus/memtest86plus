@@ -43,6 +43,16 @@ void cpuid_init(void)
         );
     }
 
+    // Get the structured extended feature flags, only save EBX.
+    if (cpuid_info.max_cpuid >= 7) {
+        cpuid(0x7, 0,
+            &reg[0],
+            &cpuid_info.flags.raw[3],
+            &reg[1],
+            &reg[2]
+        );
+    }
+
     // Get the digital thermal sensor & power management status bits.
     if (cpuid_info.max_cpuid >= 6) {
         cpuid(0x6, 0,

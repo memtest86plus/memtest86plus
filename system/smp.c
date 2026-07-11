@@ -1169,28 +1169,31 @@ void smp_init(bool smp_enable)
     smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
 #if defined(__i386__) || defined(__x86_64__)
-    ap_startup_addr = (uintptr_t)startup;
-
-    size_t ap_trampoline_size = ap_trampoline_end - ap_trampoline;
-    memcpy((uint8_t *)HEAP_BASE_ADDR, ap_trampoline, ap_trampoline_size);
-
-    alloc_addr = HEAP_BASE_ADDR + ap_trampoline_size;
-#elif defined(__loongarch_lp64)
-    ap_startup_addr = (uintptr_t)startup64;
+    alloc_addr = HEAP_BASE_ADDR + (ap_trampoline_end - ap_trampoline);
+#elif defined(__loongarch_lp64) || defined(__aarch64__)
     alloc_addr = HEAP_BASE_ADDR;
-#elif defined(__aarch64__)
-    ap_startup_addr = (uintptr_t)startup64;
-    alloc_addr = HEAP_BASE_ADDR;
-
-    // The APs start executing with their MMU and caches disabled, so make
-    // sure the program image is visible at the point of coherency.
-    cache_clean_range(_start, _end);
 #endif
 }
 
 int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 {
     int cpu_num;
+
+    // Set up the AP startup vector here rather than in smp_init(): the program
+    // may have been relocated in between, and the APs must enter the running copy.
+#if defined(__i386__) || defined(__x86_64__)
+    ap_startup_addr = (uintptr_t)startup;
+
+    memcpy((uint8_t *)HEAP_BASE_ADDR, ap_trampoline, ap_trampoline_end - ap_trampoline);
+#elif defined(__loongarch_lp64)
+    ap_startup_addr = (uintptr_t)startup64;
+#elif defined(__aarch64__)
+    ap_startup_addr = (uintptr_t)startup64;
+
+    // The APs boot with MMU and caches off, so make the (possibly relocated)
+    // program image visible at the point of coherency before waking them.
+    cache_clean_range(_start, _end);
+#endif
 
     cpu_state[0] = CPU_STATE_RUNNING;  // we don't support disabling the boot CPU
 

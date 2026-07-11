@@ -30,6 +30,7 @@ INC_DIRS = -I../../boot -I../../system -I../../system/imc -I../../system/x86 -I.
 SYS_OBJS = system/acpi.o \
            system/cpulocal.o \
            system/ehci.o \
+           system/fat32.o \
            system/font.o \
            system/heap.o \
            system/hwquirks.o \
@@ -46,6 +47,7 @@ SYS_OBJS = system/acpi.o \
            system/timers.o \
            system/uhci.o \
            system/usbhcd.o \
+           system/usbmsd.o \
            system/xhci.o \
            system/x86/cpuid.o \
            system/x86/cpuinfo.o \
@@ -53,6 +55,7 @@ SYS_OBJS = system/acpi.o \
            system/x86/i2c.o \
            system/x86/membw.o \
            system/x86/memctrl.o \
+           system/x86/simd.o \
            system/x86/temperature.o \
            system/x86/vmem.o
 
@@ -68,11 +71,17 @@ LIB_OBJS = lib/barrier.o \
 TST_OBJS = tests/addr_walk1.o \
            tests/bit_fade.o \
            tests/block_move.o \
+           tests/bus_stress.o \
            tests/modulo_n.o \
            tests/mov_inv_fixed.o \
-           tests/mov_inv_random.o \
+           tests/mov_inv_rng.o \
+           tests/vec_prsg.o \
+           tests/x86/vec_prsg_avx2.o \
+           tests/x86/vec_prsg_sse2.o \
+           tests/x86/rowhammer_x86.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
+           tests/rowhammer.o \
            tests/test_helper.o \
            tests/tests.o
 
@@ -81,6 +90,7 @@ APP_OBJS = app/badram.o \
            app/display.o \
            app/error.o \
            app/main.o \
+           app/reports.o \
            app/x86/interrupt.o
 
 OBJS = boot/x86/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
@@ -135,6 +145,10 @@ system/x86/%.o: ../../system/x86/%.c
 lib/%.o: ../../lib/%.c
 	@mkdir -p lib
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+tests/x86/%.o: ../../tests/x86/%.c
+	@mkdir -p tests/x86
+	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 tests/%.o: ../../tests/%.c
 	@mkdir -p tests
