@@ -33,7 +33,7 @@
 // Public Variables
 //------------------------------------------------------------------------------
 
-const char  *cpu_model = NULL;
+const char  *cpu_model = "";    // static init required: creates the reloc record that rebases it
 
 int         l1_cache = 0;
 int         l2_cache = 0;

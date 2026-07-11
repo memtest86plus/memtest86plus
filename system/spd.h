@@ -32,7 +32,7 @@ typedef struct spd_infos {
     uint8_t     slot_num;
     uint16_t    jedec_code;
     uint32_t    module_size;
-    char        *type;
+    char        type[6];    // inline, not a pointer: the BSS cache has no reloc records to rebase it
     char        sku[SPD_SKU_LEN + 1];
     uint8_t     XMP;
     uint16_t    freq;
@@ -55,7 +55,7 @@ typedef struct ram_infos {
     uint16_t    tRCD;
     uint16_t    tRP;
     uint16_t    tRAS;
-    char        *type;
+    char        type[6];
 } ram_info_t;
 
 typedef struct {

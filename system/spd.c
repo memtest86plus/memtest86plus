@@ -23,6 +23,10 @@ ram_info_t ram = { 0, 0, 0, 0, 0, 0, "N/A"};
 ram_slot_info_t ram_slot_info[MAX_SPD_SLOT];
 spd_info spd_slot_cache[MAX_SPD_SLOT];
 
+// spd_info.type is an inline array, not a pointer: a literal pointer stored in this
+// BSS cache would have no relocation record and go stale after a program relocation.
+#define set_spd_type(spdi, t)   memcpy((spdi)->type, t, sizeof(t))
+
 static inline uint8_t bcd_to_ui8(uint8_t bcd)
 {
     return bcd - 6 * (bcd >> 4);
@@ -89,7 +93,7 @@ void print_spdi(spd_info spdi, uint8_t row)
     }
 
     // Populate global ram var
-    ram.type = spdi.type;
+    memcpy(ram.type, spdi.type, sizeof(ram.type));
     if (ram.freq == 0 || ram.freq > spdi.freq) {
         ram.freq = spdi.freq;
     }
@@ -128,7 +132,7 @@ static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_l
 
 static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "DDR5";
+    set_spd_type(spdi, "DDR5");
 
     // Compute module size for symmetric & asymmetric configuration
     for (int sbyte_adr = 1; sbyte_adr <= 2; sbyte_adr++) {
@@ -311,7 +315,7 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 
 static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "DDR4";
+    set_spd_type(spdi, "DDR4");
 
     // Compute module size in MB with shifts
     spdi->module_size = 1U << (
@@ -432,7 +436,7 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
 
 static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "DDR3";
+    set_spd_type(spdi, "DDR3");
 
     // Compute module size in MB with shifts
     spdi->module_size = 1U << (
@@ -591,7 +595,7 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
 
 static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "DDR2";
+    set_spd_type(spdi, "DDR2");
 
     // Compute module size in MB
     switch (get_spd(slot_idx, 31)) {
@@ -730,7 +734,7 @@ static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
 
 static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "DDR";
+    set_spd_type(spdi, "DDR");
 
     // Compute module size in MB
     switch (get_spd(slot_idx, 31)) {
@@ -821,7 +825,7 @@ static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
 
 static void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "RDRAM";
+    set_spd_type(spdi, "RDRAM");
 
     // Compute module size in MB
     uint8_t tbyte = get_spd(slot_idx, 5);
@@ -896,7 +900,7 @@ static void parse_spd_rdram(spd_info *spdi, uint8_t slot_idx)
 
 static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
 {
-    spdi->type = "SDRAM";
+    set_spd_type(spdi, "SDRAM");
 
     uint8_t spd_byte3  = get_spd(slot_idx, 3) & 0x0F; // Number of Row Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
     uint8_t spd_byte4  = get_spd(slot_idx, 4) & 0x0F; // Number of Column Addresses (2 x 4 bits, upper part used if asymmetrical banking used)
