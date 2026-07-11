@@ -255,7 +255,12 @@ void pmem_init(void)
 
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 
-    int sanitized_entries = sanitize_e820_map(sanitized_map, boot_params->e820_map, boot_params->e820_entries);
+    int e820_entries = boot_params->e820_entries;
+    if (e820_entries > E820_MAP_SIZE) {
+        e820_entries = E820_MAP_SIZE;
+    }
+
+    int sanitized_entries = sanitize_e820_map(sanitized_map, boot_params->e820_map, e820_entries);
 
     init_pm_map(sanitized_map, sanitized_entries);
     sort_pm_map();

@@ -35,6 +35,12 @@
 #define VM_WINDOW_SIZE  PAGE_C(1,GB)
 
 /**
+ * Set if any range could not be mapped when the page tables were built or
+ * rebuilt (never cleared). Accessing an unmapped range will fault.
+ */
+extern bool paging_incomplete;
+
+/**
  * Maps a physical memory region into the upper 2GB of virtual memory. The
  * virtual address will have the same alignment within a page as the physical
  * address.

@@ -39,23 +39,18 @@ struct trap_regs {
 // Constants
 //------------------------------------------------------------------------------
 
-static const char *vector_name[] = {
-    "Synchronous EL1t",
-    "IRQ EL1t",
-    "FIQ EL1t",
-    "SError EL1t",
-    "Synchronous EL1h",
-    "IRQ EL1h",
-    "FIQ EL1h",
-    "SError EL1h",
-    "Synchronous EL0/64",
-    "IRQ EL0/64",
-    "FIQ EL0/64",
-    "SError EL0/64",
-    "Synchronous EL0/32",
-    "IRQ EL0/32",
-    "FIQ EL0/32",
-    "SError EL0/32"
+static const char vector_type_name[][12] = {
+    "Synchronous",
+    "IRQ",
+    "FIQ",
+    "SError",
+};
+
+static const char vector_origin_name[][7] = {
+    "EL1t",
+    "EL1h",
+    "EL0/64",
+    "EL0/32",
 };
 
 //------------------------------------------------------------------------------
@@ -98,8 +93,9 @@ void interrupt(struct trap_regs *trap_regs)
     clear_message_area();
 
     display_pinned_message(0, 0, "Unexpected exception on CPU %i", smp_my_cpu_num());
-    display_pinned_message(2, 0, "Type: %s (%s)", vector_name[trap_regs->vec & 0xF],
-                                                  exception_class_name(trap_regs->esr));
+    display_pinned_message(2, 0, "Type: %s %s (%s)", vector_type_name[trap_regs->vec & 0x3],
+                                                     vector_origin_name[(trap_regs->vec >> 2) & 0x3],
+                                                     exception_class_name(trap_regs->esr));
     display_pinned_message(3, 0, "  PC: %016x", (uintptr_t)trap_regs->elr);
     display_pinned_message(4, 0, " FAR: %016x", (uintptr_t)trap_regs->far);
     display_pinned_message(5, 0, " ESR: %016x", (uintptr_t)trap_regs->esr);

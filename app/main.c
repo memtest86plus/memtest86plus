@@ -385,6 +385,9 @@ static void global_init(void)
     for (int i = 0; i < pm_map_size; i++) {
         trace(0, "pm %0*x - %0*x", 2*sizeof(uintptr_t), pm_map[i].start, 2*sizeof(uintptr_t), pm_map[i].end);
     }
+    if (paging_incomplete) {
+        trace(0, "WARNING: page table pool exhausted, some address ranges are not mapped");
+    }
     if (acpi_config.rsdp_addr != 0) {
         trace(0, "ACPI RSDP (v%u.%u) found in %s at %0*x", acpi_config.ver_maj, acpi_config.ver_min, rsdp_source, 2*sizeof(uintptr_t), acpi_config.rsdp_addr);
         trace(0, "ACPI FADT found at %0*x", 2*sizeof(uintptr_t), acpi_config.fadt_addr);
@@ -486,6 +489,9 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
                 uint64_t new_end;
 
                 while (1) {
+                    if (vm_map_size >= MAX_MEM_SEGMENTS) {
+                        break;
+                    }
                     if (smp_narrow_to_proximity_domain(orig_start, orig_end, &proximity_domain_idx, &new_start, &new_end)) {
                         // Create a new entry in the virtual memory map.
                         num_mapped_pages += (new_end - new_start) >> PAGE_SHIFT;

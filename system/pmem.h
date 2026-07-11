@@ -13,7 +13,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MAX_MEM_SEGMENTS    127
+#define MAX_MEM_SEGMENTS    128     // must be >= E820_MAP_SIZE (boot.h)
 
 typedef struct {
     uintptr_t       start;

@@ -113,6 +113,8 @@ static uint64_t cmd_line_end = 0;
 
 uint64_t ttbr0_table[512] __attribute__((aligned(PAGE_SIZE)));
 
+bool paging_incomplete = false;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
@@ -176,13 +178,14 @@ static uint64_t *get_l2_table(uint64_t *entry)
 
 static bool map_range(uint64_t start, uint64_t end, uint64_t attrs)
 {
-    start = start & ~(BLOCK_2M - 1);
-    end   = (end + BLOCK_2M - 1) & ~(BLOCK_2M - 1);
-
-    // Nothing mappable beyond the 48-bit input address range.
-    if (end > (UINT64_C(1) << 48)) {
+    // Reject inverted ranges and anything beyond the 48-bit input address
+    // range, before the rounding below can wrap for an end near 2^64.
+    if (start > end || end > (UINT64_C(1) << 48)) {
         return false;
     }
+
+    start = start & ~(BLOCK_2M - 1);
+    end   = (end + BLOCK_2M - 1) & ~(BLOCK_2M - 1);
 
     uint64_t addr = start;
     while (addr < end) {
@@ -266,7 +269,7 @@ void paging_init(void)
     // systems it is allocated from RAM, and we must make sure the display
     // controller sees our writes.
     if (lfb_end != 0) {
-        map_range(lfb_start, lfb_end, PTE_ATTR_NORMAL_NC);
+        paging_incomplete |= !map_range(lfb_start, lfb_end, PTE_ATTR_NORMAL_NC);
     }
 
     // Map all the memory regions described by the BIOS memory map as Normal
@@ -274,19 +277,19 @@ void paging_init(void)
     for (int i = 0; i < e820_copy_entries; i++) {
         const e820_entry_t *entry = &e820_copy[i];
         if (entry->type == E820_RAM || entry->type == E820_ACPI) {
-            map_range(entry->addr, entry->addr + entry->size, PTE_ATTR_NORMAL);
+            paging_incomplete |= !map_range(entry->addr, entry->addr + entry->size, PTE_ATTR_NORMAL);
         }
     }
 
     // The boot command line may live outside the mapped regions if the boot
     // loader put it somewhere unusual.
     if (cmd_line_start != 0) {
-        map_range(cmd_line_start, cmd_line_end, PTE_ATTR_NORMAL);
+        paging_incomplete |= !map_range(cmd_line_start, cmd_line_end, PTE_ATTR_NORMAL);
     }
 
     // Replay the device mappings made via map_region.
     for (int i = 0; i < num_device_regions; i++) {
-        map_range(device_regions[i].start, device_regions[i].end, PTE_ATTR_DEVICE);
+        paging_incomplete |= !map_range(device_regions[i].start, device_regions[i].end, PTE_ATTR_DEVICE);
     }
 }
 
@@ -294,6 +297,11 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup __a
 {
     if (size == 0) {
         size = 1;
+    }
+
+    // Reject sizes that would wrap the address space.
+    if (base_addr + size < base_addr) {
+        return 0;
     }
 
     // Record the region (at block granularity) so the mapping can be

@@ -221,6 +221,11 @@ static void ecam_init(void)
     rsdt_header_t *mcfg = (rsdt_header_t *)map_region(acpi_config.mcfg_addr, sizeof(rsdt_header_t), true);
     if (mcfg == NULL) return;
 
+    // Reject truncated tables, so the entry count below can't underflow.
+    if (mcfg->length < sizeof(rsdt_header_t) + 8) {
+        return;
+    }
+
     mcfg = (rsdt_header_t *)map_region(acpi_config.mcfg_addr, mcfg->length, true);
     if (mcfg == NULL) return;
 
@@ -235,6 +240,9 @@ static void ecam_init(void)
     for (int i = 0; i < num_entries; i++) {
         mcfg_entry_t *entry = (mcfg_entry_t *)(first_entry + i * sizeof(mcfg_entry_t));
         if (entry->segment == 0) {
+            if (entry->start_bus > entry->end_bus) {
+                continue;   // malformed entry
+            }
             size_t ecam_size = ((size_t)(entry->end_bus - entry->start_bus) + 1) << 20;
             ecam_phys      = entry->base_addr;
             ecam_base      = map_region(entry->base_addr, ecam_size, false);

@@ -18,7 +18,7 @@
 
 typedef struct {
     uint16_t    part_num;
-    const char  *name;
+    const char  name[16];   // 15 chars + NUL max; GCC < 15 doesn't warn if the NUL gets dropped
 } cpu_part_t;
 
 //------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ static const cpu_part_t arm_parts[] = {
     { 0xD87, "Cortex-A725"  },
     { 0xD89, "Cortex-A720AE"},
     { 0xD8E, "Neoverse N3"  },
-    { 0, NULL }
+    { 0, "" }
 };
 
 static const cpu_part_t qcom_parts[] = {
@@ -73,7 +73,7 @@ static const cpu_part_t qcom_parts[] = {
     { 0x804, "Kryo 4xx Au"  },
     { 0x805, "Kryo 4xx Ag"  },
     { 0xC00, "Falkor"       },
-    { 0, NULL }
+    { 0, "" }
 };
 
 static const cpu_part_t apple_parts[] = {
@@ -89,12 +89,12 @@ static const cpu_part_t apple_parts[] = {
     { 0x035, "M2 Aval Pro"  },
     { 0x038, "M2 Bliz Max"  },
     { 0x039, "M2 Aval Max"  },
-    { 0, NULL }
+    { 0, "" }
 };
 
 static const cpu_part_t microsoft_parts[] = {
     { 0xD49, "Cobalt 100"   },
-    { 0, NULL }
+    { 0, "" }
 };
 
 static const cpu_part_t cavium_parts[] = {
@@ -108,7 +108,7 @@ static const cpu_part_t cavium_parts[] = {
     { 0x0B4, "OcteonTx2 95N"},
     { 0x0B5, "OcteonTx2 95M"},
     { 0x0B6, "OcteonTx2 95O"},
-    { 0, NULL }
+    { 0, "" }
 };
 
 //------------------------------------------------------------------------------
@@ -123,7 +123,7 @@ cpuid_info_t cpuid_info;
 
 static const char *lookup_part(const cpu_part_t *parts, uint16_t part_num)
 {
-    for (int i = 0; parts[i].name != NULL; i++) {
+    for (int i = 0; parts[i].name[0] != '\0'; i++) {
         if (parts[i].part_num == part_num) {
             return parts[i].name;
         }
