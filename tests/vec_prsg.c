@@ -185,6 +185,11 @@ void vec_fill(vec_state_t *st, testword_t *p, size_t nblocks, bool splat)
         vec_fill_sse2(st, p, nblocks, splat);
         return;
     }
+#elif defined(__aarch64__)
+    if (simd_tier == SIMD_NEON) {
+        vec_fill_neon(st, p, nblocks, splat);
+        return;
+    }
 #endif
     vec_fill_scalar(st, p, nblocks, splat);
 }
@@ -196,6 +201,23 @@ void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
         while (nblocks > 0) {
             size_t done = (simd_tier == SIMD_AVX2) ? vec_scan_fwd_avx2(st, p, nblocks, splat)
                                                    : vec_scan_fwd_sse2(st, p, nblocks, splat);
+            p += done * VEC_LANES;
+            nblocks -= done;
+            if (nblocks == 0) {
+                break;
+            }
+            // The scan stopped at a mismatching block. Report and fix it up,
+            // then resume the scan on the remaining blocks.
+            vec_check_fwd_scalar(st, p, 1, splat, use_for_badram);
+            p += VEC_LANES;
+            nblocks--;
+        }
+        return;
+    }
+#elif defined(__aarch64__)
+    if (simd_tier == SIMD_NEON) {
+        while (nblocks > 0) {
+            size_t done = vec_scan_fwd_neon(st, p, nblocks, splat);
             p += done * VEC_LANES;
             nblocks -= done;
             if (nblocks == 0) {
@@ -230,6 +252,30 @@ void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
             // already stepped back to it. Report and fix it up, then resume.
             // Unlike the forward case, the scalar kernel cannot be reused
             // here as it would step the lane states back a second time.
+            for (int l = 0; l < VEC_LANES; l++) {
+                testword_t expect = ~st->lane[l];
+                testword_t actual = read_word(&q[l]);
+                if (unlikely(actual != expect)) {
+                    data_error(&q[l], expect, actual, use_for_badram);
+                }
+                write_word(&q[l], st->lane[l]);
+            }
+            q -= VEC_LANES;
+            nblocks--;
+        }
+        return;
+    }
+#elif defined(__aarch64__)
+    if (simd_tier == SIMD_NEON) {
+        testword_t *q = p + (nblocks - 1) * VEC_LANES;
+        while (nblocks > 0) {
+            size_t done = vec_scan_rev_neon(st, q, nblocks, splat);
+            q -= done * VEC_LANES;
+            nblocks -= done;
+            if (nblocks == 0) {
+                break;
+            }
+            // The scan stopped at a mismatching block.
             for (int l = 0; l < VEC_LANES; l++) {
                 testword_t expect = ~st->lane[l];
                 testword_t actual = read_word(&q[l]);

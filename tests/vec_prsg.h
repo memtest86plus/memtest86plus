@@ -62,6 +62,19 @@ size_t vec_scan_fwd_avx2(vec_state_t *st, testword_t *p, size_t nblocks, bool sp
 size_t vec_scan_rev_avx2(vec_state_t *st, testword_t *q, size_t nblocks, bool splat);
 #endif
 
+#if defined(__aarch64__)
+/*
+ * NEON kernels (see tests/aarch64/vec_prsg_neon.c). Same contract as the x86
+ * kernels above: start from the lane states in *st, leave the updated states
+ * back in *st, and end with a DSB ISH so no non-temporal store is left
+ * buffered. The scan kernels stop at the first mismatching block and return
+ * the number of blocks completed, positioned at the failing block.
+ */
+void   vec_fill_neon(vec_state_t *st, testword_t *p, size_t nblocks, bool splat);
+size_t vec_scan_fwd_neon(vec_state_t *st, testword_t *p, size_t nblocks, bool splat);
+size_t vec_scan_rev_neon(vec_state_t *st, testword_t *q, size_t nblocks, bool splat);
+#endif
+
 /**
  * Initialises the lane states from seed. For splat rounds all lanes hold the
  * same value and are never stepped, giving a uniform background pattern.
