@@ -1,8 +1,8 @@
 # Memtest86+
 
-Memtest86+ is a free, open-source, stand-alone memory tester for x86, x86-64
-and LoongArch64 architecture computers. It provides a much more thorough memory
-check than that provided by BIOS memory tests.
+Memtest86+ is a free, open-source, stand-alone memory tester for x86, x86-64,
+ARM AArch64 and LoongArch64 architecture computers. It provides a much more
+thorough memory check than that provided by BIOS memory tests.
 
 It is also able to access almost all the computer's memory, not being
 restricted by the memory used by the operating system and not depending
@@ -11,8 +11,8 @@ on any underlying software like UEFI libraries.
 Memtest86+ can be loaded and run either directly by a PC BIOS (legacy or UEFI)
 or via an intermediate bootloader that supports the Linux 16-bit, 32-bit,
 64-bit, or EFI handover boot protocol. It should work on most x86, x86-64 CPU
- (Pentium class or later 32-bit or 64-bit) and most LoongArch64 CPU (Loongson 3
-and Loongson 2 family).
+ (Pentium class or later 32-bit or 64-bit), most ARMv8-A AArch64 CPU (UEFI
+boot only) and most LoongArch64 CPU (Loongson 3 and Loongson 2 family).
 
 Binary releases (both stable and nightly dev builds) are available on
 [memtest.org](https://memtest.org).
@@ -85,6 +85,16 @@ an intermediate bootloader using the Linux 16-bit boot protocol. The image
 can be also booted by an intermediate bootloader using the Linux 32-bit,
 64-bit, or 64-bit EFI handover boot protocols.
 
+### To build an ARM AArch64 64-bit image
+
+Change directory into the `build/aarch64` directory and type `make`. When not
+building on an AArch64 host, the Makefile defaults to the `aarch64-linux-gnu-`
+cross toolchain; pass `CC=`, `LD=` and `OBJCOPY=` overrides if yours is named
+differently. The result is a `mt86plus` binary image file which can be booted
+directly by a 64-bit UEFI firmware (if named `mt86plus.efi`, or as
+`EFI/BOOT/BOOTAA64.EFI` on removable media). UEFI is the only supported boot
+method on this architecture.
+
 ### To build a LoongArch64 64-bit image
 
 #### x86-64 Linux environment
@@ -142,9 +152,10 @@ GRUB as an intermediate bootloader. See the individual `Makefile` under the
 `build` directory for details. The ISO image is both legacy and UEFI bootable,
 so you need GRUB modules for both legacy and EFI boot installed on your
 build system (e.g. on Debian, the required GRUB modules are located in
-packages `grub-pc-bin`, `grub-efi-ia32-bin`, `grub-efi-amd64-bin` and
-`grub-efi-loong64-bin`). You may need to adjust some path and file names
-in the Makefile to match the naming on your system.<br>
+packages `grub-pc-bin`, `grub-efi-ia32-bin`, `grub-efi-amd64-bin`,
+`grub-efi-arm64-bin` and `grub-efi-loong64-bin`). You may need to adjust
+some path and file names in the Makefile to match the naming on your
+system.<br>
 **P.S.** LoongArch64 GRUB ISO can only be created on LoongArch64 Linux
 environment.
 
@@ -643,10 +654,11 @@ the memory interface. The burst length changes on every round, and every other
 round inserts short idle gaps into the traffic to generate load transients in
 the module power delivery. This targets DDR5-era interface faults that on-die
 ECC cannot correct: link signal-integrity errors, marginal XMP/EXPO training
-and PMIC voltage droop. On x86_64 the bursts use the same non-temporal
-SIMD kernels as test 5; other builds fall back to cached scalar accesses, which
-exercise the interface less aggressively. Errors from this test are typically
-transient and will not necessarily repeat at the same address; they do not
+and PMIC voltage droop. On x86_64 and AArch64 the bursts use the same
+non-temporal SIMD kernels as test 5; other builds fall back to cached scalar
+accesses, which exercise the interface less aggressively. Errors from this
+test are typically transient and will not necessarily repeat at the same
+address; they do not
 contribute to BadRAM patterns, memmap regions, or bad page regions.
 
 ### Test 4 : Moving inversions, ones & zeros
@@ -658,10 +670,11 @@ inversions algorithm with patterns of all ones and all zeros.
 
 In each memory region in turn, uses the moving inversions algorithm with a
 vector-wide pseudo-random sequence and its complement. On x86_64 the fill and
-check loops use AVX2 (256-bit) or SSE2 (128-bit) instructions, selected
-automatically at boot and shown in the test name, with each vector lane
-running an independent pseudo-random stream. Writes use non-temporal stores,
-which bypass the cache and maximise the stress on the memory bus. Every
+check loops use AVX2 (256-bit) or SSE2 (128-bit) instructions, and on AArch64
+NEON (128-bit) instructions, selected automatically at boot and shown in the
+test name, with each vector lane running an independent pseudo-random stream.
+Writes use non-temporal stores, which bypass the cache and maximise the
+stress on the memory bus. Every
 fourth round a single random value is broadcast to all lanes, reproducing the
 uniform-background fault model of the classic random pattern test. The random
 sequences are different on each round and each test pass, so multiple passes
