@@ -107,6 +107,10 @@ static bool usb_runtime_scan = false;
 
 static usb_msd_t usb_msd_info;
 
+// Index into hcd_list of the controller hosting the MSD. Stored as an index because
+// a cached usb_hcd_t pointer would go stale on relocation (see the note in reloc64.c).
+static int usb_msd_hcd_idx = -1;
+
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
@@ -470,7 +474,7 @@ static bool check_for_usb_msd(const usb_hcd_t *hcd, const usb_ep_t *ep0, usb_spe
     }
     ep_out.driver_data = *(uintptr_t *)hcd->ws->data_buffer;
 
-    usb_msd_info.hcd     = hcd;
+    usb_msd_hcd_idx      = hcd - hcd_list;
     usb_msd_info.ep0     = *ep0;
     usb_msd_info.ep_in   = ep_in;
     usb_msd_info.ep_out  = ep_out;
@@ -1227,10 +1231,11 @@ void usb_rearm_keyboards(void)
 
 bool find_usb_mass_storage(usb_msd_t *msd)
 {
-    if (!usb_mass_storage_found) {
+    if (!usb_mass_storage_found || usb_msd_hcd_idx < 0) {
         return false;
     }
     *msd = usb_msd_info;
+    msd->hcd = &hcd_list[usb_msd_hcd_idx];
     msd->block_count = 0;
     msd->block_size  = 512;
     return true;
