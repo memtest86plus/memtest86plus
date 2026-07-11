@@ -112,6 +112,7 @@ static void get_dynamic_info(Elf32_Dyn *dyn_section, Elf32_Addr load_offs, Elf32
     }
 }
 
+// Slot contents must be image pointers only - see the note in reloc64.c.
 static void do_relocation(Elf32_Addr load_addr, Elf32_Addr load_offs, const Elf32_Rel *rel)
 {
     Elf32_Addr *target_addr = (Elf32_Addr *)(load_addr + rel->r_offset);

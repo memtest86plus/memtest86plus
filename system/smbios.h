@@ -164,6 +164,13 @@ struct mem_dev {
 extern struct mem_dev *dmi_memory_device;
 
 /**
+ * Cached copy of dmi_memory_device->type (0 = undefined). Use this after
+ * startup: pointers into the SMBIOS table do not survive relocation.
+ */
+
+extern uint8_t dmi_memory_device_type;
+
+/**
  * Maximum number of SMBIOS Type 17 (Memory Device) structs collected.
  * Pointers only, so this is cheap; 32 covers 2-socket servers with
  * 24-32 DIMM slots. Devices beyond the limit are ignored.

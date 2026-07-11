@@ -79,6 +79,10 @@ char *strstr(const char *haystack, const char *needle)
     size_t haystack_len = strlen(haystack);
     size_t needle_len   = strlen(needle);
 
+    if (needle_len > haystack_len) {
+        return NULL;
+    }
+
     size_t max_idx = haystack_len - needle_len;
 
     for (size_t idx = 0; idx <= max_idx; idx++) {

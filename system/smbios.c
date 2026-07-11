@@ -25,14 +25,12 @@ static const efi_guid_t SMBIOS2_GUID = { 0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16
 // Some firmware (e.g. QEMU virt, ARM laptops) only publishes the 64-bit SMBIOS v3 entry point.
 static const efi_guid_t SMBIOS3_GUID = { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} };
 
-// Consumers of dmi_memory_device read ->type without a NULL check, so point
-// it at an all-zero struct (type 0 = undefined) until a real one is found.
-static struct mem_dev null_mem_dev;
-
 struct system_info *dmi_system_info;
 struct baseboard_info *dmi_baseboard_info;
-struct mem_dev *dmi_memory_device = &null_mem_dev;
+struct mem_dev *dmi_memory_device;  // no static initialiser: reloc() would rebase it (see reloc64.c)
 struct cpu_info *dmi_cpu_info;
+
+uint8_t dmi_memory_device_type;
 
 struct mem_dev *dmi_memory_devices[MAX_DMI_MEM_DEVICES];
 int dmi_num_memory_devices = 0;
@@ -179,8 +177,9 @@ static int parse_dmi(uint16_t numstructs)
             // Multiple type 17 structs are allowed, with unpopulated slots sometimes
             // reported as type 2 (unknown). If type is 0 (uninitialized) or 1/2 (previously
             // initialized with unknown value) => set or overwrite the struct
-            if (dmi_memory_device->type <= 2) {
+            if (dmi_memory_device_type <= 2) {
                 dmi_memory_device = mdev;
+                dmi_memory_device_type = mdev->type;
             }
             // Collect every populated device (size 0 means empty socket,
             // 0xFFFF means populated with unknown size, so keep the latter).
@@ -195,6 +194,8 @@ static int parse_dmi(uint16_t numstructs)
             dmi_system_info = NULL;
             dmi_baseboard_info = NULL;
             dmi_cpu_info = NULL;
+            dmi_memory_device = NULL;
+            dmi_memory_device_type = 0;
             dmi_num_memory_devices = 0;
             return -1;
         }
@@ -209,6 +210,8 @@ static int parse_dmi(uint16_t numstructs)
             dmi_system_info = NULL;
             dmi_baseboard_info = NULL;
             dmi_cpu_info = NULL;
+            dmi_memory_device = NULL;
+            dmi_memory_device_type = 0;
             dmi_num_memory_devices = 0;
             return -1;
         }

@@ -406,7 +406,7 @@ static bool ich5_get_smb(void)
     // Enable I2C Host Controller Interface if disabled
     // Use SMBUS Mode for DDR5 to allow bank switch using Proc Call
     uint8_t temp = pci_config_read8(smbbus, smbdev, smbfun, 0x40);
-    if ((temp & 4) == 0 && dmi_memory_device->type != DMI_DDR5) {
+    if ((temp & 4) == 0 && dmi_memory_device_type != DMI_DDR5) {
        pci_config_write8(smbbus, smbdev, smbfun, 0x40, temp | 0x04);
     }
 
@@ -553,7 +553,7 @@ uint8_t get_spd(uint8_t slot_idx, uint16_t spd_adr)
 
 uint8_t get_spd_hub_register(uint8_t slot_idx, uint8_t spd_hub_adr)
 {
-    if(dmi_memory_device->type == DMI_DDR5) {
+    if(dmi_memory_device_type == DMI_DDR5) {
         return ich5_read_spd_byte(slot_idx, spd_hub_adr | 0xFF00);
     }
 
@@ -572,7 +572,7 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
 {
     smbus_adr += 0x50;
 
-    if (dmi_memory_device->type == DMI_DDR4) {
+    if (dmi_memory_device_type == DMI_DDR4) {
         // Switch page if needed (DDR4)
         if (spd_adr > 0xFF && spd_page != 1) {
             __outb((0x37 << 1) | I2C_WRITE, SMBHSTADD);
@@ -592,7 +592,7 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
         if (spd_adr > 0xFF) {
             spd_adr -= 0x100;
         }
-    } else if (dmi_memory_device->type == DMI_DDR5) {
+    } else if (dmi_memory_device_type == DMI_DDR5) {
             // For DDR5, choose between reading from the SPD EEPROM (which may require a bank switch)
             // and reading from the DDR5 SPD Hub Register (where we added a 0xFF00 offset).
 

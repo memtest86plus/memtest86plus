@@ -165,7 +165,7 @@ int get_ram_temp(uint8_t slot)
     float ram_temp;
 
     // RAM Temperature is only supported on DDR5
-    if (dmi_memory_device->type != DMI_DDR5 || slot >= MAX_SPD_SLOT)
+    if (dmi_memory_device_type != DMI_DDR5 || slot >= MAX_SPD_SLOT)
         return TEMP_INVALID;
 
     // Check if slot has a temp sensor

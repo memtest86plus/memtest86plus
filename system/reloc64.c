@@ -169,6 +169,11 @@ static void get_dynamic_info(Elf64_Dyn *dyn_section, Elf64_Addr load_offs, Elf64
     }
 }
 
+/*
+ * Slots are adjusted by the move delta, so a statically initialised pointer
+ * variable must only ever hold pointers into the program image; anything
+ * else (firmware tables, heap, MMIO) belongs in a BSS variable.
+ */
 static void do_relocation(Elf64_Addr load_addr, Elf64_Addr load_offs, const Elf64_Rela *rel)
 {
     Elf64_Addr *target_addr = (Elf64_Addr *)(load_addr + rel->r_offset);

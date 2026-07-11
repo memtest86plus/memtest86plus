@@ -440,7 +440,7 @@ void display_temperature(void)
 
     if (enable_temp_ram) {
         // Display RAM Temperature (DDR5+ Only) - LA64 unsupported yet
-        if (dmi_memory_device != NULL && dmi_memory_device->type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
+        if (dmi_memory_device_type == DMI_DDR5 && !strstr(cpuid_info.vendor_id.str, "Loongson")) {
 
             for (int i = 0; i < MAX_SPD_SLOT; i++) {
 
