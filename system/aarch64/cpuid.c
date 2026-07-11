@@ -83,12 +83,35 @@ static const cpu_part_t apple_parts[] = {
     { 0x025, "M1 Fire Pro"  },
     { 0x028, "M1 Ice Max"   },
     { 0x029, "M1 Fire Max"  },
+
     { 0x032, "M2 Blizzard"  },
     { 0x033, "M2 Avalanche" },
     { 0x034, "M2 Bliz Pro"  },
     { 0x035, "M2 Aval Pro"  },
     { 0x038, "M2 Bliz Max"  },
     { 0x039, "M2 Aval Max"  },
+
+    { 0x042, "M3 Sawtooth"  },
+    { 0x043, "M3 Everest"   },
+    { 0x044, "M3 Saw Pro"   },
+    { 0x045, "M3 Ever Pro"  },
+    { 0x048, "M3 Saw Max"   },
+    { 0x049, "M3 Ever Max"  },
+
+    { 0x052, "M4 Sawtooth"  },
+    { 0x053, "M4 Everest"   },
+    { 0x054, "M4 Saw Pro"   },
+    { 0x055, "M4 Ever Pro"  },
+    { 0x058, "M4 Saw Max"   },
+    { 0x059, "M4 Ever Max"  },
+    { 0, "" }
+};
+
+static const cpu_part_t nvidia_parts[] = {
+    { 0x000, "Denver"   },
+    { 0x003, "Denver 2" },
+    { 0x004, "Carmel"   },
+    { 0x010, "Olympus"  },
     { 0, "" }
 };
 
@@ -179,6 +202,7 @@ void cpuid_init(void)
         break;
       case 0x4E:
         vendor = "NVIDIA";
+        part   = lookup_part(nvidia_parts, MIDR_PART_NUM(midr));
         break;
       case 0x46:
         vendor = "Fujitsu";
