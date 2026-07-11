@@ -356,6 +356,9 @@ static void determine_imc(void)
             break;
           case 0xB:
             switch(cpuid_info.version.extendedModel) {
+              case 0:
+                imc.family = IMC_K1A_TUR; // Zen5 EPYC (Family 1Ah - Turin Classic, SP5)
+                break;
               case 2:
                 imc.family = IMC_K1A_STP; // Zen5 APU (Family 1Ah - Strix Point)
                 break;

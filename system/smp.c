@@ -481,7 +481,7 @@ static bool find_cpus_in_floating_mp_struct(void)
     }
     if (fp == NULL) {
         // Search the BIOS EBDA area.
-        uintptr_t address = *(uint16_t *)0x40E << 4;
+        uintptr_t address = (uintptr_t)bda_read16(0x40E) << 4;
         if (address) {
             fp = scan_for_floating_ptr_struct(address, 0x400);
         }
@@ -1076,14 +1076,8 @@ void smp_init(bool smp_enable)
     smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
 #if defined(__i386__) || defined(__x86_64__)
-    ap_startup_addr = (uintptr_t)startup;
-
-    size_t ap_trampoline_size = ap_trampoline_end - ap_trampoline;
-    memcpy((uint8_t *)HEAP_BASE_ADDR, ap_trampoline, ap_trampoline_size);
-
-    alloc_addr = HEAP_BASE_ADDR + ap_trampoline_size;
+    alloc_addr = HEAP_BASE_ADDR + (ap_trampoline_end - ap_trampoline);
 #elif defined(__loongarch_lp64)
-    ap_startup_addr = (uintptr_t)startup64;
     alloc_addr = HEAP_BASE_ADDR;
 #endif
 }
@@ -1091,6 +1085,16 @@ void smp_init(bool smp_enable)
 int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 {
     int cpu_num;
+
+    // Set up the AP startup vector here rather than in smp_init(): the program
+    // may have been relocated in between, and the APs must enter the running copy.
+#if defined(__i386__) || defined(__x86_64__)
+    ap_startup_addr = (uintptr_t)startup;
+
+    memcpy((uint8_t *)HEAP_BASE_ADDR, ap_trampoline, ap_trampoline_end - ap_trampoline);
+#elif defined(__loongarch_lp64)
+    ap_startup_addr = (uintptr_t)startup64;
+#endif
 
     cpu_state[0] = CPU_STATE_RUNNING;  // we don't support disabling the boot CPU
 

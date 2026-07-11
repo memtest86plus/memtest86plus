@@ -125,4 +125,28 @@ __MEMRW_FLUSH_FUNC(32)
  */
 __MEMRW_FLUSH_FUNC(64)
 
+#if defined(__i386__) || defined(__x86_64__)
+// The BDA helpers below dereference small constant addresses, which GCC's
+// -Warray-bounds heuristic flags as likely null derefs. Suppress locally;
+// the accesses are intentional reads/writes of the x86 BIOS Data Area.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+/**
+ * Reads a 16-bit value from the x86 BIOS Data Area at the given linear address.
+ */
+static inline uint16_t bda_read16(uintptr_t address)
+{
+    return read16((const volatile uint16_t *)address);
+}
+
+/**
+ * Writes a 16-bit value to the x86 BIOS Data Area at the given linear address.
+ */
+static inline void bda_write16(uintptr_t address, uint16_t value)
+{
+    write16((const volatile uint16_t *)address, value);
+}
+#pragma GCC diagnostic pop
+#endif
+
 #endif // MEMRW_H

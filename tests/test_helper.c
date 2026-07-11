@@ -94,3 +94,21 @@ void flush_caches(int my_cpu)
         }
     }
 }
+
+void flush_caches_all(int my_cpu)
+{
+    if (my_cpu >= 0) {
+        bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
+        if (use_spin_wait) {
+            barrier_spin_wait(run_barrier);
+        } else {
+            barrier_halt_wait(run_barrier);
+        }
+        cache_flush();
+        if (use_spin_wait) {
+            barrier_spin_wait(run_barrier);
+        } else {
+            barrier_halt_wait(run_barrier);
+        }
+    }
+}

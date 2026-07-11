@@ -271,7 +271,7 @@ static int format_results(char *buf, int bufsize)
             pos = buf_printf(pos, " ECC");
         }
 
-        const char *mfg = jedec_manufacturer_name(spdi->jedec_code);
+        const char *mfg = get_jep106_name(spdi->jedec_code);
         if (mfg) {
             pos = buf_printf(pos, " - %s", mfg);
         } else if (spdi->jedec_code != 0) {

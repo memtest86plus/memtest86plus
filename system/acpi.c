@@ -6,6 +6,7 @@
 #include "bootparams.h"
 #include "efi.h"
 
+#include "memrw.h"
 #include "pmem.h"
 #include "string.h"
 #include "unistd.h"
@@ -173,7 +174,7 @@ static uintptr_t find_rsdp(void)
 #if defined(__i386__) || defined(__x86_64__)
     if (rp == NULL) {
         // Search the BIOS EBDA area.
-        uintptr_t address = *(uint16_t *)0x40E << 4;
+        uintptr_t address = (uintptr_t)bda_read16(0x40E) << 4;
         if (address) {
             rp = scan_for_rsdp(address, 0x400);
             if (rp) rsdp_source = "BIOS EBDA";

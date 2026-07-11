@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2025 Sam Demeulemeester
+// Copyright (C) 2004-2026 Sam Demeulemeester
 //
 // ------------------------
 // This file is used to detect quirks on specific hardware
@@ -11,6 +11,7 @@
 #include "hwquirks.h"
 #include "io.h"
 #include "pci.h"
+#include "string.h"
 #include "unistd.h"
 #include "cpuinfo.h"
 #include "cpuid.h"
@@ -60,9 +61,10 @@ static int *get_motherboard_cache(void)
     return NULL;
 }
 
-static void get_m1541_l2_cache_size(void)
+static void get_m1531_41_mb_cache_size(void)
 {
-    if (l2_cache != 0) {
+    int *const mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
         return;
     }
 
@@ -71,12 +73,40 @@ static void get_m1541_l2_cache_size(void)
         return;
     }
 
-    // Get L2 Cache Size with L2CC-1 Register[3:2]
-    uint8_t reg = (pci_config_read8(0, 0, 0, 0x41) >> 2) & 3;
+    // Get L2 Cache Size from L2CC-1 Register (bits differ per chip variant)
+    uint8_t ali_reg = pci_config_read8(0, 0, 0, 0x41);
 
-    if (reg == 0b00) { l2_cache = 256; }
-    if (reg == 0b01) { l2_cache = 512; }
-    if (reg == 0b10) { l2_cache = 1024; }
+    if (quirk.root_did == 0x1531) {         // ALi Aladdin IV (M1531): Register[2:1]
+        switch ((ali_reg >> 1) & 0x3) {
+          case 0b01: *mb_cache = 256;  break;
+          case 0b10: *mb_cache = 512;  break;
+          case 0b11: *mb_cache = 1024; break;
+        }
+    } else {                                // ALi Aladdin V (M1541): Register[3:2]
+        switch ((ali_reg >> 2) & 0x3) {
+          case 0b00: *mb_cache = 256;  break;
+          case 0b01: *mb_cache = 512;  break;
+          case 0b10: *mb_cache = 1024; break;
+        }
+    }
+}
+
+static void get_sis_530_mb_cache_size(void)
+{
+    int *const mb_cache = get_motherboard_cache();
+    if (!mb_cache) {
+        return;
+    }
+
+    uint8_t sis_reg = pci_config_read8(0, 0, 0, 0x51);
+
+    // Check if cache is enabled with Register[7]
+    if ((sis_reg & 0x80) == 0) {
+        return;
+    }
+
+    // Get cache size with Register[5:4]
+    *mb_cache = 256 << ((sis_reg >> 4) & 0x03);
 }
 
 static void get_vt82c585_597_mb_cache_size(void)
@@ -127,6 +157,48 @@ static void amd_k8_revfg_temp(void)
         return;
 
     cpu_temp_offset = 21.0f;
+}
+
+// AMD Zen Tctl -> Tdie offset table.
+typedef struct {
+    uint8_t      ext_family;
+    uint8_t      ext_model;
+    float        tctl_offset;
+    char         brand_prefix[CPUID_BRAND_STR_LENGTH];
+} amd_tctl_offset_t;
+
+static const amd_tctl_offset_t amd_tctl_offset_table[] = {
+    { 0x8, 0x0, -20.0f, "AMD Ryzen 5 1600X"         },  // Summit Ridge
+    { 0x8, 0x0, -20.0f, "AMD Ryzen 7 1700X"         },  // Summit Ridge
+    { 0x8, 0x0, -20.0f, "AMD Ryzen 7 1800X"         },  // Summit Ridge
+    { 0x8, 0x0, -10.0f, "AMD Ryzen 7 2700X"         },  // Pinnacle Ridge
+    { 0x8, 0x0, -27.0f, "AMD Ryzen Threadripper 19" },  // Whitehaven (1900X/1920X/1950X)
+    { 0x8, 0x0, -27.0f, "AMD Ryzen Threadripper 29" },  // Colfax (29x0X/29x0WX)
+    { 0x8, 0x0, -27.0f, "AMD EPYC 7"                },  // Naples (Family 17h, Model 01h)
+    //{ 0xA, 0xA, -49.0f, "AMD EPYC 8"                },  // Siena (Maybe needed)
+    //{ 0xA, 0x1, -49.0f, "AMD EPYC 9"                },  // Genoa (Maybe needed)
+    { 0xB, 0x0, -49.0f, "AMD EPYC 9"                },  // Turin (Family 19h, Model 11h)
+    // Other EPYC parts report Tdie directly using the bit-19 (T_OFFSET_PRESENT) path.
+};
+
+static void amd_zen_apply_tctl_offset(void)
+{
+    const char *brand = cpuid_info.brand_id.str;
+    uint8_t ext_family = cpuid_info.version.extendedFamily;
+    uint8_t ext_model  = cpuid_info.version.extendedModel;
+
+    for (size_t i = 0; i < sizeof(amd_tctl_offset_table) / sizeof(amd_tctl_offset_table[0]); i++) {
+        const amd_tctl_offset_t *e = &amd_tctl_offset_table[i];
+
+        if (e->ext_family != ext_family || e->ext_model != ext_model) {
+            continue;
+        }
+
+        if (strncmp(brand, e->brand_prefix, strlen(e->brand_prefix)) == 0) {
+            cpu_temp_offset += e->tctl_offset;
+            return;
+        }
+    }
 }
 
 static void loongson_7a00_ehci_workaround(void)
@@ -187,15 +259,16 @@ void quirks_init(void)
     quirk.root_did  = pci_config_read16(0, 0, 0, PCI_DID_REG);
     quirk.process   = NULL;
 
-    //  -------------------------
-    //  -- ALi Aladdin V Quirk --
-    //  -------------------------
+    //  -------------------------------------------------
+    //  -- ALi Aladdin IV (M1531) & V (M1541) Quirks  --
+    //  -------------------------------------------------
     // As on many Socket 7 Motherboards, the L2 cache is external and must
     // be detected by a proprietary way based on chipset registers
-    if (quirk.root_vid == PCI_VID_ALI && quirk.root_did == 0x1541) {    // ALi Aladdin V (M1541)
-        quirk.id    = QUIRK_ALI_ALADDIN_V;
+    if (quirk.root_vid == PCI_VID_ALI && (quirk.root_did == 0x1531      // ALi Aladdin IV (M1531)
+            || quirk.root_did == 0x1541)) {                              // ALi Aladdin V  (M1541)
+        quirk.id    = QUIRK_ALI_ALADDIN_IV_V;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
-        quirk.process = get_m1541_l2_cache_size;
+        quirk.process = get_m1531_41_mb_cache_size;
     }
 
     //  -------------------------------------------------------------------
@@ -207,6 +280,16 @@ void quirks_init(void)
         quirk.id    = QUIRK_VIA_VP;
         quirk.type |= QUIRK_TYPE_MEM_SIZE;
         quirk.process = get_vt82c585_597_mb_cache_size;
+    }
+
+    //  --------------------------
+    //  -- SiS 530 Quirk        --
+    //  --------------------------
+    // Motherboard cache detection
+    else if (quirk.root_vid == PCI_VID_SIS && quirk.root_did == 0x0530) {  // SiS 530
+        quirk.id    = QUIRK_SIS_530;
+        quirk.type |= QUIRK_TYPE_MEM_SIZE;
+        quirk.process = get_sis_530_mb_cache_size;
     }
 
     //  ------------------------
@@ -285,6 +368,17 @@ void quirks_init(void)
                 quirk.process = disable_temp_reporting;
             }
         }
+    }
+
+    //  -----------------------------------------------------------
+    //  -- AMD Zen-class Tctl -> Tdie offset for affected SKUs   --
+    //  -----------------------------------------------------------
+    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
+        && cpuid_info.version.extendedFamily >= 8) {
+
+        quirk.id    = QUIRK_AMD_ZEN_TCTL_OFFSET;
+        quirk.type |= QUIRK_TYPE_TEMP;
+        quirk.process = amd_zen_apply_tctl_offset;
     }
 
     //  -----------------------------------------------------------

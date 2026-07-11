@@ -167,13 +167,14 @@ init_idt_descr:
 
 	lidt	idt_descr@GOTOFF(%ebx)
 
-	# Zero the BSS (if first boot).
+	# Zero the BSS (if first boot). The stack area is excluded: it needs no
+	# init and, when loaded in low memory, may extend into the video/ROM region.
 
 	cmpl	$1, first_boot@GOTOFF(%ebx)
 	jne	1f
 	xorl	%eax, %eax
 	leal	_bss@GOTOFF(%ebx), %edi
-	leal	_end@GOTOFF(%ebx), %ecx
+	leal	_stacks@GOTOFF(%ebx), %ecx
 	subl	%edi, %ecx
 0:	movl	%eax, (%edi)
 	addl	$4, %edi

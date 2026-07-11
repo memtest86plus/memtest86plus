@@ -54,7 +54,7 @@ typedef union {
 } cpuid_proc_info_t;
 
 typedef union {
-    uint32_t        raw[3];
+    uint32_t        raw[4];
     struct {
         uint32_t    fpu     : 1;    // EDX feature flags, bit 0 */
         uint32_t    vme     : 1;
@@ -99,10 +99,17 @@ typedef union {
         uint32_t    tm2     : 1;
         uint32_t            : 12;   // ECX feature flags, bit 20
         uint32_t    x2apic  : 1;
-        uint32_t            : 10;   // ECX feature flags, bit 31
+        uint32_t            : 4;    // ECX feature flags, bit 25
+        uint32_t    xsave   : 1;    // ECX feature flags, bit 26
+        uint32_t    osxsave : 1;
+        uint32_t    avx     : 1;    // ECX feature flags, bit 28
+        uint32_t            : 3;    // ECX feature flags, bit 31
         uint32_t            : 29;   // EDX extended feature flags, bit 0
         uint32_t    lm      : 1;
         uint32_t            : 2;    // EDX extended feature flags, bit 31
+        uint32_t            : 5;    // EBX extended feature flags (leaf 7), bit 0
+        uint32_t    avx2    : 1;    // EBX extended feature flags, bit 5
+        uint32_t            : 26;   // EBX extended feature flags, bit 31
     };
 } cpuid_feature_flags_t;
 

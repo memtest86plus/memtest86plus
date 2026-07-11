@@ -805,7 +805,7 @@ coff_header:
 #else
 	.word	IMAGE_FILE_MACHINE_I386		# Machine (i386)
 #endif
-	.word	4				# NumberOfSections
+	.word	5				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
@@ -954,6 +954,20 @@ section_table:
 	.long	IMAGE_SCN_MEM_READ		\
 	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
+	.ascii	".osrel"
+	.byte	0
+	.byte	0
+	.long	_virt_osrel_size		# VirtualSize
+	.long	_virt_osrel_start		# VirtualAddress
+	.long	_file_osrel_size		# SizeOfRawData
+	.long	_file_osrel_start		# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.word	0				# NumberOfRelocations
+	.word	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+
 # Pad to the declared size.
 	.org	(SETUP_SECS*512)
 
@@ -964,3 +978,9 @@ section_table:
 
 .section ".sbat", "a", @progbits
 .incbin "../boot/sbat.csv"
+
+.section ".osrel", "a", @progbits
+	.ascii	"ID=memtest86plus\n"
+	.ascii	"NAME=\"Memtest86+\"\n"
+	.ascii	"VERSION_ID=\"" , MT_VERSION , "\"\n"
+	.ascii	"PRETTY_NAME=\"Memtest86+ v" , MT_VERSION , "\"\n"

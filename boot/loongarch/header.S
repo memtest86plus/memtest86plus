@@ -10,6 +10,7 @@
 #define __ASSEMBLY__
 
 #include "boot.h"
+#include "build_version.h"
 #include "peimage.h"
 
 # The EFI loader loads the header at ImageBase, so we have to locate the main program
@@ -36,7 +37,7 @@ pe_header:
 
 coff_header:
 	.short	IMAGE_FILE_MACHINE_LOONGARCH64		# Machine (LoongArch64)
-	.short	4				# NumberOfSections
+	.short	5				# NumberOfSections
 	.long	0 				# TimeDateStamp
 	.long	0				# PointerToSymbolTable
 	.long	0				# NumberOfSymbols
@@ -159,6 +160,20 @@ section_table:
 	.long	IMAGE_SCN_MEM_READ		\
 	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
 
+	.ascii	".osrel"
+	.byte	0
+	.byte	0
+	.long	_virt_osrel_size		# VirtualSize
+	.long	_virt_osrel_start		# VirtualAddress
+	.long	_file_osrel_size		# SizeOfRawData
+	.long	_file_osrel_start		# PointerToRawData
+	.long	0				# PointerToRelocations
+	.long	0				# PointerToLineNumbers
+	.short	0				# NumberOfRelocations
+	.short	0				# NumberOfLineNumbers
+	.long	IMAGE_SCN_MEM_READ		\
+	      | IMAGE_SCN_CNT_INITIALIZED_DATA	# Characteristics (section flags)
+
 	.org	512
 
 .section ".reloc"
@@ -168,3 +183,9 @@ section_table:
 
 .section ".sbat", "a", @progbits
 .incbin "../boot/sbat.csv"
+
+.section ".osrel", "a", @progbits
+	.ascii	"ID=memtest86plus\n"
+	.ascii	"NAME=\"Memtest86+\"\n"
+	.ascii	"VERSION_ID=\"" , MT_VERSION , "\"\n"
+	.ascii	"PRETTY_NAME=\"Memtest86+ v" , MT_VERSION , "\"\n"

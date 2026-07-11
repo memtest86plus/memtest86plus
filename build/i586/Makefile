@@ -56,6 +56,7 @@ SYS_OBJS = system/acpi.o \
            system/x86/i2c.o \
            system/x86/membw.o \
            system/x86/memctrl.o \
+           system/x86/simd.o \
            system/x86/temperature.o \
            system/x86/vmem.o
 
@@ -72,11 +73,14 @@ LIB_OBJS = lib/barrier.o \
 TST_OBJS = tests/addr_walk1.o \
            tests/bit_fade.o \
            tests/block_move.o \
+           tests/bus_stress.o \
            tests/modulo_n.o \
            tests/mov_inv_fixed.o \
-           tests/mov_inv_random.o \
+           tests/mov_inv_rng.o \
+           tests/vec_prsg.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
+           tests/rowhammer.o \
            tests/test_helper.o \
            tests/tests.o
 

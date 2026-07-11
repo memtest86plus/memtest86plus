@@ -28,6 +28,16 @@ static inline uint8_t bcd_to_ui8(uint8_t bcd)
     return bcd - 6 * (bcd >> 4);
 }
 
+const char *get_jep106_name(uint16_t jedec_code)
+{
+    for (uint16_t i = 0; i < JEP106_CNT; i++) {
+        if (jedec_code == jep106[i].jedec_code) {
+            return jep106[i].name;
+        }
+    }
+    return NULL;
+}
+
 void print_spdi(spd_info spdi, uint8_t row)
 {
     uint8_t curcol;
@@ -51,10 +61,11 @@ void print_spdi(spd_info spdi, uint8_t row)
         curcol = prints(row, ++curcol, "EPP");
     }
 
-    // Print Manufacturer from JEDEC106
-    const char *mfg_name = jedec_manufacturer_name(spdi.jedec_code);
-    if (mfg_name) {
-        curcol = printf(row, ++curcol, "- %s", mfg_name);
+    // Print Manufacturer from JEDEC106, or the raw JEDEC ID if not in the table
+    const char *manufacturer = get_jep106_name(spdi.jedec_code);
+
+    if (manufacturer != NULL) {
+        curcol = printf(row, ++curcol, "- %s", manufacturer);
     } else if (spdi.jedec_code == 0) {
         curcol = prints(row, ++curcol, "- Noname");
     } else {
@@ -89,16 +100,6 @@ void print_spdi(spd_info spdi, uint8_t row)
         ram.tRP     = spdi.tRP;
         ram.tRAS    = spdi.tRAS;
     }
-}
-
-const char *jedec_manufacturer_name(uint16_t jedec_code)
-{
-    for (uint16_t i = 0; i < JEP106_CNT; i++) {
-        if (jep106[i].jedec_code == jedec_code) {
-            return jep106[i].name;
-        }
-    }
-    return NULL;
 }
 
 static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_len)

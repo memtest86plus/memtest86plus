@@ -15,6 +15,7 @@
 #include "efi.h"
 
 #include "io.h"
+#include "memrw.h"
 
 #include "unistd.h"
 
@@ -73,7 +74,7 @@ void reboot(void)
 
     if (efi_rs_table == NULL) {
         // In last resort, (very) obsolete reboot method using BIOS
-        *((uint16_t *)0x472) = 0x1234;
+        bda_write16(0x472, 0x1234);
     }
 }
 

@@ -83,7 +83,9 @@
 #define IMC_K1A_GRG     0x8210  // Zen5 (Granite Ridge)
 #define IMC_K1A_KRN     0x8220  // Zen5 (Krackan)
 #define IMC_K1A_STH     0x8230  // Zen5 (Strix Halo)
-#define IMC_K1A_MDS     0x8240  // Zen6 (Medusa)
+#define IMC_K1A_TUR     0x8240  // Zen5 (Turin)
+
+#define IMC_K1A_MDS     0x8300  // Zen6 (Medusa)
 
 #define IMC_LSLA        0xC000  // Loongson LoongArch family
 #define IMC_LA464       0xC010  // LA464 (Loongson 3th Gen)
