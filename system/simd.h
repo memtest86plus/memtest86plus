@@ -20,7 +20,8 @@ typedef enum {
     SIMD_SSE2,      // x86 128-bit
     SIMD_AVX2,      // x86 256-bit
     SIMD_NEON,      // aarch64 128-bit
-    SIMD_SVE        // aarch64 scalable (reserved; no kernels yet)
+    SIMD_SVE,       // aarch64 scalable (reserved; no kernels yet)
+    SIMD_LASX       // loongarch 256-bit
 } simd_tier_t;
 
 /**
@@ -48,6 +49,8 @@ static inline const char *simd_tier_name(void)
         return "NEON";
       case SIMD_SVE:
         return "SVE";
+      case SIMD_LASX:
+        return "LASX";
       default:
         return NULL;
     }

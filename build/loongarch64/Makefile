@@ -74,6 +74,7 @@ TST_OBJS = tests/addr_walk1.o \
            tests/mov_inv_fixed.o \
            tests/mov_inv_rng.o \
            tests/vec_prsg.o \
+           tests/loongarch/vec_prsg_lasx.o \
            tests/mov_inv_walk1.o \
            tests/own_addr.o \
            tests/rowhammer.o \
@@ -147,6 +148,10 @@ lib/%.o: ../../lib/%.c
 
 tests/%.o: ../../tests/%.c
 	@mkdir -p tests
+	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+tests/loongarch/%.o: ../../tests/loongarch/%.c
+	@mkdir -p tests/loongarch
 	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 app/%.o: ../../app/%.c app/build_version.h

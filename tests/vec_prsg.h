@@ -75,6 +75,19 @@ size_t vec_scan_fwd_neon(vec_state_t *st, testword_t *p, size_t nblocks, bool sp
 size_t vec_scan_rev_neon(vec_state_t *st, testword_t *q, size_t nblocks, bool splat);
 #endif
 
+#if defined(__loongarch_lp64)
+/*
+ * LASX kernels (see tests/loongarch/vec_prsg_lasx.c). Same contract as the
+ * x86 kernels above: start from the lane states in *st, leave the updated
+ * states back in *st, and end with a DBAR so no store is left buffered.
+ * The scan kernels stop at the first mismatching block and return the
+ * number of blocks completed, positioned at the failing block.
+ */
+void   vec_fill_lasx(vec_state_t *st, testword_t *p, size_t nblocks, bool splat);
+size_t vec_scan_fwd_lasx(vec_state_t *st, testword_t *p, size_t nblocks, bool splat);
+size_t vec_scan_rev_lasx(vec_state_t *st, testword_t *q, size_t nblocks, bool splat);
+#endif
+
 /**
  * Initialises the lane states from seed. For splat rounds all lanes hold the
  * same value and are never stepped, giving a uniform background pattern.

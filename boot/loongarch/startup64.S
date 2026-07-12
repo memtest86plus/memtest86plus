@@ -336,8 +336,13 @@ Jmp:
     li.w       $t1, 0x1004
     iocsrwr.w  $t0, $t1
 
-    # Turn on FPE to enable FPU.
-    li.w    $t0, (0x1 << 0)
+    # Turn on the FPU, plus LSX/LASX when implemented
+    # (CPUCFG2 bits 6/7 map directly onto EUEN.SXE/ASXE at bits 1/2).
+    li.w    $t0, 0x2
+    cpucfg  $t0, $t0
+    andi    $t0, $t0, 0xC0
+    srli.w  $t0, $t0, 5
+    ori     $t0, $t0, 0x1
     csrxchg $t0, $t0, LOONGARCH_CSR_EUEN
 
     b startup
