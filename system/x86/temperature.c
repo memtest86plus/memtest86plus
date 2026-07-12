@@ -79,14 +79,15 @@ void cpu_temp_init(void)
         }
     }
 
-    // On Zen and newer, check once whether firmware reports the generic
-    // -49 °C Tctl bias via T_OFFSET_PRESENT (bit 19). The result is folded
-    // into cpu_temp_offset so per-SKU quirks set above can still apply.
+    // On Zen and newer, apply the -49 °C range shift when signalled by
+    // CUR_TEMP_RANGE_SEL (bit 19) or CUR_TEMP_TJ_SEL (bits 17:16) == 0b11
+    // (BIOS-written register, typical on server parts). Folded into
+    // cpu_temp_offset so per-SKU quirks set above still apply.
     if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
         && cpuid_info.version.extendedFamily >= 8) {
 
         regl = amd_smn_read(SMN_THM_TCON_CUR_TMP);
-        if ((regl >> 19) & 0x01) {
+        if (((regl >> 19) & 0x1) || ((regl >> 16) & 0x3) == 0x3) {
             cpu_temp_offset += -49.0f;
         }
     }
