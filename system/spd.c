@@ -7,7 +7,6 @@
 
 #include "i2c_x86.h"
 #include "spd.h"
-#include "jedec_id.h"
 #include "print.h"
 
 /** Rounding factors for timing computation
@@ -32,12 +31,37 @@ static inline uint8_t bcd_to_ui8(uint8_t bcd)
     return bcd - 6 * (bcd >> 4);
 }
 
+// The manufacturer list is stored as a code array plus a string table of the
+// same order, instead of an array of {code, char *} pairs: this avoids one
+// pointer and one runtime relocation record per entry.
+#define ENTRY(id, name) id,
+static const uint16_t jep106_codes[] = {
+#include "jedec_id.h"
+};
+#undef ENTRY
+
+#define ENTRY(id, name) name "\0"
+static const char jep106_names[] =
+#include "jedec_id.h"
+;
+#undef ENTRY
+
+#define JEP106_CNT (sizeof(jep106_codes) / sizeof(jep106_codes[0]))
+
 const char *get_jep106_name(uint16_t jedec_code)
 {
+    const char *name = jep106_names;
+
     for (uint16_t i = 0; i < JEP106_CNT; i++) {
-        if (jedec_code == jep106[i].jedec_code) {
-            return jep106[i].name;
+        if (jedec_code == jep106_codes[i]) {
+            return name;
         }
+        // Skip to the next string. Few bytes saved at -Os
+        // Was: "name += strlen(name) + 1".
+       while (*name) {
+            name++;
+        }
+        name++;
     }
     return NULL;
 }

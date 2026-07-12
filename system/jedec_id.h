@@ -7,1680 +7,1672 @@
 
 #define JEDEC_CONT_CODE_MAX 14
 
-#define JEP106_CNT \
-    sizeof(jep106)/sizeof(jep106[0])
-
-struct __attribute__((packed)) spd_jedec_manufacturer {
-    uint16_t jedec_code;
-    char *name;
-};
-
-static const struct __attribute__((packed)) spd_jedec_manufacturer jep106[] = {
-    { 0x0001, "AMD" },
-//  { 0x0002, "AMI" },
-//  { 0x0003, "Fairchild" },
-    { 0x0004, "Fujitsu" },
-    { 0x0005, "GTE" },
-//  { 0x0006, "Harris" },
-//  { 0x0007, "Hitachi" },
-//  { 0x0008, "Inmos" },
-    { 0x0009, "Intel" },
-//  { 0x000A, "I.T.T." },
-//  { 0x000B, "Intersil" },
-//  { 0x000C, "Monolithic Memories" },
-//  { 0x000D, "Mostek" },
-    { 0x000E, "Freescale" },
-//  { 0x000F, "National" },
-    { 0x0010, "NEC" },
-//  { 0x0011, "RCA" },
-//  { 0x0012, "Raytheon" },
-//  { 0x0013, "Conexant (Rockwell)" },
-//  { 0x0014, "Seeq" },
-//  { 0x0015, "NXP (Philips)" },
-//  { 0x0016, "Synertek" },
-    { 0x0017, "Texas Instruments" },
-    { 0x0018, "Kioxia (Toshiba)" },
-//  { 0x0019, "Xicor" },
-//  { 0x001A, "Zilog" },
-//  { 0x001B, "Eurotechnique" },
-//  { 0x001C, "Mitsubishi" },
-//  { 0x001D, "Lucent (AT&T)" },
-//  { 0x001E, "Exel" },
-//  { 0x001F, "Atmel" },
-    { 0x0020, "STMicro." },
-//  { 0x0021, "Lattice Semi." },
-//  { 0x0022, "NCR" },
-//  { 0x0023, "Wafer Scale Integration" },
-    { 0x0024, "IBM" },
-//  { 0x0025, "Tristar" },
-//  { 0x0026, "Visic" },
-//  { 0x0027, "Intl. CMOS" },
-//  { 0x0028, "SSSI" },
-    { 0x0029, "Microchip" },
-//  { 0x002A, "Ricoh" },
-//  { 0x002B, "VLSI" },
-    { 0x002C, "Micron" },
-    { 0x002D, "SK Hynix" },
-//  { 0x002E, "OKI" },
-//  { 0x002F, "ACTEL" },
-//  { 0x0030, "Sharp" },
-//  { 0x0031, "Catalyst" },
-//  { 0x0032, "Panasonic" },
-//  { 0x0033, "IDT" },
-//  { 0x0034, "Cypress" },
-//  { 0x0035, "DEC" },
-//  { 0x0036, "LSI Logic" },
-//  { 0x0037, "Zarlink (Plessey)" },
-//  { 0x0038, "UTMC" },
-//  { 0x0039, "Thinking Machine" },
-//  { 0x003A, "Thomson CSF" },
-//  { 0x003B, "Integrated CMOS (Vertex)" },
-//  { 0x003C, "Honeywell" },
-//  { 0x003D, "Tektronix" },
-//  { 0x003E, "Oracle" },
-//  { 0x003F, "Silicon Storage" },
-    { 0x0040, "MOSEL" },
-    { 0x0041, "Infineon" },
-    { 0x0042, "Macronix" },
-//  { 0x0043, "Xerox" },
-//  { 0x0044, "Plus Logic" },
-//  { 0x0045, "Western Digital" },
-//  { 0x0046, "Elan Circuit Tech." },
-//  { 0x0047, "European Silicon Str." },
-    { 0x0048, "Apple" },
-//  { 0x0049, "Xilinx" },
-//  { 0x004A, "Compaq" },
-//  { 0x004B, "Protocol Engines" },
-//  { 0x004C, "SCI" },
-//  { 0x004D, "Seiko Instruments" },
-    { 0x004E, "Samsung" },
-//  { 0x004F, "I3 Design System" },
-//  { 0x0050, "Klic" },
-//  { 0x0051, "Crosspoint Solutions" },
-//  { 0x0052, "Alliance Memory" },
-//  { 0x0053, "Tandem" },
-//  { 0x0054, "Hewlett-Packard" },
-//  { 0x0055, "Integrated Silicon Solutions" },
-//  { 0x0056, "Brooktree" },
-//  { 0x0057, "New Media" },
-//  { 0x0058, "MHS Electronic" },
-//  { 0x0059, "Performance Semi." },
-    { 0x005A, "Winbond" },
-//  { 0x005B, "Kawasaki Steel" },
-//  { 0x005C, "Bright Micro" },
-//  { 0x005D, "TECMAR" },
-//  { 0x005E, "Exar" },
-//  { 0x005F, "PCMCIA" },
-    { 0x0060, "LG" }, // LG Semi (Goldstar)
-//  { 0x0061, "Northern Telecom" },
-    { 0x0062, "Sanyo" },
-//  { 0x0063, "Array Microsystems" },
-//  { 0x0064, "Crystal Semiconductor" },
-//  { 0x0065, "Analog Devices" },
-//  { 0x0066, "PMC-Sierra" },
-//  { 0x0067, "Asparix" },
-//  { 0x0068, "Convex Computer" },
-//  { 0x0069, "Quality Semiconductor" },
-//  { 0x006A, "Nimbus" },
-//  { 0x006B, "Transwitch" },
-//  { 0x006C, "Micronas (ITT Intermetall)" },
-//  { 0x006D, "Cannon" },
-//  { 0x006E, "Altera" },
-//  { 0x006F, "NEXCOM" },
-//  { 0x0070, "Qualcomm" },
-//  { 0x0071, "Sony" },
-//  { 0x0072, "Cray Research" },
-//  { 0x0073, "AMS(Austria Micro)" },
-//  { 0x0074, "Vitesse" },
-//  { 0x0075, "Aster" },
-//  { 0x0076, "Bay Networks (Synoptic)" },
-//  { 0x0077, "Zentrum/ZMD" },
-//  { 0x0078, "TRW" },
-//  { 0x0079, "Thesys" },
-//  { 0x007A, "Solbourne Computer" },
-//  { 0x007B, "Allied-Signal" },
-//  { 0x007C, "Dialog Semiconductor" },
-//  { 0x007D, "Media Vision" },
-//  { 0x007E, "Numonyx" },
-//  { 0x0101, "Cirrus Logic" },
-//  { 0x0102, "National Instruments" },
-//  { 0x0103, "ILC Data Device" },
-//  { 0x0104, "Alcatel Mietec" },
-//  { 0x0105, "Micro Linear" },
-//  { 0x0106, "Univ. of NC" },
-//  { 0x0107, "JTAG" },
-//  { 0x0108, "BAE Systems (Loral)" },
-//  { 0x0109, "Nchip" },
-//  { 0x010A, "Galileo Tech" },
-//  { 0x010B, "Bestlink Systems" },
-//  { 0x010C, "Graychip" },
-//  { 0x010D, "GENNUM" },
-//  { 0x010E, "VideoLogic" },
-//  { 0x010F, "Robert Bosch" },
-//  { 0x0110, "Chip Express" },
-//  { 0x0111, "DATARAM" },
-//  { 0x0112, "United Microelectronics" },
-//  { 0x0113, "TCSI" },
-    { 0x0114, "Smart Modular" },
-//  { 0x0115, "Hughes Aircraft" },
-//  { 0x0116, "Lanstar Semiconductor" },
-//  { 0x0117, "Qlogic" },
-    { 0x0118, "Kingston" },
-//  { 0x0119, "Music Semi" },
-//  { 0x011A, "Ericsson Components" },
-//  { 0x011B, "SpaSE" },
-//  { 0x011C, "Eon Silicon Devices" },
-//  { 0x011D, "ISSI" },
-//  { 0x011E, "DoD" },
-//  { 0x011F, "Integ. Memories Tech." },
-//  { 0x0120, "Corollary" },
-//  { 0x0121, "Dallas Semiconductor" },
-//  { 0x0122, "Omnivision" },
-//  { 0x0123, "EIV(Switzerland)" },
-//  { 0x0124, "Novatel Wireless" },
-//  { 0x0125, "Zarlink (Mitel)" },
-//  { 0x0126, "Clearpoint" },
-//  { 0x0127, "Cabletron" },
-//  { 0x0128, "STEC (Silicon Tech)" },
-//  { 0x0129, "Vanguard" },
-//  { 0x012A, "Hagiwara Sys-Com" },
-//  { 0x012B, "Vantis" },
-//  { 0x012C, "Celestica" },
-//  { 0x012D, "Century" },
-//  { 0x012E, "Hal Computers" },
-//  { 0x012F, "Rohm Company" },
-//  { 0x0130, "Juniper Networks" },
-//  { 0x0131, "Libit Signal Processing" },
-    { 0x0132, "Mushkin" },
-//  { 0x0133, "Tundra Semiconductor" },
-//  { 0x0134, "Adaptec" },
-//  { 0x0135, "LightSpeed Semi." },
-//  { 0x0136, "ZSP" },
-//  { 0x0137, "AMIC" },
-//  { 0x0138, "Adobe Systems" },
-//  { 0x0139, "Dynachip" },
-    { 0x013A, "PNY" },
-//  { 0x013B, "Newport Digital" },
-//  { 0x013C, "MMC Networks" },
-//  { 0x013D, "T Square" },
-//  { 0x013E, "Seiko Epson" },
-//  { 0x013F, "Broadcom" },
-    { 0x0140, "Viking" },
-//  { 0x0141, "V3 Semiconductor" },
-    { 0x0142, "Flextronics" },
-//  { 0x0143, "Suwa" },
-//  { 0x0144, "Transmeta" },
-    { 0x0145, "Micron CMS" },
-//  { 0x0147, "Enhance 3000" },
-//  { 0x0148, "Tower Semiconductor" },
-//  { 0x0149, "CPU Design" },
-//  { 0x014A, "Price Point" },
-//  { 0x014B, "Maxim Integrated Product" },
-//  { 0x014C, "Tellabs" },
-//  { 0x014D, "Centaur" },
-//  { 0x014E, "Unigen" },
-    { 0x014F, "Transcend" },
-//  { 0x0150, "Memory Card" },
-//  { 0x0151, "CKD" },
-//  { 0x0152, "Capital Instruments" },
-//  { 0x0153, "Aica Kogyo" },
-//  { 0x0154, "Linvex" },
-//  { 0x0155, "MSC Vertriebs GmbH" },
-//  { 0x0156, "AKM Company" },
-//  { 0x0157, "Dynamem" },
-//  { 0x0158, "NERA ASA" },
-//  { 0x0159, "GSI" },
-    { 0x015A, "Dane-Elec" },
-//  { 0x015B, "Acorn Computers" },
-//  { 0x015C, "Lara" },
-//  { 0x015D, "Oak" },
-//  { 0x015E, "Itec Memory" },
-//  { 0x015F, "Tanisys" },
-//  { 0x0160, "Truevision" },
-    { 0x0161, "Wintec" },
-//  { 0x0162, "Super PC Memory" },
-//  { 0x0163, "MGV Memory" },
-//  { 0x0164, "Galvantech" },
-//  { 0x0165, "Gadzoox Networks" },
-//  { 0x0166, "Multi Dimensional Cons." },
-//  { 0x0167, "GateField" },
-//  { 0x0168, "Integrated Memory System" },
-//  { 0x0169, "Triscend" },
-//  { 0x016A, "XaQti" },
-//  { 0x016B, "Goldenram" },
-//  { 0x016C, "Clear Logic" },
-//  { 0x016D, "Cimaron" },
-//  { 0x016E, "Nippon Steel Semi." },
-//  { 0x016F, "Advantage Memory" },
-//  { 0x0170, "AMCC" },
-//  { 0x0171, "LeCroy" },
-//  { 0x0172, "Yamaha" },
-//  { 0x0173, "Digital Microwave" },
-//  { 0x0174, "NetLogic Microsystems" },
-//  { 0x0175, "MIMOS Semiconductor" },
-//  { 0x0176, "Advanced Fibre" },
-//  { 0x0177, "BF Goodrich Data." },
-//  { 0x0178, "Epigram" },
-    { 0x0179, "Acbel" },
-    { 0x017A, "Apacer" },
-//  { 0x017B, "Admor Memory" },
-    { 0x017C, "FOXCONN" },
-//  { 0x017D, "Quadratics" },
-//  { 0x017E, "3COM" },
-//  { 0x0201, "Camintonn" },
-//  { 0x0202, "ISOA Incorporated" },
-//  { 0x0203, "Agate Semiconductor" },
-//  { 0x0204, "ADMtek Incorporated" },
-//  { 0x0205, "HYPERTEC" },
-//  { 0x0206, "Adhoc" },
-//  { 0x0207, "MOSAID" },
-//  { 0x0208, "Ardent" },
-//  { 0x0209, "Switchcore" },
-//  { 0x020A, "Cisco Systems" },
-//  { 0x020B, "Allayer" },
-//  { 0x020C, "WorkX AG (Wichman)" },
-//  { 0x020D, "Oasis Semiconductor" },
-//  { 0x020E, "Novanet Semiconductor" },
-//  { 0x020F, "E-M Solutions" },
-//  { 0x0210, "Power General" },
-//  { 0x0211, "Advanced Hardware Arch." },
-//  { 0x0212, "Inova" },
-//  { 0x0213, "Telocity" },
-//  { 0x0214, "Delkin Devices" },
-//  { 0x0215, "Symagery Microsystems" },
-//  { 0x0216, "C-Port" },
-//  { 0x0217, "SiberCore" },
-//  { 0x0218, "Southland Microsystems" },
-//  { 0x0219, "Malleable" },
-//  { 0x021A, "Kendin" },
-//  { 0x021B, "Great Technology Micro." },
-//  { 0x021C, "Sanmina" },
-//  { 0x021D, "HADCO" },
-    { 0x021E, "Corsair" },
-//  { 0x021F, "Actrans System" },
-//  { 0x0220, "ALPHA" },
-//  { 0x0221, "Silicon Laboratories Inc (Cygnal)" },
-//  { 0x0222, "Artesyn" },
-//  { 0x0223, "Align Manufacturing" },
-//  { 0x0224, "Peregrine Semiconductor" },
-//  { 0x0225, "Chameleon Systems" },
-//  { 0x0226, "Aplus Flash" },
-//  { 0x0227, "MIPS" },
-//  { 0x0228, "Chrysalis ITS" },
-//  { 0x0229, "ADTEC" },
-    { 0x022A, "Kentron" },
-//  { 0x022B, "Win" },
-//  { 0x022C, "Tezzaron Semiconductor" },
-//  { 0x022D, "Extreme Packet Devices" },
-//  { 0x022E, "RF Micro Devices" },
-    { 0x022F, "Siemens AG" },
-//  { 0x0230, "Sarnoff" },
-//  { 0x0231, "Itautec SA" },
-//  { 0x0232, "Radiata" },
-//  { 0x0233, "Benchmark Elect. (AVEX)" },
-//  { 0x0234, "Legend" },
-    { 0x0235, "SpecTek" },
-//  { 0x0236, "Hi/fn" },
-//  { 0x0237, "Enikia Incorporated" },
-//  { 0x0238, "SwitchOn Networks" },
-//  { 0x0239, "AANetcom Incorporated" },
-//  { 0x023A, "Micro Memory Bank" },
-//  { 0x023B, "ESS" },
-//  { 0x023C, "Virata" },
-//  { 0x023D, "Excess Bandwidth" },
-//  { 0x023E, "West Bay Semiconductor" },
-//  { 0x023F, "DSP Group" },
-//  { 0x0240, "Newport" },
-//  { 0x0241, "Chip2Chip Incorporated" },
-//  { 0x0242, "Phobos" },
-//  { 0x0243, "Intellitech" },
-//  { 0x0244, "Nordic VLSI ASA" },
-//  { 0x0245, "Ishoni Networks" },
-//  { 0x0246, "Silicon Spice" },
-//  { 0x0247, "Alchemy Semiconductor" },
-//  { 0x0248, "Agilent" },
-//  { 0x0249, "Centillium" },
-//  { 0x024A, "W.L. Gore" },
-//  { 0x024B, "HanBit" },
-//  { 0x024C, "GlobeSpan" },
-//  { 0x024D, "Element 14" },
-//  { 0x024E, "Pycon" },
-//  { 0x024F, "Saifun Semiconductors" },
-//  { 0x0250, "Sibyte Incorporated" },
-//  { 0x0251, "MetaLink" },
-//  { 0x0252, "Feiya" },
-//  { 0x0253, "I & C" },
-//  { 0x0254, "Shikatronics" },
-//  { 0x0255, "Elektrobit" },
-//  { 0x0256, "Megic" },
-//  { 0x0257, "Com-Tier" },
-//  { 0x0258, "Malaysia Micro Solutions" },
-//  { 0x0259, "Hyperchip" },
-//  { 0x025A, "Gemstone" },
-//  { 0x025B, "Anadigm (Anadyne)" },
-//  { 0x025C, "3ParData" },
-//  { 0x025D, "Mellanox" },
-//  { 0x025E, "Tenx" },
-//  { 0x025F, "Helix AG" },
-//  { 0x0260, "Domosys" },
-//  { 0x0261, "Skyup" },
-//  { 0x0262, "HiNT" },
-//  { 0x0263, "Chiaro" },
-//  { 0x0264, "MDT Technologies GmbH" },
-//  { 0x0265, "Exbit Technology A/S" },
-//  { 0x0266, "Integrated Technology Express" },
-//  { 0x0267, "AVED Memory" },
-//  { 0x0268, "Legerity" },
-//  { 0x0269, "Jasmine Networks" },
-//  { 0x026A, "Caspian Networks" },
-//  { 0x026B, "nCUBE" },
-//  { 0x026C, "Silicon Access Networks" },
-//  { 0x026D, "FDK" },
-//  { 0x026E, "High Bandwidth Access" },
-//  { 0x026F, "MultiLink" },
-//  { 0x0270, "BRECIS" },
-//  { 0x0271, "World Wide Packets" },
-//  { 0x0272, "APW" },
-//  { 0x0273, "Chicory Systems" },
-//  { 0x0274, "Xstream Logic" },
-//  { 0x0275, "Fast-Chip" },
-//  { 0x0276, "Zucotto Wireless" },
-//  { 0x0277, "Realchip" },
-//  { 0x0278, "Galaxy Power" },
-//  { 0x0279, "eSilicon" },
-//  { 0x027A, "Morphics" },
-//  { 0x027B, "Accelerant Networks" },
-//  { 0x027C, "Silicon Wave" },
-//  { 0x027D, "SandCraft" },
-    { 0x027E, "Elpida" },
-//  { 0x0301, "Solectron" },
-//  { 0x0302, "Optosys" },
-//  { 0x0303, "Buffalo (Formerly Melco)" },
-//  { 0x0304, "TriMedia" },
-//  { 0x0305, "Cyan" },
-//  { 0x0306, "Global Locate" },
-//  { 0x0307, "Optillion" },
-//  { 0x0308, "Terago" },
-//  { 0x0309, "Ikanos" },
-//  { 0x030A, "Princeton" },
-    { 0x030B, "Nanya" },
-//  { 0x030C, "Elite Flash Storage" },
-//  { 0x030D, "Mysticom" },
-//  { 0x030E, "LightSand" },
-    { 0x030F, "ATI" },
-//  { 0x0310, "Agere Systems" },
-//  { 0x0311, "NeoMagic" },
-//  { 0x0312, "AuroraNetics" },
-    { 0x0313, "GEIL" },
-    { 0x0314, "Mushkin" },
-//  { 0x0315, "Tioga" },
-    { 0x0316, "Netlist" },
-//  { 0x0317, "TeraLogic" },
-//  { 0x0318, "Cicada Semiconductor" },
-//  { 0x0319, "Centon" },
-//  { 0x031A, "Tyco" },
-//  { 0x031B, "Magis Works" },
-//  { 0x031C, "Zettacom" },
-//  { 0x031D, "Cogency Semiconductor" },
-//  { 0x031E, "Chipcon AS" },
-//  { 0x031F, "Aspex" },
-//  { 0x0320, "F5 Networks" },
-//  { 0x0321, "Programmable Silicon Solutions" },
-//  { 0x0322, "ChipWrights" },
-//  { 0x0323, "Acorn Networks" },
-//  { 0x0324, "Quicklogic" },
-    { 0x0325, "Kingmax" },
-//  { 0x0326, "BOPS" },
-//  { 0x0327, "Flasys" },
-//  { 0x0328, "BitBlitz" },
-//  { 0x0329, "eMemory" },
-//  { 0x032A, "Procket Networks" },
-//  { 0x032B, "Purple Ray" },
-//  { 0x032C, "Trebia Networks" },
-//  { 0x032D, "Delta" },
-//  { 0x032E, "Onex" },
-//  { 0x032F, "Ample" },
-//  { 0x0330, "Memory Experts Intl" },
-//  { 0x0331, "Astute Networks" },
-//  { 0x0332, "Azanda Network Devices" },
-//  { 0x0333, "Dibcom" },
-    { 0x0334, "Tekmos" },
-//  { 0x0335, "API NetWorks" },
-//  { 0x0336, "Bay Microsystems" },
-//  { 0x0337, "Firecron" },
-//  { 0x0338, "Resonext" },
-//  { 0x0339, "Tachys" },
-//  { 0x033A, "Equator" },
-//  { 0x033B, "Concept Computer" },
-//  { 0x033C, "SILCOM" },
-//  { 0x033D, "3Dlabs" },
-//  { 0x033E, "c&t Magazine" },
-//  { 0x033F, "Sanera Systems" },
-//  { 0x0340, "Silicon Packets" },
-//  { 0x0341, "Viasystems Group" },
-//  { 0x0342, "Simtek" },
-//  { 0x0343, "Semicon Devices Singapore" },
-//  { 0x0344, "Satron Handelsges" },
-//  { 0x0345, "Improv Systems" },
-//  { 0x0346, "INDUSYS GmbH" },
-//  { 0x0347, "Corrent" },
-//  { 0x0348, "Infrant" },
-//  { 0x0349, "Ritek" },
-//  { 0x034A, "empowerTel Networks" },
-//  { 0x034B, "Hypertec" },
-//  { 0x034C, "Cavium Networks" },
-//  { 0x034D, "PLX" },
-//  { 0x034E, "Massana Design" },
-//  { 0x034F, "Intrinsity" },
-//  { 0x0350, "Valence Semiconductor" },
-//  { 0x0351, "Terawave" },
-//  { 0x0352, "IceFyre Semiconductor" },
-//  { 0x0353, "Primarion" },
-//  { 0x0354, "Picochip Designs" },
-//  { 0x0355, "Silverback Systems" },
-    { 0x0356, "Jade Star" },
-//  { 0x0357, "Pijnenburg Securealink" },
-    { 0x0358, "takeMS" }, // Ultron AG
-//  { 0x0359, "Cambridge Silicon Radio" },
-    { 0x035A, "Swissbit" },
-//  { 0x035B, "Nazomi" },
-//  { 0x035C, "eWave System" },
-//  { 0x035D, "Rockwell Collins" },
-//  { 0x035E, "Picocel Co Ltd (Paion)" },
-//  { 0x035F, "Alphamosaic" },
-//  { 0x0360, "Sandburst" },
-//  { 0x0361, "SiCon Video" },
-//  { 0x0362, "NanoAmp Solutions" },
-//  { 0x0363, "Ericsson" },
-//  { 0x0364, "PrairieComm" },
-//  { 0x0365, "Mitac" },
-//  { 0x0366, "Layer N Networks" },
-//  { 0x0367, "MtekVision (Atsana)" },
-//  { 0x0368, "Allegro Networks" },
-//  { 0x0369, "Marvell Semiconductors" },
-//  { 0x036A, "Netergy Microelectronic" },
-    { 0x036B, "NVIDIA" },
-//  { 0x036C, "Internet Machines" },
-//  { 0x036D, "Memorysolution GmbH" },
-//  { 0x036E, "Litchfield Communication" },
-//  { 0x036F, "Accton" },
-//  { 0x0370, "Teradiant Networks" },
-//  { 0x0371, "Scaleo Chip" },
-//  { 0x0372, "Cortina Systems" },
-//  { 0x0373, "RAM Components" },
-//  { 0x0374, "Raqia Networks" },
-//  { 0x0375, "ClearSpeed" },
-//  { 0x0376, "Matsushita Battery" },
-//  { 0x0377, "Xelerated" },
-//  { 0x0378, "SimpleTech" },
-    { 0x0379, "Utron" },
-//  { 0x037A, "Astec" },
-//  { 0x037B, "AVM gmbH" },
-//  { 0x037C, "Redux" },
-//  { 0x037D, "Dot Hill Systems" },
-//  { 0x037E, "TeraChip" },
-//  { 0x0401, "T-RAM Incorporated" },
-//  { 0x0402, "Innovics Wireless" },
-//  { 0x0403, "Teknovus" },
-//  { 0x0404, "KeyEye" },
-//  { 0x0405, "Runcom" },
-//  { 0x0406, "RedSwitch" },
-//  { 0x0407, "Dotcast" },
-//  { 0x0408, "Silicon Mountain Memory" },
-//  { 0x0409, "Signia" },
-//  { 0x040A, "Pixim" },
-//  { 0x040B, "Galazar Networks" },
-//  { 0x040C, "White Electronic Designs" },
-//  { 0x040D, "Patriot Scientific" },
-//  { 0x040E, "Neoaxiom" },
-//  { 0x040F, "3Y Power" },
-//  { 0x0410, "Scaleo Chip" },
-//  { 0x0411, "Potentia Power Systems" },
-//  { 0x0412, "C-guys Incorporated" },
-//  { 0x0413, "Digital" },
-//  { 0x0414, "Silicon-Based" },
-//  { 0x0415, "Fulcrum Microsystems" },
-    { 0x0416, "Positivo" },
-//  { 0x0417, "XIOtech" },
-//  { 0x0418, "PortalPlayer" },
-//  { 0x0419, "Zhiying Software" },
-//  { 0x041A, "ParkerVision" },
-//  { 0x041B, "Phonex Broadband" },
-//  { 0x041C, "Skyworks Solutions" },
-//  { 0x041D, "Entropic" },
-//  { 0x041E, "I&M Intelligent Memory" },
-//  { 0x041F, "Zensys A/S" },
-//  { 0x0420, "Legend Silicon" },
-//  { 0x0421, "Sci-worx GmbH" },
-//  { 0x0422, "SMSC (Standard Microsystems)" },
-//  { 0x0423, "Renesas" },
-//  { 0x0424, "Raza Microelectronics" },
-//  { 0x0425, "Phyworks" },
-    { 0x0426, "MediaTek" },
-//  { 0x0427, "Non-cents Productions" },
-//  { 0x0428, "US Modular" },
-//  { 0x0429, "Wintegra" },
-//  { 0x042A, "Mathstar" },
-//  { 0x042B, "StarCore" },
-//  { 0x042C, "Oplus" },
-//  { 0x042D, "Mindspeed" },
-//  { 0x042E, "Just Young Computer" },
-//  { 0x042F, "Radia" },
-    { 0x0430, "OCZ" },
-//  { 0x0431, "Emuzed" },
-//  { 0x0432, "LOGIC Devices" },
-//  { 0x0433, "Inphi" },
-//  { 0x0434, "Quake" },
-//  { 0x0435, "Vixel" },
-//  { 0x0436, "SolusTek" },
-//  { 0x0437, "Kongsberg Maritime" },
-//  { 0x0438, "Faraday" },
-//  { 0x0439, "Altium" },
-//  { 0x043A, "Insyte" },
-//  { 0x043B, "ARM" },
-//  { 0x043C, "DigiVision" },
-//  { 0x043D, "Vativ" },
-//  { 0x043E, "Endicott Interconnect" },
-//  { 0x043F, "Pericom" },
-//  { 0x0440, "Bandspeed" },
-//  { 0x0441, "LeWiz" },
-//  { 0x0442, "CPU" },
-    { 0x0443, "Ramaxel" },
-//  { 0x0444, "DSP Group" },
-//  { 0x0445, "Axis" },
-//  { 0x0446, "Legacy" },
-//  { 0x0447, "Chrontel" },
-//  { 0x0448, "Powerchip Semiconductor" },
-//  { 0x0449, "MobilEye" },
-    { 0x044A, "Excel" },
-    { 0x044B, "A-DATA" },
-//  { 0x044C, "VirtualDigm" },
-    { 0x044D, "G.Skill" },
-    { 0x044E, "Quanta" },
-//  { 0x044F, "Yield Microelectronics" },
-//  { 0x0450, "Afa" },
-//  { 0x0451, "KINGBOX" },
-//  { 0x0452, "Ceva" },
-//  { 0x0453, "iStor Networks" },
-//  { 0x0454, "Advance Modules" },
-    { 0x0455, "Microsoft" },
-    { 0x0456, "Open-Silicon" },
-//  { 0x0457, "Goal Semiconductor" },
-//  { 0x0458, "ARC" },
-//  { 0x0459, "Simmtec" },
-//  { 0x045A, "Metanoia" },
-//  { 0x045B, "Key Stream" },
-//  { 0x045C, "Lowrance" },
-//  { 0x045D, "Adimos" },
-//  { 0x045E, "SiGe Semiconductor" },
-//  { 0x045F, "Fodus" },
-//  { 0x0460, "Credence Systems" },
-//  { 0x0461, "Genesis Microchip" },
-//  { 0x0462, "Vihana" },
-//  { 0x0463, "WIS" },
-//  { 0x0464, "GateChange" },
-//  { 0x0465, "High Density Devices AS" },
-//  { 0x0466, "Synopsys" },
-    { 0x0467, "Gigaram" },
-//  { 0x0468, "Enigma Semiconductor" },
-//  { 0x0469, "Century Micro" },
-//  { 0x046A, "Icera Semiconductor" },
-//  { 0x046B, "Mediaworks Integrated Systems" },
-//  { 0x046C, "O?Neil Product Development" },
-//  { 0x046D, "Supreme Top" },
-//  { 0x046E, "MicroDisplay" },
-    { 0x046F, "Team Group" },
-//  { 0x0470, "Sinett" },
-    { 0x0471, "Toshiba" },
-//  { 0x0472, "Tensilica" },
-//  { 0x0473, "SiRF" },
-//  { 0x0474, "Bacoc" },
-//  { 0x0475, "SMaL Camera" },
-    { 0x0476, "Thomson SC" },
-//  { 0x0477, "Airgo Networks" },
-//  { 0x0478, "Wisair" },
-//  { 0x0479, "SigmaTel" },
-//  { 0x047A, "Arkados" },
-//  { 0x047B, "Compete IT" },
-//  { 0x047C, "Eudar" },
-//  { 0x047D, "Focus Enhancements" },
-//  { 0x047E, "Xyratex" },
-//  { 0x0501, "Specular Networks" },
-    { 0x0502, "Patriot" },
-//  { 0x0503, "U-Chip Technology" },
-//  { 0x0504, "Silicon Optix" },
-//  { 0x0505, "Greenfield Networks" },
-    { 0x0506, "CompuRAM" },
-//  { 0x0507, "Stargen" },
-//  { 0x0508, "NetCell" },
-//  { 0x0509, "Excalibrus" },
-//  { 0x050A, "SCM Microsystems" },
-//  { 0x050B, "Xsigo Systems" },
-//  { 0x050C, "CHIPS & Systems" },
-//  { 0x050D, "Tier 1 Multichip Solutions" },
-//  { 0x050E, "CWRL Labs" },
-//  { 0x050F, "Teradici" },
-    { 0x0510, "Gigaram" },
-//  { 0x0511, "g2 Microsystems" },
-//  { 0x0512, "PowerFlash" },
-//  { 0x0513, "P.A. Semi" },
-//  { 0x0514, "NovaTech Solutions S.A." },
-//  { 0x0515, "c2 Microsystems" },
-//  { 0x0516, "Level5 Networks" },
-    { 0x0517, "COS Memory" },
-//  { 0x0518, "Innovasic Semiconductor" },
-//  { 0x0519, "02IC" },
-//  { 0x051A, "Tabula" },
-    { 0x051B, "Crucial" },
-//  { 0x051C, "Chelsio" },
-//  { 0x051D, "Solarflare" },
-//  { 0x051E, "Xambala" },
-//  { 0x051F, "EADS Astrium" },
-//  { 0x0520, "Terra Semiconductor" },
-//  { 0x0521, "Imaging Works" },
-//  { 0x0522, "Astute Networks" },
-//  { 0x0523, "Tzero" },
-//  { 0x0524, "Emulex" },
-//  { 0x0525, "Power-One" },
-//  { 0x0526, "Pulse~LINK" },
-//  { 0x0527, "Hon Hai Precision Industry" },
-//  { 0x0528, "White Rock Networks" },
-//  { 0x0529, "Telegent Systems USA" },
-//  { 0x052A, "Atrua" },
-    { 0x052B, "Acbel" },
-//  { 0x052C, "eRide" },
-//  { 0x052D, "ULi" },
-//  { 0x052E, "Magnum Semiconductor" },
-//  { 0x052F, "neoOne" },
-//  { 0x0530, "Connex" },
-//  { 0x0531, "Stream Processors" },
-//  { 0x0532, "Focus Enhancements" },
-//  { 0x0533, "Telecis Wireless" },
-//  { 0x0534, "uNav Microelectronics" },
-//  { 0x0535, "Tarari" },
-//  { 0x0536, "Ambric" },
-//  { 0x0537, "Newport Media" },
-//  { 0x0538, "VMTS" },
-//  { 0x0539, "Enuclia Semiconductor" },
-//  { 0x053A, "Virtium" },
-//  { 0x053B, "Solid State System" },
-//  { 0x053C, "Kian Tech LLC" },
-//  { 0x053D, "Artimi" },
-    { 0x053E, "PQI" },
-//  { 0x053F, "Avago" },
-//  { 0x0540, "ADTechnology" },
-//  { 0x0541, "Sigma Designs" },
-//  { 0x0542, "SiCortex" },
-//  { 0x0543, "Ventura Technology Group" },
-//  { 0x0544, "eASIC" },
-//  { 0x0545, "M.H.S. SAS" },
-    { 0x0546, "MSI" },
-//  { 0x0547, "Rapport" },
-//  { 0x0548, "Makway" },
-//  { 0x0549, "Broad Reach Engineering" },
-//  { 0x054A, "Semiconductor Mfg Intl" },
-//  { 0x054B, "SiConnect" },
-//  { 0x054C, "FCI USA" },
-//  { 0x054D, "Validity Sensors" },
-//  { 0x054E, "Coney" },
-//  { 0x054F, "Spans Logic" },
-//  { 0x0550, "Neterion" },
-    { 0x0551, "Qimonda" },
-//  { 0x0552, "New Japan Radio" },
-//  { 0x0553, "Velogix" },
-//  { 0x0554, "Montalvo Systems" },
-//  { 0x0555, "iVivity" },
-    { 0x0556, "Chaintech" },
-    { 0x0557, "AENEON" },
-//  { 0x0558, "Lorom Industrial" },
-//  { 0x0559, "Radiospire Networks" },
-//  { 0x055A, "Sensio" },
-//  { 0x055B, "Nethra Imaging" },
-    { 0x055C, "Hexon" },
-//  { 0x055D, "CompuStocx (CSX)" },
-//  { 0x055E, "Methode" },
-//  { 0x055F, "Connect One" },
-//  { 0x0560, "Opulan" },
-//  { 0x0561, "Septentrio NV" },
-    { 0x0562, "Goldenmars" },
-    { 0x0563, "Kreton" },
-//  { 0x0564, "Cochlear" },
-//  { 0x0565, "Altair Semiconductor" },
-//  { 0x0566, "NetEffect" },
-    { 0x0567, "Spansion" },
-//  { 0x0568, "Taiwan Semiconductor Mfg" },
-//  { 0x0569, "Emphany Systems" },
-//  { 0x056A, "ApaceWave" },
-//  { 0x056B, "Mobilygen" },
-//  { 0x056C, "Tego" },
-//  { 0x056D, "Cswitch" },
-//  { 0x056E, "Haier (Beijing) IC Design" },
-//  { 0x056F, "MetaRAM" },
-//  { 0x0570, "Axel" },
-//  { 0x0571, "Tilera" },
-//  { 0x0572, "Aquantia" },
-//  { 0x0573, "Vivace Semiconductor" },
-//  { 0x0574, "Redpine Signals" },
-//  { 0x0575, "Octalica" },
-//  { 0x0576, "InterDigital" },
-    { 0x0577, "Avant" },
-    { 0x0578, "Asrock" },
-//  { 0x0579, "Availink" },
-//  { 0x057A, "Quartics" },
-//  { 0x057B, "Element CXI" },
-//  { 0x057C, "Innovaciones Micro." },
-//  { 0x057D, "VeriSilicon Micro." },
-//  { 0x057E, "W5 Networks" },
-//  { 0x0601, "MOVEKING" },
-//  { 0x0602, "Mavrix" },
-//  { 0x0603, "CellGuide" },
-//  { 0x0604, "Faraday" },
-//  { 0x0605, "Diablo" },
-//  { 0x0606, "Jennic" },
-//  { 0x0607, "Octasic" },
-//  { 0x0608, "Molex Incorporated" },
-//  { 0x0609, "3Leaf Networks" },
-//  { 0x060A, "Bright Micron" },
-//  { 0x060B, "Netxen" },
-//  { 0x060C, "NextWave Broadband" },
-//  { 0x060D, "DisplayLink" },
-//  { 0x060E, "ZMOS" },
-//  { 0x060F, "Tec-Hill" },
-//  { 0x0610, "Multigig" },
-//  { 0x0611, "Amimon" },
-//  { 0x0612, "Euphonic" },
-//  { 0x0613, "BRN Phoenix" },
-//  { 0x0614, "InSilica" },
-//  { 0x0615, "Ember" },
-    { 0x0616, "Avexir" },
-//  { 0x0617, "Echelon" },
-//  { 0x0618, "Edgewater Computer Systems" },
-//  { 0x0619, "XMOS Semiconductor" },
-//  { 0x061A, "GENUSION" },
-//  { 0x061B, "Memory Corp NV" },
-//  { 0x061C, "SiliconBlue" },
-    { 0x061D, "Rambus" },
-//  { 0x061E, "Andes Technology" },
-//  { 0x061F, "Coronis Systems" },
-//  { 0x0620, "Achronix Semiconductor" },
-//  { 0x0621, "Siano Mobile Silicon" },
-//  { 0x0622, "Semtech" },
-//  { 0x0623, "Pixelworks" },
-//  { 0x0624, "Gaisler Research AB" },
-//  { 0x0625, "Teranetics" },
-//  { 0x0626, "Toppan Printing" },
-//  { 0x0627, "Kingxcon" },
-//  { 0x0628, "Silicon Integrated Systems" },
-//  { 0x0629, "I-O Data Device" },
-//  { 0x062A, "NDS Americas" },
-//  { 0x062B, "Solomon Systech" },
-//  { 0x062C, "On Demand Microelectronics" },
-//  { 0x062D, "Amicus Wireless" },
-//  { 0x062E, "SMARDTV SNC" },
-//  { 0x062F, "Comsys Communication" },
-//  { 0x0630, "Movidia" },
-//  { 0x0631, "Javad GNSS" },
-//  { 0x0632, "Montage Technology Group" },
-//  { 0x0633, "Trident Microsystems" },
-    { 0x0634, "Super Talent" },
-//  { 0x0635, "Optichron" },
-//  { 0x0636, "Future Waves UK" },
-//  { 0x0637, "SiBEAM" },
-//  { 0x0638, "InicoreInc" },
-//  { 0x0639, "Virident Systems" },
-//  { 0x063A, "M2000" },
-//  { 0x063B, "ZeroG Wireless" },
-//  { 0x063C, "Gingle" },
-//  { 0x063D, "Space Micro" },
-//  { 0x063E, "Wilocity" },
-//  { 0x063F, "Novafora" },
-//  { 0x0640, "iKoa" },
-    { 0x0641, "ASint" },
-    { 0x0642, "Ramtron" },
-//  { 0x0643, "Plato Networks" },
-//  { 0x0644, "IPtronics AS" },
-//  { 0x0645, "Infinite-Memories" },
-//  { 0x0646, "Parade" },
-//  { 0x0647, "Dune Networks" },
-    { 0x0648, "GigaDevice" },
-//  { 0x0649, "Modu" },
-//  { 0x064A, "CEITEC" },
-    { 0x064B, "Northrop Grumman" },
-//  { 0x064C, "XRONET" },
-//  { 0x064D, "Sicon Semiconductor AB" },
-//  { 0x064E, "Atla" },
-//  { 0x064F, "TOPRAM" },
-//  { 0x0650, "Silego" },
-    { 0x0651, "Kinglife" },
-//  { 0x0652, "Ability Industries" },
-    { 0x0653, "Silicon Power" },
-//  { 0x0654, "Augusta" },
-//  { 0x0655, "Nantronics Semiconductors" },
-//  { 0x0656, "Hilscher Gesellschaft" },
-//  { 0x0657, "Quixant" },
-//  { 0x0658, "Percello" },
-//  { 0x0659, "NextIO" },
-//  { 0x065A, "Scanimetrics" },
-//  { 0x065B, "FS-Semi Company" },
-//  { 0x065C, "Infinera" },
-    { 0x065D, "SandForce" },
-    { 0x065E, "Lexar Media" },
-//  { 0x065F, "Teradyne" },
-//  { 0x0660, "Memory Exchange" },
-    { 0x0661, "Smartek" },
-//  { 0x0662, "Avantium" },
-//  { 0x0663, "ATP" },
-//  { 0x0664, "Valens Semiconductor" },
-//  { 0x0665, "Agate Logic" },
-//  { 0x0666, "Netronome" },
-//  { 0x0667, "Zenverge" },
-//  { 0x0668, "N-trig" },
-    { 0x0669, "SanMax" },
-//  { 0x066A, "Contour Semiconductor" },
-    { 0x066B, "TwinMOS" },
-//  { 0x066C, "Silicon Systems" },
-//  { 0x066D, "V-Color" },
-//  { 0x066E, "Certicom" },
-//  { 0x066F, "JSC ICC Milandr" },
-//  { 0x0670, "PhotoFast Global" },
-    { 0x0671, "InnoDisk" },
-//  { 0x0672, "Muscle Power" },
-//  { 0x0673, "Energy Micro" },
-//  { 0x0674, "Innofidei" },
-//  { 0x0675, "CopperGate" },
-//  { 0x0676, "Holtek" },
-//  { 0x0677, "Myson Century" },
-//  { 0x0678, "FIDELIX" },
-//  { 0x0679, "Red Digital Cinema" },
-//  { 0x067A, "Densbits" },
-//  { 0x067B, "Zempro" },
-//  { 0x067C, "MoSys" },
-//  { 0x067D, "Provigent" },
-//  { 0x067E, "Triad Semiconductor" },
-//  { 0x0701, "Siklu Communication" },
-//  { 0x0702, "A Force Manufacturing" },
-    { 0x0703, "Strontium" },
-//  { 0x0704, "ALi Corp (Abilis Systems)" },
-//  { 0x0705, "Siglead" },
-//  { 0x0706, "Ubicom" },
-//  { 0x0707, "Unifosa" },
-//  { 0x0708, "Stretch" },
-//  { 0x0709, "Lantiq Deutschland GmbH" },
-//  { 0x070A, "Visipro." },
-//  { 0x070B, "EKMemory" },
-//  { 0x070C, "Microelectronics Institute ZTE" },
-//  { 0x070D, "u-blox AG" },
-//  { 0x070E, "Carry" },
-//  { 0x070F, "Nokia" },
-    { 0x0710, "King Tiger" },
-//  { 0x0711, "Sierra Wireless" },
-//  { 0x0712, "HT Micron" },
-//  { 0x0713, "Albatron" },
-//  { 0x0714, "Leica Geosystems AG" },
-//  { 0x0715, "BroadLight" },
-//  { 0x0716, "AEXEA" },
-//  { 0x0717, "ClariPhy" },
-//  { 0x0718, "Green Plug" },
-//  { 0x0719, "Design Art Networks" },
-//  { 0x071A, "Mach Xtreme" },
-//  { 0x071B, "ATO Solutions" },
-//  { 0x071C, "Ramsta" },
-//  { 0x071D, "Greenliant Systems" },
-//  { 0x071E, "Teikon" },
-//  { 0x071F, "Antec Hadron" },
-//  { 0x0720, "NavCom" },
-//  { 0x0721, "Shanghai Fudan Microelectronics" },
-//  { 0x0722, "Calxeda" },
-//  { 0x0723, "JSC EDC" },
-//  { 0x0724, "Kandit" },
-    { 0x0725, "Ramos" },
-//  { 0x0726, "Goldenmars" },
-//  { 0x0727, "XeL" },
-//  { 0x0728, "Newzone" },
-//  { 0x0729, "ShenZhen MercyPower Tech" },
-//  { 0x072A, "Nanjing Yihuo" },
-//  { 0x072B, "Nethra Imaging" },
-//  { 0x072C, "SiTel Semiconductor BV" },
-//  { 0x072D, "SolidGear" },
-    { 0x072E, "Topower" },
-//  { 0x072F, "Wilocity" },
-//  { 0x0730, "Profichip GmbH" },
-//  { 0x0731, "Gerad" },
-    { 0x0732, "Ritek" },
-//  { 0x0733, "Gomos" },
-//  { 0x0734, "Memoright" },
-//  { 0x0735, "D-Broad" },
-//  { 0x0736, "HiSilicon" },
-//  { 0x0737, "Syndiant Inc." },
-//  { 0x0738, "Enverv" },
-//  { 0x0739, "Cognex" },
-//  { 0x073A, "Xinnova" },
-//  { 0x073B, "Ultron AG" },
-//  { 0x073C, "Concord Idea" },
-//  { 0x073D, "AIM" },
-//  { 0x073E, "Lifetime Memory Products" },
-//  { 0x073F, "Ramsway" },
-//  { 0x0740, "Recore Systems B.V." },
-//  { 0x0741, "Haotian Jinshibo Science Tech" },
-//  { 0x0742, "Being Advanced Memory" },
-//  { 0x0743, "Adesto" },
-//  { 0x0744, "Giantec Semiconductor" },
-//  { 0x0745, "HMD Electronics AG" },
-//  { 0x0746, "Gloway International (HK)" },
-//  { 0x0747, "Kingcore" },
-//  { 0x0748, "Anucell Technology Holding" },
-//  { 0x0749, "Accord Software & Systems Pvt." },
-//  { 0x074A, "Active-Semi" },
-//  { 0x074B, "Denso" },
-//  { 0x074C, "TLSI" },
-//  { 0x074D, "Qidan" },
-//  { 0x074E, "Mustang" },
-//  { 0x074F, "Orca Systems" },
-//  { 0x0750, "Passif Semiconductor" },
-//  { 0x0752, "Memphis Electronic" },
-//  { 0x0753, "Beckhoff Automation GmbH" },
-//  { 0x0754, "Harmony Semiconductor" },
-//  { 0x0755, "Air Computers SRL" },
-//  { 0x0756, "TMT Memory" },
-//  { 0x0757, "Eorex" },
-//  { 0x0758, "Xingtera" },
-//  { 0x0759, "Netsol" },
-//  { 0x075A, "Bestdon" },
-//  { 0x075B, "Baysand" },
-//  { 0x075C, "Uroad" },
-    { 0x075D, "Wilk Elektronik" },
-//  { 0x075E, "AAI" },
-//  { 0x075F, "Harman" },
-//  { 0x0760, "Berg Microelectronics" },
-//  { 0x0761, "ASSIA" },
-//  { 0x0762, "Visiontek Products LLC" },
-    { 0x0763, "OCMEMORY" },
-//  { 0x0764, "Welink Solution" },
-//  { 0x0765, "Shark Gaming" },
-//  { 0x0766, "Avalanche" },
-//  { 0x0767, "R&D Center ELVEES OJSC" },
-    { 0x0768, "KingboMars" },
-    { 0x076A, "Transcend" },
-//  { 0x076B, "Everspin" },
-//  { 0x076C, "Hon-Hai Precision" },
-//  { 0x076D, "Smart Storage Systems" },
-//  { 0x076E, "Toumaz Group" },
-    { 0x076F, "Zentel" },
-//  { 0x0770, "Panram International" },
-//  { 0x0771, "Silicon Space" },
-    { 0x0772, "LITE-ON" },
-//  { 0x0773, "Inuitive" },
-//  { 0x0774, "HMicro" },
-//  { 0x0775, "BittWare" },
-//  { 0x0776, "GLOBALFOUNDRIES" },
-//  { 0x0777, "ACPI Digital" },
-//  { 0x0778, "Annapurna Labs" },
-//  { 0x0779, "AcSiP Technology" },
-//  { 0x077A, "Idea! Electronic Systems" },
-//  { 0x077B, "Gowe" },
-//  { 0x077C, "Hermes Testing Solutions" },
-//  { 0x077D, "Positivo BGH" },
-//  { 0x077E, "Intelligence  Silicon" },
-//  { 0x0801, "3D PLUS" },
-//  { 0x0802, "Diehl Aerospace" },
-//  { 0x0803, "Fairchild" },
-//  { 0x0804, "Mercury Systems" },
-//  { 0x0805, "Sonics" },
-//  { 0x0806, "Emerson Automation Solutions" },
-//  { 0x0807, "Shenzhen Jinge Information" },
-//  { 0x0808, "SCWW" },
-//  { 0x0809, "Silicon Motion" },
-//  { 0x080A, "Anurag" },
-//  { 0x080B, "King Kong" },
-//  { 0x080C, "FROM30" },
-//  { 0x080D, "Gowin Semiconductor" },
-//  { 0x080E, "Fremont Micro Devices" },
-//  { 0x080F, "Ericsson Modems" },
-//  { 0x0810, "Exelis" },
-//  { 0x0811, "Satixfy" },
-    { 0x0812, "Galaxy" },
-    { 0x0813, "Gloway" },
-//  { 0x0814, "Lab" },
-//  { 0x0815, "Smart Energy Instruments" },
-//  { 0x0816, "Approved Memory" },
-//  { 0x0817, "Axell" },
-    { 0x0818, "KLEVV" },
-//  { 0x0819, "Phytium" },
-//  { 0x081A, "Xi'an UniIC Semi." },
-//  { 0x081B, "Ambiq Micro" },
-//  { 0x081C, "eveRAM" },
-//  { 0x081D, "Infomax" },
-//  { 0x081E, "Butterfly Network" },
-//  { 0x081F, "Shenzhen City Gcai" },
-//  { 0x0820, "Stack Devices" },
-//  { 0x0821, "ADK Media Group" },
-//  { 0x0822, "TSP Global" },
-//  { 0x0823, "HighX" },
-//  { 0x0824, "Shenzhen Elicks" },
-//  { 0x0825, "XinKai/Silicon Kaiser" },
-    { 0x0826, "Google" },
-//  { 0x0827, "Dasima International Development" },
-//  { 0x0828, "Leahkinn" },
-//  { 0x0829, "HIMA Paul Hildebrandt GmbH Co KG" },
-    { 0x082A, "Keysight" },
-//  { 0x082B, "Techcomp International (Fastable)" },
-//  { 0x082C, "Ancore" },
-//  { 0x082D, "Nuvoton" },
-//  { 0x082E, "Korea Uhbele" },
-//  { 0x082F, "Ikegami Tsushinki" },
-//  { 0x0830, "RelChip" },
-//  { 0x0831, "Baikal" },
-//  { 0x0832, "Nemostech" },
-    { 0x0833, "Memorysolution" },
-//  { 0x0834, "Silicon Integrated Systems" },
-//  { 0x0835, "Xiede" },
-//  { 0x0836, "BRC" },
-//  { 0x0837, "Flash Chi" },
-//  { 0x0838, "Jone" },
-//  { 0x0839, "GCT Semiconductor" },
-//  { 0x083A, "Hong Kong Zetta Device" },
-//  { 0x083B, "Unimemory Technology(s) Pte" },
-    { 0x083C, "Cuso" },
-    { 0x083D, "Kuso" },
-//  { 0x083E, "Uniquify" },
-//  { 0x083F, "Skymedi" },
-//  { 0x0840, "Core Chance" },
-//  { 0x0841, "Tekism" },
-//  { 0x0842, "Seagate Technology PLC" },
-//  { 0x0843, "Hong Kong Gaia Group" },
-//  { 0x0844, "Gigacom Semiconductor LLC" },
-//  { 0x0845, "V2" },
-//  { 0x0846, "TLi" },
-//  { 0x0847, "Neotion" },
-    { 0x0848, "Lenovo" },
-//  { 0x0849, "Shenzhen Zhongteng Electronic" },
-//  { 0x084A, "Compound Photonics" },
-//  { 0x084B, "in2H2" },
-//  { 0x084C, "Shenzhen Pango Microsystems" },
-//  { 0x084D, "Vasekey" },
-//  { 0x084F, "Eyenix" },
-    { 0x0850, "Heoriady" },
-//  { 0x0851, "Accelerated Memory Production" },
-//  { 0x0852, "INVECAS" },
-//  { 0x0853, "AP Memory" },
-//  { 0x0854, "Douqi" },
-//  { 0x0855, "Etron" },
-//  { 0x0856, "Indie Semiconductor" },
-//  { 0x0857, "Socionext" },
-    { 0x0858, "HGST" },
-    { 0x0859, "EVGA" },
-//  { 0x085A, "Audience" },
-//  { 0x085B, "EpicGear" },
-//  { 0x085C, "Vitesse Enterprise" },
-    { 0x085D, "Foxtronn" },
-//  { 0x085E, "Bretelon" },
-//  { 0x085F, "Graphcore" },
-//  { 0x0860, "Eoplex" },
-//  { 0x0861, "MaxLinear" },
-//  { 0x0862, "ETA Devices" },
-//  { 0x0863, "LOKI" },
-//  { 0x0864, "IMS" },
-//  { 0x0865, "Dosilicon" },
-//  { 0x0866, "Dolphin Integration" },
-//  { 0x0867, "Shenzhen Mic Electronics Technology" },
-//  { 0x0868, "Boya Microelectronics" },
-//  { 0x0869, "Geniachip (Roche)" },
-//  { 0x086A, "Axign" },
-//  { 0x086B, "Kingred Electronic" },
-//  { 0x086C, "Chao Yue Zhuo" },
-//  { 0x086E, "Crocus" },
-//  { 0x086F, "Creative Chips GmbH" },
-//  { 0x0870, "GE Aviation Systems LLC." },
-    { 0x0871, "Asgard" },
-//  { 0x0872, "Good Wealth" },
-//  { 0x0873, "TriCor" },
-//  { 0x0874, "Nova-Systems GmbH" },
-    { 0x0875, "JUHOR" },
-//  { 0x0876, "Zhuhai Douke Commerce" },
-//  { 0x0877, "DSL Memory" },
-//  { 0x0878, "Anvo-Systems" },
-    { 0x0879, "Realtek" },
-//  { 0x087A, "AltoBeam" },
-//  { 0x087B, "Wave Computing" },
-//  { 0x087C, "Beijing TrustNet" },
-//  { 0x087D, "Innovium" },
-//  { 0x087E, "Starsway" },
-//  { 0x0901, "Weltronics" },
-    { 0x0902, "VMware" },
-    { 0x0903, "HPE" },
-//  { 0x0904, "INTENSO" },
-//  { 0x0905, "Puya Semiconductor" },
-//  { 0x0906, "MEMORFI" },
-//  { 0x0907, "MSC Technologies GmbH" },
-//  { 0x0908, "Txrui" },
-//  { 0x0909, "SiFive" },
-//  { 0x090A, "Spreadtrum" },
-//  { 0x090B, "XTX" },
-//  { 0x090C, "UMAX" },
-//  { 0x090D, "Shenzhen Yong Sheng" },
-//  { 0x090E, "SNOAMOO (Shenzhen Kai Zhuo Yue)" },
-//  { 0x090F, "Daten Tecnologia LTDA" },
-//  { 0x0910, "Shenzhen XinRuiYan" },
-//  { 0x0911, "Eta Compute" },
-//  { 0x0912, "Energous" },
-//  { 0x0913, "Raspberry Pi" },
-//  { 0x0914, "Shenzhen Chixingzhe Tech" },
-//  { 0x0915, "Silicon Mobility" },
-//  { 0x0916, "IQ-Analog" },
-//  { 0x0917, "Uhnder" },
-//  { 0x0918, "Impinj" },
-//  { 0x0919, "DEPO Computers" },
-//  { 0x091A, "Nespeed Sysems" },
-    { 0x091B, "YMTC" },
-//  { 0x091C, "MemxPro" },
-//  { 0x091D, "Tammuz" },
-    { 0x091E, "Allwinner" },
-//  { 0x0920, "XMC" },
-//  { 0x0921, "Teclast" },
-    { 0x0922, "Maxsun" },
-//  { 0x0923, "Haiguang Integrated Circuit Design" },
-    { 0x0924, "RamCENTER" },
-//  { 0x0925, "Phison" },
-//  { 0x0926, "Guizhou Huaxintong Semi-Conductor" },
-//  { 0x0927, "Network Intelligence" },
-//  { 0x0928, "Continental Technology (Holdings)" },
-//  { 0x0929, "Guangzhou Huayan Suning Electronic" },
-//  { 0x092A, "Guangzhou Zhouji Electronic" },
-//  { 0x092B, "Shenzhen Giant Hui Kang Tech" },
-//  { 0x092C, "Shenzhen Yilong Innovative" },
-//  { 0x092D, "Neo Forza" },
-//  { 0x092E, "Lyontek" },
-//  { 0x092F, "Shanghai Kuxin Microelectronics" },
-//  { 0x0930, "Shenzhen Larix" },
-//  { 0x0931, "Qbit Semiconductor" },
-//  { 0x0932, "Insignis" },
-//  { 0x0933, "Lanson Memory" },
-//  { 0x0934, "Shenzhen Superway" },
-//  { 0x0935, "Canaan-Creative" },
-//  { 0x0936, "Black Diamond Memory" },
-//  { 0x0937, "Shenzhen City Parker Baking" },
-//  { 0x0938, "Shenzhen Baihong" },
-//  { 0x0939, "GEO Semiconductors" },
-//  { 0x093A, "OCPC" },
-//  { 0x093B, "Artery" },
-//  { 0x093C, "Jinyu" },
-//  { 0x093D, "ShenzhenYing Chi Technology Development" },
-//  { 0x093E, "Shenzhen Pengcheng Xin" },
-//  { 0x093F, "Pegasus Semiconductor (Shanghai)" },
-//  { 0x0940, "Mythic" },
-//  { 0x0941, "Elmos Semiconductor AG" },
-    { 0x0942, "Kllisre" },
-//  { 0x0943, "Shenzhen Winconway" },
-//  { 0x0944, "Shenzhen Xingmem Technology" },
-//  { 0x0945, "Gold Key" },
-//  { 0x0946, "Habana Labs" },
-//  { 0x0947, "Hoodisk" },
-//  { 0x0948, "SemsoTai (SZ)" },
-//  { 0x0949, "OM Nanotech Pvt." },
-//  { 0x094A, "Shenzhen Zhifeng Weiye" },
-//  { 0x094B, "Xinshirui (Shenzhen)" },
-//  { 0x094C, "Guangzhou Zhong Hao Tian Electronic" },
-//  { 0x094D, "Shenzhen Longsys" },
-//  { 0x094E, "Deciso B.V." },
-//  { 0x094F, "Puya Semiconductor (Shenzhen)" },
-//  { 0x0950, "Shenzhen Veineda" },
-//  { 0x0951, "Antec Memory" },
-//  { 0x0952, "Cortus SAS" },
-//  { 0x0953, "Dust Leopard" },
-//  { 0x0954, "MyWo AS" },
-//  { 0x0955, "J&A Information" },
-//  { 0x0956, "Shenzhen JIEPEI" },
-//  { 0x0957, "Heidelberg University" },
-//  { 0x0958, "Flexxon PTE" },
-//  { 0x0959, "Wiliot" },
-//  { 0x095A, "Raysun" },
-//  { 0x095B, "Aquarius Production Company LLC" },
-//  { 0x095C, "MACNICA DHW LTDA" },
-//  { 0x095D, "Intelimem" },
-//  { 0x095E, "Zbit Semiconductor" },
-//  { 0x095F, "Shenzhen" },
-//  { 0x0960, "Signalchip" },
-//  { 0x0961, "Shenzen Recadata Storage" },
-//  { 0x0962, "Hyundai" },
-//  { 0x0963, "Shanghai Fudi Investment Development" },
-//  { 0x0964, "Aixi" },
-//  { 0x0965, "Tecon MT" },
-//  { 0x0966, "Onda Electric" },
-//  { 0x0967, "Jinshen" },
-//  { 0x0968, "Kimtigo Semiconductor (HK)" },
-//  { 0x0969, "IIT Madras" },
-//  { 0x096A, "Shenshan (Shenzhen) Electronic" },
-//  { 0x096B, "Hefei Core Storage Electronic" },
-    { 0x096C, "Colorful" },
-//  { 0x096D, "Visenta (Xiamen)" },
-//  { 0x096E, "Roa Logic BV" },
-//  { 0x096F, "NSITEXE" },
-//  { 0x0970, "Hong Kong Hyunion" },
-//  { 0x0971, "ASK Technology Group" },
-    { 0x0972, "GIGABYTE" },
-//  { 0x0973, "Terabyte" },
-//  { 0x0974, "Hyundai" },
-//  { 0x0975, "EXCELERAM" },
-//  { 0x0976, "PsiKick" },
-    { 0x0977, "Netac" },
-    { 0x0978, "PCCOOLER" },
-//  { 0x0979, "Jiangsu Huacun Electronic" },
-//  { 0x097A, "Shenzhen Micro Innovation Industry" },
-//  { 0x097B, "Beijing Tongfang Microelectronics" },
-//  { 0x097C, "XZN Storage" },
-//  { 0x097D, "ChipCraft Sp. z.o.o." },
-//  { 0x097E, "ALLFLASH" },
-//  { 0x0A01, "Foerd" },
-    { 0x0A02, "KingSpec" },
-//  { 0x0A03, "Codasip GmbH" },
-//  { 0x0A04, "SL Link" },
-//  { 0x0A05, "Shenzhen Kefu" },
-//  { 0x0A06, "Shenzhen ZST" },
-//  { 0x0A07, "Kyokuto Electronic" },
-//  { 0x0A08, "Warrior" },
-//  { 0x0A09, "TRINAMIC Motion Control GmbH &" },
-//  { 0x0A0A, "PixelDisplay" },
-//  { 0x0A0B, "Shenzhen Futian District Bo Yueda Elec" },
-//  { 0x0A0C, "Richtek Power" },
-//  { 0x0A0D, "Shenzhen LianTeng" },
-//  { 0x0A0E, "AITC Memory" },
-//  { 0x0A0F, "UNIC Memory" },
-//  { 0x0A10, "Shenzhen Huafeng Science" },
-    { 0x0A11, "CXMT" },
-//  { 0x0A13, "SambaNova Systems" },
-//  { 0x0A14, "V-GEN" },
-//  { 0x0A15, "Jump Trading" },
-//  { 0x0A16, "Ampere Computing" },
-//  { 0x0A17, "Shenzhen Zhongshi" },
-//  { 0x0A18, "Shenzhen Zhongtian Bozhong" },
-//  { 0x0A19, "Tri-Tech" },
-//  { 0x0A1A, "Silicon Intergrated Systems" },
-//  { 0x0A1B, "Shenzhen HongDingChen Information" },
-//  { 0x0A1C, "Plexton Holdings" },
-//  { 0x0A1D, "AMS (Jiangsu Advanced Memory Semi)" },
-//  { 0x0A1E, "Wuhan Jing Tian Interconnected Tech" },
-//  { 0x0A1F, "Axia Memory" },
-//  { 0x0A20, "Chipset Technology Holding" },
-//  { 0x0A21, "Shenzhen Xinshida" },
-//  { 0x0A22, "Shenzhen Chuangshifeida" },
-//  { 0x0A23, "Guangzhou MiaoYuanJi" },
-//  { 0x0A24, "ADVAN" },
-//  { 0x0A26, "Guangzhou Guang Xie Cheng Trading" },
-//  { 0x0A27, "StarRam" },
-//  { 0x0A28, "Shen Zhen XinShenHua Tech" },
-//  { 0x0A29, "UltraMemory" },
-//  { 0x0A2A, "New Coastline Global Tech Industry" },
-//  { 0x0A2B, "Sinker" },
-//  { 0x0A2C, "Diamond" },
-    { 0x0A2D, "PUSKILL" },
-//  { 0x0A2E, "Guangzhou Hao Jia Ye" },
-//  { 0x0A2F, "Ming Xin" },
-//  { 0x0A30, "Barefoot Networks" },
-    { 0x0A31, "Biwin" },
-//  { 0x0A32, "UD INFO" },
-//  { 0x0A33, "Trek Technology (S) PTE" },
-//  { 0x0A34, "Xiamen Kingblaze" },
-//  { 0x0A35, "Shenzhen Lomica" },
-//  { 0x0A36, "Nuclei System" },
-//  { 0x0A37, "Wuhan Xun Zhan Electronic" },
-//  { 0x0A38, "Shenzhen Ingacom Semiconductor" },
-//  { 0x0A39, "Zotac" },
-//  { 0x0A3A, "Foxline" },
-//  { 0x0A3B, "Shenzhen Farasia Science" },
-//  { 0x0A3C, "Efinix" },
-//  { 0x0A3D, "Hua Nan San Xian" },
-//  { 0x0A3E, "Goldtech" },
-//  { 0x0A3F, "Shanghai Han Rong Microelectronics" },
-//  { 0x0A40, "Shenzhen Zhongguang Yunhe Trading" },
-//  { 0x0A41, "Smart Shine(QingDao) Microelectronics" },
-    { 0x0A42, "Thermaltake" },
-//  { 0x0A43, "Shenzhen O?Yang Maile" },
-//  { 0x0A44, "UPMEM" },
-    { 0x0A45, "Chun Well" },
-//  { 0x0A46, "Astera Labs" },
-//  { 0x0A47, "Winconway" },
-//  { 0x0A48, "Advantech" },
-//  { 0x0A49, "Chengdu Fengcai Electronic" },
-//  { 0x0A4A, "The Boeing Company" },
-//  { 0x0A4B, "Blaize" },
-//  { 0x0A4C, "Ramonster" },
-//  { 0x0A4D, "Wuhan Naonongmai" },
-//  { 0x0A4E, "Shenzhen Hui ShingTong" },
-//  { 0x0A4F, "Yourlyon" },
-//  { 0x0A50, "Fabu" },
-//  { 0x0A51, "Shenzhen Yikesheng" },
-//  { 0x0A52, "NOR-MEM" },
-//  { 0x0A53, "Cervoz" },
-//  { 0x0A54, "Bitmain Technologies Inc." },
-    { 0x0A55, "Facebook" },
-//  { 0x0A56, "Shenzhen Longsys" },
-//  { 0x0A57, "Guangzhou Siye Electronic" },
-//  { 0x0A58, "Silergy" },
-//  { 0x0A59, "Adamway" },
-//  { 0x0A5A, "PZG" },
-//  { 0x0A5B, "Shenzhen King Power" },
-//  { 0x0A5C, "Guangzhou ZiaoFu Tranding" },
-    { 0x0A5D, "SKIHOTAR" },
-//  { 0x0A5E, "PulseRain" },
-//  { 0x0A5F, "Seeker" },
-//  { 0x0A60, "Shenzhen OSCOO Tech" },
-//  { 0x0A61, "Shenzhen Yze" },
-//  { 0x0A62, "Shenzhen Jieshuo Electronic Commerce" },
-//  { 0x0A63, "Gazda" },
-//  { 0x0A64, "Hua Wei" },
-//  { 0x0A65, "Esperanto" },
-//  { 0x0A66, "JinSheng" },
-//  { 0x0A67, "Shenzhen Shi Bolunshuai" },
-//  { 0x0A68, "Shanghai Rei Zuan Information Tech" },
-    { 0x0A69, "Fraunhofer IIS" },
-//  { 0x0A6A, "Kandou Bus SA" },
-    { 0x0A6B, "Acer" },
-//  { 0x0A6C, "Artmem" },
-//  { 0x0A6D, "Gstar Semiconductor" },
-//  { 0x0A6E, "ShineDisk" },
-//  { 0x0A6F, "Shenzhen CHN" },
-//  { 0x0A70, "UnionChip Semiconductor" },
-//  { 0x0A71, "Tanbassh" },
-//  { 0x0A72, "Shenzhen Tianyu Jieyun Intl Logistics" },
-//  { 0x0A73, "MCLogic" },
-//  { 0x0A74, "Eorex" },
-//  { 0x0A75, "Arm Technology (China)" },
-    { 0x0A76, "Lexar" },
-//  { 0x0A77, "QinetiQ Group plc" },
-//  { 0x0A78, "Exascend" },
-//  { 0x0A79, "Hong Kong Hyunion" },
-//  { 0x0A7A, "Shenzhen Banghong" },
-//  { 0x0A7B, "MBit Wireless" },
-//  { 0x0A7C, "Hex Five Security" },
-    { 0x0A7D, "Juhor" },
-//  { 0x0A7E, "Shenzhen Reeinno" },
-//  { 0x0B01, "ABIT Electronics (Shenzhen)" },
-//  { 0x0B02, "Semidrive" },
-//  { 0x0B03, "MyTek" },
-//  { 0x0B04, "Wxilicon" },
-//  { 0x0B05, "Shenzhen Meixin" },
-//  { 0x0B06, "Ghost Wolf" },
-//  { 0x0B07, "LiSion" },
-//  { 0x0B08, "Power Active" },
-//  { 0x0B09, "Pioneer High Fidelity Taiwan" },
-//  { 0x0B0A, "LuoSilk" },
-//  { 0x0B0B, "Shenzhen Chuangshifeida" },
-//  { 0x0B0C, "Black Sesame" },
-//  { 0x0B0D, "Jiangsu Xinsheng Intelligent" },
-//  { 0x0B0E, "MLOONG" },
-//  { 0x0B0F, "Quadratica LLC" },
-//  { 0x0B10, "Anpec" },
-//  { 0x0B11, "Xi'an Morebeck Semiconductor Tech" },
-    { 0x0B12, "Kingbank" },
-//  { 0x0B13, "ITRenew" },
-//  { 0x0B14, "Shenzhen Eaget Innovation Tech" },
-//  { 0x0B15, "Jazer" },
-//  { 0x0B16, "Xiamen Semiconductor Investment Group" },
-//  { 0x0B17, "Guangzhou Longdao Network Tech" },
-//  { 0x0B18, "Shenzhen Futian SEC Electronic Market" },
-    { 0x0B19, "Allegro" },
-//  { 0x0B1A, "Hunan RunCore Innovation" },
-//  { 0x0B1B, "C-Corsa" },
-//  { 0x0B1C, "Zhuhai Chuangfeixin" },
-//  { 0x0B1D, "Beijing InnoMem" },
-//  { 0x0B1E, "YooTin" },
-//  { 0x0B1F, "Shenzhen Pengxiong" },
-//  { 0x0B20, "Dongguan Yingbang Commercial Trading" },
-//  { 0x0B21, "Shenzhen Ronisys" },
-//  { 0x0B22, "Hongkong Xinlan Guangke" },
-//  { 0x0B23, "Apex Microelectronics" },
-//  { 0x0B24, "Beijing Hongda Jinming" },
-//  { 0x0B25, "Ling Rui Technology (Shenzhen)" },
-//  { 0x0B26, "Hongkong Hyunion" },
-//  { 0x0B27, "Starsystems" },
-//  { 0x0B28, "Shenzhen Yingjiaxun Industrial" },
-//  { 0x0B29, "Dongguan Crown Code Electronic Commerce" },
-//  { 0x0B2A, "Monolithic Power Systems" },
-//  { 0x0B2B, "WuHan SenNaiBo E-Commerce" },
-    { 0x0B2C, "Hikstorage" },
-//  { 0x0B2D, "Shenzhen Goodix" },
-//  { 0x0B2E, "Aigo Electronic" },
-//  { 0x0B2F, "Hefei Konsemi Storage" },
-//  { 0x0B30, "Cactus" },
-//  { 0x0B31, "DSIN" },
-//  { 0x0B32, "Blu Wireless" },
-//  { 0x0B33, "Nanjing UCUN" },
-//  { 0x0B34, "Acacia" },
-//  { 0x0B35, "Beijinjinshengyihe" },
-//  { 0x0B36, "Zyzyx" },
-//  { 0x0B37, "T-HEAD Semiconductor" },
-//  { 0x0B38, "Shenzhen Hystou" },
-//  { 0x0B39, "Syzexion" },
-//  { 0x0B3A, "Kembona" },
-//  { 0x0B3B, "Qingdao Thunderobot" },
-//  { 0x0B3C, "Morse Micro" },
-//  { 0x0B3D, "Shenzhen Envida " },
-//  { 0x0B3E, "UDStore Solution" },
-//  { 0x0B3F, "Shunlie" },
-//  { 0x0B40, "Shenzhen Xin Hong Rui Tech" },
-//  { 0x0B41, "Shenzhen Yze" },
-//  { 0x0B42, "Shenzhen Huang Pu He Xin" },
-//  { 0x0B43, "Xiamen Pengpai Microelectronics" },
-//  { 0x0B44, "JISHUN" },
-//  { 0x0B45, "Shenzhen WODPOSIT" },
-//  { 0x0B46, "Unistar" },
-//  { 0x0B47, "UNICORE Electronic (Suzhou)" },
-//  { 0x0B48, "Axonne" },
-//  { 0x0B49, "Shenzhen SOVERECA" },
-//  { 0x0B4A, "Dire Wolf" },
-//  { 0x0B4B, "Whampoa Core" },
-//  { 0x0B4C, "CSI Halbleiter GmbH" },
-//  { 0x0B4D, "ONE Semiconductor" },
-//  { 0x0B4E, "SimpleMachines" },
-//  { 0x0B4F, "Shenzhen Chengyi Qingdian Electronic" },
-//  { 0x0B50, "Shenzhen Xinlianxin Network" },
-//  { 0x0B51, "Vayyar Imaging" },
-//  { 0x0B52, "Paisen Network" },
-//  { 0x0B53, "Shenzhen Fengwensi" },
-//  { 0x0B54, "Caplink" },
-//  { 0x0B55, "JJT Solution" },
-//  { 0x0B56, "HOSIN Global" },
-//  { 0x0B57, "Shenzhen KingDisk Century" },
-    { 0x0B58, "SOYO" },
-//  { 0x0B59, "DIT" },
-//  { 0x0B5A, "iFound" },
-//  { 0x0B5B, "Aril Computer Company" },
-    { 0x0B5C, "ASUS" },
-//  { 0x0B5D, "Shenzhen Ruiyingtong" },
-//  { 0x0B5E, "HANA Micron" },
-//  { 0x0B5F, "RANSOR" },
-//  { 0x0B60, "Axiado" },
-//  { 0x0B61, "Tesla" },
-//  { 0x0B62, "Pingtouge (Shanghai) Semiconductor" },
-//  { 0x0B63, "S3Plus Technologies SA" },
-//  { 0x0B64, "Integrated Silicon Solution Israel" },
-//  { 0x0B65, "GreenWaves" },
-//  { 0x0B66, "NUVIA" },
-//  { 0x0B67, "Guangzhou Shuvrwine" },
-//  { 0x0B68, "Shenzhen Hangshun Chip" },
-//  { 0x0B69, "Chengboliwei Electronic Business" },
-//  { 0x0B6A, "Kowin Memory" },
-//  { 0x0B6B, "Euronet" },
-//  { 0x0B6C, "SCY" },
-//  { 0x0B6D, "Shenzhen Xinhongyusheng Electrical" },
-//  { 0x0B6E, "PICOCOM" },
-//  { 0x0B6F, "Shenzhen Toooogo Memory" },
-//  { 0x0B70, "VLSI Solution" },
-//  { 0x0B71, "Costar" },
-//  { 0x0B72, "Shenzhen Huatop" },
-//  { 0x0B73, "Inspur Electronic Information Industry" },
-//  { 0x0B74, "Shenzhen Boyuan Computer" },
-//  { 0x0B75, "Beijing Welldisk" },
-//  { 0x0B76, "Suzhou EP Semicon" },
-    { 0x0B77, "Dahua" },
-//  { 0x0B78, "Virtu Financial" },
-//  { 0x0B79, "Datotek" },
-//  { 0x0B7A, "Telecom and Microelectronics Industries" },
-//  { 0x0B7B, "Echow" },
-//  { 0x0B7C, "APEX-INFO" },
-//  { 0x0B7D, "Yingpark" },
-//  { 0x0B7E, "Shenzhen Bigway Tech" },
-//  { 0x0C01, "Beijing Haawking" },
-//  { 0x0C02, "Open HW Group" },
-//  { 0x0C03, "JHICC" },
-//  { 0x0C04, "ncoder AG" },
-//  { 0x0C05, "ThinkTech Information" },
-//  { 0x0C06, "Shenzhen Chixingzhe" },
-//  { 0x0C07, "Biao Ram" },
-//  { 0x0C08, "Shenzhen Kaizhuoyue" },
-//  { 0x0C09, "Shenzhen YC Storage" },
-//  { 0x0C0A, "Shenzhen Chixingzhe" },
-//  { 0x0C0B, "Wink Semiconductor  (Shenzhen)" },
-//  { 0x0C0C, "AISTOR" },
-//  { 0x0C0D, "Palma Ceia SemiDesign" },
-//  { 0x0C0E, "EM Microelectronic-Marin SA" },
-//  { 0x0C0F, "Shenzhen Monarch Memory" },
-    { 0x0C10, "Reliance Memory" },
-//  { 0x0C11, "Jesis" },
-    { 0x0C12, "Espressif" },
-//  { 0x0C13, "Shenzhen Sati Smart" },
-//  { 0x0C14, "NeuMem" },
-//  { 0x0C15, "Lifelong" },
-//  { 0x0C16, "Beijing Oitech" },
-    { 0x0C17, "LDLC" },
-//  { 0x0C18, "Semidynamics Technology Services SLU" },
-//  { 0x0C19, "swordbill" },
-//  { 0x0C1A, "YIREN" },
-//  { 0x0C1B, "Shenzhen Yinxiang" },
-//  { 0x0C1C, "PoweV Electronic" },
-//  { 0x0C1D, "LEORICE" },
-//  { 0x0C1E, "Waymo LLC" },
-//  { 0x0C1F, "Ventana Micro Systems" },
-//  { 0x0C20, "Hefei Guangxin Microelectronics" },
-//  { 0x0C21, "Shenzhen Sooner Industrial" },
-//  { 0x0C22, "Horizon Robotics" },
-//  { 0x0C23, "Tangem AG" },
-//  { 0x0C24, "FuturePath Technology (Shenzhen)" },
-//  { 0x0C25, "RC Module" },
-    { 0x0C26, "Timetec" },
-//  { 0x0C27, "ICMAX" },
-//  { 0x0C28, "Lynxi" },
-//  { 0x0C29, "Guangzhou Taisupanke Computer Equipment" },
-//  { 0x0C2A, "Ceremorphic" },
-//  { 0x0C2B, "Biwin Storage" },
-//  { 0x0C2C, "Beijing ESWIN Computing" },
-//  { 0x0C2D, "WeForce" },
-//  { 0x0C2E, "Shenzhen Fanxiang Information" },
-//  { 0x0C2F, "Unisoc" },
-//  { 0x0C30, "YingChu" },
-//  { 0x0C31, "GUANCUN" },
-//  { 0x0C32, "IPASON" },
-//  { 0x0C33, "Ayar Labs" },
-    { 0x0C34, "Amazon" },
-//  { 0x0C35, "Shenzhen Xinxinshun" },
-//  { 0x0C36, "Galois" },
-//  { 0x0C37, "Ubilite" },
-//  { 0x0C38, "Shenzhen Quanxing" },
-//  { 0x0C39, "Group RZX Technology LTDA" },
-//  { 0x0C3A, "Yottac Technology (XI'AN) Cooperation" },
-//  { 0x0C3B, "Shenzhen RuiRen" },
-//  { 0x0C3C, "Group Star" },
-//  { 0x0C3D, "RWA (Hong Kong)" },
-//  { 0x0C3E, "Genesys Logic" },
-//  { 0x0C3F, "T3 Robotics Inc." },
-//  { 0x0C40, "Biostar Microtech" },
-//  { 0x0C41, "Shenzhen SXmicro" },
-//  { 0x0C42, "Shanghai Yili Computer" },
-//  { 0x0C43, "Zhixin Semicoducotor" },
-//  { 0x0C44, "uFound" },
-//  { 0x0C45, "Aigo Data Security" },
-//  { 0x0C46, "GXore" },
-//  { 0x0C47, "Shenzhen Pradeon Intelligent" },
-//  { 0x0C48, "Power LSI" },
-//  { 0x0C49, "PRIME" },
-//  { 0x0C4A, "Shenzhen Juyang Innovative" },
-//  { 0x0C4B, "CERVO" },
-//  { 0x0C4C, "SiEngine Technology Co.," },
-//  { 0x0C4D, "Beijing Unigroup Tsingteng MicroSystem" },
-//  { 0x0C4E, "Brainsao GmbH" },
-//  { 0x0C4F, "Credo Technology Group" },
-//  { 0x0C50, "Shanghai Biren" },
-//  { 0x0C51, "Nucleu Semiconductor" },
-//  { 0x0C52, "Shenzhen Guangshuo" },
-//  { 0x0C53, "ZhongsihangTechnology" },
-//  { 0x0C54, "Suzhou Mainshine Electronic Co" },
-//  { 0x0C55, "Guangzhou Riss Electronic" },
-//  { 0x0C56, "Shenzhen Cloud Security Storage " },
-    { 0x0C57, "ROG" },
-//  { 0x0C58, "Perceive" },
-//  { 0x0C59, "e-peas" },
-//  { 0x0C5A, "Fraunhofer IPMS" },
-//  { 0x0C5B, "Shenzhen Daxinlang Electronic Tech" },
-//  { 0x0C5C, "Abacus Peripherals Private" },
-    { 0x0C5D, "OLOy" },
-//  { 0x0C5E, "Wuhan P&S Semiconductor" },
-//  { 0x0C5F, "Sitrus" },
-//  { 0x0C60, "AnHui Conner Storage" },
-    { 0x0C61, "Rochester" },
-//  { 0x0C62, "Wuxi Petabyte" },
-    { 0x0C63, "Star Memory" },
-    { 0x0C64, "Agile Memory" },
-//  { 0x0C65, "MEJEC" },
-//  { 0x0C66, "Rockchip" },
-//  { 0x0C67, "Dongguan Guanma e-commerce" },
-//  { 0x0C68, "Rayson Hi-Tech (SZ)" },
-//  { 0x0C69, "MINRES Technologies GmbH" },
-//  { 0x0C6A, "Himax" },
-//  { 0x0C6B, "Shenzhen Cwinner" },
-//  { 0x0C6C, "Tecmiyo" },
-//  { 0x0C6D, "Shenzhen Suhuicun" },
-//  { 0x0C6E, "Vickter" },
-//  { 0x0C6F, "lowRISC" },
-//  { 0x0C70, "EXEGate FZE" },
-//  { 0x0C71, "Shenzhen 9 Chapter" },
-//  { 0x0C72, "Addlink" },
-//  { 0x0C73, "Starsway" },
-//  { 0x0C74, "Pensando Systems Inc." },
-//  { 0x0C75, "AirDisk" },
-//  { 0x0C76, "Shenzhen Speedmobile" },
-//  { 0x0C77, "PEZY Computing" },
-//  { 0x0C78, "Extreme Engineering Solutions" },
-//  { 0x0C79, "Shangxin" },
-    { 0x0C7A, "Zhaoxin" },
-//  { 0x0C7B, "Xsight Labs" },
-    { 0x0C7C, "Hikstorage" },
-    { 0x0C7D, "Dell" },
-//  { 0x0C7E, "Guangdong StarFive" },
-//  { 0x0D01, "TECOTON" },
-//  { 0x0D02, "Abko" },
-//  { 0x0D03, "Shenzhen Feisrike" },
-//  { 0x0D04, "Shenzhen Sunhome" },
-//  { 0x0D05, "Global Mixed-mode" },
-//  { 0x0D06, "Shenzhen Weien" },
-//  { 0x0D07, "Shenzhen Cooyes" },
-//  { 0x0D08, "Keymos Electronics Co.," },
-//  { 0x0D09, "E-Rockic Technology Company" },
-//  { 0x0D0A, "Aerospace Science Memory Shenzhen" },
-//  { 0x0D0B, "Shenzhen Quanji" },
-//  { 0x0D0C, "Dukosi" },
-//  { 0x0D0D, "Maxell Corporation of America" },
-//  { 0x0D0E, "Shenshen Xinxintao" },
-//  { 0x0D0F, "Zhuhai Sanxia Semiconductor" },
-//  { 0x0D10, "Groq" },
-//  { 0x0D11, "AstraTek" },
-//  { 0x0D12, "Shenzhen Xinyuze Technology " },
-//  { 0x0D13, "All Bit Semiconductor" },
-//  { 0x0D14, "ACFlow" },
-//  { 0x0D15, "Shenzhen Sipeed" },
-//  { 0x0D16, "Linzhi Hong Kong" },
-//  { 0x0D17, "Supreme Wise" },
-//  { 0x0D18, "Blue Cheetah Analog Design" },
-//  { 0x0D19, "Hefei Laiku" },
-//  { 0x0D1A, "Zord" },
-//  { 0x0D1B, "SBO Hearing A/S" },
-//  { 0x0D1C, "Regent Sharp" },
-//  { 0x0D1D, "Permanent Potential" },
-//  { 0x0D1E, "Creative World" },
-//  { 0x0D1F, "Base Creation" },
-    { 0x0D61, "Lyczar" },
-    { 0x0E51, "Xiaoli AI" },
-    { 0x0E58, "Trium Elek." },
-    { 0x0F33, "Xllbyte" },
-    { 0x0F37, "SSTC" },
-    { 0xFFFF, "Unknown"}
-};
+// No include guard by design: spd.c includes this file twice, with different
+// definitions of ENTRY(), to build a code array and a matching string table.
+    ENTRY(0x0001, "AMD")
+//  ENTRY(0x0002, "AMI")
+//  ENTRY(0x0003, "Fairchild")
+    ENTRY(0x0004, "Fujitsu")
+    ENTRY(0x0005, "GTE")
+//  ENTRY(0x0006, "Harris")
+//  ENTRY(0x0007, "Hitachi")
+//  ENTRY(0x0008, "Inmos")
+    ENTRY(0x0009, "Intel")
+//  ENTRY(0x000A, "I.T.T.")
+//  ENTRY(0x000B, "Intersil")
+//  ENTRY(0x000C, "Monolithic Memories")
+//  ENTRY(0x000D, "Mostek")
+    ENTRY(0x000E, "Freescale")
+//  ENTRY(0x000F, "National")
+    ENTRY(0x0010, "NEC")
+//  ENTRY(0x0011, "RCA")
+//  ENTRY(0x0012, "Raytheon")
+//  ENTRY(0x0013, "Conexant (Rockwell)")
+//  ENTRY(0x0014, "Seeq")
+//  ENTRY(0x0015, "NXP (Philips)")
+//  ENTRY(0x0016, "Synertek")
+    ENTRY(0x0017, "Texas Instruments")
+    ENTRY(0x0018, "Kioxia (Toshiba)")
+//  ENTRY(0x0019, "Xicor")
+//  ENTRY(0x001A, "Zilog")
+//  ENTRY(0x001B, "Eurotechnique")
+//  ENTRY(0x001C, "Mitsubishi")
+//  ENTRY(0x001D, "Lucent (AT&T)")
+//  ENTRY(0x001E, "Exel")
+//  ENTRY(0x001F, "Atmel")
+    ENTRY(0x0020, "STMicro.")
+//  ENTRY(0x0021, "Lattice Semi.")
+//  ENTRY(0x0022, "NCR")
+//  ENTRY(0x0023, "Wafer Scale Integration")
+    ENTRY(0x0024, "IBM")
+//  ENTRY(0x0025, "Tristar")
+//  ENTRY(0x0026, "Visic")
+//  ENTRY(0x0027, "Intl. CMOS")
+//  ENTRY(0x0028, "SSSI")
+    ENTRY(0x0029, "Microchip")
+//  ENTRY(0x002A, "Ricoh")
+//  ENTRY(0x002B, "VLSI")
+    ENTRY(0x002C, "Micron")
+    ENTRY(0x002D, "SK Hynix")
+//  ENTRY(0x002E, "OKI")
+//  ENTRY(0x002F, "ACTEL")
+//  ENTRY(0x0030, "Sharp")
+//  ENTRY(0x0031, "Catalyst")
+//  ENTRY(0x0032, "Panasonic")
+//  ENTRY(0x0033, "IDT")
+//  ENTRY(0x0034, "Cypress")
+//  ENTRY(0x0035, "DEC")
+//  ENTRY(0x0036, "LSI Logic")
+//  ENTRY(0x0037, "Zarlink (Plessey)")
+//  ENTRY(0x0038, "UTMC")
+//  ENTRY(0x0039, "Thinking Machine")
+//  ENTRY(0x003A, "Thomson CSF")
+//  ENTRY(0x003B, "Integrated CMOS (Vertex)")
+//  ENTRY(0x003C, "Honeywell")
+//  ENTRY(0x003D, "Tektronix")
+//  ENTRY(0x003E, "Oracle")
+//  ENTRY(0x003F, "Silicon Storage")
+    ENTRY(0x0040, "MOSEL")
+    ENTRY(0x0041, "Infineon")
+    ENTRY(0x0042, "Macronix")
+//  ENTRY(0x0043, "Xerox")
+//  ENTRY(0x0044, "Plus Logic")
+//  ENTRY(0x0045, "Western Digital")
+//  ENTRY(0x0046, "Elan Circuit Tech.")
+//  ENTRY(0x0047, "European Silicon Str.")
+    ENTRY(0x0048, "Apple")
+//  ENTRY(0x0049, "Xilinx")
+//  ENTRY(0x004A, "Compaq")
+//  ENTRY(0x004B, "Protocol Engines")
+//  ENTRY(0x004C, "SCI")
+//  ENTRY(0x004D, "Seiko Instruments")
+    ENTRY(0x004E, "Samsung")
+//  ENTRY(0x004F, "I3 Design System")
+//  ENTRY(0x0050, "Klic")
+//  ENTRY(0x0051, "Crosspoint Solutions")
+//  ENTRY(0x0052, "Alliance Memory")
+//  ENTRY(0x0053, "Tandem")
+//  ENTRY(0x0054, "Hewlett-Packard")
+//  ENTRY(0x0055, "Integrated Silicon Solutions")
+//  ENTRY(0x0056, "Brooktree")
+//  ENTRY(0x0057, "New Media")
+//  ENTRY(0x0058, "MHS Electronic")
+//  ENTRY(0x0059, "Performance Semi.")
+    ENTRY(0x005A, "Winbond")
+//  ENTRY(0x005B, "Kawasaki Steel")
+//  ENTRY(0x005C, "Bright Micro")
+//  ENTRY(0x005D, "TECMAR")
+//  ENTRY(0x005E, "Exar")
+//  ENTRY(0x005F, "PCMCIA")
+    ENTRY(0x0060, "LG") // LG Semi (Goldstar)
+//  ENTRY(0x0061, "Northern Telecom")
+    ENTRY(0x0062, "Sanyo")
+//  ENTRY(0x0063, "Array Microsystems")
+//  ENTRY(0x0064, "Crystal Semiconductor")
+//  ENTRY(0x0065, "Analog Devices")
+//  ENTRY(0x0066, "PMC-Sierra")
+//  ENTRY(0x0067, "Asparix")
+//  ENTRY(0x0068, "Convex Computer")
+//  ENTRY(0x0069, "Quality Semiconductor")
+//  ENTRY(0x006A, "Nimbus")
+//  ENTRY(0x006B, "Transwitch")
+//  ENTRY(0x006C, "Micronas (ITT Intermetall)")
+//  ENTRY(0x006D, "Cannon")
+//  ENTRY(0x006E, "Altera")
+//  ENTRY(0x006F, "NEXCOM")
+//  ENTRY(0x0070, "Qualcomm")
+//  ENTRY(0x0071, "Sony")
+//  ENTRY(0x0072, "Cray Research")
+//  ENTRY(0x0073, "AMS(Austria Micro)")
+//  ENTRY(0x0074, "Vitesse")
+//  ENTRY(0x0075, "Aster")
+//  ENTRY(0x0076, "Bay Networks (Synoptic)")
+//  ENTRY(0x0077, "Zentrum/ZMD")
+//  ENTRY(0x0078, "TRW")
+//  ENTRY(0x0079, "Thesys")
+//  ENTRY(0x007A, "Solbourne Computer")
+//  ENTRY(0x007B, "Allied-Signal")
+//  ENTRY(0x007C, "Dialog Semiconductor")
+//  ENTRY(0x007D, "Media Vision")
+//  ENTRY(0x007E, "Numonyx")
+//  ENTRY(0x0101, "Cirrus Logic")
+//  ENTRY(0x0102, "National Instruments")
+//  ENTRY(0x0103, "ILC Data Device")
+//  ENTRY(0x0104, "Alcatel Mietec")
+//  ENTRY(0x0105, "Micro Linear")
+//  ENTRY(0x0106, "Univ. of NC")
+//  ENTRY(0x0107, "JTAG")
+//  ENTRY(0x0108, "BAE Systems (Loral)")
+//  ENTRY(0x0109, "Nchip")
+//  ENTRY(0x010A, "Galileo Tech")
+//  ENTRY(0x010B, "Bestlink Systems")
+//  ENTRY(0x010C, "Graychip")
+//  ENTRY(0x010D, "GENNUM")
+//  ENTRY(0x010E, "VideoLogic")
+//  ENTRY(0x010F, "Robert Bosch")
+//  ENTRY(0x0110, "Chip Express")
+//  ENTRY(0x0111, "DATARAM")
+//  ENTRY(0x0112, "United Microelectronics")
+//  ENTRY(0x0113, "TCSI")
+    ENTRY(0x0114, "Smart Modular")
+//  ENTRY(0x0115, "Hughes Aircraft")
+//  ENTRY(0x0116, "Lanstar Semiconductor")
+//  ENTRY(0x0117, "Qlogic")
+    ENTRY(0x0118, "Kingston")
+//  ENTRY(0x0119, "Music Semi")
+//  ENTRY(0x011A, "Ericsson Components")
+//  ENTRY(0x011B, "SpaSE")
+//  ENTRY(0x011C, "Eon Silicon Devices")
+//  ENTRY(0x011D, "ISSI")
+//  ENTRY(0x011E, "DoD")
+//  ENTRY(0x011F, "Integ. Memories Tech.")
+//  ENTRY(0x0120, "Corollary")
+//  ENTRY(0x0121, "Dallas Semiconductor")
+//  ENTRY(0x0122, "Omnivision")
+//  ENTRY(0x0123, "EIV(Switzerland)")
+//  ENTRY(0x0124, "Novatel Wireless")
+//  ENTRY(0x0125, "Zarlink (Mitel)")
+//  ENTRY(0x0126, "Clearpoint")
+//  ENTRY(0x0127, "Cabletron")
+//  ENTRY(0x0128, "STEC (Silicon Tech)")
+//  ENTRY(0x0129, "Vanguard")
+//  ENTRY(0x012A, "Hagiwara Sys-Com")
+//  ENTRY(0x012B, "Vantis")
+//  ENTRY(0x012C, "Celestica")
+//  ENTRY(0x012D, "Century")
+//  ENTRY(0x012E, "Hal Computers")
+//  ENTRY(0x012F, "Rohm Company")
+//  ENTRY(0x0130, "Juniper Networks")
+//  ENTRY(0x0131, "Libit Signal Processing")
+    ENTRY(0x0132, "Mushkin")
+//  ENTRY(0x0133, "Tundra Semiconductor")
+//  ENTRY(0x0134, "Adaptec")
+//  ENTRY(0x0135, "LightSpeed Semi.")
+//  ENTRY(0x0136, "ZSP")
+//  ENTRY(0x0137, "AMIC")
+//  ENTRY(0x0138, "Adobe Systems")
+//  ENTRY(0x0139, "Dynachip")
+    ENTRY(0x013A, "PNY")
+//  ENTRY(0x013B, "Newport Digital")
+//  ENTRY(0x013C, "MMC Networks")
+//  ENTRY(0x013D, "T Square")
+//  ENTRY(0x013E, "Seiko Epson")
+//  ENTRY(0x013F, "Broadcom")
+    ENTRY(0x0140, "Viking")
+//  ENTRY(0x0141, "V3 Semiconductor")
+    ENTRY(0x0142, "Flextronics")
+//  ENTRY(0x0143, "Suwa")
+//  ENTRY(0x0144, "Transmeta")
+    ENTRY(0x0145, "Micron CMS")
+//  ENTRY(0x0147, "Enhance 3000")
+//  ENTRY(0x0148, "Tower Semiconductor")
+//  ENTRY(0x0149, "CPU Design")
+//  ENTRY(0x014A, "Price Point")
+//  ENTRY(0x014B, "Maxim Integrated Product")
+//  ENTRY(0x014C, "Tellabs")
+//  ENTRY(0x014D, "Centaur")
+//  ENTRY(0x014E, "Unigen")
+    ENTRY(0x014F, "Transcend")
+//  ENTRY(0x0150, "Memory Card")
+//  ENTRY(0x0151, "CKD")
+//  ENTRY(0x0152, "Capital Instruments")
+//  ENTRY(0x0153, "Aica Kogyo")
+//  ENTRY(0x0154, "Linvex")
+//  ENTRY(0x0155, "MSC Vertriebs GmbH")
+//  ENTRY(0x0156, "AKM Company")
+//  ENTRY(0x0157, "Dynamem")
+//  ENTRY(0x0158, "NERA ASA")
+//  ENTRY(0x0159, "GSI")
+    ENTRY(0x015A, "Dane-Elec")
+//  ENTRY(0x015B, "Acorn Computers")
+//  ENTRY(0x015C, "Lara")
+//  ENTRY(0x015D, "Oak")
+//  ENTRY(0x015E, "Itec Memory")
+//  ENTRY(0x015F, "Tanisys")
+//  ENTRY(0x0160, "Truevision")
+    ENTRY(0x0161, "Wintec")
+//  ENTRY(0x0162, "Super PC Memory")
+//  ENTRY(0x0163, "MGV Memory")
+//  ENTRY(0x0164, "Galvantech")
+//  ENTRY(0x0165, "Gadzoox Networks")
+//  ENTRY(0x0166, "Multi Dimensional Cons.")
+//  ENTRY(0x0167, "GateField")
+//  ENTRY(0x0168, "Integrated Memory System")
+//  ENTRY(0x0169, "Triscend")
+//  ENTRY(0x016A, "XaQti")
+//  ENTRY(0x016B, "Goldenram")
+//  ENTRY(0x016C, "Clear Logic")
+//  ENTRY(0x016D, "Cimaron")
+//  ENTRY(0x016E, "Nippon Steel Semi.")
+//  ENTRY(0x016F, "Advantage Memory")
+//  ENTRY(0x0170, "AMCC")
+//  ENTRY(0x0171, "LeCroy")
+//  ENTRY(0x0172, "Yamaha")
+//  ENTRY(0x0173, "Digital Microwave")
+//  ENTRY(0x0174, "NetLogic Microsystems")
+//  ENTRY(0x0175, "MIMOS Semiconductor")
+//  ENTRY(0x0176, "Advanced Fibre")
+//  ENTRY(0x0177, "BF Goodrich Data.")
+//  ENTRY(0x0178, "Epigram")
+    ENTRY(0x0179, "Acbel")
+    ENTRY(0x017A, "Apacer")
+//  ENTRY(0x017B, "Admor Memory")
+    ENTRY(0x017C, "FOXCONN")
+//  ENTRY(0x017D, "Quadratics")
+//  ENTRY(0x017E, "3COM")
+//  ENTRY(0x0201, "Camintonn")
+//  ENTRY(0x0202, "ISOA Incorporated")
+//  ENTRY(0x0203, "Agate Semiconductor")
+//  ENTRY(0x0204, "ADMtek Incorporated")
+//  ENTRY(0x0205, "HYPERTEC")
+//  ENTRY(0x0206, "Adhoc")
+//  ENTRY(0x0207, "MOSAID")
+//  ENTRY(0x0208, "Ardent")
+//  ENTRY(0x0209, "Switchcore")
+//  ENTRY(0x020A, "Cisco Systems")
+//  ENTRY(0x020B, "Allayer")
+//  ENTRY(0x020C, "WorkX AG (Wichman)")
+//  ENTRY(0x020D, "Oasis Semiconductor")
+//  ENTRY(0x020E, "Novanet Semiconductor")
+//  ENTRY(0x020F, "E-M Solutions")
+//  ENTRY(0x0210, "Power General")
+//  ENTRY(0x0211, "Advanced Hardware Arch.")
+//  ENTRY(0x0212, "Inova")
+//  ENTRY(0x0213, "Telocity")
+//  ENTRY(0x0214, "Delkin Devices")
+//  ENTRY(0x0215, "Symagery Microsystems")
+//  ENTRY(0x0216, "C-Port")
+//  ENTRY(0x0217, "SiberCore")
+//  ENTRY(0x0218, "Southland Microsystems")
+//  ENTRY(0x0219, "Malleable")
+//  ENTRY(0x021A, "Kendin")
+//  ENTRY(0x021B, "Great Technology Micro.")
+//  ENTRY(0x021C, "Sanmina")
+//  ENTRY(0x021D, "HADCO")
+    ENTRY(0x021E, "Corsair")
+//  ENTRY(0x021F, "Actrans System")
+//  ENTRY(0x0220, "ALPHA")
+//  ENTRY(0x0221, "Silicon Laboratories Inc (Cygnal)")
+//  ENTRY(0x0222, "Artesyn")
+//  ENTRY(0x0223, "Align Manufacturing")
+//  ENTRY(0x0224, "Peregrine Semiconductor")
+//  ENTRY(0x0225, "Chameleon Systems")
+//  ENTRY(0x0226, "Aplus Flash")
+//  ENTRY(0x0227, "MIPS")
+//  ENTRY(0x0228, "Chrysalis ITS")
+//  ENTRY(0x0229, "ADTEC")
+    ENTRY(0x022A, "Kentron")
+//  ENTRY(0x022B, "Win")
+//  ENTRY(0x022C, "Tezzaron Semiconductor")
+//  ENTRY(0x022D, "Extreme Packet Devices")
+//  ENTRY(0x022E, "RF Micro Devices")
+    ENTRY(0x022F, "Siemens AG")
+//  ENTRY(0x0230, "Sarnoff")
+//  ENTRY(0x0231, "Itautec SA")
+//  ENTRY(0x0232, "Radiata")
+//  ENTRY(0x0233, "Benchmark Elect. (AVEX)")
+//  ENTRY(0x0234, "Legend")
+    ENTRY(0x0235, "SpecTek")
+//  ENTRY(0x0236, "Hi/fn")
+//  ENTRY(0x0237, "Enikia Incorporated")
+//  ENTRY(0x0238, "SwitchOn Networks")
+//  ENTRY(0x0239, "AANetcom Incorporated")
+//  ENTRY(0x023A, "Micro Memory Bank")
+//  ENTRY(0x023B, "ESS")
+//  ENTRY(0x023C, "Virata")
+//  ENTRY(0x023D, "Excess Bandwidth")
+//  ENTRY(0x023E, "West Bay Semiconductor")
+//  ENTRY(0x023F, "DSP Group")
+//  ENTRY(0x0240, "Newport")
+//  ENTRY(0x0241, "Chip2Chip Incorporated")
+//  ENTRY(0x0242, "Phobos")
+//  ENTRY(0x0243, "Intellitech")
+//  ENTRY(0x0244, "Nordic VLSI ASA")
+//  ENTRY(0x0245, "Ishoni Networks")
+//  ENTRY(0x0246, "Silicon Spice")
+//  ENTRY(0x0247, "Alchemy Semiconductor")
+//  ENTRY(0x0248, "Agilent")
+//  ENTRY(0x0249, "Centillium")
+//  ENTRY(0x024A, "W.L. Gore")
+//  ENTRY(0x024B, "HanBit")
+//  ENTRY(0x024C, "GlobeSpan")
+//  ENTRY(0x024D, "Element 14")
+//  ENTRY(0x024E, "Pycon")
+//  ENTRY(0x024F, "Saifun Semiconductors")
+//  ENTRY(0x0250, "Sibyte Incorporated")
+//  ENTRY(0x0251, "MetaLink")
+//  ENTRY(0x0252, "Feiya")
+//  ENTRY(0x0253, "I & C")
+//  ENTRY(0x0254, "Shikatronics")
+//  ENTRY(0x0255, "Elektrobit")
+//  ENTRY(0x0256, "Megic")
+//  ENTRY(0x0257, "Com-Tier")
+//  ENTRY(0x0258, "Malaysia Micro Solutions")
+//  ENTRY(0x0259, "Hyperchip")
+//  ENTRY(0x025A, "Gemstone")
+//  ENTRY(0x025B, "Anadigm (Anadyne)")
+//  ENTRY(0x025C, "3ParData")
+//  ENTRY(0x025D, "Mellanox")
+//  ENTRY(0x025E, "Tenx")
+//  ENTRY(0x025F, "Helix AG")
+//  ENTRY(0x0260, "Domosys")
+//  ENTRY(0x0261, "Skyup")
+//  ENTRY(0x0262, "HiNT")
+//  ENTRY(0x0263, "Chiaro")
+//  ENTRY(0x0264, "MDT Technologies GmbH")
+//  ENTRY(0x0265, "Exbit Technology A/S")
+//  ENTRY(0x0266, "Integrated Technology Express")
+//  ENTRY(0x0267, "AVED Memory")
+//  ENTRY(0x0268, "Legerity")
+//  ENTRY(0x0269, "Jasmine Networks")
+//  ENTRY(0x026A, "Caspian Networks")
+//  ENTRY(0x026B, "nCUBE")
+//  ENTRY(0x026C, "Silicon Access Networks")
+//  ENTRY(0x026D, "FDK")
+//  ENTRY(0x026E, "High Bandwidth Access")
+//  ENTRY(0x026F, "MultiLink")
+//  ENTRY(0x0270, "BRECIS")
+//  ENTRY(0x0271, "World Wide Packets")
+//  ENTRY(0x0272, "APW")
+//  ENTRY(0x0273, "Chicory Systems")
+//  ENTRY(0x0274, "Xstream Logic")
+//  ENTRY(0x0275, "Fast-Chip")
+//  ENTRY(0x0276, "Zucotto Wireless")
+//  ENTRY(0x0277, "Realchip")
+//  ENTRY(0x0278, "Galaxy Power")
+//  ENTRY(0x0279, "eSilicon")
+//  ENTRY(0x027A, "Morphics")
+//  ENTRY(0x027B, "Accelerant Networks")
+//  ENTRY(0x027C, "Silicon Wave")
+//  ENTRY(0x027D, "SandCraft")
+    ENTRY(0x027E, "Elpida")
+//  ENTRY(0x0301, "Solectron")
+//  ENTRY(0x0302, "Optosys")
+//  ENTRY(0x0303, "Buffalo (Formerly Melco)")
+//  ENTRY(0x0304, "TriMedia")
+//  ENTRY(0x0305, "Cyan")
+//  ENTRY(0x0306, "Global Locate")
+//  ENTRY(0x0307, "Optillion")
+//  ENTRY(0x0308, "Terago")
+//  ENTRY(0x0309, "Ikanos")
+//  ENTRY(0x030A, "Princeton")
+    ENTRY(0x030B, "Nanya")
+//  ENTRY(0x030C, "Elite Flash Storage")
+//  ENTRY(0x030D, "Mysticom")
+//  ENTRY(0x030E, "LightSand")
+    ENTRY(0x030F, "ATI")
+//  ENTRY(0x0310, "Agere Systems")
+//  ENTRY(0x0311, "NeoMagic")
+//  ENTRY(0x0312, "AuroraNetics")
+    ENTRY(0x0313, "GEIL")
+    ENTRY(0x0314, "Mushkin")
+//  ENTRY(0x0315, "Tioga")
+    ENTRY(0x0316, "Netlist")
+//  ENTRY(0x0317, "TeraLogic")
+//  ENTRY(0x0318, "Cicada Semiconductor")
+//  ENTRY(0x0319, "Centon")
+//  ENTRY(0x031A, "Tyco")
+//  ENTRY(0x031B, "Magis Works")
+//  ENTRY(0x031C, "Zettacom")
+//  ENTRY(0x031D, "Cogency Semiconductor")
+//  ENTRY(0x031E, "Chipcon AS")
+//  ENTRY(0x031F, "Aspex")
+//  ENTRY(0x0320, "F5 Networks")
+//  ENTRY(0x0321, "Programmable Silicon Solutions")
+//  ENTRY(0x0322, "ChipWrights")
+//  ENTRY(0x0323, "Acorn Networks")
+//  ENTRY(0x0324, "Quicklogic")
+    ENTRY(0x0325, "Kingmax")
+//  ENTRY(0x0326, "BOPS")
+//  ENTRY(0x0327, "Flasys")
+//  ENTRY(0x0328, "BitBlitz")
+//  ENTRY(0x0329, "eMemory")
+//  ENTRY(0x032A, "Procket Networks")
+//  ENTRY(0x032B, "Purple Ray")
+//  ENTRY(0x032C, "Trebia Networks")
+//  ENTRY(0x032D, "Delta")
+//  ENTRY(0x032E, "Onex")
+//  ENTRY(0x032F, "Ample")
+//  ENTRY(0x0330, "Memory Experts Intl")
+//  ENTRY(0x0331, "Astute Networks")
+//  ENTRY(0x0332, "Azanda Network Devices")
+//  ENTRY(0x0333, "Dibcom")
+    ENTRY(0x0334, "Tekmos")
+//  ENTRY(0x0335, "API NetWorks")
+//  ENTRY(0x0336, "Bay Microsystems")
+//  ENTRY(0x0337, "Firecron")
+//  ENTRY(0x0338, "Resonext")
+//  ENTRY(0x0339, "Tachys")
+//  ENTRY(0x033A, "Equator")
+//  ENTRY(0x033B, "Concept Computer")
+//  ENTRY(0x033C, "SILCOM")
+//  ENTRY(0x033D, "3Dlabs")
+//  ENTRY(0x033E, "c&t Magazine")
+//  ENTRY(0x033F, "Sanera Systems")
+//  ENTRY(0x0340, "Silicon Packets")
+//  ENTRY(0x0341, "Viasystems Group")
+//  ENTRY(0x0342, "Simtek")
+//  ENTRY(0x0343, "Semicon Devices Singapore")
+//  ENTRY(0x0344, "Satron Handelsges")
+//  ENTRY(0x0345, "Improv Systems")
+//  ENTRY(0x0346, "INDUSYS GmbH")
+//  ENTRY(0x0347, "Corrent")
+//  ENTRY(0x0348, "Infrant")
+//  ENTRY(0x0349, "Ritek")
+//  ENTRY(0x034A, "empowerTel Networks")
+//  ENTRY(0x034B, "Hypertec")
+//  ENTRY(0x034C, "Cavium Networks")
+//  ENTRY(0x034D, "PLX")
+//  ENTRY(0x034E, "Massana Design")
+//  ENTRY(0x034F, "Intrinsity")
+//  ENTRY(0x0350, "Valence Semiconductor")
+//  ENTRY(0x0351, "Terawave")
+//  ENTRY(0x0352, "IceFyre Semiconductor")
+//  ENTRY(0x0353, "Primarion")
+//  ENTRY(0x0354, "Picochip Designs")
+//  ENTRY(0x0355, "Silverback Systems")
+    ENTRY(0x0356, "Jade Star")
+//  ENTRY(0x0357, "Pijnenburg Securealink")
+    ENTRY(0x0358, "takeMS") // Ultron AG
+//  ENTRY(0x0359, "Cambridge Silicon Radio")
+    ENTRY(0x035A, "Swissbit")
+//  ENTRY(0x035B, "Nazomi")
+//  ENTRY(0x035C, "eWave System")
+//  ENTRY(0x035D, "Rockwell Collins")
+//  ENTRY(0x035E, "Picocel Co Ltd (Paion)")
+//  ENTRY(0x035F, "Alphamosaic")
+//  ENTRY(0x0360, "Sandburst")
+//  ENTRY(0x0361, "SiCon Video")
+//  ENTRY(0x0362, "NanoAmp Solutions")
+//  ENTRY(0x0363, "Ericsson")
+//  ENTRY(0x0364, "PrairieComm")
+//  ENTRY(0x0365, "Mitac")
+//  ENTRY(0x0366, "Layer N Networks")
+//  ENTRY(0x0367, "MtekVision (Atsana)")
+//  ENTRY(0x0368, "Allegro Networks")
+//  ENTRY(0x0369, "Marvell Semiconductors")
+//  ENTRY(0x036A, "Netergy Microelectronic")
+    ENTRY(0x036B, "NVIDIA")
+//  ENTRY(0x036C, "Internet Machines")
+//  ENTRY(0x036D, "Memorysolution GmbH")
+//  ENTRY(0x036E, "Litchfield Communication")
+//  ENTRY(0x036F, "Accton")
+//  ENTRY(0x0370, "Teradiant Networks")
+//  ENTRY(0x0371, "Scaleo Chip")
+//  ENTRY(0x0372, "Cortina Systems")
+//  ENTRY(0x0373, "RAM Components")
+//  ENTRY(0x0374, "Raqia Networks")
+//  ENTRY(0x0375, "ClearSpeed")
+//  ENTRY(0x0376, "Matsushita Battery")
+//  ENTRY(0x0377, "Xelerated")
+//  ENTRY(0x0378, "SimpleTech")
+    ENTRY(0x0379, "Utron")
+//  ENTRY(0x037A, "Astec")
+//  ENTRY(0x037B, "AVM gmbH")
+//  ENTRY(0x037C, "Redux")
+//  ENTRY(0x037D, "Dot Hill Systems")
+//  ENTRY(0x037E, "TeraChip")
+//  ENTRY(0x0401, "T-RAM Incorporated")
+//  ENTRY(0x0402, "Innovics Wireless")
+//  ENTRY(0x0403, "Teknovus")
+//  ENTRY(0x0404, "KeyEye")
+//  ENTRY(0x0405, "Runcom")
+//  ENTRY(0x0406, "RedSwitch")
+//  ENTRY(0x0407, "Dotcast")
+//  ENTRY(0x0408, "Silicon Mountain Memory")
+//  ENTRY(0x0409, "Signia")
+//  ENTRY(0x040A, "Pixim")
+//  ENTRY(0x040B, "Galazar Networks")
+//  ENTRY(0x040C, "White Electronic Designs")
+//  ENTRY(0x040D, "Patriot Scientific")
+//  ENTRY(0x040E, "Neoaxiom")
+//  ENTRY(0x040F, "3Y Power")
+//  ENTRY(0x0410, "Scaleo Chip")
+//  ENTRY(0x0411, "Potentia Power Systems")
+//  ENTRY(0x0412, "C-guys Incorporated")
+//  ENTRY(0x0413, "Digital")
+//  ENTRY(0x0414, "Silicon-Based")
+//  ENTRY(0x0415, "Fulcrum Microsystems")
+    ENTRY(0x0416, "Positivo")
+//  ENTRY(0x0417, "XIOtech")
+//  ENTRY(0x0418, "PortalPlayer")
+//  ENTRY(0x0419, "Zhiying Software")
+//  ENTRY(0x041A, "ParkerVision")
+//  ENTRY(0x041B, "Phonex Broadband")
+//  ENTRY(0x041C, "Skyworks Solutions")
+//  ENTRY(0x041D, "Entropic")
+//  ENTRY(0x041E, "I&M Intelligent Memory")
+//  ENTRY(0x041F, "Zensys A/S")
+//  ENTRY(0x0420, "Legend Silicon")
+//  ENTRY(0x0421, "Sci-worx GmbH")
+//  ENTRY(0x0422, "SMSC (Standard Microsystems)")
+//  ENTRY(0x0423, "Renesas")
+//  ENTRY(0x0424, "Raza Microelectronics")
+//  ENTRY(0x0425, "Phyworks")
+    ENTRY(0x0426, "MediaTek")
+//  ENTRY(0x0427, "Non-cents Productions")
+//  ENTRY(0x0428, "US Modular")
+//  ENTRY(0x0429, "Wintegra")
+//  ENTRY(0x042A, "Mathstar")
+//  ENTRY(0x042B, "StarCore")
+//  ENTRY(0x042C, "Oplus")
+//  ENTRY(0x042D, "Mindspeed")
+//  ENTRY(0x042E, "Just Young Computer")
+//  ENTRY(0x042F, "Radia")
+    ENTRY(0x0430, "OCZ")
+//  ENTRY(0x0431, "Emuzed")
+//  ENTRY(0x0432, "LOGIC Devices")
+//  ENTRY(0x0433, "Inphi")
+//  ENTRY(0x0434, "Quake")
+//  ENTRY(0x0435, "Vixel")
+//  ENTRY(0x0436, "SolusTek")
+//  ENTRY(0x0437, "Kongsberg Maritime")
+//  ENTRY(0x0438, "Faraday")
+//  ENTRY(0x0439, "Altium")
+//  ENTRY(0x043A, "Insyte")
+//  ENTRY(0x043B, "ARM")
+//  ENTRY(0x043C, "DigiVision")
+//  ENTRY(0x043D, "Vativ")
+//  ENTRY(0x043E, "Endicott Interconnect")
+//  ENTRY(0x043F, "Pericom")
+//  ENTRY(0x0440, "Bandspeed")
+//  ENTRY(0x0441, "LeWiz")
+//  ENTRY(0x0442, "CPU")
+    ENTRY(0x0443, "Ramaxel")
+//  ENTRY(0x0444, "DSP Group")
+//  ENTRY(0x0445, "Axis")
+//  ENTRY(0x0446, "Legacy")
+//  ENTRY(0x0447, "Chrontel")
+//  ENTRY(0x0448, "Powerchip Semiconductor")
+//  ENTRY(0x0449, "MobilEye")
+    ENTRY(0x044A, "Excel")
+    ENTRY(0x044B, "A-DATA")
+//  ENTRY(0x044C, "VirtualDigm")
+    ENTRY(0x044D, "G.Skill")
+    ENTRY(0x044E, "Quanta")
+//  ENTRY(0x044F, "Yield Microelectronics")
+//  ENTRY(0x0450, "Afa")
+//  ENTRY(0x0451, "KINGBOX")
+//  ENTRY(0x0452, "Ceva")
+//  ENTRY(0x0453, "iStor Networks")
+//  ENTRY(0x0454, "Advance Modules")
+    ENTRY(0x0455, "Microsoft")
+    ENTRY(0x0456, "Open-Silicon")
+//  ENTRY(0x0457, "Goal Semiconductor")
+//  ENTRY(0x0458, "ARC")
+//  ENTRY(0x0459, "Simmtec")
+//  ENTRY(0x045A, "Metanoia")
+//  ENTRY(0x045B, "Key Stream")
+//  ENTRY(0x045C, "Lowrance")
+//  ENTRY(0x045D, "Adimos")
+//  ENTRY(0x045E, "SiGe Semiconductor")
+//  ENTRY(0x045F, "Fodus")
+//  ENTRY(0x0460, "Credence Systems")
+//  ENTRY(0x0461, "Genesis Microchip")
+//  ENTRY(0x0462, "Vihana")
+//  ENTRY(0x0463, "WIS")
+//  ENTRY(0x0464, "GateChange")
+//  ENTRY(0x0465, "High Density Devices AS")
+//  ENTRY(0x0466, "Synopsys")
+    ENTRY(0x0467, "Gigaram")
+//  ENTRY(0x0468, "Enigma Semiconductor")
+//  ENTRY(0x0469, "Century Micro")
+//  ENTRY(0x046A, "Icera Semiconductor")
+//  ENTRY(0x046B, "Mediaworks Integrated Systems")
+//  ENTRY(0x046C, "O?Neil Product Development")
+//  ENTRY(0x046D, "Supreme Top")
+//  ENTRY(0x046E, "MicroDisplay")
+    ENTRY(0x046F, "Team Group")
+//  ENTRY(0x0470, "Sinett")
+    ENTRY(0x0471, "Toshiba")
+//  ENTRY(0x0472, "Tensilica")
+//  ENTRY(0x0473, "SiRF")
+//  ENTRY(0x0474, "Bacoc")
+//  ENTRY(0x0475, "SMaL Camera")
+    ENTRY(0x0476, "Thomson SC")
+//  ENTRY(0x0477, "Airgo Networks")
+//  ENTRY(0x0478, "Wisair")
+//  ENTRY(0x0479, "SigmaTel")
+//  ENTRY(0x047A, "Arkados")
+//  ENTRY(0x047B, "Compete IT")
+//  ENTRY(0x047C, "Eudar")
+//  ENTRY(0x047D, "Focus Enhancements")
+//  ENTRY(0x047E, "Xyratex")
+//  ENTRY(0x0501, "Specular Networks")
+    ENTRY(0x0502, "Patriot")
+//  ENTRY(0x0503, "U-Chip Technology")
+//  ENTRY(0x0504, "Silicon Optix")
+//  ENTRY(0x0505, "Greenfield Networks")
+    ENTRY(0x0506, "CompuRAM")
+//  ENTRY(0x0507, "Stargen")
+//  ENTRY(0x0508, "NetCell")
+//  ENTRY(0x0509, "Excalibrus")
+//  ENTRY(0x050A, "SCM Microsystems")
+//  ENTRY(0x050B, "Xsigo Systems")
+//  ENTRY(0x050C, "CHIPS & Systems")
+//  ENTRY(0x050D, "Tier 1 Multichip Solutions")
+//  ENTRY(0x050E, "CWRL Labs")
+//  ENTRY(0x050F, "Teradici")
+    ENTRY(0x0510, "Gigaram")
+//  ENTRY(0x0511, "g2 Microsystems")
+//  ENTRY(0x0512, "PowerFlash")
+//  ENTRY(0x0513, "P.A. Semi")
+//  ENTRY(0x0514, "NovaTech Solutions S.A.")
+//  ENTRY(0x0515, "c2 Microsystems")
+//  ENTRY(0x0516, "Level5 Networks")
+    ENTRY(0x0517, "COS Memory")
+//  ENTRY(0x0518, "Innovasic Semiconductor")
+//  ENTRY(0x0519, "02IC")
+//  ENTRY(0x051A, "Tabula")
+    ENTRY(0x051B, "Crucial")
+//  ENTRY(0x051C, "Chelsio")
+//  ENTRY(0x051D, "Solarflare")
+//  ENTRY(0x051E, "Xambala")
+//  ENTRY(0x051F, "EADS Astrium")
+//  ENTRY(0x0520, "Terra Semiconductor")
+//  ENTRY(0x0521, "Imaging Works")
+//  ENTRY(0x0522, "Astute Networks")
+//  ENTRY(0x0523, "Tzero")
+//  ENTRY(0x0524, "Emulex")
+//  ENTRY(0x0525, "Power-One")
+//  ENTRY(0x0526, "Pulse~LINK")
+//  ENTRY(0x0527, "Hon Hai Precision Industry")
+//  ENTRY(0x0528, "White Rock Networks")
+//  ENTRY(0x0529, "Telegent Systems USA")
+//  ENTRY(0x052A, "Atrua")
+    ENTRY(0x052B, "Acbel")
+//  ENTRY(0x052C, "eRide")
+//  ENTRY(0x052D, "ULi")
+//  ENTRY(0x052E, "Magnum Semiconductor")
+//  ENTRY(0x052F, "neoOne")
+//  ENTRY(0x0530, "Connex")
+//  ENTRY(0x0531, "Stream Processors")
+//  ENTRY(0x0532, "Focus Enhancements")
+//  ENTRY(0x0533, "Telecis Wireless")
+//  ENTRY(0x0534, "uNav Microelectronics")
+//  ENTRY(0x0535, "Tarari")
+//  ENTRY(0x0536, "Ambric")
+//  ENTRY(0x0537, "Newport Media")
+//  ENTRY(0x0538, "VMTS")
+//  ENTRY(0x0539, "Enuclia Semiconductor")
+//  ENTRY(0x053A, "Virtium")
+//  ENTRY(0x053B, "Solid State System")
+//  ENTRY(0x053C, "Kian Tech LLC")
+//  ENTRY(0x053D, "Artimi")
+    ENTRY(0x053E, "PQI")
+//  ENTRY(0x053F, "Avago")
+//  ENTRY(0x0540, "ADTechnology")
+//  ENTRY(0x0541, "Sigma Designs")
+//  ENTRY(0x0542, "SiCortex")
+//  ENTRY(0x0543, "Ventura Technology Group")
+//  ENTRY(0x0544, "eASIC")
+//  ENTRY(0x0545, "M.H.S. SAS")
+    ENTRY(0x0546, "MSI")
+//  ENTRY(0x0547, "Rapport")
+//  ENTRY(0x0548, "Makway")
+//  ENTRY(0x0549, "Broad Reach Engineering")
+//  ENTRY(0x054A, "Semiconductor Mfg Intl")
+//  ENTRY(0x054B, "SiConnect")
+//  ENTRY(0x054C, "FCI USA")
+//  ENTRY(0x054D, "Validity Sensors")
+//  ENTRY(0x054E, "Coney")
+//  ENTRY(0x054F, "Spans Logic")
+//  ENTRY(0x0550, "Neterion")
+    ENTRY(0x0551, "Qimonda")
+//  ENTRY(0x0552, "New Japan Radio")
+//  ENTRY(0x0553, "Velogix")
+//  ENTRY(0x0554, "Montalvo Systems")
+//  ENTRY(0x0555, "iVivity")
+    ENTRY(0x0556, "Chaintech")
+    ENTRY(0x0557, "AENEON")
+//  ENTRY(0x0558, "Lorom Industrial")
+//  ENTRY(0x0559, "Radiospire Networks")
+//  ENTRY(0x055A, "Sensio")
+//  ENTRY(0x055B, "Nethra Imaging")
+    ENTRY(0x055C, "Hexon")
+//  ENTRY(0x055D, "CompuStocx (CSX)")
+//  ENTRY(0x055E, "Methode")
+//  ENTRY(0x055F, "Connect One")
+//  ENTRY(0x0560, "Opulan")
+//  ENTRY(0x0561, "Septentrio NV")
+    ENTRY(0x0562, "Goldenmars")
+    ENTRY(0x0563, "Kreton")
+//  ENTRY(0x0564, "Cochlear")
+//  ENTRY(0x0565, "Altair Semiconductor")
+//  ENTRY(0x0566, "NetEffect")
+    ENTRY(0x0567, "Spansion")
+//  ENTRY(0x0568, "Taiwan Semiconductor Mfg")
+//  ENTRY(0x0569, "Emphany Systems")
+//  ENTRY(0x056A, "ApaceWave")
+//  ENTRY(0x056B, "Mobilygen")
+//  ENTRY(0x056C, "Tego")
+//  ENTRY(0x056D, "Cswitch")
+//  ENTRY(0x056E, "Haier (Beijing) IC Design")
+//  ENTRY(0x056F, "MetaRAM")
+//  ENTRY(0x0570, "Axel")
+//  ENTRY(0x0571, "Tilera")
+//  ENTRY(0x0572, "Aquantia")
+//  ENTRY(0x0573, "Vivace Semiconductor")
+//  ENTRY(0x0574, "Redpine Signals")
+//  ENTRY(0x0575, "Octalica")
+//  ENTRY(0x0576, "InterDigital")
+    ENTRY(0x0577, "Avant")
+    ENTRY(0x0578, "Asrock")
+//  ENTRY(0x0579, "Availink")
+//  ENTRY(0x057A, "Quartics")
+//  ENTRY(0x057B, "Element CXI")
+//  ENTRY(0x057C, "Innovaciones Micro.")
+//  ENTRY(0x057D, "VeriSilicon Micro.")
+//  ENTRY(0x057E, "W5 Networks")
+//  ENTRY(0x0601, "MOVEKING")
+//  ENTRY(0x0602, "Mavrix")
+//  ENTRY(0x0603, "CellGuide")
+//  ENTRY(0x0604, "Faraday")
+//  ENTRY(0x0605, "Diablo")
+//  ENTRY(0x0606, "Jennic")
+//  ENTRY(0x0607, "Octasic")
+//  ENTRY(0x0608, "Molex Incorporated")
+//  ENTRY(0x0609, "3Leaf Networks")
+//  ENTRY(0x060A, "Bright Micron")
+//  ENTRY(0x060B, "Netxen")
+//  ENTRY(0x060C, "NextWave Broadband")
+//  ENTRY(0x060D, "DisplayLink")
+//  ENTRY(0x060E, "ZMOS")
+//  ENTRY(0x060F, "Tec-Hill")
+//  ENTRY(0x0610, "Multigig")
+//  ENTRY(0x0611, "Amimon")
+//  ENTRY(0x0612, "Euphonic")
+//  ENTRY(0x0613, "BRN Phoenix")
+//  ENTRY(0x0614, "InSilica")
+//  ENTRY(0x0615, "Ember")
+    ENTRY(0x0616, "Avexir")
+//  ENTRY(0x0617, "Echelon")
+//  ENTRY(0x0618, "Edgewater Computer Systems")
+//  ENTRY(0x0619, "XMOS Semiconductor")
+//  ENTRY(0x061A, "GENUSION")
+//  ENTRY(0x061B, "Memory Corp NV")
+//  ENTRY(0x061C, "SiliconBlue")
+    ENTRY(0x061D, "Rambus")
+//  ENTRY(0x061E, "Andes Technology")
+//  ENTRY(0x061F, "Coronis Systems")
+//  ENTRY(0x0620, "Achronix Semiconductor")
+//  ENTRY(0x0621, "Siano Mobile Silicon")
+//  ENTRY(0x0622, "Semtech")
+//  ENTRY(0x0623, "Pixelworks")
+//  ENTRY(0x0624, "Gaisler Research AB")
+//  ENTRY(0x0625, "Teranetics")
+//  ENTRY(0x0626, "Toppan Printing")
+//  ENTRY(0x0627, "Kingxcon")
+//  ENTRY(0x0628, "Silicon Integrated Systems")
+//  ENTRY(0x0629, "I-O Data Device")
+//  ENTRY(0x062A, "NDS Americas")
+//  ENTRY(0x062B, "Solomon Systech")
+//  ENTRY(0x062C, "On Demand Microelectronics")
+//  ENTRY(0x062D, "Amicus Wireless")
+//  ENTRY(0x062E, "SMARDTV SNC")
+//  ENTRY(0x062F, "Comsys Communication")
+//  ENTRY(0x0630, "Movidia")
+//  ENTRY(0x0631, "Javad GNSS")
+//  ENTRY(0x0632, "Montage Technology Group")
+//  ENTRY(0x0633, "Trident Microsystems")
+    ENTRY(0x0634, "Super Talent")
+//  ENTRY(0x0635, "Optichron")
+//  ENTRY(0x0636, "Future Waves UK")
+//  ENTRY(0x0637, "SiBEAM")
+//  ENTRY(0x0638, "InicoreInc")
+//  ENTRY(0x0639, "Virident Systems")
+//  ENTRY(0x063A, "M2000")
+//  ENTRY(0x063B, "ZeroG Wireless")
+//  ENTRY(0x063C, "Gingle")
+//  ENTRY(0x063D, "Space Micro")
+//  ENTRY(0x063E, "Wilocity")
+//  ENTRY(0x063F, "Novafora")
+//  ENTRY(0x0640, "iKoa")
+    ENTRY(0x0641, "ASint")
+    ENTRY(0x0642, "Ramtron")
+//  ENTRY(0x0643, "Plato Networks")
+//  ENTRY(0x0644, "IPtronics AS")
+//  ENTRY(0x0645, "Infinite-Memories")
+//  ENTRY(0x0646, "Parade")
+//  ENTRY(0x0647, "Dune Networks")
+    ENTRY(0x0648, "GigaDevice")
+//  ENTRY(0x0649, "Modu")
+//  ENTRY(0x064A, "CEITEC")
+    ENTRY(0x064B, "Northrop Grumman")
+//  ENTRY(0x064C, "XRONET")
+//  ENTRY(0x064D, "Sicon Semiconductor AB")
+//  ENTRY(0x064E, "Atla")
+//  ENTRY(0x064F, "TOPRAM")
+//  ENTRY(0x0650, "Silego")
+    ENTRY(0x0651, "Kinglife")
+//  ENTRY(0x0652, "Ability Industries")
+    ENTRY(0x0653, "Silicon Power")
+//  ENTRY(0x0654, "Augusta")
+//  ENTRY(0x0655, "Nantronics Semiconductors")
+//  ENTRY(0x0656, "Hilscher Gesellschaft")
+//  ENTRY(0x0657, "Quixant")
+//  ENTRY(0x0658, "Percello")
+//  ENTRY(0x0659, "NextIO")
+//  ENTRY(0x065A, "Scanimetrics")
+//  ENTRY(0x065B, "FS-Semi Company")
+//  ENTRY(0x065C, "Infinera")
+    ENTRY(0x065D, "SandForce")
+    ENTRY(0x065E, "Lexar Media")
+//  ENTRY(0x065F, "Teradyne")
+//  ENTRY(0x0660, "Memory Exchange")
+    ENTRY(0x0661, "Smartek")
+//  ENTRY(0x0662, "Avantium")
+//  ENTRY(0x0663, "ATP")
+//  ENTRY(0x0664, "Valens Semiconductor")
+//  ENTRY(0x0665, "Agate Logic")
+//  ENTRY(0x0666, "Netronome")
+//  ENTRY(0x0667, "Zenverge")
+//  ENTRY(0x0668, "N-trig")
+    ENTRY(0x0669, "SanMax")
+//  ENTRY(0x066A, "Contour Semiconductor")
+    ENTRY(0x066B, "TwinMOS")
+//  ENTRY(0x066C, "Silicon Systems")
+//  ENTRY(0x066D, "V-Color")
+//  ENTRY(0x066E, "Certicom")
+//  ENTRY(0x066F, "JSC ICC Milandr")
+//  ENTRY(0x0670, "PhotoFast Global")
+    ENTRY(0x0671, "InnoDisk")
+//  ENTRY(0x0672, "Muscle Power")
+//  ENTRY(0x0673, "Energy Micro")
+//  ENTRY(0x0674, "Innofidei")
+//  ENTRY(0x0675, "CopperGate")
+//  ENTRY(0x0676, "Holtek")
+//  ENTRY(0x0677, "Myson Century")
+//  ENTRY(0x0678, "FIDELIX")
+//  ENTRY(0x0679, "Red Digital Cinema")
+//  ENTRY(0x067A, "Densbits")
+//  ENTRY(0x067B, "Zempro")
+//  ENTRY(0x067C, "MoSys")
+//  ENTRY(0x067D, "Provigent")
+//  ENTRY(0x067E, "Triad Semiconductor")
+//  ENTRY(0x0701, "Siklu Communication")
+//  ENTRY(0x0702, "A Force Manufacturing")
+    ENTRY(0x0703, "Strontium")
+//  ENTRY(0x0704, "ALi Corp (Abilis Systems)")
+//  ENTRY(0x0705, "Siglead")
+//  ENTRY(0x0706, "Ubicom")
+//  ENTRY(0x0707, "Unifosa")
+//  ENTRY(0x0708, "Stretch")
+//  ENTRY(0x0709, "Lantiq Deutschland GmbH")
+//  ENTRY(0x070A, "Visipro.")
+//  ENTRY(0x070B, "EKMemory")
+//  ENTRY(0x070C, "Microelectronics Institute ZTE")
+//  ENTRY(0x070D, "u-blox AG")
+//  ENTRY(0x070E, "Carry")
+//  ENTRY(0x070F, "Nokia")
+    ENTRY(0x0710, "King Tiger")
+//  ENTRY(0x0711, "Sierra Wireless")
+//  ENTRY(0x0712, "HT Micron")
+//  ENTRY(0x0713, "Albatron")
+//  ENTRY(0x0714, "Leica Geosystems AG")
+//  ENTRY(0x0715, "BroadLight")
+//  ENTRY(0x0716, "AEXEA")
+//  ENTRY(0x0717, "ClariPhy")
+//  ENTRY(0x0718, "Green Plug")
+//  ENTRY(0x0719, "Design Art Networks")
+//  ENTRY(0x071A, "Mach Xtreme")
+//  ENTRY(0x071B, "ATO Solutions")
+//  ENTRY(0x071C, "Ramsta")
+//  ENTRY(0x071D, "Greenliant Systems")
+//  ENTRY(0x071E, "Teikon")
+//  ENTRY(0x071F, "Antec Hadron")
+//  ENTRY(0x0720, "NavCom")
+//  ENTRY(0x0721, "Shanghai Fudan Microelectronics")
+//  ENTRY(0x0722, "Calxeda")
+//  ENTRY(0x0723, "JSC EDC")
+//  ENTRY(0x0724, "Kandit")
+    ENTRY(0x0725, "Ramos")
+//  ENTRY(0x0726, "Goldenmars")
+//  ENTRY(0x0727, "XeL")
+//  ENTRY(0x0728, "Newzone")
+//  ENTRY(0x0729, "ShenZhen MercyPower Tech")
+//  ENTRY(0x072A, "Nanjing Yihuo")
+//  ENTRY(0x072B, "Nethra Imaging")
+//  ENTRY(0x072C, "SiTel Semiconductor BV")
+//  ENTRY(0x072D, "SolidGear")
+    ENTRY(0x072E, "Topower")
+//  ENTRY(0x072F, "Wilocity")
+//  ENTRY(0x0730, "Profichip GmbH")
+//  ENTRY(0x0731, "Gerad")
+    ENTRY(0x0732, "Ritek")
+//  ENTRY(0x0733, "Gomos")
+//  ENTRY(0x0734, "Memoright")
+//  ENTRY(0x0735, "D-Broad")
+//  ENTRY(0x0736, "HiSilicon")
+//  ENTRY(0x0737, "Syndiant Inc.")
+//  ENTRY(0x0738, "Enverv")
+//  ENTRY(0x0739, "Cognex")
+//  ENTRY(0x073A, "Xinnova")
+//  ENTRY(0x073B, "Ultron AG")
+//  ENTRY(0x073C, "Concord Idea")
+//  ENTRY(0x073D, "AIM")
+//  ENTRY(0x073E, "Lifetime Memory Products")
+//  ENTRY(0x073F, "Ramsway")
+//  ENTRY(0x0740, "Recore Systems B.V.")
+//  ENTRY(0x0741, "Haotian Jinshibo Science Tech")
+//  ENTRY(0x0742, "Being Advanced Memory")
+//  ENTRY(0x0743, "Adesto")
+//  ENTRY(0x0744, "Giantec Semiconductor")
+//  ENTRY(0x0745, "HMD Electronics AG")
+//  ENTRY(0x0746, "Gloway International (HK)")
+//  ENTRY(0x0747, "Kingcore")
+//  ENTRY(0x0748, "Anucell Technology Holding")
+//  ENTRY(0x0749, "Accord Software & Systems Pvt.")
+//  ENTRY(0x074A, "Active-Semi")
+//  ENTRY(0x074B, "Denso")
+//  ENTRY(0x074C, "TLSI")
+//  ENTRY(0x074D, "Qidan")
+//  ENTRY(0x074E, "Mustang")
+//  ENTRY(0x074F, "Orca Systems")
+//  ENTRY(0x0750, "Passif Semiconductor")
+//  ENTRY(0x0752, "Memphis Electronic")
+//  ENTRY(0x0753, "Beckhoff Automation GmbH")
+//  ENTRY(0x0754, "Harmony Semiconductor")
+//  ENTRY(0x0755, "Air Computers SRL")
+//  ENTRY(0x0756, "TMT Memory")
+//  ENTRY(0x0757, "Eorex")
+//  ENTRY(0x0758, "Xingtera")
+//  ENTRY(0x0759, "Netsol")
+//  ENTRY(0x075A, "Bestdon")
+//  ENTRY(0x075B, "Baysand")
+//  ENTRY(0x075C, "Uroad")
+    ENTRY(0x075D, "Wilk Elektronik")
+//  ENTRY(0x075E, "AAI")
+//  ENTRY(0x075F, "Harman")
+//  ENTRY(0x0760, "Berg Microelectronics")
+//  ENTRY(0x0761, "ASSIA")
+//  ENTRY(0x0762, "Visiontek Products LLC")
+    ENTRY(0x0763, "OCMEMORY")
+//  ENTRY(0x0764, "Welink Solution")
+//  ENTRY(0x0765, "Shark Gaming")
+//  ENTRY(0x0766, "Avalanche")
+//  ENTRY(0x0767, "R&D Center ELVEES OJSC")
+    ENTRY(0x0768, "KingboMars")
+    ENTRY(0x076A, "Transcend")
+//  ENTRY(0x076B, "Everspin")
+//  ENTRY(0x076C, "Hon-Hai Precision")
+//  ENTRY(0x076D, "Smart Storage Systems")
+//  ENTRY(0x076E, "Toumaz Group")
+    ENTRY(0x076F, "Zentel")
+//  ENTRY(0x0770, "Panram International")
+//  ENTRY(0x0771, "Silicon Space")
+    ENTRY(0x0772, "LITE-ON")
+//  ENTRY(0x0773, "Inuitive")
+//  ENTRY(0x0774, "HMicro")
+//  ENTRY(0x0775, "BittWare")
+//  ENTRY(0x0776, "GLOBALFOUNDRIES")
+//  ENTRY(0x0777, "ACPI Digital")
+//  ENTRY(0x0778, "Annapurna Labs")
+//  ENTRY(0x0779, "AcSiP Technology")
+//  ENTRY(0x077A, "Idea! Electronic Systems")
+//  ENTRY(0x077B, "Gowe")
+//  ENTRY(0x077C, "Hermes Testing Solutions")
+//  ENTRY(0x077D, "Positivo BGH")
+//  ENTRY(0x077E, "Intelligence  Silicon")
+//  ENTRY(0x0801, "3D PLUS")
+//  ENTRY(0x0802, "Diehl Aerospace")
+//  ENTRY(0x0803, "Fairchild")
+//  ENTRY(0x0804, "Mercury Systems")
+//  ENTRY(0x0805, "Sonics")
+//  ENTRY(0x0806, "Emerson Automation Solutions")
+//  ENTRY(0x0807, "Shenzhen Jinge Information")
+//  ENTRY(0x0808, "SCWW")
+//  ENTRY(0x0809, "Silicon Motion")
+//  ENTRY(0x080A, "Anurag")
+//  ENTRY(0x080B, "King Kong")
+//  ENTRY(0x080C, "FROM30")
+//  ENTRY(0x080D, "Gowin Semiconductor")
+//  ENTRY(0x080E, "Fremont Micro Devices")
+//  ENTRY(0x080F, "Ericsson Modems")
+//  ENTRY(0x0810, "Exelis")
+//  ENTRY(0x0811, "Satixfy")
+    ENTRY(0x0812, "Galaxy")
+    ENTRY(0x0813, "Gloway")
+//  ENTRY(0x0814, "Lab")
+//  ENTRY(0x0815, "Smart Energy Instruments")
+//  ENTRY(0x0816, "Approved Memory")
+//  ENTRY(0x0817, "Axell")
+    ENTRY(0x0818, "KLEVV")
+//  ENTRY(0x0819, "Phytium")
+//  ENTRY(0x081A, "Xi'an UniIC Semi.")
+//  ENTRY(0x081B, "Ambiq Micro")
+//  ENTRY(0x081C, "eveRAM")
+//  ENTRY(0x081D, "Infomax")
+//  ENTRY(0x081E, "Butterfly Network")
+//  ENTRY(0x081F, "Shenzhen City Gcai")
+//  ENTRY(0x0820, "Stack Devices")
+//  ENTRY(0x0821, "ADK Media Group")
+//  ENTRY(0x0822, "TSP Global")
+//  ENTRY(0x0823, "HighX")
+//  ENTRY(0x0824, "Shenzhen Elicks")
+//  ENTRY(0x0825, "XinKai/Silicon Kaiser")
+    ENTRY(0x0826, "Google")
+//  ENTRY(0x0827, "Dasima International Development")
+//  ENTRY(0x0828, "Leahkinn")
+//  ENTRY(0x0829, "HIMA Paul Hildebrandt GmbH Co KG")
+    ENTRY(0x082A, "Keysight")
+//  ENTRY(0x082B, "Techcomp International (Fastable)")
+//  ENTRY(0x082C, "Ancore")
+//  ENTRY(0x082D, "Nuvoton")
+//  ENTRY(0x082E, "Korea Uhbele")
+//  ENTRY(0x082F, "Ikegami Tsushinki")
+//  ENTRY(0x0830, "RelChip")
+//  ENTRY(0x0831, "Baikal")
+//  ENTRY(0x0832, "Nemostech")
+    ENTRY(0x0833, "Memorysolution")
+//  ENTRY(0x0834, "Silicon Integrated Systems")
+//  ENTRY(0x0835, "Xiede")
+//  ENTRY(0x0836, "BRC")
+//  ENTRY(0x0837, "Flash Chi")
+//  ENTRY(0x0838, "Jone")
+//  ENTRY(0x0839, "GCT Semiconductor")
+//  ENTRY(0x083A, "Hong Kong Zetta Device")
+//  ENTRY(0x083B, "Unimemory Technology(s) Pte")
+    ENTRY(0x083C, "Cuso")
+    ENTRY(0x083D, "Kuso")
+//  ENTRY(0x083E, "Uniquify")
+//  ENTRY(0x083F, "Skymedi")
+//  ENTRY(0x0840, "Core Chance")
+//  ENTRY(0x0841, "Tekism")
+//  ENTRY(0x0842, "Seagate Technology PLC")
+//  ENTRY(0x0843, "Hong Kong Gaia Group")
+//  ENTRY(0x0844, "Gigacom Semiconductor LLC")
+//  ENTRY(0x0845, "V2")
+//  ENTRY(0x0846, "TLi")
+//  ENTRY(0x0847, "Neotion")
+    ENTRY(0x0848, "Lenovo")
+//  ENTRY(0x0849, "Shenzhen Zhongteng Electronic")
+//  ENTRY(0x084A, "Compound Photonics")
+//  ENTRY(0x084B, "in2H2")
+//  ENTRY(0x084C, "Shenzhen Pango Microsystems")
+//  ENTRY(0x084D, "Vasekey")
+//  ENTRY(0x084F, "Eyenix")
+    ENTRY(0x0850, "Heoriady")
+//  ENTRY(0x0851, "Accelerated Memory Production")
+//  ENTRY(0x0852, "INVECAS")
+//  ENTRY(0x0853, "AP Memory")
+//  ENTRY(0x0854, "Douqi")
+//  ENTRY(0x0855, "Etron")
+//  ENTRY(0x0856, "Indie Semiconductor")
+//  ENTRY(0x0857, "Socionext")
+    ENTRY(0x0858, "HGST")
+    ENTRY(0x0859, "EVGA")
+//  ENTRY(0x085A, "Audience")
+//  ENTRY(0x085B, "EpicGear")
+//  ENTRY(0x085C, "Vitesse Enterprise")
+    ENTRY(0x085D, "Foxtronn")
+//  ENTRY(0x085E, "Bretelon")
+//  ENTRY(0x085F, "Graphcore")
+//  ENTRY(0x0860, "Eoplex")
+//  ENTRY(0x0861, "MaxLinear")
+//  ENTRY(0x0862, "ETA Devices")
+//  ENTRY(0x0863, "LOKI")
+//  ENTRY(0x0864, "IMS")
+//  ENTRY(0x0865, "Dosilicon")
+//  ENTRY(0x0866, "Dolphin Integration")
+//  ENTRY(0x0867, "Shenzhen Mic Electronics Technology")
+//  ENTRY(0x0868, "Boya Microelectronics")
+//  ENTRY(0x0869, "Geniachip (Roche)")
+//  ENTRY(0x086A, "Axign")
+//  ENTRY(0x086B, "Kingred Electronic")
+//  ENTRY(0x086C, "Chao Yue Zhuo")
+//  ENTRY(0x086E, "Crocus")
+//  ENTRY(0x086F, "Creative Chips GmbH")
+//  ENTRY(0x0870, "GE Aviation Systems LLC.")
+    ENTRY(0x0871, "Asgard")
+//  ENTRY(0x0872, "Good Wealth")
+//  ENTRY(0x0873, "TriCor")
+//  ENTRY(0x0874, "Nova-Systems GmbH")
+    ENTRY(0x0875, "JUHOR")
+//  ENTRY(0x0876, "Zhuhai Douke Commerce")
+//  ENTRY(0x0877, "DSL Memory")
+//  ENTRY(0x0878, "Anvo-Systems")
+    ENTRY(0x0879, "Realtek")
+//  ENTRY(0x087A, "AltoBeam")
+//  ENTRY(0x087B, "Wave Computing")
+//  ENTRY(0x087C, "Beijing TrustNet")
+//  ENTRY(0x087D, "Innovium")
+//  ENTRY(0x087E, "Starsway")
+//  ENTRY(0x0901, "Weltronics")
+    ENTRY(0x0902, "VMware")
+    ENTRY(0x0903, "HPE")
+//  ENTRY(0x0904, "INTENSO")
+//  ENTRY(0x0905, "Puya Semiconductor")
+//  ENTRY(0x0906, "MEMORFI")
+//  ENTRY(0x0907, "MSC Technologies GmbH")
+//  ENTRY(0x0908, "Txrui")
+//  ENTRY(0x0909, "SiFive")
+//  ENTRY(0x090A, "Spreadtrum")
+//  ENTRY(0x090B, "XTX")
+//  ENTRY(0x090C, "UMAX")
+//  ENTRY(0x090D, "Shenzhen Yong Sheng")
+//  ENTRY(0x090E, "SNOAMOO (Shenzhen Kai Zhuo Yue)")
+//  ENTRY(0x090F, "Daten Tecnologia LTDA")
+//  ENTRY(0x0910, "Shenzhen XinRuiYan")
+//  ENTRY(0x0911, "Eta Compute")
+//  ENTRY(0x0912, "Energous")
+//  ENTRY(0x0913, "Raspberry Pi")
+//  ENTRY(0x0914, "Shenzhen Chixingzhe Tech")
+//  ENTRY(0x0915, "Silicon Mobility")
+//  ENTRY(0x0916, "IQ-Analog")
+//  ENTRY(0x0917, "Uhnder")
+//  ENTRY(0x0918, "Impinj")
+//  ENTRY(0x0919, "DEPO Computers")
+//  ENTRY(0x091A, "Nespeed Sysems")
+    ENTRY(0x091B, "YMTC")
+//  ENTRY(0x091C, "MemxPro")
+//  ENTRY(0x091D, "Tammuz")
+    ENTRY(0x091E, "Allwinner")
+//  ENTRY(0x0920, "XMC")
+//  ENTRY(0x0921, "Teclast")
+    ENTRY(0x0922, "Maxsun")
+//  ENTRY(0x0923, "Haiguang Integrated Circuit Design")
+    ENTRY(0x0924, "RamCENTER")
+//  ENTRY(0x0925, "Phison")
+//  ENTRY(0x0926, "Guizhou Huaxintong Semi-Conductor")
+//  ENTRY(0x0927, "Network Intelligence")
+//  ENTRY(0x0928, "Continental Technology (Holdings)")
+//  ENTRY(0x0929, "Guangzhou Huayan Suning Electronic")
+//  ENTRY(0x092A, "Guangzhou Zhouji Electronic")
+//  ENTRY(0x092B, "Shenzhen Giant Hui Kang Tech")
+//  ENTRY(0x092C, "Shenzhen Yilong Innovative")
+//  ENTRY(0x092D, "Neo Forza")
+//  ENTRY(0x092E, "Lyontek")
+//  ENTRY(0x092F, "Shanghai Kuxin Microelectronics")
+//  ENTRY(0x0930, "Shenzhen Larix")
+//  ENTRY(0x0931, "Qbit Semiconductor")
+//  ENTRY(0x0932, "Insignis")
+//  ENTRY(0x0933, "Lanson Memory")
+//  ENTRY(0x0934, "Shenzhen Superway")
+//  ENTRY(0x0935, "Canaan-Creative")
+//  ENTRY(0x0936, "Black Diamond Memory")
+//  ENTRY(0x0937, "Shenzhen City Parker Baking")
+//  ENTRY(0x0938, "Shenzhen Baihong")
+//  ENTRY(0x0939, "GEO Semiconductors")
+//  ENTRY(0x093A, "OCPC")
+//  ENTRY(0x093B, "Artery")
+//  ENTRY(0x093C, "Jinyu")
+//  ENTRY(0x093D, "ShenzhenYing Chi Technology Development")
+//  ENTRY(0x093E, "Shenzhen Pengcheng Xin")
+//  ENTRY(0x093F, "Pegasus Semiconductor (Shanghai)")
+//  ENTRY(0x0940, "Mythic")
+//  ENTRY(0x0941, "Elmos Semiconductor AG")
+    ENTRY(0x0942, "Kllisre")
+//  ENTRY(0x0943, "Shenzhen Winconway")
+//  ENTRY(0x0944, "Shenzhen Xingmem Technology")
+//  ENTRY(0x0945, "Gold Key")
+//  ENTRY(0x0946, "Habana Labs")
+//  ENTRY(0x0947, "Hoodisk")
+//  ENTRY(0x0948, "SemsoTai (SZ)")
+//  ENTRY(0x0949, "OM Nanotech Pvt.")
+//  ENTRY(0x094A, "Shenzhen Zhifeng Weiye")
+//  ENTRY(0x094B, "Xinshirui (Shenzhen)")
+//  ENTRY(0x094C, "Guangzhou Zhong Hao Tian Electronic")
+//  ENTRY(0x094D, "Shenzhen Longsys")
+//  ENTRY(0x094E, "Deciso B.V.")
+//  ENTRY(0x094F, "Puya Semiconductor (Shenzhen)")
+//  ENTRY(0x0950, "Shenzhen Veineda")
+//  ENTRY(0x0951, "Antec Memory")
+//  ENTRY(0x0952, "Cortus SAS")
+//  ENTRY(0x0953, "Dust Leopard")
+//  ENTRY(0x0954, "MyWo AS")
+//  ENTRY(0x0955, "J&A Information")
+//  ENTRY(0x0956, "Shenzhen JIEPEI")
+//  ENTRY(0x0957, "Heidelberg University")
+//  ENTRY(0x0958, "Flexxon PTE")
+//  ENTRY(0x0959, "Wiliot")
+//  ENTRY(0x095A, "Raysun")
+//  ENTRY(0x095B, "Aquarius Production Company LLC")
+//  ENTRY(0x095C, "MACNICA DHW LTDA")
+//  ENTRY(0x095D, "Intelimem")
+//  ENTRY(0x095E, "Zbit Semiconductor")
+//  ENTRY(0x095F, "Shenzhen")
+//  ENTRY(0x0960, "Signalchip")
+//  ENTRY(0x0961, "Shenzen Recadata Storage")
+//  ENTRY(0x0962, "Hyundai")
+//  ENTRY(0x0963, "Shanghai Fudi Investment Development")
+//  ENTRY(0x0964, "Aixi")
+//  ENTRY(0x0965, "Tecon MT")
+//  ENTRY(0x0966, "Onda Electric")
+//  ENTRY(0x0967, "Jinshen")
+//  ENTRY(0x0968, "Kimtigo Semiconductor (HK)")
+//  ENTRY(0x0969, "IIT Madras")
+//  ENTRY(0x096A, "Shenshan (Shenzhen) Electronic")
+//  ENTRY(0x096B, "Hefei Core Storage Electronic")
+    ENTRY(0x096C, "Colorful")
+//  ENTRY(0x096D, "Visenta (Xiamen)")
+//  ENTRY(0x096E, "Roa Logic BV")
+//  ENTRY(0x096F, "NSITEXE")
+//  ENTRY(0x0970, "Hong Kong Hyunion")
+//  ENTRY(0x0971, "ASK Technology Group")
+    ENTRY(0x0972, "GIGABYTE")
+//  ENTRY(0x0973, "Terabyte")
+//  ENTRY(0x0974, "Hyundai")
+//  ENTRY(0x0975, "EXCELERAM")
+//  ENTRY(0x0976, "PsiKick")
+    ENTRY(0x0977, "Netac")
+    ENTRY(0x0978, "PCCOOLER")
+//  ENTRY(0x0979, "Jiangsu Huacun Electronic")
+//  ENTRY(0x097A, "Shenzhen Micro Innovation Industry")
+//  ENTRY(0x097B, "Beijing Tongfang Microelectronics")
+//  ENTRY(0x097C, "XZN Storage")
+//  ENTRY(0x097D, "ChipCraft Sp. z.o.o.")
+//  ENTRY(0x097E, "ALLFLASH")
+//  ENTRY(0x0A01, "Foerd")
+    ENTRY(0x0A02, "KingSpec")
+//  ENTRY(0x0A03, "Codasip GmbH")
+//  ENTRY(0x0A04, "SL Link")
+//  ENTRY(0x0A05, "Shenzhen Kefu")
+//  ENTRY(0x0A06, "Shenzhen ZST")
+//  ENTRY(0x0A07, "Kyokuto Electronic")
+//  ENTRY(0x0A08, "Warrior")
+//  ENTRY(0x0A09, "TRINAMIC Motion Control GmbH &")
+//  ENTRY(0x0A0A, "PixelDisplay")
+//  ENTRY(0x0A0B, "Shenzhen Futian District Bo Yueda Elec")
+//  ENTRY(0x0A0C, "Richtek Power")
+//  ENTRY(0x0A0D, "Shenzhen LianTeng")
+//  ENTRY(0x0A0E, "AITC Memory")
+//  ENTRY(0x0A0F, "UNIC Memory")
+//  ENTRY(0x0A10, "Shenzhen Huafeng Science")
+    ENTRY(0x0A11, "CXMT")
+//  ENTRY(0x0A13, "SambaNova Systems")
+//  ENTRY(0x0A14, "V-GEN")
+//  ENTRY(0x0A15, "Jump Trading")
+//  ENTRY(0x0A16, "Ampere Computing")
+//  ENTRY(0x0A17, "Shenzhen Zhongshi")
+//  ENTRY(0x0A18, "Shenzhen Zhongtian Bozhong")
+//  ENTRY(0x0A19, "Tri-Tech")
+//  ENTRY(0x0A1A, "Silicon Intergrated Systems")
+//  ENTRY(0x0A1B, "Shenzhen HongDingChen Information")
+//  ENTRY(0x0A1C, "Plexton Holdings")
+//  ENTRY(0x0A1D, "AMS (Jiangsu Advanced Memory Semi)")
+//  ENTRY(0x0A1E, "Wuhan Jing Tian Interconnected Tech")
+//  ENTRY(0x0A1F, "Axia Memory")
+//  ENTRY(0x0A20, "Chipset Technology Holding")
+//  ENTRY(0x0A21, "Shenzhen Xinshida")
+//  ENTRY(0x0A22, "Shenzhen Chuangshifeida")
+//  ENTRY(0x0A23, "Guangzhou MiaoYuanJi")
+//  ENTRY(0x0A24, "ADVAN")
+//  ENTRY(0x0A26, "Guangzhou Guang Xie Cheng Trading")
+//  ENTRY(0x0A27, "StarRam")
+//  ENTRY(0x0A28, "Shen Zhen XinShenHua Tech")
+//  ENTRY(0x0A29, "UltraMemory")
+//  ENTRY(0x0A2A, "New Coastline Global Tech Industry")
+//  ENTRY(0x0A2B, "Sinker")
+//  ENTRY(0x0A2C, "Diamond")
+    ENTRY(0x0A2D, "PUSKILL")
+//  ENTRY(0x0A2E, "Guangzhou Hao Jia Ye")
+//  ENTRY(0x0A2F, "Ming Xin")
+//  ENTRY(0x0A30, "Barefoot Networks")
+    ENTRY(0x0A31, "Biwin")
+//  ENTRY(0x0A32, "UD INFO")
+//  ENTRY(0x0A33, "Trek Technology (S) PTE")
+//  ENTRY(0x0A34, "Xiamen Kingblaze")
+//  ENTRY(0x0A35, "Shenzhen Lomica")
+//  ENTRY(0x0A36, "Nuclei System")
+//  ENTRY(0x0A37, "Wuhan Xun Zhan Electronic")
+//  ENTRY(0x0A38, "Shenzhen Ingacom Semiconductor")
+//  ENTRY(0x0A39, "Zotac")
+//  ENTRY(0x0A3A, "Foxline")
+//  ENTRY(0x0A3B, "Shenzhen Farasia Science")
+//  ENTRY(0x0A3C, "Efinix")
+//  ENTRY(0x0A3D, "Hua Nan San Xian")
+//  ENTRY(0x0A3E, "Goldtech")
+//  ENTRY(0x0A3F, "Shanghai Han Rong Microelectronics")
+//  ENTRY(0x0A40, "Shenzhen Zhongguang Yunhe Trading")
+//  ENTRY(0x0A41, "Smart Shine(QingDao) Microelectronics")
+    ENTRY(0x0A42, "Thermaltake")
+//  ENTRY(0x0A43, "Shenzhen O?Yang Maile")
+//  ENTRY(0x0A44, "UPMEM")
+    ENTRY(0x0A45, "Chun Well")
+//  ENTRY(0x0A46, "Astera Labs")
+//  ENTRY(0x0A47, "Winconway")
+//  ENTRY(0x0A48, "Advantech")
+//  ENTRY(0x0A49, "Chengdu Fengcai Electronic")
+//  ENTRY(0x0A4A, "The Boeing Company")
+//  ENTRY(0x0A4B, "Blaize")
+//  ENTRY(0x0A4C, "Ramonster")
+//  ENTRY(0x0A4D, "Wuhan Naonongmai")
+//  ENTRY(0x0A4E, "Shenzhen Hui ShingTong")
+//  ENTRY(0x0A4F, "Yourlyon")
+//  ENTRY(0x0A50, "Fabu")
+//  ENTRY(0x0A51, "Shenzhen Yikesheng")
+//  ENTRY(0x0A52, "NOR-MEM")
+//  ENTRY(0x0A53, "Cervoz")
+//  ENTRY(0x0A54, "Bitmain Technologies Inc.")
+    ENTRY(0x0A55, "Facebook")
+//  ENTRY(0x0A56, "Shenzhen Longsys")
+//  ENTRY(0x0A57, "Guangzhou Siye Electronic")
+//  ENTRY(0x0A58, "Silergy")
+//  ENTRY(0x0A59, "Adamway")
+//  ENTRY(0x0A5A, "PZG")
+//  ENTRY(0x0A5B, "Shenzhen King Power")
+//  ENTRY(0x0A5C, "Guangzhou ZiaoFu Tranding")
+    ENTRY(0x0A5D, "SKIHOTAR")
+//  ENTRY(0x0A5E, "PulseRain")
+//  ENTRY(0x0A5F, "Seeker")
+//  ENTRY(0x0A60, "Shenzhen OSCOO Tech")
+//  ENTRY(0x0A61, "Shenzhen Yze")
+//  ENTRY(0x0A62, "Shenzhen Jieshuo Electronic Commerce")
+//  ENTRY(0x0A63, "Gazda")
+//  ENTRY(0x0A64, "Hua Wei")
+//  ENTRY(0x0A65, "Esperanto")
+//  ENTRY(0x0A66, "JinSheng")
+//  ENTRY(0x0A67, "Shenzhen Shi Bolunshuai")
+//  ENTRY(0x0A68, "Shanghai Rei Zuan Information Tech")
+    ENTRY(0x0A69, "Fraunhofer IIS")
+//  ENTRY(0x0A6A, "Kandou Bus SA")
+    ENTRY(0x0A6B, "Acer")
+//  ENTRY(0x0A6C, "Artmem")
+//  ENTRY(0x0A6D, "Gstar Semiconductor")
+//  ENTRY(0x0A6E, "ShineDisk")
+//  ENTRY(0x0A6F, "Shenzhen CHN")
+//  ENTRY(0x0A70, "UnionChip Semiconductor")
+//  ENTRY(0x0A71, "Tanbassh")
+//  ENTRY(0x0A72, "Shenzhen Tianyu Jieyun Intl Logistics")
+//  ENTRY(0x0A73, "MCLogic")
+//  ENTRY(0x0A74, "Eorex")
+//  ENTRY(0x0A75, "Arm Technology (China)")
+    ENTRY(0x0A76, "Lexar")
+//  ENTRY(0x0A77, "QinetiQ Group plc")
+//  ENTRY(0x0A78, "Exascend")
+//  ENTRY(0x0A79, "Hong Kong Hyunion")
+//  ENTRY(0x0A7A, "Shenzhen Banghong")
+//  ENTRY(0x0A7B, "MBit Wireless")
+//  ENTRY(0x0A7C, "Hex Five Security")
+    ENTRY(0x0A7D, "Juhor")
+//  ENTRY(0x0A7E, "Shenzhen Reeinno")
+//  ENTRY(0x0B01, "ABIT Electronics (Shenzhen)")
+//  ENTRY(0x0B02, "Semidrive")
+//  ENTRY(0x0B03, "MyTek")
+//  ENTRY(0x0B04, "Wxilicon")
+//  ENTRY(0x0B05, "Shenzhen Meixin")
+//  ENTRY(0x0B06, "Ghost Wolf")
+//  ENTRY(0x0B07, "LiSion")
+//  ENTRY(0x0B08, "Power Active")
+//  ENTRY(0x0B09, "Pioneer High Fidelity Taiwan")
+//  ENTRY(0x0B0A, "LuoSilk")
+//  ENTRY(0x0B0B, "Shenzhen Chuangshifeida")
+//  ENTRY(0x0B0C, "Black Sesame")
+//  ENTRY(0x0B0D, "Jiangsu Xinsheng Intelligent")
+//  ENTRY(0x0B0E, "MLOONG")
+//  ENTRY(0x0B0F, "Quadratica LLC")
+//  ENTRY(0x0B10, "Anpec")
+//  ENTRY(0x0B11, "Xi'an Morebeck Semiconductor Tech")
+    ENTRY(0x0B12, "Kingbank")
+//  ENTRY(0x0B13, "ITRenew")
+//  ENTRY(0x0B14, "Shenzhen Eaget Innovation Tech")
+//  ENTRY(0x0B15, "Jazer")
+//  ENTRY(0x0B16, "Xiamen Semiconductor Investment Group")
+//  ENTRY(0x0B17, "Guangzhou Longdao Network Tech")
+//  ENTRY(0x0B18, "Shenzhen Futian SEC Electronic Market")
+    ENTRY(0x0B19, "Allegro")
+//  ENTRY(0x0B1A, "Hunan RunCore Innovation")
+//  ENTRY(0x0B1B, "C-Corsa")
+//  ENTRY(0x0B1C, "Zhuhai Chuangfeixin")
+//  ENTRY(0x0B1D, "Beijing InnoMem")
+//  ENTRY(0x0B1E, "YooTin")
+//  ENTRY(0x0B1F, "Shenzhen Pengxiong")
+//  ENTRY(0x0B20, "Dongguan Yingbang Commercial Trading")
+//  ENTRY(0x0B21, "Shenzhen Ronisys")
+//  ENTRY(0x0B22, "Hongkong Xinlan Guangke")
+//  ENTRY(0x0B23, "Apex Microelectronics")
+//  ENTRY(0x0B24, "Beijing Hongda Jinming")
+//  ENTRY(0x0B25, "Ling Rui Technology (Shenzhen)")
+//  ENTRY(0x0B26, "Hongkong Hyunion")
+//  ENTRY(0x0B27, "Starsystems")
+//  ENTRY(0x0B28, "Shenzhen Yingjiaxun Industrial")
+//  ENTRY(0x0B29, "Dongguan Crown Code Electronic Commerce")
+//  ENTRY(0x0B2A, "Monolithic Power Systems")
+//  ENTRY(0x0B2B, "WuHan SenNaiBo E-Commerce")
+    ENTRY(0x0B2C, "Hikstorage")
+//  ENTRY(0x0B2D, "Shenzhen Goodix")
+//  ENTRY(0x0B2E, "Aigo Electronic")
+//  ENTRY(0x0B2F, "Hefei Konsemi Storage")
+//  ENTRY(0x0B30, "Cactus")
+//  ENTRY(0x0B31, "DSIN")
+//  ENTRY(0x0B32, "Blu Wireless")
+//  ENTRY(0x0B33, "Nanjing UCUN")
+//  ENTRY(0x0B34, "Acacia")
+//  ENTRY(0x0B35, "Beijinjinshengyihe")
+//  ENTRY(0x0B36, "Zyzyx")
+//  ENTRY(0x0B37, "T-HEAD Semiconductor")
+//  ENTRY(0x0B38, "Shenzhen Hystou")
+//  ENTRY(0x0B39, "Syzexion")
+//  ENTRY(0x0B3A, "Kembona")
+//  ENTRY(0x0B3B, "Qingdao Thunderobot")
+//  ENTRY(0x0B3C, "Morse Micro")
+//  ENTRY(0x0B3D, "Shenzhen Envida ")
+//  ENTRY(0x0B3E, "UDStore Solution")
+//  ENTRY(0x0B3F, "Shunlie")
+//  ENTRY(0x0B40, "Shenzhen Xin Hong Rui Tech")
+//  ENTRY(0x0B41, "Shenzhen Yze")
+//  ENTRY(0x0B42, "Shenzhen Huang Pu He Xin")
+//  ENTRY(0x0B43, "Xiamen Pengpai Microelectronics")
+//  ENTRY(0x0B44, "JISHUN")
+//  ENTRY(0x0B45, "Shenzhen WODPOSIT")
+//  ENTRY(0x0B46, "Unistar")
+//  ENTRY(0x0B47, "UNICORE Electronic (Suzhou)")
+//  ENTRY(0x0B48, "Axonne")
+//  ENTRY(0x0B49, "Shenzhen SOVERECA")
+//  ENTRY(0x0B4A, "Dire Wolf")
+//  ENTRY(0x0B4B, "Whampoa Core")
+//  ENTRY(0x0B4C, "CSI Halbleiter GmbH")
+//  ENTRY(0x0B4D, "ONE Semiconductor")
+//  ENTRY(0x0B4E, "SimpleMachines")
+//  ENTRY(0x0B4F, "Shenzhen Chengyi Qingdian Electronic")
+//  ENTRY(0x0B50, "Shenzhen Xinlianxin Network")
+//  ENTRY(0x0B51, "Vayyar Imaging")
+//  ENTRY(0x0B52, "Paisen Network")
+//  ENTRY(0x0B53, "Shenzhen Fengwensi")
+//  ENTRY(0x0B54, "Caplink")
+//  ENTRY(0x0B55, "JJT Solution")
+//  ENTRY(0x0B56, "HOSIN Global")
+//  ENTRY(0x0B57, "Shenzhen KingDisk Century")
+    ENTRY(0x0B58, "SOYO")
+//  ENTRY(0x0B59, "DIT")
+//  ENTRY(0x0B5A, "iFound")
+//  ENTRY(0x0B5B, "Aril Computer Company")
+    ENTRY(0x0B5C, "ASUS")
+//  ENTRY(0x0B5D, "Shenzhen Ruiyingtong")
+//  ENTRY(0x0B5E, "HANA Micron")
+//  ENTRY(0x0B5F, "RANSOR")
+//  ENTRY(0x0B60, "Axiado")
+//  ENTRY(0x0B61, "Tesla")
+//  ENTRY(0x0B62, "Pingtouge (Shanghai) Semiconductor")
+//  ENTRY(0x0B63, "S3Plus Technologies SA")
+//  ENTRY(0x0B64, "Integrated Silicon Solution Israel")
+//  ENTRY(0x0B65, "GreenWaves")
+//  ENTRY(0x0B66, "NUVIA")
+//  ENTRY(0x0B67, "Guangzhou Shuvrwine")
+//  ENTRY(0x0B68, "Shenzhen Hangshun Chip")
+//  ENTRY(0x0B69, "Chengboliwei Electronic Business")
+//  ENTRY(0x0B6A, "Kowin Memory")
+//  ENTRY(0x0B6B, "Euronet")
+//  ENTRY(0x0B6C, "SCY")
+//  ENTRY(0x0B6D, "Shenzhen Xinhongyusheng Electrical")
+//  ENTRY(0x0B6E, "PICOCOM")
+//  ENTRY(0x0B6F, "Shenzhen Toooogo Memory")
+//  ENTRY(0x0B70, "VLSI Solution")
+//  ENTRY(0x0B71, "Costar")
+//  ENTRY(0x0B72, "Shenzhen Huatop")
+//  ENTRY(0x0B73, "Inspur Electronic Information Industry")
+//  ENTRY(0x0B74, "Shenzhen Boyuan Computer")
+//  ENTRY(0x0B75, "Beijing Welldisk")
+//  ENTRY(0x0B76, "Suzhou EP Semicon")
+    ENTRY(0x0B77, "Dahua")
+//  ENTRY(0x0B78, "Virtu Financial")
+//  ENTRY(0x0B79, "Datotek")
+//  ENTRY(0x0B7A, "Telecom and Microelectronics Industries")
+//  ENTRY(0x0B7B, "Echow")
+//  ENTRY(0x0B7C, "APEX-INFO")
+//  ENTRY(0x0B7D, "Yingpark")
+//  ENTRY(0x0B7E, "Shenzhen Bigway Tech")
+//  ENTRY(0x0C01, "Beijing Haawking")
+//  ENTRY(0x0C02, "Open HW Group")
+//  ENTRY(0x0C03, "JHICC")
+//  ENTRY(0x0C04, "ncoder AG")
+//  ENTRY(0x0C05, "ThinkTech Information")
+//  ENTRY(0x0C06, "Shenzhen Chixingzhe")
+//  ENTRY(0x0C07, "Biao Ram")
+//  ENTRY(0x0C08, "Shenzhen Kaizhuoyue")
+//  ENTRY(0x0C09, "Shenzhen YC Storage")
+//  ENTRY(0x0C0A, "Shenzhen Chixingzhe")
+//  ENTRY(0x0C0B, "Wink Semiconductor  (Shenzhen)")
+//  ENTRY(0x0C0C, "AISTOR")
+//  ENTRY(0x0C0D, "Palma Ceia SemiDesign")
+//  ENTRY(0x0C0E, "EM Microelectronic-Marin SA")
+//  ENTRY(0x0C0F, "Shenzhen Monarch Memory")
+    ENTRY(0x0C10, "Reliance Memory")
+//  ENTRY(0x0C11, "Jesis")
+    ENTRY(0x0C12, "Espressif")
+//  ENTRY(0x0C13, "Shenzhen Sati Smart")
+//  ENTRY(0x0C14, "NeuMem")
+//  ENTRY(0x0C15, "Lifelong")
+//  ENTRY(0x0C16, "Beijing Oitech")
+    ENTRY(0x0C17, "LDLC")
+//  ENTRY(0x0C18, "Semidynamics Technology Services SLU")
+//  ENTRY(0x0C19, "swordbill")
+//  ENTRY(0x0C1A, "YIREN")
+//  ENTRY(0x0C1B, "Shenzhen Yinxiang")
+//  ENTRY(0x0C1C, "PoweV Electronic")
+//  ENTRY(0x0C1D, "LEORICE")
+//  ENTRY(0x0C1E, "Waymo LLC")
+//  ENTRY(0x0C1F, "Ventana Micro Systems")
+//  ENTRY(0x0C20, "Hefei Guangxin Microelectronics")
+//  ENTRY(0x0C21, "Shenzhen Sooner Industrial")
+//  ENTRY(0x0C22, "Horizon Robotics")
+//  ENTRY(0x0C23, "Tangem AG")
+//  ENTRY(0x0C24, "FuturePath Technology (Shenzhen)")
+//  ENTRY(0x0C25, "RC Module")
+    ENTRY(0x0C26, "Timetec")
+//  ENTRY(0x0C27, "ICMAX")
+//  ENTRY(0x0C28, "Lynxi")
+//  ENTRY(0x0C29, "Guangzhou Taisupanke Computer Equipment")
+//  ENTRY(0x0C2A, "Ceremorphic")
+//  ENTRY(0x0C2B, "Biwin Storage")
+//  ENTRY(0x0C2C, "Beijing ESWIN Computing")
+//  ENTRY(0x0C2D, "WeForce")
+//  ENTRY(0x0C2E, "Shenzhen Fanxiang Information")
+//  ENTRY(0x0C2F, "Unisoc")
+//  ENTRY(0x0C30, "YingChu")
+//  ENTRY(0x0C31, "GUANCUN")
+//  ENTRY(0x0C32, "IPASON")
+//  ENTRY(0x0C33, "Ayar Labs")
+    ENTRY(0x0C34, "Amazon")
+//  ENTRY(0x0C35, "Shenzhen Xinxinshun")
+//  ENTRY(0x0C36, "Galois")
+//  ENTRY(0x0C37, "Ubilite")
+//  ENTRY(0x0C38, "Shenzhen Quanxing")
+//  ENTRY(0x0C39, "Group RZX Technology LTDA")
+//  ENTRY(0x0C3A, "Yottac Technology (XI'AN) Cooperation")
+//  ENTRY(0x0C3B, "Shenzhen RuiRen")
+//  ENTRY(0x0C3C, "Group Star")
+//  ENTRY(0x0C3D, "RWA (Hong Kong)")
+//  ENTRY(0x0C3E, "Genesys Logic")
+//  ENTRY(0x0C3F, "T3 Robotics Inc.")
+//  ENTRY(0x0C40, "Biostar Microtech")
+//  ENTRY(0x0C41, "Shenzhen SXmicro")
+//  ENTRY(0x0C42, "Shanghai Yili Computer")
+//  ENTRY(0x0C43, "Zhixin Semicoducotor")
+//  ENTRY(0x0C44, "uFound")
+//  ENTRY(0x0C45, "Aigo Data Security")
+//  ENTRY(0x0C46, "GXore")
+//  ENTRY(0x0C47, "Shenzhen Pradeon Intelligent")
+//  ENTRY(0x0C48, "Power LSI")
+//  ENTRY(0x0C49, "PRIME")
+//  ENTRY(0x0C4A, "Shenzhen Juyang Innovative")
+//  ENTRY(0x0C4B, "CERVO")
+//  ENTRY(0x0C4C, "SiEngine Technology Co.,")
+//  ENTRY(0x0C4D, "Beijing Unigroup Tsingteng MicroSystem")
+//  ENTRY(0x0C4E, "Brainsao GmbH")
+//  ENTRY(0x0C4F, "Credo Technology Group")
+//  ENTRY(0x0C50, "Shanghai Biren")
+//  ENTRY(0x0C51, "Nucleu Semiconductor")
+//  ENTRY(0x0C52, "Shenzhen Guangshuo")
+//  ENTRY(0x0C53, "ZhongsihangTechnology")
+//  ENTRY(0x0C54, "Suzhou Mainshine Electronic Co")
+//  ENTRY(0x0C55, "Guangzhou Riss Electronic")
+//  ENTRY(0x0C56, "Shenzhen Cloud Security Storage ")
+    ENTRY(0x0C57, "ROG")
+//  ENTRY(0x0C58, "Perceive")
+//  ENTRY(0x0C59, "e-peas")
+//  ENTRY(0x0C5A, "Fraunhofer IPMS")
+//  ENTRY(0x0C5B, "Shenzhen Daxinlang Electronic Tech")
+//  ENTRY(0x0C5C, "Abacus Peripherals Private")
+    ENTRY(0x0C5D, "OLOy")
+//  ENTRY(0x0C5E, "Wuhan P&S Semiconductor")
+//  ENTRY(0x0C5F, "Sitrus")
+//  ENTRY(0x0C60, "AnHui Conner Storage")
+    ENTRY(0x0C61, "Rochester")
+//  ENTRY(0x0C62, "Wuxi Petabyte")
+    ENTRY(0x0C63, "Star Memory")
+    ENTRY(0x0C64, "Agile Memory")
+//  ENTRY(0x0C65, "MEJEC")
+//  ENTRY(0x0C66, "Rockchip")
+//  ENTRY(0x0C67, "Dongguan Guanma e-commerce")
+//  ENTRY(0x0C68, "Rayson Hi-Tech (SZ)")
+//  ENTRY(0x0C69, "MINRES Technologies GmbH")
+//  ENTRY(0x0C6A, "Himax")
+//  ENTRY(0x0C6B, "Shenzhen Cwinner")
+//  ENTRY(0x0C6C, "Tecmiyo")
+//  ENTRY(0x0C6D, "Shenzhen Suhuicun")
+//  ENTRY(0x0C6E, "Vickter")
+//  ENTRY(0x0C6F, "lowRISC")
+//  ENTRY(0x0C70, "EXEGate FZE")
+//  ENTRY(0x0C71, "Shenzhen 9 Chapter")
+//  ENTRY(0x0C72, "Addlink")
+//  ENTRY(0x0C73, "Starsway")
+//  ENTRY(0x0C74, "Pensando Systems Inc.")
+//  ENTRY(0x0C75, "AirDisk")
+//  ENTRY(0x0C76, "Shenzhen Speedmobile")
+//  ENTRY(0x0C77, "PEZY Computing")
+//  ENTRY(0x0C78, "Extreme Engineering Solutions")
+//  ENTRY(0x0C79, "Shangxin")
+    ENTRY(0x0C7A, "Zhaoxin")
+//  ENTRY(0x0C7B, "Xsight Labs")
+    ENTRY(0x0C7C, "Hikstorage")
+    ENTRY(0x0C7D, "Dell")
+//  ENTRY(0x0C7E, "Guangdong StarFive")
+//  ENTRY(0x0D01, "TECOTON")
+//  ENTRY(0x0D02, "Abko")
+//  ENTRY(0x0D03, "Shenzhen Feisrike")
+//  ENTRY(0x0D04, "Shenzhen Sunhome")
+//  ENTRY(0x0D05, "Global Mixed-mode")
+//  ENTRY(0x0D06, "Shenzhen Weien")
+//  ENTRY(0x0D07, "Shenzhen Cooyes")
+//  ENTRY(0x0D08, "Keymos Electronics Co.,")
+//  ENTRY(0x0D09, "E-Rockic Technology Company")
+//  ENTRY(0x0D0A, "Aerospace Science Memory Shenzhen")
+//  ENTRY(0x0D0B, "Shenzhen Quanji")
+//  ENTRY(0x0D0C, "Dukosi")
+//  ENTRY(0x0D0D, "Maxell Corporation of America")
+//  ENTRY(0x0D0E, "Shenshen Xinxintao")
+//  ENTRY(0x0D0F, "Zhuhai Sanxia Semiconductor")
+//  ENTRY(0x0D10, "Groq")
+//  ENTRY(0x0D11, "AstraTek")
+//  ENTRY(0x0D12, "Shenzhen Xinyuze Technology ")
+//  ENTRY(0x0D13, "All Bit Semiconductor")
+//  ENTRY(0x0D14, "ACFlow")
+//  ENTRY(0x0D15, "Shenzhen Sipeed")
+//  ENTRY(0x0D16, "Linzhi Hong Kong")
+//  ENTRY(0x0D17, "Supreme Wise")
+//  ENTRY(0x0D18, "Blue Cheetah Analog Design")
+//  ENTRY(0x0D19, "Hefei Laiku")
+//  ENTRY(0x0D1A, "Zord")
+//  ENTRY(0x0D1B, "SBO Hearing A/S")
+//  ENTRY(0x0D1C, "Regent Sharp")
+//  ENTRY(0x0D1D, "Permanent Potential")
+//  ENTRY(0x0D1E, "Creative World")
+//  ENTRY(0x0D1F, "Base Creation")
+    ENTRY(0x0D61, "Lyczar")
+    ENTRY(0x0E51, "Xiaoli AI")
+    ENTRY(0x0E58, "Trium Elek.")
+    ENTRY(0x0F33, "Xllbyte")
+    ENTRY(0x0F37, "SSTC")
+    ENTRY(0xFFFF, "Unknown")
