@@ -5,6 +5,7 @@
 #include "tsc.h"
 #include "io.h"
 #include "heap.h"
+#include "hwctrl.h"
 #include "memctrl.h"
 #include "pmem.h"
 #include "serial.h"
@@ -639,6 +640,12 @@ void serial_log_event(slog_event_t event)
       case SLOG_PASS_END:
         slog("pass_end", " pass=%i errors=%u status=%s",
              pass_num, (uintptr_t)error_count, error_count == 0 ? "pass" : "fail");
+        // Hooked before main() increments pass_num, so completed passes = pass_num + 1.
+        if (log_max_passes > 0 && pass_num + 1 >= log_max_passes) {
+            slog("done", " passes=%i status=%s", pass_num + 1, error_count == 0 ? "pass" : "fail");
+            usleep(100 * MILLISEC);  // Let the UART drain the last line.
+            reboot();
+        }
         break;
       case SLOG_TEST_START: {
         log_error_seen = false;

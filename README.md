@@ -236,6 +236,9 @@ recognised:
     * outputs one `MTLOG ts=<seconds> ev=<event> key=value ...` line per event
       (start banner, system info, pass/test lifecycle, timed progress, errors)
     * mutually exclusive with `console=`; if both are given, `log` wins
+  * maxpasses=*n*
+    * stop after *n* completed passes: emit a final `ev=done` line, then reboot
+    * only used in `log` mode; 0 = unlimited (default)
   * testlist=*x,y,z*
     * where *x,y,z* is a list of the numerical values of the tests to run.
     * if specified, the initial test configuration is modified such that only the
