@@ -110,7 +110,7 @@ static void tty_goto(int y, int x)
 
 void tty_init(void)
 {
-    if (!enable_tty) {
+    if (!enable_tty && !enable_tty_log) {
         return;
     }
 
@@ -149,8 +149,10 @@ void tty_init(void)
     if (console_serial.is_pl011) {
         // The PL011 has already been configured by the firmware; just use
         // it as-is.
-        tty_clear_screen();
-        tty_disable_cursor();
+        if (enable_tty) {
+            tty_clear_screen();
+            tty_disable_cursor();
+        }
         return;
     }
 
@@ -181,8 +183,16 @@ void tty_init(void)
         serial_write_reg(&console_serial, UART_FCR, (0xFF) & (UART_FCR_ENA | UART_FCR_THR));
     }
 
-    tty_clear_screen();
-    tty_disable_cursor();
+    // Log mode wants a raw byte stream, so don't emit VT100 sequences.
+    if (enable_tty) {
+        tty_clear_screen();
+        tty_disable_cursor();
+    }
+}
+
+void tty_send_string(const char *p)
+{
+    serial_echo_print(p);
 }
 
 void tty_send_region(int start_row, int start_col, int end_row, int end_col)

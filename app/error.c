@@ -26,6 +26,7 @@
 #include "serial.h"
 #include "memctrl.h"
 #include "error.h"
+#include "reports.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -203,6 +204,8 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
                 test_list[test_num].errors++;
             }
         }
+        static const char * const log_type[] = { "addr", "data", "parity", "uecc", "ecc" };
+        serial_log_error(log_type[type], page, offset, good, bad);
     }
 
     switch (error_mode) {
@@ -412,4 +415,6 @@ void error_update(void)
             tty_error_redraw();
         }
     }
+
+    serial_log_tick();
 }

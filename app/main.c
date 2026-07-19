@@ -47,6 +47,7 @@
 #include "config.h"
 #include "display.h"
 #include "error.h"
+#include "reports.h"
 #include "test.h"
 
 #include "tests.h"
@@ -318,6 +319,8 @@ static void global_init(void)
     memctrl_init();
 
     tty_init();
+
+    serial_log_start();
 
     smp_init(smp_enabled);
 
@@ -730,6 +733,7 @@ void main(void)
                     display_start_run();
                     badram_init();
                     error_init();
+                    serial_log_run_start();
                 }
             }
             if (start_pass) {
@@ -739,6 +743,7 @@ void main(void)
                     ticks_per_pass[pass_num] = 0;
                 } else {
                     display_start_pass();
+                    serial_log_event(SLOG_PASS_START);
                 }
             }
             if (start_test) {
@@ -749,6 +754,7 @@ void main(void)
                     ticks_per_test[pass_num][test_num] = 0;
                 } else if (test_list[test_num].enabled) {
                     display_start_test();
+                    serial_log_event(SLOG_TEST_START);
                 }
                 bail = false;
             }
@@ -816,6 +822,8 @@ void main(void)
 
         if (dummy_run) {
             ticks_per_pass[pass_num] += ticks_per_test[pass_num][test_num];
+        } else if (test_list[test_num].enabled) {
+            serial_log_event(SLOG_TEST_END);
         }
 
         start_test = true;
@@ -824,6 +832,9 @@ void main(void)
             continue;
         }
 
+        if (!dummy_run) {
+            serial_log_event(SLOG_PASS_END);
+        }
         pass_num++;
         if (dummy_run && pass_num == NUM_PASS_TYPES) {
             start_run = true;

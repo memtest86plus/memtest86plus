@@ -111,6 +111,7 @@ bool            dark_mode          = false;
 power_save_t    power_save         = POWER_SAVE_HIGH;
 
 bool            enable_tty         = false;
+bool            enable_tty_log     = false;             // Machine-parseable serial log instead of interactive console
 uintptr_t       tty_address        = 0x3F8;             // Legacy IO or MMIO Address accepted
 int             tty_baud_rate      = 115200;
 int             tty_update_period  = 2;                 // Update TTY every 2 seconds (default)
@@ -298,6 +299,9 @@ static void parse_option(const char *option, const char *params)
 
     if (strncmp(option, "console", 8) == 0) {
         parse_serial_params(params);
+    } else if (strncmp(option, "log", 4) == 0) {
+        parse_serial_params(params);
+        enable_tty_log = enable_tty;
     } else if (strncmp(option, "newline", 7) == 0) {
         tty_new_line = true;
     } else if (strncmp(option, "cpuseqmode", 11) == 0) {
@@ -1010,6 +1014,11 @@ void config_init(void)
         if (cmd_line_addr != 0) {
             parse_command_line((char *)cmd_line_addr, cmd_line_size);
         }
+    }
+
+    // Serial log mode replaces the interactive serial console.
+    if (enable_tty_log) {
+        enable_tty = false;
     }
 }
 

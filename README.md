@@ -230,6 +230,12 @@ recognised:
     * modifies the console to print a newline after every change to the frame buffer
       * useful in logging over serial where an escape or newline is needed
     * only used when using console/serial output
+  * log=*x*,*y*
+    * activate the machine-parseable serial log instead of the interactive
+      serial console, using the same *x*,*y* parameters as `console=`
+    * outputs one `MTLOG ts=<seconds> ev=<event> key=value ...` line per event
+      (start banner, system info, pass/test lifecycle, timed progress, errors)
+    * mutually exclusive with `console=`; if both are given, `log` wins
   * testlist=*x,y,z*
     * where *x,y,z* is a list of the numerical values of the tests to run.
     * if specified, the initial test configuration is modified such that only the

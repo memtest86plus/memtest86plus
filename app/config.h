@@ -61,6 +61,7 @@ extern bool         enable_temp_ram;
 
 extern bool         enable_sm;
 extern bool         enable_tty;
+extern bool         enable_tty_log;
 extern bool         enable_bench;
 extern bool         enable_mch_read;
 extern bool         enable_ecc_polling;

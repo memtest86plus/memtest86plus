@@ -189,6 +189,8 @@ void tty_init(void);
 
 void tty_print(int y, int x, const char *p);
 
+void tty_send_string(const char *p);
+
 void tty_send_region(int start_row, int start_col, int end_row, int end_col);
 
 char tty_get_char(int max_wait_frames);
