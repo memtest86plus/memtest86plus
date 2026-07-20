@@ -38,6 +38,7 @@ typedef struct spd_infos {
     uint16_t    freq;
     bool        hasECC;
     bool        hasTempSensor;
+    bool        hasBadCRC;
     uint8_t     fab_year;
     uint8_t     fab_week;
     uint16_t    tCL;

@@ -276,6 +276,10 @@ static int format_results(char *buf, int bufsize)
                          spdi->slot_num, (uintptr_t)spdi->module_size,
                          spdi->type, (uintptr_t)spdi->freq);
 
+        if (spdi->hasBadCRC) {
+            pos = buf_printf(pos, " [BAD CRC]");
+        }
+
         if (spdi->hasECC) {
             pos = buf_printf(pos, " ECC");
         }

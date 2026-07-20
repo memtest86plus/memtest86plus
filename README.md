@@ -179,6 +179,8 @@ recognised:
     * disables the big PASS/FAIL pop-up status display
   * nosm
     * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
+  * nospdcrc
+    * disables SPD checksum/CRC verification
   * nomch
     * disables memory controller configuration polling
   * nopause

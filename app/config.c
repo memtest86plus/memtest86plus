@@ -99,6 +99,7 @@ bool            enable_temp_cpu    = true;
 bool            enable_temp_ram    = true;              // DDR5+ temperature polling
 
 bool            enable_sm          = true;
+bool            enable_spd_crc     = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
 bool            enable_numa        = false;
@@ -348,6 +349,8 @@ static void parse_option(const char *option, const char *params)
         enable_sm = false;
     } else if (strncmp(option, "nosmp", 6) == 0) {
         smp_enabled = false;
+    } else if (strncmp(option, "nospdcrc", 9) == 0) {
+        enable_spd_crc = false;
     } else if (strncmp(option, "numa", 5) == 0) {
         enable_numa = true;
     } else if (strncmp(option, "nonuma", 7) == 0) {

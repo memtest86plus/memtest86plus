@@ -60,6 +60,7 @@ extern bool         enable_temp_cpu;
 extern bool         enable_temp_ram;
 
 extern bool         enable_sm;
+extern bool         enable_spd_crc;
 extern bool         enable_tty;
 extern bool         enable_bench;
 extern bool         enable_mch_read;

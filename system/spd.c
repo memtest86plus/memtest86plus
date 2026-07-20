@@ -5,6 +5,9 @@
 #include "stdint.h"
 #include "string.h"
 
+#include "config.h"
+#include "display.h"
+
 #include "i2c_x86.h"
 #include "spd.h"
 #include "print.h"
@@ -76,6 +79,13 @@ void print_spdi(spd_info spdi, uint8_t row)
                     spdi.module_size * 1024,
                     spdi.type,
                     spdi.freq);
+
+    // Flag modules with an invalid SPD checksum/CRC
+    if (spdi.hasBadCRC) {
+        set_foreground_colour(BOLD + RED);
+        curcol = prints(row, ++curcol, "BAD CRC!");
+        set_foreground_colour(palette.foreground);
+    }
 
     // Print ECC status
     if (spdi.hasECC) {
@@ -990,6 +1000,51 @@ static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
     spdi->isValid = true;
 }
 
+// JEDEC SPD CRC16 (XMODEM: poly 0x1021, init 0) over bytes [0, count)
+static uint16_t spd_crc16(uint8_t slot_idx, uint16_t count)
+{
+    uint16_t crc = 0;
+
+    for (uint16_t adr = 0; adr < count; adr++) {
+        crc ^= (uint16_t)get_spd(slot_idx, adr) << 8;
+        for (int i = 0; i < 8; i++) {
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+        }
+    }
+    return crc;
+}
+
+static bool spd_check_crc16(uint8_t slot_idx, uint16_t count, uint16_t crc_adr)
+{
+    uint16_t crc = get_spd(slot_idx, crc_adr) | (uint16_t)get_spd(slot_idx, crc_adr + 1) << 8;
+
+    return spd_crc16(slot_idx, count) == crc;
+}
+
+static bool spd_checksum_ok(uint8_t slot_idx, uint8_t spd_type)
+{
+    switch (spd_type)
+    {
+        case 0x12: // DDR5: CRC16 over bytes 0-509, stored at 510/511
+            return spd_check_crc16(slot_idx, 510, 510);
+        case 0x0C: // DDR4: base config bytes 0-125 only (block 1 CRC often unprogrammed)
+            return spd_check_crc16(slot_idx, 126, 126);
+        case 0x0B: // DDR3: byte0[7] set excludes mfg bytes 117-125 from coverage
+            return spd_check_crc16(slot_idx, (get_spd(slot_idx, 0) & 0x80) ? 117 : 126, 126);
+        case 0x08: // DDR2 / DDR / SDRAM: byte 63 = LSB of sum of bytes 0-62
+        case 0x07:
+        case 0x04: {
+            uint8_t sum = 0;
+            for (uint8_t adr = 0; adr < 63; adr++) {
+                sum += get_spd(slot_idx, adr);
+            }
+            return sum == get_spd(slot_idx, 63);
+        }
+        default:   // RDRAM & others: no checksum defined
+            return true;
+    }
+}
+
 void parse_spd(spd_info *spdi, uint8_t slot_idx)
 {
     memset(spdi, 0, sizeof(*spdi));     // Also sets isValid to False
@@ -998,7 +1053,9 @@ void parse_spd(spd_info *spdi, uint8_t slot_idx)
     if (get_spd(slot_idx, 0) == 0xFF)
         return;
 
-    switch(get_spd(slot_idx, 2))
+    uint8_t spd_type = get_spd(slot_idx, 2);
+
+    switch(spd_type)
     {
         case 0x12: // DDR5
             parse_spd_ddr5(spdi, slot_idx);
@@ -1023,5 +1080,11 @@ void parse_spd(spd_info *spdi, uint8_t slot_idx)
                 parse_spd_rdram(spdi, slot_idx);
             }
             break;
+    }
+
+    // Verify twice on mismatch so a transient SMBUS misread can't flag a good module
+    if (enable_spd_crc && spdi->isValid
+        && !spd_checksum_ok(slot_idx, spd_type) && !spd_checksum_ok(slot_idx, spd_type)) {
+        spdi->hasBadCRC = true;
     }
 }
