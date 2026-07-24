@@ -678,7 +678,7 @@ void serial_log_tick(void)
     // Same progress calculation as do_tick(), from our own tick counters.
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
-    slog("prog", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
+    slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
          pass_num, slog_pct(log_pass_ticks, ticks_per_pass[pass_type]),
          test_num, slog_pct(log_test_ticks, ticks_per_test[pass_type][test_num]),
          (uintptr_t)error_count);
