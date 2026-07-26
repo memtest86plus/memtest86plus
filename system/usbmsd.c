@@ -77,15 +77,14 @@ static bool msd_clear_stall(usb_msd_t *msd, const usb_ep_t *ep, bool is_in)
     usb_setup_pkt_t setup_pkt;
     build_setup_packet(&setup_pkt, USB_REQ_TO_ENDPOINT, USB_CLR_FEATURE,
                        USB_ENDPOINT_HALT, ep->endpoint_num | (is_in ? 0x80 : 0), 0);
-    if (!hcd->methods->setup_request(hcd, &msd->ep0, &setup_pkt)) {
-        return false;
-    }
+    bool ok = hcd->methods->setup_request(hcd, &msd->ep0, &setup_pkt);
 
+    // Resync the host toggle even on failure: a mismatched toggle wedges the endpoint.
     if (hcd->methods->reset_bulk_ep != NULL) {
         int ep_id = 2 * ep->endpoint_num + (is_in ? 1 : 0);
-        return hcd->methods->reset_bulk_ep(hcd, ep, ep_id);
+        ok = hcd->methods->reset_bulk_ep(hcd, ep, ep_id) && ok;
     }
-    return true;
+    return ok;
 }
 
 // BOT Reset Recovery (BOT spec 5.3.4): class reset, then clear both bulk endpoints.
@@ -157,6 +156,19 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
     return data_ok && csw.status == CSW_STATUS_PASSED;
 }
 
+// Retry transient bus errors. The command is reissued whole, so a partial op just repeats.
+static bool msd_bot_command_retry(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
+                                  void *data, uint32_t data_len, bool data_in)
+{
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (msd_bot_command(msd, cdb, cdb_len, data, data_len, data_in)) {
+            return true;
+        }
+        usleep(20 * MILLISEC);
+    }
+    return false;
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -177,7 +189,7 @@ static bool read_capacity_16(usb_msd_t *msd)
         0, 0
     };
     uint8_t cap_data[32];
-    if (!msd_bot_command(msd, cdb, 16, cap_data, sizeof(cap_data), true)) {
+    if (!msd_bot_command_retry(msd, cdb, 16, cap_data, sizeof(cap_data), true)) {
         return false;
     }
 
@@ -211,7 +223,7 @@ bool msd_init(usb_msd_t *msd)
     uint8_t cdb_cap[10] = { SCSI_READ_CAPACITY_10 };
 
     uint8_t cap_data[8];
-    if (!msd_bot_command(msd, cdb_cap, 10, cap_data, 8, true)) {
+    if (!msd_bot_command_retry(msd, cdb_cap, 10, cap_data, 8, true)) {
         // Some larger drives reject 10-byte commands; try the 16-byte variant.
         if (!read_capacity_16(msd)) return false;
         msd->use_16 = true;
@@ -247,7 +259,7 @@ bool msd_read_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, void *buffer
             (uint8_t)(count >> 24), (uint8_t)(count >> 16), (uint8_t)(count >> 8), (uint8_t)count,
             0, 0
         };
-        return msd_bot_command(msd, cdb, 16, buffer, count * msd->block_size, true);
+        return msd_bot_command_retry(msd, cdb, 16, buffer, count * msd->block_size, true);
     }
 
     uint8_t cdb[10] = {
@@ -256,7 +268,7 @@ bool msd_read_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, void *buffer
         0,
         (uint8_t)(count >> 8), (uint8_t)count, 0
     };
-    return msd_bot_command(msd, cdb, 10, buffer, count * msd->block_size, true);
+    return msd_bot_command_retry(msd, cdb, 10, buffer, count * msd->block_size, true);
 }
 
 bool msd_write_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, const void *buffer)
@@ -269,7 +281,7 @@ bool msd_write_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, const void 
             (uint8_t)(count >> 24), (uint8_t)(count >> 16), (uint8_t)(count >> 8), (uint8_t)count,
             0, 0
         };
-        return msd_bot_command(msd, cdb, 16, (void *)buffer, count * msd->block_size, false);
+        return msd_bot_command_retry(msd, cdb, 16, (void *)buffer, count * msd->block_size, false);
     }
 
     uint8_t cdb[10] = {
@@ -278,5 +290,5 @@ bool msd_write_sectors(usb_msd_t *msd, uint64_t lba, uint32_t count, const void 
         0,
         (uint8_t)(count >> 8), (uint8_t)count, 0
     };
-    return msd_bot_command(msd, cdb, 10, (void *)buffer, count * msd->block_size, false);
+    return msd_bot_command_retry(msd, cdb, 10, (void *)buffer, count * msd->block_size, false);
 }

@@ -31,6 +31,12 @@
 
 #define EHCI_EXT_CAP_OS_HANDOFF 0x01
 
+// USB Legacy Support extended capability registers (byte offsets from the capability pointer)
+
+#define EHCI_USBLEGSUP_BIOS     0x02            // HC BIOS Owned Semaphore
+#define EHCI_USBLEGSUP_OS       0x03            // HC OS Owned Semaphore
+#define EHCI_USBLEGCTLSTS       0x04            // Legacy Support Control/Status register
+
 // Host Controller Structural Parameters
 
 #define EHCI_HCS_PPC            0x00000010      // Port Power Control
@@ -384,28 +390,57 @@ static void build_ehci_qhd(ehci_qhd_t *qhd, const ehci_qtd_t *qtd, const usb_ep_
     qhd->next_qtd_ptr = (uintptr_t)qtd;
 }
 
+// Clears a latched host system error and restarts the halted controller for recovery.
+static void restart_host_controller(const workspace_t *ws)
+{
+    ehci_op_regs_t *op_regs = ws->op_regs;
+
+    // start_host_controller rewrites USBCMD wholesale, so preserve the periodic schedule.
+    bool periodic_on = read32(&op_regs->usb_command) & EHCI_USBCMD_PSE;
+
+    write32(&op_regs->usb_status, EHCI_USBSTS_HSE | EHCI_USBSTS_ERR | EHCI_USBSTS_INT);
+    write32(&op_regs->async_list_addr, (uintptr_t)(ws->qhd));
+    (void)start_host_controller(op_regs);
+    if (periodic_on) {
+        enable_periodic_schedule(op_regs);
+    }
+    flush32(&op_regs->config_flag, 1);
+}
+
 static bool do_async_transfer(const workspace_t *ws, int num_tds)
 {
+    ehci_op_regs_t *op_regs = ws->op_regs;
+
     // The controller only detects device errors; a device that NAKs forever would
     // hang us, so also enforce a software timeout.
     bool ok = true;
-    enable_async_schedule(ws->op_regs);
+    bool hc_died = false;
+    enable_async_schedule(op_regs);
     for (int td_idx = 0; td_idx < num_tds && ok; td_idx++) {
         const ehci_qtd_t *qtd = &ws->qtd[td_idx];
         int timer = 5000 * MILLISEC / 10;
         while (qtd->status & EHCI_QTD_ACTIVE) {
+            // A halted controller will never complete this qTD, so fail fast.
+            if (read32(&op_regs->usb_status) & (EHCI_USBSTS_HSE | EHCI_USBSTS_HCH)) {
+                ok = false;
+                hc_died = true;
+                break;
+            }
             if (timer-- == 0) {
                 ok = false;
                 break;
             }
             usleep(10);
         }
-        if (qtd->status & (EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS)) {
+        if (qtd->status & (EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF)) {
             ok = false;
         }
     }
     // This waits for the schedule to go idle, so it also stops a timed-out transfer.
-    disable_async_schedule(ws->op_regs);
+    disable_async_schedule(op_regs);
+    if (hc_died) {
+        restart_host_controller(ws);
+    }
     return ok;
 }
 
@@ -468,7 +503,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-        uint8_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF | EHCI_QTD_PS;
+        uint8_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF;
         if (~status & error_mask) {
             hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
             if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
@@ -678,13 +713,22 @@ bool ehci_reset(int bus, int dev, int func, uintptr_t base_addr)
         uint8_t ext_cap_id = pci_config_read8(bus, dev, func, ext_cap_ptr + 0);
         if (ext_cap_id == EHCI_EXT_CAP_OS_HANDOFF) {
             // Take ownership from the SMM if necessary.
+            bool acquired = true;
             int timer = 1000;
-            pci_config_write8(bus, dev, func, ext_cap_ptr + 3, 1);
-            while (pci_config_read8(bus, dev, func, ext_cap_ptr + 2) & 1) {
-                if (timer == 0) return false;
+            pci_config_write8(bus, dev, func, ext_cap_ptr + EHCI_USBLEGSUP_OS, 1);
+            while (pci_config_read8(bus, dev, func, ext_cap_ptr + EHCI_USBLEGSUP_BIOS) & 1) {
+                if (timer == 0) {
+                    acquired = false;
+                    break;
+                }
                 usleep(1*MILLISEC);
                 timer--;
             }
+
+            // Disable all SMI sources either way: they survive HCRESET and can wedge the CPU in SMM.
+            pci_config_write32(bus, dev, func, ext_cap_ptr + EHCI_USBLEGCTLSTS, 0);
+
+            if (!acquired) return false;
         }
         ext_cap_ptr = pci_config_read8(bus, dev, func, ext_cap_ptr + 1);
     }
@@ -883,6 +927,9 @@ bool ehci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
     return true;
 
 no_keyboards_found:
+    // The frame list and workspace are freed and reused below, so stop all DMA first.
+    (void)halt_host_controller(op_regs);
+    (void)reset_host_controller(op_regs);
     heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
     return false;
 }

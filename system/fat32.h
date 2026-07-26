@@ -36,6 +36,8 @@ typedef struct {
     uint32_t    fat_start_lba;
     uint32_t    data_start_lba;
     uint8_t     *sector_buf;        // one sector buffer
+    uint32_t    buf_lba;            // LBA currently held in sector_buf
+    bool        buf_valid;          // true if buf_lba is meaningful
 } fat32_fs_t;
 
 /**

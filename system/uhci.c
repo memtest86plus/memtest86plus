@@ -536,7 +536,6 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
                    num_keyboards, num_keyboards != 1 ? "s" : "");
 
     if (num_keyboards == 0) {
-        (void)halt_host_controller(io_base);
         goto no_keyboards_found;
     }
 
@@ -577,6 +576,10 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
     return true;
 
 no_keyboards_found:
+    // The frame list is freed and reused below, so the controller must not reach it.
+    (void)halt_host_controller(io_base);
+    (void)reset_host_controller(io_base);
+    outl(0, UHCI_FLBASE);
     heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
     return false;
 }
