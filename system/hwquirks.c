@@ -253,6 +253,19 @@ static void loongson_7a00_ehci_workaround(void)
     write8((uint8_t *)(reg_addr + 0x3830), 0x0);
 }
 
+static void via_vt823x_ehci_workaround(void)
+{
+    // Stretch the EHCI MMIO sleep timer from 1us to 10us (bit 5 of config reg 0x4B)
+    // so bulk DMA can't saturate the PCI bus until devices stop answering.
+    for (int func = 3; func <= 4; func++) {         // VT8235 is 00:10.3, VT8237 00:10.4
+        if (pci_config_read16(0, 0x10, func, PCI_VID_REG) == PCI_VID_VIA
+        &&  pci_config_read16(0, 0x10, func, PCI_DID_REG) == 0x3104) {   // VIA EHCI
+            pci_config_write8(0, 0x10, func, 0x4b,
+                              pci_config_read8(0, 0x10, func, 0x4b) | 0x20);
+        }
+    }
+}
+
 
 static void unhide_ich_0_5(void)
 {
@@ -437,6 +450,18 @@ void quirks_init(void)
             quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
             quirk.type |= QUIRK_TYPE_USB;
             quirk.process = loongson_7a00_ehci_workaround;
+        }
+    }
+
+    //  ------------------------------------------------------
+    //  -- VIA VT8235/37 EHCI PCI bus starvation workaround --
+    //  ------------------------------------------------------
+    if (quirk.root_vid == PCI_VID_VIA) {
+        if (pci_config_read16(0, 0x10, 3, PCI_DID_REG) == 0x3104
+        ||  pci_config_read16(0, 0x10, 4, PCI_DID_REG) == 0x3104) {
+            quirk.id    = QUIRK_VIA_VT823X_EHCI;
+            quirk.type |= QUIRK_TYPE_USB;
+            quirk.process = via_vt823x_ehci_workaround;
         }
     }
 

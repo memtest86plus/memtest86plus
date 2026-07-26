@@ -73,12 +73,30 @@ static uint32_t cluster_to_lba(const fat32_fs_t *fs, uint32_t cluster)
 
 static bool read_sector(fat32_fs_t *fs, uint32_t lba)
 {
-    return msd_read_sectors(fs->msd, fs->partition_lba + lba, 1, fs->sector_buf);
+    // The FAT is walked one cluster at a time, and a FAT32 sector holds 128 of them, so
+    // without this the same sector is fetched over the bus 128 times in a row.
+    if (fs->buf_valid && fs->buf_lba == lba) {
+        return true;
+    }
+    fs->buf_valid = false;
+    if (!msd_read_sectors(fs->msd, fs->partition_lba + lba, 1, fs->sector_buf)) {
+        return false;
+    }
+    fs->buf_lba   = lba;
+    fs->buf_valid = true;
+    return true;
 }
 
 static bool write_sector(fat32_fs_t *fs, uint32_t lba)
 {
-    return msd_write_sectors(fs->msd, fs->partition_lba + lba, 1, fs->sector_buf);
+    // The buffer holds this sector's contents once written, so it stays a valid entry.
+    fs->buf_valid = false;
+    if (!msd_write_sectors(fs->msd, fs->partition_lba + lba, 1, fs->sector_buf)) {
+        return false;
+    }
+    fs->buf_lba   = lba;
+    fs->buf_valid = true;
+    return true;
 }
 
 static uint32_t fat_read_entry(fat32_fs_t *fs, uint32_t cluster)
@@ -307,6 +325,9 @@ bool fat32_mount(fat32_fs_t *fs, usb_msd_t *msd, uint8_t *buf)
     fs->msd = msd;
     fs->sector_buf = buf;
     fs->partition_lba = 0;
+
+    // Mounting reads through msd_read_sectors directly, bypassing the sector cache.
+    fs->buf_valid = false;
 
     // Read sector 0.
     if (!msd_read_sectors(msd, 0, 1, buf)) return false;
