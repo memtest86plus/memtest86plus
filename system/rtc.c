@@ -6,9 +6,9 @@
 
 #include "io.h"
 
-#include "string.h"
-
 #include "rtc.h"
+
+#include "build_version.h"
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -83,23 +83,16 @@ bool rtc_get_time(rtc_time_t *dt)
     }
 #endif
 
-    // Build date & time of the binary: __DATE__ is "Mmm dd yyyy", __TIME__ is "hh:mm:ss".
-    static const char bdate[] = __DATE__;
-    static const char btime[] = __TIME__;
-    static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+    // BUILD_DATETIME ("YYYY-MM-DD hh:mm:ss") is the git commit date, not __DATE__,
+    // so builds stay reproducible as required for shim-review.
+    static const char bd[] = BUILD_DATETIME;
 
-    dt->month = 1;
-    for (int i = 0; i < 12; i++) {
-        if (memcmp(bdate, &months[i * 3], 3) == 0) {
-            dt->month = i + 1;
-            break;
-        }
-    }
-    dt->day   = (bdate[4] == ' ' ? 0 : (bdate[4] - '0') * 10) + bdate[5] - '0';
-    dt->year  = (bdate[7] - '0') * 1000 + (bdate[8] - '0') * 100 + (bdate[9] - '0') * 10 + bdate[10] - '0';
-    dt->hour  = (btime[0] - '0') * 10 + btime[1] - '0';
-    dt->min   = (btime[3] - '0') * 10 + btime[4] - '0';
-    dt->sec   = (btime[6] - '0') * 10 + btime[7] - '0';
+    dt->year  = (bd[0] - '0') * 1000 + (bd[1] - '0') * 100 + (bd[2] - '0') * 10 + bd[3] - '0';
+    dt->month = (bd[5] - '0') * 10 + bd[6] - '0';
+    dt->day   = (bd[8] - '0') * 10 + bd[9] - '0';
+    dt->hour  = (bd[11] - '0') * 10 + bd[12] - '0';
+    dt->min   = (bd[14] - '0') * 10 + bd[15] - '0';
+    dt->sec   = (bd[17] - '0') * 10 + bd[18] - '0';
 
     return false;
 }
