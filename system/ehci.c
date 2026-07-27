@@ -699,6 +699,14 @@ static const hcd_methods_t methods = {
     .scan_for_msd        = scan_for_msd
 };
 
+// Clearing CONFIGFLAG reverts the ports to the companion controllers, so a dead EHCI can't hide them.
+static bool abandon_controller(ehci_op_regs_t *op_regs, const char *what)
+{
+    flush32(&op_regs->config_flag, 0);
+    print_usb_info(" EHCI %s failed, ports released to companions", what);
+    return false;
+}
+
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -728,7 +736,10 @@ bool ehci_reset(int bus, int dev, int func, uintptr_t base_addr)
             // Disable all SMI sources either way: they survive HCRESET and can wedge the CPU in SMM.
             pci_config_write32(bus, dev, func, ext_cap_ptr + EHCI_USBLEGCTLSTS, 0);
 
-            if (!acquired) return false;
+            // With SMIs disabled the SMM can't interfere, so a stuck BIOS semaphore is not fatal.
+            if (!acquired) {
+                print_usb_info(" BIOS handoff timed out, taking over anyway");
+            }
         }
         ext_cap_ptr = pci_config_read8(bus, dev, func, ext_cap_ptr + 1);
     }
@@ -736,8 +747,8 @@ bool ehci_reset(int bus, int dev, int func, uintptr_t base_addr)
     ehci_op_regs_t *op_regs = (ehci_op_regs_t *)(base_addr + cap_regs->cap_length);
 
     // Ensure the controller is halted and then reset it.
-    if (!halt_host_controller(op_regs)) return false;
-    if (!reset_host_controller(op_regs)) return false;
+    if (!halt_host_controller(op_regs)) return abandon_controller(op_regs, "halt");
+    if (!reset_host_controller(op_regs)) return abandon_controller(op_regs, "reset");
 
     return true;
 }
@@ -930,6 +941,8 @@ no_keyboards_found:
     // The frame list and workspace are freed and reused below, so stop all DMA first.
     (void)halt_host_controller(op_regs);
     (void)reset_host_controller(op_regs);
+    // In case the reset failed to clear CONFIGFLAG, release the ports explicitly.
+    flush32(&op_regs->config_flag, 0);
     heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
     return false;
 }
