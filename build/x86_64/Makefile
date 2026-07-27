@@ -131,6 +131,8 @@ system/reloc.o: ../../system/reloc64.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) -fno-strict-aliasing $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
+system/rtc.o: app/build_version.h
+
 system/%.o: ../../system/%.c
 	@mkdir -p system
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
@@ -170,6 +172,8 @@ app/build_version.h: FORCE
 	  if $(GIT_AVAILABLE) && test -d ../../.git ; then \
 	    hash=`git rev-parse HEAD | cut -c1-7`; \
 	    sed -i 's/GIT_HASH\s\".*"/GIT_HASH "'$$hash'"/' $@.tmp; \
+	    bdate=`TZ=UTC git log -1 --format=%cd --date=format-local:'%Y-%m-%d %H:%M:%S'`; \
+	    sed -i 's/BUILD_DATETIME\s".*"/BUILD_DATETIME "'"$$bdate"'"/' $@.tmp; \
 	  else \
 	    sed -i 's/GIT_HASH\s\".*"/GIT_HASH "unknown"/' $@.tmp; \
 	  fi; \
