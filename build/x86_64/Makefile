@@ -39,6 +39,7 @@ SYS_OBJS = system/acpi.o \
            system/pci.o \
            system/pmem.o \
            system/reloc.o \
+           system/rtc.o \
            system/screen.o \
            system/serial.o \
            system/smbios.o \

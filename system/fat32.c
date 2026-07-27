@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "rtc.h"
+
 #include "string.h"
 
 #include "fat32.h"
@@ -507,6 +509,23 @@ bool fat32_write_file(fat32_fs_t *fs, const char *name_8_3, const void *data, ui
 
     // Attributes.
     entry[11] = DIR_ATTR_ARCHIVE;
+
+    // Creation/access/write timestamps. DIR_WrtDate is mandatory and 0 encodes an
+    // invalid date (day/month 0), so fall back to the build date when there is no RTC.
+    rtc_time_t now;
+    (void)rtc_get_time(&now);
+    uint16_t fat_time = now.hour << 11 | now.min << 5 | now.sec / 2;
+    uint16_t fat_date = (now.year - 1980) << 9 | now.month << 5 | now.day;
+    entry[14] = fat_time & 0xFF;            // creation time (bytes 14-15)
+    entry[15] = (fat_time >> 8) & 0xFF;
+    entry[16] = fat_date & 0xFF;            // creation date (bytes 16-17)
+    entry[17] = (fat_date >> 8) & 0xFF;
+    entry[18] = fat_date & 0xFF;            // last access date (bytes 18-19)
+    entry[19] = (fat_date >> 8) & 0xFF;
+    entry[22] = fat_time & 0xFF;            // last write time (bytes 22-23)
+    entry[23] = (fat_time >> 8) & 0xFF;
+    entry[24] = fat_date & 0xFF;            // last write date (bytes 24-25)
+    entry[25] = (fat_date >> 8) & 0xFF;
 
     // First cluster high word (bytes 20-21).
     entry[20] = (first_cluster >> 16) & 0xFF;
