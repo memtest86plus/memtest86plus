@@ -1284,10 +1284,27 @@ bool usb_hcd_available(void)
     return num_hcd > 0;
 }
 
+void usb_forget_msd(void)
+{
+    usb_mass_storage_found = false;
+    usb_msd_hcd_idx = -1;
+    usb_msd_name[0] = '\0';
+}
+
 bool usb_scan_for_msd(void)
 {
     if (usb_mass_storage_found) {
-        return true;
+        // An unplug or replug makes the stored device state stale, so check it still responds.
+        const usb_hcd_t *hcd = &hcd_list[usb_msd_hcd_idx];
+        usb_setup_pkt_t setup_pkt;
+        build_setup_packet(&setup_pkt, USB_REQ_FROM_DEVICE, USB_GET_DESCRIPTOR,
+                           USB_DESC_DEVICE << 8, 0, sizeof(usb_device_desc_t));
+        if (hcd->methods->get_data_request(hcd, &usb_msd_info.ep0, &setup_pkt,
+                                           hcd->ws->data_buffer, sizeof(usb_device_desc_t))
+        &&  valid_usb_device_descriptor(hcd->ws->data_buffer)) {
+            return true;
+        }
+        usb_forget_msd();
     }
     usb_runtime_scan = true;
     for (int i = 0; i < num_hcd && !usb_mass_storage_found; i++) {

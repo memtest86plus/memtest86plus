@@ -66,6 +66,13 @@ typedef struct __attribute__((packed)) {
 } usb_csw_t;
 
 //------------------------------------------------------------------------------
+// Private Variables
+//------------------------------------------------------------------------------
+
+// Set when the device processed the last command but rejected it (CHECK CONDITION).
+static bool cmd_rejected = false;
+
+//------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
@@ -108,6 +115,8 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
                             void *data, uint32_t data_len, bool data_in)
 {
     const usb_hcd_t *hcd = msd->hcd;
+
+    cmd_rejected = false;
 
     // Build Command Block Wrapper. cb[] not in the initializer is zero-padded.
     usb_cbw_t cbw = {
@@ -153,7 +162,22 @@ static bool msd_bot_command(usb_msd_t *msd, const uint8_t *cdb, int cdb_len,
         return false;
     }
 
-    return data_ok && csw.status == CSW_STATUS_PASSED;
+    if (data_ok && csw.status == CSW_STATUS_PASSED) {
+        return true;
+    }
+    cmd_rejected = true;
+    return false;
+}
+
+// Discard pending sense data: a post-reset unit attention fails every command until collected.
+static void msd_request_sense(usb_msd_t *msd)
+{
+    if (!cmd_rejected) {
+        return;
+    }
+    uint8_t cdb[6] = { SCSI_REQUEST_SENSE, 0, 0, 0, 18, 0 };
+    uint8_t sense_data[18];
+    (void)msd_bot_command(msd, cdb, 6, sense_data, sizeof(sense_data), true);
 }
 
 // Retry transient bus errors. The command is reissued whole, so a partial op just repeats.
@@ -164,6 +188,7 @@ static bool msd_bot_command_retry(usb_msd_t *msd, const uint8_t *cdb, int cdb_le
         if (msd_bot_command(msd, cdb, cdb_len, data, data_len, data_in)) {
             return true;
         }
+        msd_request_sense(msd);
         usleep(20 * MILLISEC);
     }
     return false;
@@ -211,13 +236,15 @@ bool msd_init(usb_msd_t *msd)
 
     // TEST UNIT READY — retry a few times since the device may need time to spin up.
     uint8_t cdb_tur[6] = { SCSI_TEST_UNIT_READY };
-    for (int retry = 0; retry < 5; retry++) {
-        if (msd_bot_command(msd, cdb_tur, 6, NULL, 0, false)) {
-            break;
+    bool ready = false;
+    for (int retry = 0; retry < 5 && !ready; retry++) {
+        ready = msd_bot_command(msd, cdb_tur, 6, NULL, 0, false);
+        if (!ready) {
+            msd_request_sense(msd);
+            usleep(500 * MILLISEC);
         }
-        usleep(500 * MILLISEC);
-        if (retry == 4) return false;
     }
+    if (!ready) return false;
 
     // READ CAPACITY (10) — returns 8 bytes: last LBA (4 bytes BE) + block size (4 bytes BE).
     uint8_t cdb_cap[10] = { SCSI_READ_CAPACITY_10 };

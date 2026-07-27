@@ -405,9 +405,12 @@ static int slog_pct(int ticks, int total)
 
 void save_results_to_usb(void)
 {
+    bool reenumerated = false;
+
     // The drive may have been plugged in after boot - scan for it now. This must be
     // done before the heap mark below is recorded, so that anything allocated for a
     // newly found drive is not freed when the save completes.
+  restart:
     if (!usb_mass_storage_found) {
         prints(POP_R+14, POP_LI, "Scanning for USB drive...   ");
         (void)usb_scan_for_msd();
@@ -429,6 +432,12 @@ void save_results_to_usb(void)
     prints(POP_R+14, POP_LI, "Initializing USB drive...   ");
 
     if (!msd_init(&msd)) {
+        // A port reset + re-enumeration is the last-resort recovery for a wedged drive, so retry once.
+        if (!reenumerated && msd.hcd->methods->scan_for_msd != NULL) {
+            reenumerated = true;
+            usb_forget_msd();
+            goto restart;
+        }
         prints(POP_R+14, POP_LI, "USB drive init failed.      ");
         usleep(2000 * MILLISEC);
         goto cleanup;

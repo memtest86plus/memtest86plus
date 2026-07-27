@@ -374,6 +374,12 @@ extern bool usb_mass_storage_found;
 extern char usb_msd_name[64];
 
 /**
+ * Discards the stored mass storage device so the next usb_scan_for_msd() call
+ * performs a full re-enumeration. Used to recover a wedged drive by port reset.
+ */
+void usb_forget_msd(void);
+
+/**
  * Returns the mass storage device discovered during the initial USB scan.
  * If found, populates msd and returns true.
  */
