@@ -18,8 +18,11 @@
 #include "boot.h"
 #include "bootparams.h"
 
+#include "acpi.h"
 #include "cpuid.h"
 #include "io.h"
+#include "memsize.h"
+#include "pmem.h"
 
 #include "pci.h"
 #include "unistd.h"
@@ -31,6 +34,9 @@
 #define PCI_CLASS_DEVICE        0x0a
 
 #define PCI_CLASS_BRIDGE_HOST   0x0600
+
+#define MAX_MMIO_ALLOCS         8
+#define MAX_MMIO_CLAIMS         64
 
 //------------------------------------------------------------------------------
 // Types
@@ -47,6 +53,14 @@ typedef enum {
 //------------------------------------------------------------------------------
 
 static pci_config_type_t pci_config_type = PCI_CONFIG_TYPE_NONE;
+
+// Ranges handed out by pci_alloc_mmio, to avoid handing out overlaps.
+static struct {
+    uintptr_t   base;
+    uintptr_t   size;
+} mmio_allocs[MAX_MMIO_ALLOCS];
+
+static int num_mmio_allocs = 0;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -245,6 +259,129 @@ void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value)
     }
 }
 
+
+uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size)
+{
+    if (num_mmio_allocs == MAX_MMIO_ALLOCS || size == 0 || (size & (size - 1)) != 0) {
+        return 0;
+    }
+
+    // Collect the sub-4GB ranges already claimed by our allocations, the MCFG table, PCI BARs,
+    // and PCI-PCI bridge windows. BAR sizes can't be probed non-destructively, so use the size
+    // implied by the address alignment, clamped to [4KB, 64MB].
+    uint64_t claimed[MAX_MMIO_CLAIMS][2];
+    int num_claimed = 0;
+
+    for (int i = 0; i < num_mmio_allocs; i++) {
+        claimed[num_claimed][0] = mmio_allocs[i].base;
+        claimed[num_claimed][1] = mmio_allocs[i].base + mmio_allocs[i].size;
+        num_claimed++;
+    }
+    if (acpi_config.mcfg_addr != 0) {
+        claimed[num_claimed][0] = acpi_config.mcfg_addr;
+        claimed[num_claimed][1] = (uint64_t)acpi_config.mcfg_addr + 0x10000000;
+        num_claimed++;
+    }
+    for (int b = 0; b < PCI_MAX_BUS; b++) {
+        for (int d = 0; d < PCI_MAX_DEV; d++) {
+            for (int f = 0; f < PCI_MAX_FUNC; f++) {
+                uint16_t vendor_id = pci_config_read16(b, d, f, 0x00);
+                uint8_t  hdr_type  = pci_config_read8 (b, d, f, 0x0e);
+                if (vendor_id == 0xffff) {
+                    if (f == 0) break;
+                    continue;
+                }
+                int last_bar = 0;
+                if ((hdr_type & 0x7f) == 0) last_bar = 0x24;
+                if ((hdr_type & 0x7f) == 1) last_bar = 0x14;
+                for (int reg = 0x10; reg <= last_bar; reg += 4) {
+                    uint32_t bar_val = pci_config_read32(b, d, f, reg);
+                    bool skip = (b == bus && d == dev && f == func && reg == bar_reg);
+                    if (bar_val & 0x1) continue;
+                    uint64_t addr = bar_val & ~(uint64_t)0xf;
+                    if ((bar_val & 0x6) == 0x4) {
+                        addr |= (uint64_t)pci_config_read32(b, d, f, reg + 4) << 32;
+                        reg += 4;
+                    }
+                    if (skip || addr == 0 || addr > 0xffffffff) continue;
+                    uint64_t extent = addr & ~(addr - 1);
+                    if (extent < 0x1000)     extent = 0x1000;
+                    if (extent > 0x04000000) extent = 0x04000000;
+                    if (num_claimed == MAX_MMIO_CLAIMS) return 0;
+                    claimed[num_claimed][0] = addr;
+                    claimed[num_claimed][1] = addr + extent;
+                    num_claimed++;
+                }
+                if ((hdr_type & 0x7f) == 1) {
+                    // Both bridge memory windows; a prefetchable window based above 4GB is irrelevant.
+                    uint64_t base  =  (uint64_t)(pci_config_read16(b, d, f, 0x20) & 0xfff0) << 16;
+                    uint64_t limit = ((uint64_t)(pci_config_read16(b, d, f, 0x22) & 0xfff0) << 16) | 0xfffff;
+                    uint16_t pref_base_reg = pci_config_read16(b, d, f, 0x24);
+                    uint64_t pref_base  =  (uint64_t)(pref_base_reg & 0xfff0) << 16;
+                    uint64_t pref_limit = ((uint64_t)(pci_config_read16(b, d, f, 0x26) & 0xfff0) << 16) | 0xfffff;
+                    if ((pref_base_reg & 0xf) == 1 && pci_config_read32(b, d, f, 0x28) != 0) {
+                        pref_base = pref_limit + 1;  // disables the claim below
+                    }
+                    if (num_claimed + 2 > MAX_MMIO_CLAIMS) return 0;
+                    if (base <= limit) {
+                        claimed[num_claimed][0] = base;
+                        claimed[num_claimed][1] = limit + 1;
+                        num_claimed++;
+                    }
+                    if (pref_base <= pref_limit) {
+                        claimed[num_claimed][0] = pref_base;
+                        claimed[num_claimed][1] = pref_limit + 1;
+                        num_claimed++;
+                    }
+                }
+                if (f == 0 && (hdr_type & 0x80) == 0) break;
+            }
+        }
+    }
+
+    // Allocate top-down in the gap between the top of low RAM and the I/O APIC, aligned to the
+    // BAR size. Firmware allocates bottom-up, so the top of the gap is most likely free.
+    uint64_t win_start = 0;
+    for (int i = 0; i < pm_map_size; i++) {
+        uint64_t region_end = (uint64_t)pm_map[i].end << PAGE_SHIFT;
+        if (region_end <= 0x100000000ULL && region_end > win_start) {
+            win_start = region_end;
+        }
+    }
+    uint64_t win_end = 0xfec00000;
+    if (win_start == 0 || win_start >= win_end) {
+        return 0;
+    }
+
+    uint64_t candidate = (win_end - size) & ~((uint64_t)size - 1);
+    bool conflict = true;
+    while (conflict && candidate >= win_start) {
+        conflict = false;
+        for (int i = 0; i < num_claimed; i++) {
+            if (candidate < claimed[i][1] && claimed[i][0] < candidate + size) {
+                conflict = true;
+                candidate = claimed[i][0] >= size ? (claimed[i][0] - size) & ~((uint64_t)size - 1) : 0;
+                break;
+            }
+        }
+    }
+    if (conflict || candidate < win_start) {
+        return 0;
+    }
+
+    mmio_allocs[num_mmio_allocs].base = candidate;
+    mmio_allocs[num_mmio_allocs].size = size;
+    num_mmio_allocs++;
+
+    // Program the BAR (and the upper half for a 64-bit BAR).
+    bool is_64bit = (pci_config_read32(bus, dev, func, bar_reg) & 0x6) == 0x4;
+    pci_config_write32(bus, dev, func, bar_reg, candidate);
+    if (is_64bit) {
+        pci_config_write32(bus, dev, func, bar_reg + 4, 0);
+    }
+
+    return candidate;
+}
 
 // -------------
 // LPC Functions

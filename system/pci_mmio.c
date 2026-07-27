@@ -126,3 +126,10 @@ uint8_t lpc_inb(uint8_t reg)
     usleep(100);
     return inb(0x2F);
 }
+
+uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size)
+{
+    // BAR reallocation is not supported on this platform.
+    (void)bus; (void)dev; (void)func; (void)bar_reg; (void)size;
+    return 0;
+}
