@@ -13,6 +13,8 @@
 #include "keyboard.h"
 #include "config.h"
 
+#include "unistd.h"
+
 //------------------------------------------------------------------------------
 // Private Constants
 //------------------------------------------------------------------------------
@@ -223,9 +225,24 @@ static const char usb_hid_keymap[] = {
 
 keyboard_types_t keyboard_types = KT_NONE;
 
+// On AT-class 8042s status bit 5 is a transmit timeout flag, not AUX data.
+static bool kbc_aux_enabled = true;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+// Check the 8042 config byte to see if the AUX (mouse) interface is enabled.
+static void kbc_read_config(void)
+{
+    int t;
+    for (t = 0; t < 1000 && (inb(0x64) & 0x02); t++) usleep(10);    // wait for IBF clear
+    if (t == 1000) return;
+    outb(0x20, 0x64);                                               // read the config byte
+    for (t = 0; t < 1000 && !(inb(0x64) & 0x01); t++) usleep(10);
+    if (t == 1000) return;
+    kbc_aux_enabled = !(inb(0x60) & 0x20);
+}
 
 // This function is called when an ESC O prefix has been detected.
 static char get_vt220_sequence1(void)
@@ -369,6 +386,9 @@ void keyboard_init(void)
     if (keyboard_types & KT_USB) {
         find_usb_keyboards(keyboard_types == KT_USB);
     }
+    if (keyboard_types & KT_LEGACY) {
+        kbc_read_config();
+    }
 }
 
 char get_key(void)
@@ -399,7 +419,7 @@ char get_key(void)
         uint8_t status = inb(0x64);
         if (status & 0x01) {
             uint8_t c = inb(0x60);
-            if (status & 0x20) {
+            if ((status & 0x20) && kbc_aux_enabled) {
                 // Ignore mouse events.
                 return '\0';
             }
