@@ -31,6 +31,14 @@ void barrier_init(barrier_t *barrier, int num_threads);
 
 /**
  * Resets an existing barrier to block the specified number of threads.
+ *
+ * This is a quiescent-only operation with a single owner: no CPU may be
+ * inside the barrier, may still enter its old generation, or may enter its
+ * new generation until the owner publishes the new participant count. It is
+ * intentionally not safe against concurrent waiters; callers provide the
+ * surrounding publication protocol. The name documents that a new count is
+ * published for the next generation, not that a running generation is torn
+ * down.
  */
 void barrier_reset(barrier_t *barrier, int num_threads);
 
