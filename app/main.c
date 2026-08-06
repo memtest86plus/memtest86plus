@@ -325,10 +325,16 @@ static void global_init(void)
 
     // Force disable the NUMA code paths when no proximity domain was found.
     if (num_proximity_domains == 0) {
-        enable_numa = false;
+        numa_mode = NUMA_OFF;
     }
     if (smp_topology_too_large) {
         trace(0, "WARNING: SRAT declares more than %i proximity domains; NUMA disabled", MAX_PROXIMITY_DOMAINS);
+    }
+    if (numa_mode == NUMA_PAR && (VMEM_MAX_CONTEXTS <= 1 || num_proximity_domains < 2)) {
+        // NUMA_PAR needs independent CPU-backed memory teams; fall back to
+        // legacy NUMA-aware placement with a clear message.
+        trace(0, "NUMA_PAR unavailable (need 2+ memory domains); using NUMA_ON");
+        numa_mode = NUMA_ON;
     }
 
     // At this point we have started reserving physical pages in the memory
@@ -356,7 +362,7 @@ static void global_init(void)
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
-            if (enable_numa) {
+            if (numa_mode != NUMA_OFF) {
                 uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
                 chunk_index[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
             } else {
@@ -493,7 +499,7 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
         }
         if (seg_start < seg_end && seg_start < win_end && seg_end > win_start) {
             // We need to test part of that physical memory segment.
-            if (enable_numa) {
+            if (numa_mode != NUMA_OFF) {
                 // Now also pay attention to proximity domains, which are based on physical addresses.
                 uint64_t orig_start = (uint64_t)seg_start << PAGE_SHIFT;
                 uint64_t orig_end = (uint64_t)seg_end << PAGE_SHIFT;
