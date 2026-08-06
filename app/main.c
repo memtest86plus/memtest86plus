@@ -124,7 +124,6 @@ spinlock_t  *error_mutex = NULL;
 
 vm_map_t    vm_map[MAX_MEM_SEGMENTS];
 int         vm_map_size = 0;
-uint32_t    proximity_domains[MAX_CPUS];
 
 int         pass_num = 0;
 int         test_num = 0;
@@ -328,6 +327,9 @@ static void global_init(void)
     if (num_proximity_domains == 0) {
         enable_numa = false;
     }
+    if (smp_topology_too_large) {
+        trace(0, "WARNING: SRAT declares more than %i proximity domains; NUMA disabled", MAX_PROXIMITY_DOMAINS);
+    }
 
     // At this point we have started reserving physical pages in the memory
     // map for data structures that need to be permanently pinned in place.
@@ -520,8 +522,10 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
                             break;
                         }
                     } else {
-                        // Could not match with proximity domain, fall back to default behaviour. This shouldn't happen !
-                        vm_map[vm_map_size].proximity_domain_idx = 0;
+                        // Keep the covered prefix and assign only the remaining
+                        // span to the BSP domain, which always has a tester.
+                        seg_start = orig_start >> PAGE_SHIFT;
+                        vm_map[vm_map_size].proximity_domain_idx = smp_get_proximity_domain_idx(0);
                         goto non_numa_vm_map_entry;
                     }
                 }
