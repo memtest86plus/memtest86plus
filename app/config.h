@@ -23,6 +23,12 @@ typedef enum {
 } cpu_mode_t;
 
 typedef enum {
+    NUMA_OFF = 0,
+    NUMA_ON  = 1,
+    NUMA_PAR = 2
+} numa_mode_t;
+
+typedef enum {
     ERROR_MODE_NONE,
     ERROR_MODE_SUMMARY,
     ERROR_MODE_ADDRESS,
@@ -67,7 +73,7 @@ extern int          log_max_passes;
 extern bool         enable_bench;
 extern bool         enable_mch_read;
 extern bool         enable_ecc_polling;
-extern bool         enable_numa;
+extern numa_mode_t  numa_mode;
 
 extern bool         pause_at_start;
 extern bool         dark_mode;
