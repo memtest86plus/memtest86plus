@@ -29,9 +29,10 @@
 #define MAX_APIC_IDS                MAX_CPUS
 
 /**
- * The maximum number of NUMA proximity domains.
+ * The maximum number of NUMA proximity domains. Independent of MAX_APIC_IDS:
+ * it bounds immutable/discovery-side SRAT topology data, not CPU ordinals.
  */
-#define MAX_PROXIMITY_DOMAINS       MAX_APIC_IDS
+#define MAX_PROXIMITY_DOMAINS       64
 
 /**
  * The current state of a CPU core.
@@ -53,6 +54,12 @@ extern int num_available_cpus;
  * may increase after calling smp_init().
  */
 extern int num_proximity_domains;
+
+/**
+ * Set if the SRAT declares more distinct proximity domains than
+ * MAX_PROXIMITY_DOMAINS; NUMA placement is disabled entirely in that case.
+ */
+extern bool smp_topology_too_large;
 
 /**
  * Initialises the SMP state and detects the number of available CPU cores.
@@ -98,6 +105,12 @@ static inline uint16_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_doma
  * Computes the first span, limited to a single proximity domain, of the given memory range.
  */
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end);
+
+/**
+ * Returns true if the given proximity-domain index owns at least one
+ * accepted SRAT memory range.
+ */
+bool smp_domain_has_memory(uint32_t domain_idx);
 
 //int count_cpus_for_proximity_domain_corresponding_to_range(uintptr_t start, uintptr_t end, uint32_t proximity_domain_idx);
 

@@ -124,7 +124,6 @@ spinlock_t  *error_mutex = NULL;
 
 vm_map_t    vm_map[MAX_MEM_SEGMENTS];
 int         vm_map_size = 0;
-uint32_t    proximity_domains[MAX_CPUS];
 
 int         pass_num = 0;
 int         test_num = 0;
@@ -327,6 +326,9 @@ static void global_init(void)
     // Force disable the NUMA code paths when no proximity domain was found.
     if (num_proximity_domains == 0) {
         enable_numa = false;
+    }
+    if (smp_topology_too_large) {
+        trace(0, "WARNING: SRAT declares more than %i proximity domains; NUMA disabled", MAX_PROXIMITY_DOMAINS);
     }
 
     // At this point we have started reserving physical pages in the memory
