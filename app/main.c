@@ -404,10 +404,18 @@ static void global_init(void)
         reboot();
     }
 
-    start_barrier = smp_alloc_barrier(1);
-    run_barrier   = smp_alloc_barrier(1);
+    start_barrier = smp_alloc_barriers(1, 1);
+    run_barrier   = smp_alloc_barriers(1, 1);
 
     error_mutex   = smp_alloc_mutex();
+
+    if (start_barrier == NULL || run_barrier == NULL || error_mutex == NULL) {
+        // The pinned synchronization arena is exhausted; do not run without
+        // synchronization objects.
+        display_notice("Insufficient pinned memory for synchronization objects. Rebooting...");
+        while (get_key() == 0) { }
+        reboot();
+    }
 
     start_run = true;
     dummy_run = true;

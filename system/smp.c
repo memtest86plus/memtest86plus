@@ -136,6 +136,14 @@
 
 #define HEAP_BASE_ADDR              (smp_heap_page << PAGE_SHIFT)
 
+// The pinned synchronization arena is two pages: the first page holds the
+// AP trampoline on x86, the rest is carved up for barrier objects, mutexes
+// and future synchronization state. Both pages are excluded from pm_map
+// testing by the heap allocator.
+
+#define SYNC_ARENA_PAGES            2
+#define SYNC_ARENA_LIMIT            (HEAP_BASE_ADDR + SYNC_ARENA_PAGES * PAGE_SIZE)
+
 #define AP_TRAMPOLINE_PAGE          (smp_heap_page)
 
 //------------------------------------------------------------------------------
@@ -373,6 +381,10 @@ uint16_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 static uintptr_t         smp_heap_page = 0;
 
 static uintptr_t         alloc_addr = 0;
+
+// Fallback mutex used if the pinned synchronization arena is exhausted; a
+// shared global lock remains correct, it only serializes more broadly.
+static spinlock_t        fallback_mutex = 0;
 
 #if !defined(__aarch64__)
 static bool              apic_x2apic = false;
@@ -1208,9 +1220,9 @@ void smp_init(bool smp_enable)
         cpus_in_proximity_domain[proximity_domain_idx]++;
     }
 
-    // Allocate a page of low memory for AP trampoline and sync objects.
-    // These need to remain pinned in place during relocation.
-    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
+    // Allocate two pages of low memory for the AP trampoline and sync
+    // objects. These need to remain pinned in place during relocation.
+    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, SYNC_ARENA_PAGES * PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
 #if defined(__i386__) || defined(__x86_64__)
     alloc_addr = HEAP_BASE_ADDR + (ap_trampoline_end - ap_trampoline);
@@ -1379,16 +1391,29 @@ void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_
 }
 #endif
 
-barrier_t *smp_alloc_barrier(int num_threads)
+barrier_t *smp_alloc_barriers_(unsigned int num_barriers, unsigned int num_threads)
 {
-    barrier_t *barrier = (barrier_t *)(alloc_addr);
-    alloc_addr += sizeof(barrier_t);
-    barrier_init(barrier, num_threads);
-    return barrier;
+    size_t size = (size_t)num_barriers * sizeof(barrier_t);
+    if (alloc_addr + size > SYNC_ARENA_LIMIT) {
+        // Do not overwrite adjacent low memory; report exhaustion so the
+        // caller can disable SMP/NUMA_PAR cleanly.
+        alloc_addr = SYNC_ARENA_LIMIT;
+        return NULL;
+    }
+    barrier_t *barriers = (barrier_t *)(alloc_addr);
+    alloc_addr += size;
+    for (unsigned int i = 0; i < num_barriers; i++) {
+        barrier_init(&barriers[i], num_threads);
+    }
+    return barriers;
 }
 
 spinlock_t *smp_alloc_mutex()
 {
+    if (alloc_addr + sizeof(spinlock_t) > SYNC_ARENA_LIMIT) {
+        // A shared global lock remains correct if the arena is exhausted.
+        return &fallback_mutex;
+    }
     spinlock_t *mutex = (spinlock_t *)(alloc_addr);
     alloc_addr += sizeof(spinlock_t);
     spin_unlock(mutex);
