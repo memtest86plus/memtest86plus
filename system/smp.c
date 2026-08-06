@@ -944,6 +944,7 @@ static int find_numa_nodes_in_srat(void)
     // ordinals. On x86/LoongArch the CPU is identified by its APIC ID, on
     // AArch64 by its ACPI Processor UID (SRAT type 3).
     while (tab_entry_ptr < srat_table_end) {
+        // Pass 1 validated every entry header, so re-reading it here is safe.
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
         if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
          || entry_header->length < sizeof(srat_entry_header_t)

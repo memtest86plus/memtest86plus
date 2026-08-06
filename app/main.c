@@ -113,6 +113,7 @@ int         num_enabled_cpus = 1;
 int         num_active_cpus = 0;
 int         master_cpu = 0;
 int         window_num = 0;
+bool        numa_run_active = false;
 static uintptr_t window_start = 0;
 static uintptr_t window_end   = 0;
 
@@ -563,6 +564,41 @@ non_numa_vm_map_entry:
 #endif
 }
 
+static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uintptr_t *win_end)
+{
+    uintptr_t low_limit = LOW_LOAD_LIMIT >> PAGE_SHIFT;
+    // The end of window 1, in pages. VM_WINDOW_SIZE is in pages, so the
+    // aarch64 rounding works on page numbers.
+#if defined(__aarch64__)
+    uintptr_t window_one_end = (low_limit + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
+#else
+    uintptr_t window_one_end = VM_WINDOW_SIZE;
+#endif
+
+    switch (window_index) {
+      case 0:
+        *win_start = 0;
+        *win_end   = low_limit;
+        break;
+      case 1:
+        *win_start = low_limit;
+        *win_end   = window_one_end;
+        break;
+      default:
+        *win_start = window_one_end + (window_index - 2) * VM_WINDOW_SIZE;
+        *win_end   = *win_start + VM_WINDOW_SIZE;
+    }
+}
+
+static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
+{
+    LONG_BARRIER;
+    run_at(addr, my_cpu);
+    __builtin_unreachable();
+}
+
+#include "numa_par.c"
+
 static void test_all_windows(int my_cpu)
 {
     bool parallel_test = false;
@@ -842,9 +878,18 @@ void main(void)
                 bail = false;
             }
             if (rerun_test) {
+                // Transitional NUMA_PAR activation; 66ce1c4 replaces this
+                // with the domain-derived decision.
+                numa_run_active = !dummy_run && VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR;
+                current_wave = 0;
+                num_execution_waves = 1;
+                scheduler_phase = WAVE_BIND;
                 window_num   = 0;
                 window_start = 0;
                 window_end   = 0;
+                test_contexts[0].window_index = 0;
+                test_contexts[0].window_start = 0;
+                test_contexts[0].window_end   = 0;
             }
             start_run  = false;
             start_pass = false;
@@ -853,7 +898,11 @@ void main(void)
         }
         SHORT_BARRIER;
         if (test_list[test_num].enabled) {
-            test_all_windows(my_cpu);
+            if (numa_run_active) {
+                test_all_windows_numa(my_cpu);
+            } else {
+                test_all_windows(my_cpu);
+            }
         }
         SHORT_BARRIER;
         if (my_cpu != 0) {

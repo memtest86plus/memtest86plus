@@ -42,6 +42,9 @@ extern int num_active_cpus;
  */
 extern int master_cpu;
 
+/* True while a NUMA_PAR run is active. */
+extern bool numa_run_active;
+
 /* Legacy window state (context 0); NUMA_PAR uses test_context() fields. */
 extern int window_num;
 
