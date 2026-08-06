@@ -551,6 +551,209 @@ non_numa_vm_map_entry:
 #endif
 }
 
+// The scheduler is a relocation-resumable state machine: run_at() never
+// returns, so after every relocation main() calls test_all_windows() again,
+// which resumes from the copied scheduler_phase/current_wave globals. Each
+// logical test stage starts one state-machine sequence (wave 0..N-1 per
+// stage); NUMA_PAR binds execution contexts to CPU-backed proximity domains
+// at WAVE_BIND, while legacy modes run the single legacy context.
+//
+// Every reconfiguration (barrier_reset, context rebind, status reset,
+// relocation) happens only between the LONG/SHORT_BARRIER pairs that bracket
+// each phase, so no running barrier generation or context wait is ever
+// reconfigured concurrently: the barriers are the quiescence protocol.
+
+typedef enum {
+    GLOBAL_STAGE_ONCE,   // test-specific stage run once by CPU 0 (e.g. bit-fade delay)
+    WAVE_BIND,           // bind the wave: publish counts/barriers, then first window
+    WAVE_WINDOW_0,       // test window 0 (below LOW_LOAD_LIMIT), relocated high
+    WAVE_WINDOWS_1_PLUS, // test windows 1 and above, relocated low
+    WAVE_FINISH,         // advance to the next wave, or finish the stage
+    WAVE_DONE            // the only state that lets main() advance the stage
+} test_scheduler_phase_t;
+
+static test_scheduler_phase_t scheduler_phase;
+
+// Copied global state: relocation re-entry resumes the wave sequence from
+// exactly where it stopped. Legacy modes and the dummy run use one wave.
+static unsigned int current_wave = 0;
+static unsigned int num_execution_waves = 1;
+
+// Runs the window currently selected by the context master. Every participant
+// maps the same physical window and tests its own chunk of it. Returns false
+// when the phase must be aborted (e.g. the mapping limit was reached).
+static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, bool dummy_run_active, int iterations)
+{
+    if (!i_am_active) {
+        return true;
+    }
+
+    if (num_mapped_pages[0] == 0) {
+        // No memory to test in this window.
+        if (i_am_master) {
+            window_num++;
+        }
+        return true;
+    }
+
+    if (dummy_run_active) {
+        if (i_am_master) {
+            ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
+        }
+        return true;
+    }
+
+    if (!map_window(0, vm_map[0][0].pm_base_addr)) {
+        // Either there is no PAE or we are at the PAE limit.
+        return false;
+    }
+    run_test(my_cpu, test_num, test_stage, iterations);
+
+    if (i_am_master) {
+        window_num++;
+    }
+    return true;
+}
+
+// The scheduler's window boundaries in pages: window 0 covers the low
+// region [0, LOW_LOAD_LIMIT); window 1 ends at the next 1 GiB boundary
+// (on aarch64 LOW_LOAD_LIMIT may be above VM_WINDOW_SIZE, so the end is
+// rounded up to avoid rechecking the region containing the low copy);
+// the following windows step by VM_WINDOW_SIZE. Every window is at most
+// one tick block, which the work accounting relies on.
+static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uintptr_t *win_end)
+{
+    uintptr_t low_limit = LOW_LOAD_LIMIT >> PAGE_SHIFT;
+    // The end of window 1, in pages. VM_WINDOW_SIZE is in pages, so the
+    // aarch64 rounding works on page numbers.
+#if defined(__aarch64__)
+    uintptr_t window_one_end = (low_limit + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
+#else
+    uintptr_t window_one_end = VM_WINDOW_SIZE;
+#endif
+
+    switch (window_index) {
+      case 0:
+        *win_start = 0;
+        *win_end   = low_limit;
+        break;
+      case 1:
+        *win_start = low_limit;
+        *win_end   = window_one_end;
+        break;
+      default:
+        *win_start = window_one_end + (window_index - 2) * VM_WINDOW_SIZE;
+        *win_end   = *win_start + VM_WINDOW_SIZE;
+    }
+}
+
+// Window 0 covers [0, LOW_LOAD_LIMIT). The master computes the window and
+// the map; the publication barrier makes them visible before test access.
+static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
+{
+    if (i_am_master) {
+        test_context_t *ctx = &test_contexts[0];
+        window_page_bounds(0, &ctx->window_start, &ctx->window_end);
+        setup_vm_map(0, ctx->window_start, ctx->window_end);
+    }
+    SHORT_BARRIER;
+
+    return run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+}
+
+// Windows 1 and above, in ascending order, until the context has enumerated
+// its owned memory. In legacy modes this is the pre-existing window loop.
+// The shared legacy window result, published by the master at a global
+// barrier so every participant takes the same loop-exit decision.
+static bool legacy_window_running = true;
+
+static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
+{
+    bool running = true;
+    do {
+        LONG_BARRIER;
+        if (bail) {
+            break;
+        }
+
+        if (i_am_master) {
+            test_context_t *ctx = &test_contexts[0];
+            if (window_num == 1) {
+                window_page_bounds(1, &ctx->window_start, &ctx->window_end);
+            } else {
+                ctx->window_start = ctx->window_end;
+                ctx->window_end  += VM_WINDOW_SIZE;
+            }
+            setup_vm_map(0, ctx->window_start, ctx->window_end);
+        }
+        SHORT_BARRIER;
+
+        bool my_result = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        if (i_am_master) {
+            // The map-failure decision must be shared: the inactive CPUs
+            // would otherwise return true here (they take no part in the
+            // window) and diverge from the master through different barrier
+            // generations, deadlocking at the addressability limit.
+            legacy_window_running = my_result;
+        }
+        SHORT_BARRIER;
+        running = legacy_window_running;
+    } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
+}
+
+// Reaches a pre-copy global rendezvous, then relocates the whole program.
+// run_at() performs its own post-copy barrier before the CPUs jump to the
+// newly copied image; the resume phase is already published in the copied
+// globals, so main() re-enters the same phase after the jump.
+static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
+{
+    LONG_BARRIER;
+    run_at(addr, my_cpu);
+    __builtin_unreachable();
+}
+
+// Master-only: decides whether window 0 will be tested in this stage/wave.
+// The legacy window-0 avoidance rules (multi-stage tests and pm_limit_lower
+// above LOW_LOAD_LIMIT) apply before any relocation decision is made.
+static bool wave_has_window_zero(void)
+{
+    if (window_num == 0 && test_list[test_num].stages > 1) {
+        // A multi-stage test runs through all the windows at each stage.
+        // Relocation may disrupt the test.
+        window_num = 1;
+    }
+    if (window_num == 0 && pm_limit_lower >= LOW_LOAD_LIMIT) {
+        // Avoid unnecessary relocation.
+        window_num = 1;
+    }
+    return window_num == 0;
+}
+
+// Master-only: prepares the execution context for the current stage/wave.
+// Legacy modes reconfigure the legacy run_barrier with the active CPU count;
+// NUMA_PAR binds execution contexts to CPU-backed proximity domains instead.
+static void bind_execution_wave(bool parallel_test)
+{
+    // CPUs not taking part in this test won't re-arm their stack
+    // canaries, and the coming relocations will invalidate them.
+    stack_canary_disarm_all();
+
+    test_contexts[0].active_cpu_count = 1;
+    if (!dummy_run) {
+        if (parallel_test) {
+            test_contexts[0].active_cpu_count = num_enabled_cpus;
+            if(display_mode == DISPLAY_MODE_NA) {
+                display_all_active();
+            }
+        } else {
+            if (display_mode == 0) {
+                display_active_cpu(smp_my_cpu_num());
+            }
+        }
+    }
+    barrier_reset(run_barrier, test_contexts[0].active_cpu_count);
+}
+
 static void test_all_windows(int my_cpu)
 {
     bool parallel_test = false;
@@ -562,26 +765,6 @@ static void test_all_windows(int my_cpu)
             i_am_active = true;
         }
     }
-    if (i_am_master) {
-        // CPUs not taking part in this test won't re-arm their stack
-        // canaries, and the coming relocations will invalidate them.
-        stack_canary_disarm_all();
-
-        test_contexts[0].active_cpu_count = 1;
-        if (!dummy_run) {
-            if (parallel_test) {
-                test_contexts[0].active_cpu_count = num_enabled_cpus;
-                if(display_mode == DISPLAY_MODE_NA) {
-                    display_all_active();
-                }
-            } else {
-                if (display_mode == 0) {
-                    display_active_cpu(my_cpu);
-                }
-            }
-        }
-        barrier_reset(run_barrier, test_contexts[0].active_cpu_count);
-    }
 
     int iterations = test_list[test_num].iterations;
     if (pass_num == 0) {
@@ -589,91 +772,73 @@ static void test_all_windows(int my_cpu)
         iterations /= 3;
     }
 
-    // Loop through all possible windows.
-    do {
-        LONG_BARRIER;
-        if (bail) {
-            break;
-        }
+    for (;;) {
+        switch (scheduler_phase) {
+          case GLOBAL_STAGE_ONCE:
+            // A test-specific global-once stage (e.g. the bit-fade delay)
+            // runs once on CPU 0 between memory-touching phases.
+            LONG_BARRIER;
+            if (my_cpu == 0) {
+                scheduler_phase = WAVE_DONE;
+            }
+            LONG_BARRIER;
+            continue;
 
-        if (i_am_master) {
-            if (window_num == 0 && test_list[test_num].stages > 1) {
-                // A multi-stage test runs through all the windows at each stage.
-                // Relocation may disrupt the test.
-                window_num = 1;
+          case WAVE_BIND:
+            LONG_BARRIER;
+            if (i_am_master) {
+                bind_execution_wave(parallel_test);
+                scheduler_phase = wave_has_window_zero()
+                                ? WAVE_WINDOW_0 : WAVE_WINDOWS_1_PLUS;
             }
-            if (window_num == 0 && pm_limit_lower >= LOW_LOAD_LIMIT) {
-                // Avoid unnecessary relocation.
-                window_num = 1;
-            }
-        }
-        SHORT_BARRIER;
+            SHORT_BARRIER;
+            continue;
 
-        // Relocate if necessary.
-        if (window_num > 0) {
-            if (!dummy_run && (uintptr_t)&_start != low_load_addr) {
-                run_at(low_load_addr, my_cpu);
-            }
-        } else {
+          case WAVE_WINDOW_0: {
+            bool window_zero_ok;
             if (!dummy_run && (uintptr_t)&_start != high_load_addr) {
-                run_at(high_load_addr, my_cpu);
+                relocate_all_and_resume(high_load_addr, my_cpu);
             }
-        }
-
-        if (i_am_master) {
-            //trace(my_cpu, "start window %i", window_num);
-            test_context_t *ctx = &test_contexts[0];
-            switch (window_num) {
-              case 0:
-                ctx->window_start = 0;
-                ctx->window_end   = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
-                break;
-              case 1:
-                ctx->window_start = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
-#if defined(__aarch64__)
-                // LOW_LOAD_LIMIT may be above VM_WINDOW_SIZE. End the window
-                // at the next window boundary to avoid recheck the region containing the low copy.
-                ctx->window_end   = (ctx->window_start + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
-#else
-                ctx->window_end   = VM_WINDOW_SIZE;
-#endif
-                break;
-              default:
-                ctx->window_start = ctx->window_end;
-                ctx->window_end  += VM_WINDOW_SIZE;
+            window_zero_ok = run_owned_window_zero(my_cpu, i_am_master, i_am_active, iterations);
+            LONG_BARRIER;
+            if (my_cpu == 0) {
+                // A window-0 map failure (the PAE limit was reached) aborts
+                // the stage: the following windows would fail identically,
+                // and the run boundary falls back to legacy placement.
+                scheduler_phase = window_zero_ok ? WAVE_WINDOWS_1_PLUS : WAVE_FINISH;
             }
-            setup_vm_map(0, ctx->window_start, ctx->window_end);
-        }
-        SHORT_BARRIER;
-
-        if (!i_am_active) {
+            SHORT_BARRIER;
             continue;
-        }
+          }
 
-        if (num_mapped_pages[0] == 0) {
-            // No memory to test in this window.
-            if (i_am_master) {
-                window_num++;
+          case WAVE_WINDOWS_1_PLUS:
+            if (!dummy_run && (uintptr_t)&_start != low_load_addr) {
+                relocate_all_and_resume(low_load_addr, my_cpu);
             }
+            run_owned_windows_1_plus(my_cpu, i_am_master, i_am_active, iterations);
+            LONG_BARRIER;
+            if (my_cpu == 0) {
+                scheduler_phase = WAVE_FINISH;
+            }
+            SHORT_BARRIER;
             continue;
-        }
 
-        if (dummy_run) {
-            if (i_am_master) {
-                ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
+          case WAVE_FINISH:
+            LONG_BARRIER;
+            if (my_cpu == 0) {
+                if (++current_wave < num_execution_waves) {
+                    scheduler_phase = WAVE_BIND;
+                } else {
+                    scheduler_phase = WAVE_DONE;
+                }
             }
-        } else {
-            if (!map_window(0, vm_map[0][0].pm_base_addr)) {
-                // Either there is no PAE or we are at the PAE limit.
-                break;
-            }
-            run_test(my_cpu, test_num, test_stage, iterations);
-        }
+            SHORT_BARRIER;
+            continue;
 
-        if (i_am_master) {
-            window_num++;
+          case WAVE_DONE:
+            return;
         }
-    } while (test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
+    }
 }
 
 static void select_next_master(void)
@@ -806,6 +971,12 @@ void main(void)
                 bail = false;
             }
             if (rerun_test) {
+                // Start a new state-machine sequence for this logical
+                // test/stage. This must not run on relocation re-entry,
+                // or the scheduler would rebind and reset progress.
+                current_wave = 0;
+                num_execution_waves = 1;   // NUMA_PAR computes this from the domains
+                scheduler_phase = WAVE_BIND;
                 test_contexts[0].window_index = 0;
                 test_contexts[0].window_start = 0;
                 test_contexts[0].window_end   = 0;

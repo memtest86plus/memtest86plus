@@ -706,7 +706,10 @@ static bool find_cpus_in_madt(void)
                 // Reject duplicate core IDs: the SRAT affinity mapping would
                 // be ambiguous.
                 if (apic_id_already_listed(entry->core_id, found_cpus)) {
-                    return false;
+                    // Skip the duplicate: aborting here would silently drop
+                    // every later CPU from the enumeration.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
                 }
                 if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[found_cpus] = entry->core_id;
@@ -739,7 +742,10 @@ static bool find_cpus_in_madt(void)
                     }
                 }
                 if (uid_already_listed) {
-                    return false;
+                    // Skip the duplicate: aborting the walk here would
+                    // silently drop every later CPU from the enumeration.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
                 }
                 if (mpidr == bsp_mpidr) {
                     cpu_num_to_acpi_uid[0] = uid;
@@ -828,6 +834,14 @@ static int find_numa_nodes_in_srat(void)
     // Pass 1: parse memory affinity entries and allocate proximity domains for each of them, while validating input a little bit.
     while (tab_entry_ptr < srat_table_end) {
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
+         || entry_header->length < sizeof(srat_entry_header_t)
+         || tab_entry_ptr + entry_header->length > srat_table_end) {
+            // A truncated trailing entry must not be parsed: its length byte
+            // could match an accepted size and push the read past the end of
+            // the table.
+            return 0;
+        }
 #if defined(__aarch64__)
         if (entry_header->type == SRAT_PROCESSOR_GICC_AFFINITY) {
             if (entry_header->length != sizeof(srat_processor_gicc_affinity_entry_t)) {
@@ -864,6 +878,7 @@ static int find_numa_nodes_in_srat(void)
                 if (start == end) {
                     // A zero-length enabled entry claims no memory; discard
                     // it rather than letting it count as domain ownership.
+                    tab_entry_ptr += entry_header->length;
                     continue;
                 }
 #if defined(__loongarch_lp64)
@@ -925,6 +940,13 @@ static int find_numa_nodes_in_srat(void)
     // AArch64 by its ACPI Processor UID (SRAT type 3).
     while (tab_entry_ptr < srat_table_end) {
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
+         || entry_header->length < sizeof(srat_entry_header_t)
+         || tab_entry_ptr + entry_header->length > srat_table_end) {
+            // Defensive: pass 1 already validated the table, but never walk
+            // a truncated trailing entry.
+            return 0;
+        }
         uint32_t proximity_domain;
         uint32_t apic_id;
 #if defined(__aarch64__)
