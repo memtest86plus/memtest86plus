@@ -66,8 +66,13 @@ jobs:
           elif [ ${{ matrix.arch }} == 'x86_64' ]; then
             cd build/x86_64
           elif [ ${{ matrix.arch }} == 'la64' ]; then
+            # The toolchain installed in the dependency step lives under
+            # /opt; each workflow step runs in its own shell, so re-export
+            # its bin directory here for the make invocation below.
             export PATH=/opt/LoongArch_Toolchains/cross-tools/bin/:$PATH
             cd build/loongarch64
+            make -j 2 CC=loongarch64-unknown-linux-gnu-gcc LD=loongarch64-unknown-linux-gnu-ld OBJCOPY=loongarch64-unknown-linux-gnu-objcopy iso
+            exit 0
           elif [ ${{ matrix.arch }} == 'aarch64' ]; then
             cd build/aarch64
             make -j 2 CC=aarch64-linux-gnu-gcc LD=aarch64-linux-gnu-ld OBJCOPY=aarch64-linux-gnu-objcopy iso
