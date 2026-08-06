@@ -40,7 +40,7 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         *start = vm_map[segment].start;
         *end   = vm_map[segment].end;
     } else {
-        if (enable_numa) {
+        if (numa_mode != NUMA_OFF) {
             uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(my_cpu);
 
             // Is this CPU in the same proximity domain as the current segment ?

@@ -37,6 +37,19 @@
 
 #define	LOCALS_SIZE	64		/* Stack region reserved for thread-local storage */
 
+/*
+ * The number of execution contexts that may run memory-test teams at the
+ * same time. 16 contexts cover any realistic 1-2 node machine in a single
+ * wave while keeping the per-context page-table/map footprint bounded; more
+ * CPU-backed NUMA domains are processed in successive waves. i586 builds
+ * use a single context. The value must be visible to startup assembly.
+ */
+#if defined(__i386__)
+#define	VMEM_MAX_CONTEXTS	1
+#else
+#define	VMEM_MAX_CONTEXTS	16
+#endif
+
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */
 

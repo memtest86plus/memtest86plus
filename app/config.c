@@ -102,7 +102,7 @@ bool            enable_sm          = true;
 bool            enable_spd_crc     = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
-bool            enable_numa        = false;
+numa_mode_t     numa_mode          = NUMA_OFF;
 
 bool            enable_ecc_polling = false;
 
@@ -358,10 +358,17 @@ static void parse_option(const char *option, const char *params)
         smp_enabled = false;
     } else if (strncmp(option, "nospdcrc", 9) == 0) {
         enable_spd_crc = false;
-    } else if (strncmp(option, "numa", 5) == 0) {
-        enable_numa = true;
-    } else if (strncmp(option, "nonuma", 7) == 0) {
-        enable_numa = false;
+    } else if (strncmp(option, "numa", 4) == 0 && option[4] == '\0') {
+        if (strncmp(params, "off", 3) == 0 && params[3] == '\0') {
+            numa_mode = NUMA_OFF;
+        } else if (VMEM_MAX_CONTEXTS > 1 && strncmp(params, "par", 3) == 0 && params[3] == '\0') {
+            numa_mode = NUMA_PAR;
+        } else {
+            // "numa" alone, or an unrecognised "numa=" value.
+            numa_mode = NUMA_ON;
+        }
+    } else if (strncmp(option, "nonuma", 6) == 0 && option[6] == '\0') {
+        numa_mode = NUMA_OFF;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;
@@ -702,6 +709,11 @@ static void address_range_menu(void)
 
 static void set_cpu_mode(cpu_mode_t mode)
 {
+    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR) {
+        // Selecting a legacy sequencing mode suspends NUMA_PAR; legacy NUMA
+        // placement may still apply.
+        numa_mode = NUMA_ON;
+    }
     printc(POP_R+3+cpu_mode, POP_LM, ' ');
     cpu_mode = mode;
     printc(POP_R+3+cpu_mode, POP_LM, '*');
