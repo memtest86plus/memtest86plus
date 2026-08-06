@@ -104,9 +104,25 @@ int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * prox
 //void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end);
 
 /**
- * Allocates and initialises a barrier object in pinned memory.
+ * Allocates and initialises num_barriers barrier objects in pinned memory.
+ * Both counts must be strictly positive; the wrapper validates them at
+ * compile time (every call site passes constants). Returns NULL if the
+ * pinned synchronization arena is exhausted.
  */
-barrier_t *smp_alloc_barrier(int num_threads);
+#define smp_alloc_barriers(num_barriers, num_threads)                       \
+    ({                                                                      \
+        _Static_assert((num_barriers) > 0,                                  \
+                       "barrier count must be strictly positive");          \
+        _Static_assert((num_threads) > 0,                                   \
+                       "barrier thread count must be strictly positive");   \
+        smp_alloc_barriers_((num_barriers), (num_threads));                 \
+    })
+
+/**
+ * The pinned-arena allocation behind smp_alloc_barriers(); the wrapper
+ * validates the strictly-positive counts at compile time.
+ */
+barrier_t *smp_alloc_barriers_(unsigned int num_barriers, unsigned int num_threads);
 
 /**
  * Allocates and initialises a spinlock object in pinned memory.
