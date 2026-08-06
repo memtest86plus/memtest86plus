@@ -126,11 +126,13 @@
 #define SRAT_PROCESSOR_APIC_AFFINITY   0
 #define SRAT_MEMORY_AFFINITY           1
 #define SRAT_PROCESSOR_X2APIC_AFFINITY 2
+#define SRAT_PROCESSOR_GICC_AFFINITY   3
 
 // SRAT flag values
 #define SRAT_PAAF_ENABLED              1
 #define SRAT_MAF_ENABLED               1
 #define SRAT_PXAAF_ENABLED             1
+#define SRAT_GICC_AAF_ENABLED          1
 
 // Private memory heap used for AP trampoline and synchronisation objects
 
@@ -359,6 +361,17 @@ typedef struct __attribute__((packed)) {
     uint32_t        reserved2;
 } srat_processor_lx2apic_affinity_entry_t;
 
+// SRAT subtable type 03: Processor Local GICC Affinity (AArch64).
+// The CPU is identified by its ACPI Processor UID, not by the MPIDR.
+typedef struct __attribute__((packed)) {
+    uint8_t         type;
+    uint8_t         length;
+    uint32_t        proximity_domain;
+    uint32_t        acpi_processor_uid;
+    uint32_t        flags;
+    uint32_t        clock_domain;
+} srat_processor_gicc_affinity_entry_t;
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -370,6 +383,21 @@ static apic_register_t   *apic = NULL;
 static uint32_t          cpu_num_to_proximity_domain_idx[MAX_CPUS];
 
 static cpu_apic_id_t     cpu_num_to_apic_id[MAX_CPUS];
+
+#if defined(__aarch64__)
+// The ACPI Processor UID of each CPU, retained alongside the MPIDR because
+// SRAT type 3 (GICC affinity) identifies CPUs by UID rather than by MPIDR.
+static uint32_t          cpu_num_to_acpi_uid[MAX_CPUS];
+
+// Whether the cpu_num_to_acpi_uid slot has been assigned; UID 0 is a
+// legitimate ACPI Processor UID and must not be mistaken for unassigned.
+static bool              cpu_num_to_uid_assigned[MAX_CPUS];
+#endif
+
+// Whether cpu_num_to_proximity_domain_idx[] has been assigned yet in the
+// current SRAT pass; domain index 0 is a valid assignment, so a separate
+// marker is required to detect conflicting affinities.
+static bool              cpu_num_to_domain_assigned[MAX_CPUS];
 
 static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS];
 
@@ -577,8 +605,10 @@ static bool find_cpus_in_floating_mp_struct(void)
 }
 #endif
 
-#if defined(__i386__) || defined(__x86_64__)
-// Firmware may list the same core as both a local APIC and an x2APIC entry.
+#if defined(__i386__) || defined(__x86_64__) || defined(__loongarch_lp64)
+// Firmware may list the same core twice (e.g. as both a local APIC and an
+// x2APIC entry on x86, or with a duplicated core ID on LoongArch). Reject
+// duplicates so the SRAT affinity mapping stays unambiguous.
 static bool apic_id_already_listed(cpu_apic_id_t apic_id, int found_cpus)
 {
     int count = found_cpus < MAX_CPUS ? found_cpus : MAX_CPUS;
@@ -673,6 +703,14 @@ static bool find_cpus_in_madt(void)
         if (entry_header->type == MADT_CORE_PIC) {
             madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
+                // Reject duplicate core IDs: the SRAT affinity mapping would
+                // be ambiguous.
+                if (apic_id_already_listed(entry->core_id, found_cpus)) {
+                    // Skip the duplicate: aborting here would silently drop
+                    // every later CPU from the enumeration.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
+                }
                 if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[found_cpus] = entry->core_id;
                     // The first CPU is the BSP, don't increment.
@@ -693,8 +731,29 @@ static bool find_cpus_in_madt(void)
             madt_gicc_entry_t *entry = (madt_gicc_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_GICC_ENABLED|MADT_GICC_ONLINE_CAPABLE)) {
                 uint64_t mpidr = entry->mpidr & MPIDR_AFFINITY_MASK;
-                if (mpidr != bsp_mpidr && num_available_cpus < MAX_CPUS) {
+                uint32_t uid = entry->acpi_processor_uid;
+                // Reject duplicate Processor UIDs: SRAT type 3 resolves CPUs
+                // by UID, so a duplicated UID would make the mapping ambiguous.
+                bool uid_already_listed = false;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if (cpu_num_to_uid_assigned[i] && cpu_num_to_acpi_uid[i] == uid) {
+                        uid_already_listed = true;
+                        break;
+                    }
+                }
+                if (uid_already_listed) {
+                    // Skip the duplicate: aborting the walk here would
+                    // silently drop every later CPU from the enumeration.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
+                }
+                if (mpidr == bsp_mpidr) {
+                    cpu_num_to_acpi_uid[0] = uid;
+                    cpu_num_to_uid_assigned[0] = true;
+                } else if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[num_available_cpus] = mpidr;
+                    cpu_num_to_acpi_uid[num_available_cpus] = uid;
+                    cpu_num_to_uid_assigned[num_available_cpus] = true;
                     num_available_cpus++;
                 }
                 found_cpus++;
@@ -764,8 +823,9 @@ static int find_numa_nodes_in_srat(void)
     if (acpi_checksum(srat, srat->h.length) != 0) {
         return 0;
     }
-    // A table which contains fewer bytes than header + 1 processor local APIC entry + 1 memory affinity entry would be very weird.
-    if (srat->h.length < sizeof(*srat) + sizeof(srat_processor_lapic_affinity_entry_t) + sizeof(srat_memory_affinity_entry_t)) {
+    // A table which contains fewer bytes than header + 1 processor affinity
+    // entry + 1 memory affinity entry would be very weird.
+    if (srat->h.length < sizeof(*srat) + sizeof(srat_memory_affinity_entry_t)) {
         return 0;
     }
 
@@ -774,11 +834,32 @@ static int find_numa_nodes_in_srat(void)
     // Pass 1: parse memory affinity entries and allocate proximity domains for each of them, while validating input a little bit.
     while (tab_entry_ptr < srat_table_end) {
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
+         || entry_header->length < sizeof(srat_entry_header_t)
+         || tab_entry_ptr + entry_header->length > srat_table_end) {
+            // A truncated trailing entry must not be parsed: its length byte
+            // could match an accepted size and push the read past the end of
+            // the table.
+            return 0;
+        }
+#if defined(__aarch64__)
+        if (entry_header->type == SRAT_PROCESSOR_GICC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_gicc_affinity_entry_t)) {
+                return 0;
+            }
+        }
+#else
         if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
             if (entry_header->length != sizeof(srat_processor_lapic_affinity_entry_t)) {
                 return 0;
             }
         }
+        else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_lx2apic_affinity_entry_t)) {
+                return 0;
+            }
+        }
+#endif
         else if (entry_header->type == SRAT_MEMORY_AFFINITY) {
             if (entry_header->length != sizeof(srat_memory_affinity_entry_t)) {
                 return 0;
@@ -854,11 +935,76 @@ static int find_numa_nodes_in_srat(void)
     }
 
     tab_entry_ptr = (uint8_t *)srat + sizeof(*srat);
-    // Pass 2: parse processor APIC / x2APIC affinity entries.
+    // Pass 2: parse processor affinity entries and map them to internal CPU
+    // ordinals. On x86/LoongArch the CPU is identified by its APIC ID, on
+    // AArch64 by its ACPI Processor UID (SRAT type 3).
     while (tab_entry_ptr < srat_table_end) {
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
+         || entry_header->length < sizeof(srat_entry_header_t)
+         || tab_entry_ptr + entry_header->length > srat_table_end) {
+            // Defensive: pass 1 already validated the table, but never walk
+            // a truncated trailing entry.
+            return 0;
+        }
         uint32_t proximity_domain;
         uint32_t apic_id;
+#if defined(__aarch64__)
+        if (entry_header->type == SRAT_PROCESSOR_GICC_AFFINITY) {
+            srat_processor_gicc_affinity_entry_t *entry = (srat_processor_gicc_affinity_entry_t *)tab_entry_ptr;
+            if (entry->flags & SRAT_GICC_AAF_ENABLED) {
+                int found1;
+                proximity_domain = entry->proximity_domain;
+                apic_id = entry->acpi_processor_uid;
+
+                found1 = -1;
+                // Find entry in proximity_domains, if necessary. Linear search for now.
+                for (int i = 0; i < num_proximity_domains; i++) {
+                    if (proximity_domains[i] == proximity_domain) {
+                        found1 = i;
+                        break;
+                    }
+                }
+                if (found1 == -1) {
+                    // A CPU-only domain (no memory entry): represent it so
+                    // its CPUs are parked instead of invalidating the whole
+                    // topology.
+                    if (num_proximity_domains < (int)(ARRAY_SIZE(proximity_domains))) {
+                        proximity_domains[num_proximity_domains] = proximity_domain;
+                        found1 = num_proximity_domains;
+                        num_proximity_domains++;
+                    } else {
+                        // Topology too large: do not truncate the domain list
+                        // and continue with inconsistent CPU/memory ownership.
+                        return -1;
+                    }
+                }
+
+                // Do we know about that ACPI Processor UID ? Only populated
+                // slots count; an unassigned slot still carries UID 0.
+                int found2 = -1;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if (cpu_num_to_uid_assigned[i] && cpu_num_to_acpi_uid[i] == apic_id) {
+                        found2 = i;
+                        break;
+                    }
+                }
+
+                if (found2 == -1) {
+                    // We've found an affinity entry whose CPU we don't know about.
+                    return 0;
+                }
+
+                // Reject a second affinity entry for the same CPU: duplicate or
+                // conflicting affinities both make the mapping ambiguous.
+                if (cpu_num_to_domain_assigned[found2]) {
+                    return 0;
+                }
+                cpu_num_to_domain_assigned[found2] = true;
+                cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
+            }
+        }
+#else
         if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
             srat_processor_lapic_affinity_entry_t *entry = (srat_processor_lapic_affinity_entry_t *)tab_entry_ptr;
             if (entry->flags & SRAT_PAAF_ENABLED) {
@@ -876,8 +1022,18 @@ find_proximity_domain:
                     }
                 }
                 if (found1 == -1) {
-                    // We've found an affinity entry whose proximity domain we don't know about.
-                    return 0;
+                    // A CPU-only domain (no memory entry): represent it so
+                    // its CPUs are parked instead of invalidating the whole
+                    // topology.
+                    if (num_proximity_domains < (int)(ARRAY_SIZE(proximity_domains))) {
+                        proximity_domains[num_proximity_domains] = proximity_domain;
+                        found1 = num_proximity_domains;
+                        num_proximity_domains++;
+                    } else {
+                        // Topology too large: do not truncate the domain list
+                        // and continue with inconsistent CPU/memory ownership.
+                        return -1;
+                    }
                 }
 
                 // Do we know about that APIC ID ?
@@ -894,6 +1050,12 @@ find_proximity_domain:
                     return 0;
                 }
 
+                // Reject a second affinity entry for the same CPU: duplicate or
+                // conflicting affinities both make the mapping ambiguous.
+                if (cpu_num_to_domain_assigned[found2]) {
+                    return 0;
+                }
+                cpu_num_to_domain_assigned[found2] = true;
                 cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
             }
         }
@@ -905,6 +1067,7 @@ find_proximity_domain:
                 goto find_proximity_domain;
             }
         }
+#endif
         tab_entry_ptr += entry_header->length;
     }
 
@@ -1241,6 +1404,17 @@ void smp_init(bool smp_enable)
     }
     for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_apic_id)); i++) {
         cpu_num_to_apic_id[i] = 0;
+    }
+#if defined(__aarch64__)
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_acpi_uid)); i++) {
+        cpu_num_to_acpi_uid[i] = 0;
+    }
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_uid_assigned)); i++) {
+        cpu_num_to_uid_assigned[i] = false;
+    }
+#endif
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_domain_assigned)); i++) {
+        cpu_num_to_domain_assigned[i] = false;
     }
 
     for (int i = 0; i < (int)(ARRAY_SIZE(memory_affinity_ranges)); i++) {
