@@ -23,6 +23,10 @@ void barrier_init(barrier_t *barrier, int num_threads)
     barrier_reset(barrier, num_threads);
 }
 
+// Quiescent-only: no CPU may be inside the barrier, may still enter its old
+// generation, or may enter its new generation until this count is published.
+// The cyclic self-rearm in the wait functions means normal execution never
+// reconfigures a barrier between consecutive generations.
 void barrier_reset(barrier_t *barrier, int num_threads)
 {
     barrier->num_threads = num_threads;
@@ -34,6 +38,12 @@ void barrier_reset(barrier_t *barrier, int num_threads)
     }
 }
 
+// A completed wait acts as a full rendezvous memory barrier: a release fence
+// publishes the participant's preceding writes before its arrival, and an
+// acquire fence makes the other participants' writes visible before the
+// waiter returns. The last arrival uses the implicit full fence of the
+// locked decrement and an explicit full fence before waking the peers.
+
 void barrier_spin_wait(barrier_t *barrier)
 {
     if (barrier == NULL || barrier->num_threads < 2) {
@@ -41,6 +51,8 @@ void barrier_spin_wait(barrier_t *barrier)
     }
     local_flag_t *waiting_flags = local_flags(barrier->flag_num);
     int my_cpu = smp_my_cpu_num();
+
+    __sync_synchronize();                       // release: publish prior writes
     waiting_flags[my_cpu].flag = true;
     if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
         volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
@@ -62,6 +74,7 @@ void barrier_spin_wait(barrier_t *barrier)
             __asm__ __volatile__ ("yield");
 #endif
         }
+        __sync_synchronize();                   // acquire: see peer writes
         return;
     }
     // Last one here, so reset the barrier and wake the others. No need to
@@ -80,6 +93,8 @@ void barrier_halt_wait(barrier_t *barrier)
     }
     local_flag_t *waiting_flags = local_flags(barrier->flag_num);
     int my_cpu = smp_my_cpu_num();
+
+    __sync_synchronize();                       // release: publish prior writes
     waiting_flags[my_cpu].flag = true;
     //
     // There is a small window of opportunity for the wakeup signal to arrive
@@ -102,7 +117,7 @@ void barrier_halt_wait(barrier_t *barrier)
         "0:           \n"
         : /* no outputs */
         : "m" (barrier->count)
-        : /* no clobbers */
+        : "memory"
         : end
     );
 #elif defined(__loongarch_lp64)
@@ -143,5 +158,6 @@ void barrier_halt_wait(barrier_t *barrier)
         }
     }
 end:
+    __sync_synchronize();                       // acquire: see peer writes
     return;
 }
