@@ -48,6 +48,7 @@
 
 int test_mov_inv_rng(int my_cpu, bool splat_round)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     testword_t seed;
@@ -69,7 +70,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
     }
 
     // Initialize memory with the pseudo-random sequence.
-    for (int j = 0; j < vm_map_size; j++) {
+    for (int j = 0; j < vm_map_size[context]; j++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, j, VEC_BYTES);
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test
@@ -121,7 +122,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
 
     seed_lanes(&st, seed, splat_round);
 
-    for (int j = 0; j < vm_map_size; j++) {
+    for (int j = 0; j < vm_map_size[context]; j++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, j, VEC_BYTES);
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test
@@ -179,7 +180,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
     // stored sequence is needed.
     flush_caches(my_cpu);
 
-    for (int j = vm_map_size - 1; j >= 0; j--) {
+    for (int j = vm_map_size[context] - 1; j >= 0; j--) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, j, VEC_BYTES);
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test

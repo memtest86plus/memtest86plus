@@ -123,6 +123,7 @@ void test_list_init(void)
 
 int run_test(int my_cpu, int test, int stage, int iterations)
 {
+    int context = test_context_index();
     // (Re)arm the canary guarding against this CPU overrunning its stack.
     // Needed on every call: relocation invalidates the stack area.
     stack_canary_arm(my_cpu);
@@ -137,20 +138,20 @@ int run_test(int my_cpu, int test, int stage, int iterations)
                 first_word = (uintptr_t *)0x500;
             }
 
-#if defined(__aarch64__)
-            // RAM starts well above physical address 0, so never move the
-            // start below the first mapped RAM page.
-            if (first_word > vm_map[0].start) {
-                vm_map[0].start = first_word;
+            // Only the context owning the low prefix may clamp its first
+            // segment down to the global lower limit (and the USB guard
+            // below 0x500); a context whose owned range starts higher must
+            // keep its start, or its map would expand into another team's
+            // range and the same physical memory would be tested twice,
+            // concurrently.
+            if (first_word > vm_map[context][0].start) {
+                vm_map[context][0].start = first_word;
             }
-#else
-            vm_map[0].start = first_word;
-#endif
         }
 
         /* Update display of memory segments being tested */
-        uintptr_t pb = page_of(vm_map[0].start);
-        uintptr_t pe = page_of(vm_map[vm_map_size - 1].end) + 1;
+        uintptr_t pb = page_of(vm_map[context][0].start);
+        uintptr_t pe = page_of(vm_map[context][vm_map_size[context] - 1].end) + 1;
         display_test_addresses(pb << 2, pe << 2, num_pages_to_test << 2);
     }
     BARRIER;

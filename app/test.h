@@ -89,17 +89,18 @@ typedef struct {
  * The list of memory segments currently mapped into virtual memory for each
  * execution context.
  */
-extern vm_map_t vm_map[MAX_MEM_SEGMENTS];
+extern vm_map_t vm_map[VMEM_MAX_CONTEXTS][MAX_MEM_SEGMENTS];
 /**
  * The number of memory segments currently mapped into virtual memory for each
  * execution context.
  */
-extern int vm_map_size;
+extern int vm_map_size[VMEM_MAX_CONTEXTS];
 
 /**
  * The number of pages currently mapped into virtual memory for each execution
  * context.
  */
+extern size_t num_mapped_pages[VMEM_MAX_CONTEXTS];
 
 /**
  * The mutable per-execution-context state needed by the test scheduler and

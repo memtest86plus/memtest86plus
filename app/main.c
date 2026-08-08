@@ -98,8 +98,6 @@ static bool             rerun_test = false;
 
 static bool             dummy_run  = false;
 
-static size_t           num_mapped_pages = 0;
-
 static int              test_stage = 0;
 
 //------------------------------------------------------------------------------
@@ -116,8 +114,9 @@ barrier_t   *run_barrier = NULL;
 
 spinlock_t  *error_mutex = NULL;
 
-vm_map_t    vm_map[MAX_MEM_SEGMENTS];
-int         vm_map_size = 0;
+vm_map_t    vm_map[VMEM_MAX_CONTEXTS][MAX_MEM_SEGMENTS];
+int         vm_map_size[VMEM_MAX_CONTEXTS];
+size_t      num_mapped_pages[VMEM_MAX_CONTEXTS];
 
 test_context_t test_contexts[VMEM_MAX_CONTEXTS] = { 0 };
 
@@ -462,11 +461,11 @@ static void ap_enumerate(int my_cpu)
     }
 }
 
-static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
+static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
 {
-    vm_map_size = 0;
+    vm_map_size[context] = 0;
 
-    num_mapped_pages = 0;
+    num_mapped_pages[context] = 0;
 
     // Reduce the window to fit in the user-specified limits.
     if (win_start < pm_limit_lower) {
@@ -502,17 +501,17 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
                 uint64_t new_end;
 
                 while (1) {
-                    if (vm_map_size >= MAX_MEM_SEGMENTS) {
+                    if (vm_map_size[context] >= MAX_MEM_SEGMENTS) {
                         break;
                     }
                     if (smp_narrow_to_proximity_domain(orig_start, orig_end, &proximity_domain_idx, &new_start, &new_end)) {
                         // Create a new entry in the virtual memory map.
-                        num_mapped_pages += (new_end - new_start) >> PAGE_SHIFT;
-                        vm_map[vm_map_size].pm_base_addr = new_start >> PAGE_SHIFT;
-                        vm_map[vm_map_size].start        = first_word_mapping(new_start >> PAGE_SHIFT);
-                        vm_map[vm_map_size].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t));
-                        vm_map[vm_map_size].proximity_domain_idx = proximity_domain_idx;
-                        vm_map_size++;
+                        num_mapped_pages[context] += (new_end - new_start) >> PAGE_SHIFT;
+                        vm_map[context][vm_map_size[context]].pm_base_addr = new_start >> PAGE_SHIFT;
+                        vm_map[context][vm_map_size[context]].start        = first_word_mapping(new_start >> PAGE_SHIFT);
+                        vm_map[context][vm_map_size[context]].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t));
+                        vm_map[context][vm_map_size[context]].proximity_domain_idx = proximity_domain_idx;
+                        vm_map_size[context]++;
                         if (new_start != orig_start || new_end != orig_end) {
                             // Proceed to the next part of the range.
                             orig_start = new_end; // No shift here, we already have a physical address.
@@ -523,23 +522,23 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
                         }
                     } else {
                         // Could not match with proximity domain, fall back to default behaviour. This shouldn't happen !
-                        vm_map[vm_map_size].proximity_domain_idx = 0;
+                        vm_map[context][vm_map_size[context]].proximity_domain_idx = 0;
                         goto non_numa_vm_map_entry;
                     }
                 }
             } else {
 non_numa_vm_map_entry:
-                num_mapped_pages += seg_end - seg_start;
-                vm_map[vm_map_size].pm_base_addr = seg_start;
-                vm_map[vm_map_size].start        = first_word_mapping(seg_start);
-                vm_map[vm_map_size].end          = last_word_mapping(seg_end - 1, sizeof(testword_t));
-                vm_map_size++;
+                num_mapped_pages[context] += seg_end - seg_start;
+                vm_map[context][vm_map_size[context]].pm_base_addr = seg_start;
+                vm_map[context][vm_map_size[context]].start        = first_word_mapping(seg_start);
+                vm_map[context][vm_map_size[context]].end          = last_word_mapping(seg_end - 1, sizeof(testword_t));
+                vm_map_size[context]++;
             }
         }
     }
 #if 0
-    for (int i = 0; i < vm_map_size; i++) {
-        do_trace(0, "vm %0*x - %0*x", 2*sizeof(uintptr_t), vm_map[i].start, 2*sizeof(uintptr_t), vm_map[i].end);
+    for (int i = 0; i < vm_map_size[context]; i++) {
+        do_trace(0, "vm %0*x - %0*x", 2*sizeof(uintptr_t), vm_map[context][i].start, 2*sizeof(uintptr_t), vm_map[context][i].end);
     }
 #endif
 }
@@ -635,7 +634,7 @@ static void test_all_windows(int my_cpu)
                 ctx->window_start = ctx->window_end;
                 ctx->window_end  += VM_WINDOW_SIZE;
             }
-            setup_vm_map(ctx->window_start, ctx->window_end);
+            setup_vm_map(0, ctx->window_start, ctx->window_end);
         }
         SHORT_BARRIER;
 
@@ -643,7 +642,7 @@ static void test_all_windows(int my_cpu)
             continue;
         }
 
-        if (num_mapped_pages == 0) {
+        if (num_mapped_pages[0] == 0) {
             // No memory to test in this window.
             if (i_am_master) {
                 window_num++;
@@ -656,7 +655,7 @@ static void test_all_windows(int my_cpu)
                 ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
             }
         } else {
-            if (!map_window(vm_map[0].pm_base_addr)) {
+            if (!map_window(vm_map[0][0].pm_base_addr)) {
                 // Either there is no PAE or we are at the PAE limit.
                 break;
             }

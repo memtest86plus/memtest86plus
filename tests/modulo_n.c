@@ -29,6 +29,7 @@
 
 int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pattern2, int n, int offset)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     if (my_cpu == master_cpu) {
@@ -36,7 +37,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
     }
 
     // Write every nth location with pattern1.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
         if ((end - start) < (n - 1)) SKIP_RANGE(1)  // we need at least n words for this test
@@ -69,7 +70,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
 
     // Write the rest of memory "iteration" times with pattern2.
     for (int i = 0; i < iterations; i++) {
-        for (int j = 0; j < vm_map_size; j++) {
+        for (int j = 0; j < vm_map_size[context]; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
             if ((end - start) < (n - 1)) SKIP_RANGE(1)  // we need at least n words for this test
@@ -110,7 +111,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
     flush_caches(my_cpu);
 
     // Now check every nth location.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
         if ((end - start) < (n - 1)) SKIP_RANGE(1)  // we need at least n words for this test

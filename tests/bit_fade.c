@@ -74,10 +74,11 @@ static inline testword_t fade_seed(void)
 // and check stages (on 64-bit builds, the physical byte address).
 static testword_t fade_addr_offset(void)
 {
+    int context = test_context_index();
     testword_t offset;
 
     // Calculate the offset (in pages) between the virtual address and the physical address.
-    offset = (vm_map[0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
+    offset = (vm_map[context][0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
     offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
 #if (ARCH_BITS == 64)
     // Convert to a byte address offset. This will translate the virtual address into a physical address.
@@ -92,6 +93,7 @@ static testword_t fade_addr_offset(void)
 
 static int pattern_fill(int my_cpu, int round)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     bool       random = (round >= 2);
@@ -108,7 +110,7 @@ static int pattern_fill(int my_cpu, int round)
         display_test_pattern_value(random ? (seed ^ invert) : invert);
     }
 
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test
@@ -153,6 +155,7 @@ static int pattern_fill(int my_cpu, int round)
 
 static int pattern_check(int my_cpu, int round)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     bool       random = (round >= 2);
@@ -165,7 +168,7 @@ static int pattern_check(int my_cpu, int round)
         offset = fade_addr_offset();
     }
 
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test

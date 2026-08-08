@@ -32,6 +32,7 @@
 
 int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword_t pattern2)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     if (my_cpu == master_cpu) {
@@ -39,7 +40,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
     }
 
     // Initialize memory with the initial pattern.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
         if (end < start) SKIP_RANGE(1) // we need at least one word for this test
@@ -124,7 +125,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
     for (int i = 0; i < iterations; i++) {
         flush_caches(my_cpu);
 
-        for (int j = 0; j < vm_map_size; j++) {
+        for (int j = 0; j < vm_map_size[context]; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
             if (end < start) SKIP_RANGE(1) // we need at least one word for this test
@@ -160,7 +161,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
 
         flush_caches(my_cpu);
 
-        for (int j = vm_map_size - 1; j >= 0; j--) {
+        for (int j = vm_map_size[context] - 1; j >= 0; j--) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
             if (end < start) SKIP_RANGE(1) // we need at least one word for this test

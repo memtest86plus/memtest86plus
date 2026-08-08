@@ -30,6 +30,7 @@
 
 int test_block_move(int my_cpu, int iterations)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     if (my_cpu == master_cpu) {
@@ -37,7 +38,7 @@ int test_block_move(int my_cpu, int iterations)
     }
 
     // Initialize memory with the initial pattern.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
         if ((end - start) < 15) SKIP_RANGE(1)  // we need at least 16 words for this test
@@ -88,7 +89,7 @@ int test_block_move(int my_cpu, int iterations)
 
     // Now move the data around. First move the data up half of the segment size
     // we are testing. Then move the data to the original location + 32 bytes.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
         if ((end - start) < 15) SKIP_RANGE(iterations)  // we need at least 16 words for this test
@@ -290,7 +291,7 @@ int test_block_move(int my_cpu, int iterations)
 
     // Now check the data. The error checking is rather crude.  We just check that the
     // adjacent words are the same.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, 16 * sizeof(testword_t));
         if ((end - start) < 15) SKIP_RANGE(1)  // we need at least 16 words for this test
