@@ -426,6 +426,7 @@ static void rh_fuzz_pattern(testword_t *state, rh_pattern_t *pat, uint32_t perio
 
 int test_rowhammer(int my_cpu, int time_budget_secs)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     rh_engine_init();
@@ -436,8 +437,8 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
 
     // Total testable bytes across the segments mapped in this window.
     uintptr_t total_bytes = 0;
-    for (int s = 0; s < vm_map_size; s++) {
-        total_bytes += ((uintptr_t)vm_map[s].end - (uintptr_t)vm_map[s].start) + sizeof(testword_t);
+    for (int s = 0; s < vm_map_size[context]; s++) {
+        total_bytes += ((uintptr_t)vm_map[context][s].end - (uintptr_t)vm_map[context][s].start) + sizeof(testword_t);
     }
     if (total_bytes < sizeof(testword_t)) {
         for (int i = 0; i < RH_SITES; i++) {
@@ -456,8 +457,8 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
 
     // Per-window row-stride discovery and activation-period calibration, using
     // the first segment's base as the timing probe. Skipped on the dummy run.
-    uintptr_t probe    = (uintptr_t)vm_map[0].start;
-    uintptr_t seg0_end = (uintptr_t)vm_map[0].end + sizeof(testword_t);
+    uintptr_t probe    = (uintptr_t)vm_map[context][0].start;
+    uintptr_t seg0_end = (uintptr_t)vm_map[context][0].end + sizeof(testword_t);
     uintptr_t discovered = 0;
     uint32_t  period     = RH_DEFAULT_PERIOD;
     if (my_cpu >= 0) {
@@ -489,13 +490,13 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
         // Map site index i to a segment and an aligned base address.
         uintptr_t target = (total_bytes / RH_SITES) * (uintptr_t)i
                          + (total_bytes / RH_SITES) / 2;
-        uintptr_t seg_start = (uintptr_t)vm_map[0].start;
-        uintptr_t seg_end   = (uintptr_t)vm_map[0].end + sizeof(testword_t);
+        uintptr_t seg_start = (uintptr_t)vm_map[context][0].start;
+        uintptr_t seg_end   = (uintptr_t)vm_map[context][0].end + sizeof(testword_t);
         uintptr_t site      = seg_start;
         uintptr_t acc = 0;
-        for (int s = 0; s < vm_map_size; s++) {
-            uintptr_t ss = (uintptr_t)vm_map[s].start;
-            uintptr_t se = (uintptr_t)vm_map[s].end + sizeof(testword_t);
+        for (int s = 0; s < vm_map_size[context]; s++) {
+            uintptr_t ss = (uintptr_t)vm_map[context][s].start;
+            uintptr_t se = (uintptr_t)vm_map[context][s].end + sizeof(testword_t);
             uintptr_t sb = se - ss;
             if (target < acc + sb) {
                 seg_start = ss;
