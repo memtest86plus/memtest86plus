@@ -57,17 +57,29 @@ extern bool paging_incomplete;
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 
 /**
+ * Prepares the architecture's physical-memory mapping model for the given
+ * number of execution contexts, which must be 1..VMEM_MAX_CONTEXTS.
+ * On x86-64 this initializes every per-context PML4/PDP/PD2 root; on
+ * AArch64 and LoongArch64 it validates the shared identity/direct mapping.
+ * Returns false (leaving a single context usable) on failure or an
+ * unsupported context count. Call before AP startup.
+ */
+bool vmem_prepare_execution_contexts(int num_contexts);
+
+/**
  * Maps a \ref VM_WINDOW_SIZE region of physical memory into the upper 2GB of
- * virtual memory. The physical memory region must be aligned on a \ref
- * VM_WINDOW_SIZE boundary. The virtual address will be similarly aligned.
- * The region will remain mapped until the next call to map_window().
+ * virtual memory for the given execution context. The physical memory region
+ * must be aligned on a \ref VM_WINDOW_SIZE boundary. The virtual address will
+ * be similarly aligned. The region will remain mapped until the next call to
+ * map_window() for the same context.
  *
- * \param start_page        - the physical page number of the region.
+ * \param context_id    - the execution context whose paging state is used.
+ * \param start_page    - the physical page number of the region.
  *
  * \returns
  * On success, true. On failure, false.
  */
-bool map_window(uintptr_t start_page);
+bool map_window(int context_id, uintptr_t start_page);
 
 /**
  * Returns a virtual memory pointer to the first word of the specified physical
@@ -96,14 +108,16 @@ void *last_word_mapping(uintptr_t page, size_t word_size);
 
 /**
  * Returns the page number of the physical memory page containing the specified
- * virtual memory address. The specified address must either be permanently
+ * virtual memory address, translated through the given execution context's
+ * current window mapping. The specified address must either be permanently
  * mapped or mapped by a call to map_window() prior to calling this function.
  *
  * \param addr              - the virtual memory address.
+ * \param context_id        - the execution context whose mapping is used.
  *
  * \returns
  * The corresponding physical page number.
  */
-uintptr_t page_of(void *addr);
+uintptr_t page_of(void *addr, int context_id);
 
 #endif // VMEM_H

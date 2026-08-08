@@ -168,7 +168,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     testword_t xor = good ^ bad;
 
     bool new_stats = false;
-    testword_t page   = page_of((void *)addr);
+    testword_t page   = page_of((void *)addr, 0);
     testword_t offset = addr & (PAGE_SIZE - 1);
 
     switch (type) {
