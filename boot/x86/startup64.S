@@ -57,7 +57,7 @@ startup32:
 	leal	(pd1 - startup32)(%ebx), %eax
 	addl	$0x3, %eax
 	movl	%eax, 8(%edx)
-	leal	(pd2 - startup32)(%ebx), %eax
+	leal	(win_pd - startup32)(%ebx), %eax
 	addl	$0x3, %eax
 	movl	%eax, 16(%edx)
 	leal	(pd3 - startup32)(%ebx), %eax
@@ -181,14 +181,16 @@ startup:
 	leaq	pd1(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 8(%rdx)
-	leaq	pd2(%rip), %rax
+	leaq	win_pd(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 16(%rdx)
 	leaq	pd3(%rip), %rax
 	addq	$0x3, %rax
 	movq	%rax, 24(%rdx)
 
-	# Set the page directory base address.
+	# Load the shared paging root: all CPUs run on the same translation
+	# tables. Any extra test window slots for NUMA_PAR are inserted into
+	# the PDP by the C code before the APs start.
 
 	movq	%rcx, %cr3
 
@@ -546,15 +548,17 @@ gdt_end:
 
 	maxdepth
 
-# The level 4 page map table.
+# The level 4 page map table: one shared root for all CPUs.
 
 	.align	4096
 	.globl	pml4
 pml4:
 	.quad	0			# filled in at run time
+	.fill	511, 8, 0
 
 # Page Directory Pointer Table:
-# 4 Entries, pointing to the Page Directory Tables.
+# 4 Entries pointing to the Page Directory Tables, plus one extra entry per
+# additional test window slot for NUMA_PAR.
 
 	.align	4096
 	.globl	pdp
@@ -563,12 +567,16 @@ pdp:
 	.quad	0			# filled in at run time
 	.quad	0			# filled in at run time
 	.quad	0			# filled in at run time
+	.fill	VMEM_MAX_CONTEXTS - 1, 8, 0
+	.fill	509 - VMEM_MAX_CONTEXTS, 8, 0
 
 # Page Directory Tables:
-# There are 4 tables. The first two map the first 2 GB of memory. The third
-# is used with PAE to map the rest of memory in 1 GB segments. The fourth is
-# reserved for mapping the video frame buffer. We use 2 MB pages so only the
-# Page Directory Table is used (no page tables).
+# The first two map the first 2 GB of memory. The third is the test window
+# of context 0 (and of i586 builds, which have a single execution context);
+# the additional C-code-inserted PDP entries give every other NUMA_PAR
+# execution context its own 1 GB test window. The fourth is reserved for
+# mapping the video frame buffer. We use 2 MB pages so only the Page
+# Directory Table is used (no page tables).
 
 	.align	4096
 	.globl	pd0
@@ -581,9 +589,11 @@ pd1:
 	ptes512	0x0000000040000000, 0x0000000000000083
 
 	.align	4096
-	.globl	pd2
-pd2:
-	ptes512	0x0000000080000000, 0x0000000000000083
+	.globl	win_pd
+win_pd:
+	.rept	VMEM_MAX_CONTEXTS
+		ptes512	0x0000000080000000, 0x0000000000000083
+	.endr
 
 	.align	4096
 	.globl	pd3

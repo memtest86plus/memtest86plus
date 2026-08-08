@@ -708,16 +708,16 @@ pdp:
 	.long	0
 	.long	pd1 + 0x1		# relocated at run time
 	.long	0
-	.long	pd2 + 0x1		# relocated at run time
+	.long	win_pd + 0x1		# relocated at run time
 	.long	0
 	.long	pd3 + 0x1		# relocated at run time
 	.long	0
 
 # Page Directory Tables:
 # There are 4 tables. The first two map the first 2 GB of memory. The third
-# is used with PAE to map the rest of memory in 1 GB segments. The fourth is
-# reserved for mapping the video frame buffer. We use 2 MB pages so only the
-# Page Directory Table is used (no page tables).
+# is the test window, used with PAE to map the rest of memory in 1 GB
+# segments. The fourth is reserved for mapping the video frame buffer. We
+# use 2 MB pages so only the Page Directory Table is used (no page tables).
 
 	.align	4096
 	.globl	pd0
@@ -730,8 +730,8 @@ pd1:
 	ptes512	0x0000000040000000, 0x0000000000000083
 
 	.align	4096
-	.globl	pd2
-pd2:
+	.globl	win_pd
+win_pd:
 	ptes512	0x0000000080000000, 0x0000000000000083
 
 	.align	4096

@@ -358,7 +358,8 @@ static void global_init(void)
 
     // Prepare the architecture mapping model for up to VMEM_MAX_CONTEXTS
     // execution contexts before the APs start. On x86-64 this initializes
-    // every per-context PML4/PDP/PD2 root; i586 keeps a single context.
+    // the shared paging root and every context's test window mapping;
+    // i586 keeps a single context.
     if (!vmem_prepare_execution_contexts(VMEM_MAX_CONTEXTS)
         && numa_mode == NUMA_PAR) {
         numa_mode = NUMA_ON;
@@ -526,8 +527,8 @@ static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
                         // Create a new entry in the virtual memory map.
                         num_mapped_pages[context] += (new_end - new_start) >> PAGE_SHIFT;
                         vm_map[context][vm_map_size[context]].pm_base_addr = new_start >> PAGE_SHIFT;
-                        vm_map[context][vm_map_size[context]].start        = first_word_mapping(new_start >> PAGE_SHIFT);
-                        vm_map[context][vm_map_size[context]].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t));
+                        vm_map[context][vm_map_size[context]].start        = first_word_mapping(new_start >> PAGE_SHIFT, context);
+                        vm_map[context][vm_map_size[context]].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t), context);
                         vm_map[context][vm_map_size[context]].proximity_domain_idx = proximity_domain_idx;
                         vm_map_size[context]++;
                         if (new_start != orig_start || new_end != orig_end) {
@@ -549,8 +550,8 @@ static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
 non_numa_vm_map_entry:
                 num_mapped_pages[context] += seg_end - seg_start;
                 vm_map[context][vm_map_size[context]].pm_base_addr = seg_start;
-                vm_map[context][vm_map_size[context]].start        = first_word_mapping(seg_start);
-                vm_map[context][vm_map_size[context]].end          = last_word_mapping(seg_end - 1, sizeof(testword_t));
+                vm_map[context][vm_map_size[context]].start        = first_word_mapping(seg_start, context);
+                vm_map[context][vm_map_size[context]].end          = last_word_mapping(seg_end - 1, sizeof(testword_t), context);
                 vm_map_size[context]++;
             }
         }

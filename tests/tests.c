@@ -131,7 +131,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     if (my_cpu == master_cpu) {
         if (window_num == 0) {
             // First window, so we need to test all selected lower memory.
-            uintptr_t *first_word = first_word_mapping(pm_limit_lower);
+            uintptr_t *first_word = first_word_mapping(pm_limit_lower, context);
 
             // For USB_WORKAROUND.
             if (first_word < (uintptr_t *)0x500) {
