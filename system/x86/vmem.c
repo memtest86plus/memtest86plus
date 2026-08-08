@@ -15,6 +15,8 @@
 
 #include "boot.h"
 
+#include "assert.h"
+
 #include "cpuid.h"
 
 #include "vmem.h"
@@ -55,8 +57,9 @@ static uintptr_t    mapped_window = 2;
 // Private Functions
 //------------------------------------------------------------------------------
 
-static void load_pdbr()
+static void load_pdbr(int context_id)
 {
+    assert(context_id == 0);
     void *page_table;
     if (cpuid_info.flags.lm == 1) {
         page_table = pml4;
@@ -79,6 +82,20 @@ static void load_pdbr()
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
+
+
+bool vmem_prepare_execution_contexts(int requested_contexts)
+{
+    // The x86-64 per-context roots are prepared by the implementation
+    // commit that follows; only context 0 exists here, so more than one
+    // context is refused and the NUMA_PAR configuration downgrades to
+    // NUMA_ON.
+    if (requested_contexts != 1) {
+        return false;
+    }
+    load_pdbr(0);
+    return true;
+}
 
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
 {
@@ -109,17 +126,19 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
         pd3[device_pages_used++] = (curr_phys_page++ << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
-    load_pdbr();
+    load_pdbr(0);
     // Return the mapped address.
     return VM_REGION_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
-bool map_window(uintptr_t start_page)
+bool map_window(int context_id, uintptr_t start_page)
 {
     uintptr_t window = start_page >> (30 - PAGE_SHIFT);
 
     if (window < 2) {
-        // Less than 2 GB so no mapping is required.
+        // Less than 2 GB so no mapping is required. Only context 0 is
+        // usable until the per-context roots are prepared.
+        (void)context_id;
         return true;
     }
     if (cpuid_info.flags.pae == 0) {
@@ -140,7 +159,7 @@ bool map_window(uintptr_t start_page)
         pd2[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + 0x83;
     }
     // Reload the PDBR to flush any remnants of the old mapping.
-    load_pdbr();
+    load_pdbr(0);
 
     mapped_window = window;
     return true;
@@ -165,8 +184,9 @@ void *last_word_mapping(uintptr_t page, size_t word_size)
     return (uint8_t *)first_word_mapping(page) + (PAGE_SIZE - word_size);
 }
 
-uintptr_t page_of(void *addr)
+uintptr_t page_of(void *addr, int context_id)
 {
+    (void)context_id;
     uintptr_t page = (uintptr_t)addr >> PAGE_SHIFT;
     if (page >= PAGE_C(2,GB)) {
         page = page % PAGE_C(1,GB);

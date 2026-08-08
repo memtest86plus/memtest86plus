@@ -330,6 +330,14 @@ static void global_init(void)
         numa_mode = NUMA_ON;
     }
 
+    // Prepare the architecture mapping model for up to VMEM_MAX_CONTEXTS
+    // execution contexts before the APs start. On x86-64 this initializes
+    // every per-context PML4/PDP/PD2 root; i586 keeps a single context.
+    if (!vmem_prepare_execution_contexts(VMEM_MAX_CONTEXTS)
+        && numa_mode == NUMA_PAR) {
+        numa_mode = NUMA_ON;
+    }
+
     // At this point we have started reserving physical pages in the memory
     // map for data structures that need to be permanently pinned in place.
     // This may overwrite any data structures passed to us by the BIOS and/or
@@ -655,7 +663,7 @@ static void test_all_windows(int my_cpu)
                 ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
             }
         } else {
-            if (!map_window(vm_map[0][0].pm_base_addr)) {
+            if (!map_window(0, vm_map[0][0].pm_base_addr)) {
                 // Either there is no PAE or we are at the PAE limit.
                 break;
             }
