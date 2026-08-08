@@ -377,10 +377,10 @@ static void global_init(void)
         post_display_init();
     }
 
-    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
+    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_available_cpus - 1) * AP_STACK_SIZE;
 
-    bool load_addr_ok = set_load_addr(& low_load_addr, program_size,         0x1000,  LOW_LOAD_LIMIT)
-                     && set_load_addr(&high_load_addr, program_size, LOW_LOAD_LIMIT, HIGH_LOAD_LIMIT);
+    bool load_addr_ok =    set_load_addr( &low_load_addr, program_size,         0x1000,  LOW_LOAD_LIMIT)
+                        && set_load_addr(&high_load_addr, program_size, LOW_LOAD_LIMIT, HIGH_LOAD_LIMIT);
 
     trace(0, "program size %ikB", (int)(program_size / 1024));
     trace(0, " low_load_addr %0*x", 2*sizeof(uintptr_t),  low_load_addr);
