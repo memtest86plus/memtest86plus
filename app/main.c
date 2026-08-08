@@ -98,9 +98,6 @@ static bool             rerun_test = false;
 
 static bool             dummy_run  = false;
 
-static uintptr_t        window_start = 0;
-static uintptr_t        window_end   = 0;
-
 static size_t           num_mapped_pages = 0;
 
 static int              test_stage = 0;
@@ -113,10 +110,13 @@ static int              test_stage = 0;
 
 uint16_t     chunk_index[MAX_CPUS];
 
-int         num_active_cpus = 0;
 int         num_enabled_cpus = 1;
 
+int         num_active_cpus = 0;
 int         master_cpu = 0;
+int         window_num = 0;
+static uintptr_t window_start = 0;
+static uintptr_t window_end   = 0;
 
 barrier_t   *run_barrier = NULL;
 
@@ -125,10 +125,10 @@ spinlock_t  *error_mutex = NULL;
 vm_map_t    vm_map[MAX_MEM_SEGMENTS];
 int         vm_map_size = 0;
 
+test_context_t test_contexts[VMEM_MAX_CONTEXTS] = { 0 };
+
 int         pass_num = 0;
 int         test_num = 0;
-
-int         window_num = 0;
 
 bool        restart = false;
 bool        bail    = false;
@@ -694,6 +694,35 @@ static void select_next_master(void)
     do {
         master_cpu = (master_cpu + 1) % num_available_cpus;
     } while (cpu_state[master_cpu] == CPU_STATE_DISABLED);
+}
+
+//------------------------------------------------------------------------------
+// Public Functions
+//------------------------------------------------------------------------------
+
+// The execution-context accessors. Legacy modes (and the BSP-only dummy run)
+// always use context 0; the NUMA_PAR scheduler binds CPU ordinals to contexts
+// at globally quiescent wave boundaries.
+
+test_context_t *test_context(void)
+{
+    return &test_contexts[0];
+}
+
+int test_context_index(void)
+{
+    return 0;
+}
+
+int execution_context_for_cpu(int cpu)
+{
+    (void)cpu;
+    return 0;
+}
+
+barrier_t *test_run_barrier(void)
+{
+    return run_barrier;
 }
 
 //------------------------------------------------------------------------------
