@@ -578,9 +578,9 @@ void do_tick(int my_cpu)
     int act_sec = 0;
     bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
     if (use_spin_wait) {
-        barrier_spin_wait(run_barrier);
+        barrier_spin_wait(test_run_barrier());
     } else {
-        barrier_halt_wait(run_barrier);
+        barrier_halt_wait(test_run_barrier());
     }
 
     if (master_cpu == my_cpu) {
@@ -588,9 +588,9 @@ void do_tick(int my_cpu)
         error_update();
     }
     if (use_spin_wait) {
-        barrier_spin_wait(run_barrier);
+        barrier_spin_wait(test_run_barrier());
     } else {
-        barrier_halt_wait(run_barrier);
+        barrier_halt_wait(test_run_barrier());
     }
 
     // Only the master CPU does the update.

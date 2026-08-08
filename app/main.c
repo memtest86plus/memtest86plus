@@ -98,9 +98,6 @@ static bool             rerun_test = false;
 
 static bool             dummy_run  = false;
 
-static uintptr_t        window_start = 0;
-static uintptr_t        window_end   = 0;
-
 static size_t           num_mapped_pages = 0;
 
 static int              test_stage = 0;
@@ -113,10 +110,7 @@ static int              test_stage = 0;
 
 uint16_t     chunk_index[MAX_CPUS];
 
-int         num_active_cpus = 0;
 int         num_enabled_cpus = 1;
-
-int         master_cpu = 0;
 
 barrier_t   *run_barrier = NULL;
 
@@ -125,10 +119,10 @@ spinlock_t  *error_mutex = NULL;
 vm_map_t    vm_map[MAX_MEM_SEGMENTS];
 int         vm_map_size = 0;
 
+test_context_t test_contexts[VMEM_MAX_CONTEXTS] = { 0 };
+
 int         pass_num = 0;
 int         test_num = 0;
-
-int         window_num = 0;
 
 bool        restart = false;
 bool        bail    = false;
@@ -566,10 +560,10 @@ static void test_all_windows(int my_cpu)
         // canaries, and the coming relocations will invalidate them.
         stack_canary_disarm_all();
 
-        num_active_cpus = 1;
+        test_contexts[0].active_cpu_count = 1;
         if (!dummy_run) {
             if (parallel_test) {
-                num_active_cpus = num_enabled_cpus;
+                test_contexts[0].active_cpu_count = num_enabled_cpus;
                 if(display_mode == DISPLAY_MODE_NA) {
                     display_all_active();
                 }
@@ -579,7 +573,7 @@ static void test_all_windows(int my_cpu)
                 }
             }
         }
-        barrier_reset(run_barrier, num_active_cpus);
+        barrier_reset(run_barrier, test_contexts[0].active_cpu_count);
     }
 
     int iterations = test_list[test_num].iterations;
@@ -621,26 +615,27 @@ static void test_all_windows(int my_cpu)
 
         if (i_am_master) {
             //trace(my_cpu, "start window %i", window_num);
+            test_context_t *ctx = &test_contexts[0];
             switch (window_num) {
               case 0:
-                window_start = 0;
-                window_end   = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
+                ctx->window_start = 0;
+                ctx->window_end   = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
                 break;
               case 1:
-                window_start = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
+                ctx->window_start = (LOW_LOAD_LIMIT >> PAGE_SHIFT);
 #if defined(__aarch64__)
                 // LOW_LOAD_LIMIT may be above VM_WINDOW_SIZE. End the window
                 // at the next window boundary to avoid recheck the region containing the low copy.
-                window_end   = (window_start + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
+                ctx->window_end   = (ctx->window_start + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
 #else
-                window_end   = VM_WINDOW_SIZE;
+                ctx->window_end   = VM_WINDOW_SIZE;
 #endif
                 break;
               default:
-                window_start = window_end;
-                window_end  += VM_WINDOW_SIZE;
+                ctx->window_start = ctx->window_end;
+                ctx->window_end  += VM_WINDOW_SIZE;
             }
-            setup_vm_map(window_start, window_end);
+            setup_vm_map(ctx->window_start, ctx->window_end);
         }
         SHORT_BARRIER;
 
@@ -671,7 +666,7 @@ static void test_all_windows(int my_cpu)
         if (i_am_master) {
             window_num++;
         }
-    } while (window_end < pm_map[pm_map_size - 1].end);
+    } while (test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
 static void select_next_master(void)
@@ -679,6 +674,35 @@ static void select_next_master(void)
     do {
         master_cpu = (master_cpu + 1) % num_available_cpus;
     } while (cpu_state[master_cpu] == CPU_STATE_DISABLED);
+}
+
+//------------------------------------------------------------------------------
+// Public Functions
+//------------------------------------------------------------------------------
+
+// The execution-context accessors. Legacy modes (and the BSP-only dummy run)
+// always use context 0; the NUMA_PAR scheduler binds CPU ordinals to contexts
+// at globally quiescent wave boundaries.
+
+test_context_t *test_context(void)
+{
+    return &test_contexts[0];
+}
+
+int test_context_index(void)
+{
+    return 0;
+}
+
+int execution_context_for_cpu(int cpu)
+{
+    (void)cpu;
+    return 0;
+}
+
+barrier_t *test_run_barrier(void)
+{
+    return run_barrier;
 }
 
 //------------------------------------------------------------------------------
@@ -775,9 +799,9 @@ void main(void)
                 bail = false;
             }
             if (rerun_test) {
-                window_num   = 0;
-                window_start = 0;
-                window_end   = 0;
+                test_contexts[0].window_index = 0;
+                test_contexts[0].window_start = 0;
+                test_contexts[0].window_end   = 0;
             }
             start_run  = false;
             start_pass = false;

@@ -31,19 +31,9 @@ extern uint16_t chunk_index[MAX_CPUS];
  */
 extern uint16_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
- /*
-  * The number of CPU cores being used for the current test. This is always
-  * either 1 or the full number of enabled CPU cores.
-  */
-extern int num_active_cpus;
-
 /**
- * The current master CPU core.
- */
-extern int master_cpu;
-
-/**
- * A barrier used when running tests.
+ * A barrier used when running tests. Only the scheduler/control code may use
+ * it directly; test implementations use test_run_barrier().
  */
 extern barrier_t *run_barrier;
 
@@ -96,13 +86,68 @@ typedef struct {
 } vm_map_t;
 
 /**
- * The list of memory segments currently mapped into virtual memory.
+ * The list of memory segments currently mapped into virtual memory for each
+ * execution context.
  */
 extern vm_map_t vm_map[MAX_MEM_SEGMENTS];
 /**
- * The number of memory segments currently mapped into virtual memory.
+ * The number of memory segments currently mapped into virtual memory for each
+ * execution context.
  */
 extern int vm_map_size;
+
+/**
+ * The number of pages currently mapped into virtual memory for each execution
+ * context.
+ */
+
+/**
+ * The mutable per-execution-context state needed by the test scheduler and
+ * test implementations. Context 0 is the legacy-mode context.
+ */
+typedef struct {
+    uint32_t    proximity_domain_idx;
+    int         master_cpu_num;
+    unsigned int team_cpu_count;
+    unsigned int active_cpu_count;
+    int         window_index;
+    uintptr_t   window_start;
+    uintptr_t   window_end;
+    int         status;
+} test_context_t;
+
+/**
+ * The per-execution-context test state.
+ */
+extern test_context_t test_contexts[VMEM_MAX_CONTEXTS];
+
+/**
+ * Returns the execution context of the calling CPU. In legacy modes and
+ * during the BSP-only dummy run this is always context 0.
+ */
+test_context_t *test_context(void);
+
+/**
+ * Returns the index of the execution context of the calling CPU.
+ */
+int test_context_index(void);
+
+/**
+ * Returns the execution context currently bound to the given CPU, clamped
+ * to 0 for unbound or invalid ordinals.
+ */
+int execution_context_for_cpu(int cpu);
+
+/**
+ * Returns the barrier to use for test-internal waits from the calling CPU:
+ * the current context barrier in active NUMA_PAR, the legacy run_barrier
+ * otherwise.
+ */
+barrier_t *test_run_barrier(void);
+
+#define master_cpu       (test_context()->master_cpu_num)
+#define num_active_cpus  (test_context()->active_cpu_count)
+#define window_num       (test_context()->window_index)
 
 /**
  * The number of completed test passes.
@@ -112,10 +157,6 @@ extern int pass_num;
  * The current test number.
  */
 extern int test_num;
-/**
- * The current window number.
- */
-extern int window_num;
 
 /**
  * A flag indicating that testing should be restarted due to a configuration
