@@ -202,8 +202,17 @@ startup:
 	addq	$0x3, %rax
 	movq	%rax, 24(%rdx)
 
-	# Set the page directory base address.
+	# Select the calling CPU's paging context. Context 0 is the identity
+	# mapped control context used by the AP trampoline and parked CPUs; it
+	# was rebuilt above. Legacy modes bind every CPU to context 0, so this
+	# selects the same root on every CPU.
 
+	call	smp_my_cpu_num
+	movl	%eax, %edi
+	call	execution_context_for_cpu
+	shlq	$12, %rax
+	leaq	pml4(%rip), %rcx
+	addq	%rax, %rcx
 	movq	%rcx, %cr3
 
 	# Initialise the GDT descriptor.
@@ -565,24 +574,30 @@ gdt_end:
 	.align	4096
 	.globl	pml4
 pml4:
-	.quad	0			# filled in at run time
+	.rept	VMEM_MAX_CONTEXTS
+		.quad	0			# filled in at run time
+		.fill	511, 8, 0
+	.endr
 
 # Page Directory Pointer Table:
-# 4 Entries, pointing to the Page Directory Tables.
+# 4 Entries per context, pointing to the Page Directory Tables.
 
 	.align	4096
 	.globl	pdp
 pdp:
-	.quad	0			# filled in at run time
-	.quad	0			# filled in at run time
-	.quad	0			# filled in at run time
-	.quad	0			# filled in at run time
+	.rept	VMEM_MAX_CONTEXTS
+		.quad	0			# filled in at run time
+		.quad	0			# filled in at run time
+		.quad	0			# filled in at run time
+		.quad	0			# filled in at run time
+		.fill	508, 8, 0
+	.endr
 
 # Page Directory Tables:
-# There are 4 tables. The first two map the first 2 GB of memory. The third
-# is used with PAE to map the rest of memory in 1 GB segments. The fourth is
-# reserved for mapping the video frame buffer. We use 2 MB pages so only the
-# Page Directory Table is used (no page tables).
+# There are 4 tables per context. The first two map the first 2 GB of memory.
+# The third is used with PAE to map the rest of memory in 1 GB segments. The
+# fourth is reserved for mapping the video frame buffer. We use 2 MB pages so
+# only the Page Directory Table is used (no page tables).
 
 	.align	4096
 	.globl	pd0
@@ -597,7 +612,9 @@ pd1:
 	.align	4096
 	.globl	pd2
 pd2:
-	ptes512	0x0000000080000000, 0x0000000000000083
+	.rept	VMEM_MAX_CONTEXTS
+		ptes512	0x0000000080000000, 0x0000000000000083
+	.endr
 
 	.align	4096
 	.globl	pd3
