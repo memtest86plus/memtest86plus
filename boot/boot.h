@@ -12,11 +12,14 @@
  */
 
 /*
- * NOTE: Increasing the value of MAX_APS would require:
+ * NOTE: Increasing the value of MAX_APS requires:
  *  - relocating the stacks when the program is loaded in low memory
  *  - adjusting the display if more than 3 digits are needed for CPU IDs
+ *  - auditing the boot/link layouts for overlap between the low image, high
+ *    image, .stacks, setup area, and pinned memory, because the .stacks
+ *    reservation grows by AP_STACK_SIZE per additional AP slot
  */
-#define	MAX_APS		511		/* Maximum number of active APs */
+#define	MAX_APS		1023		/* Maximum number of active APs */
 
 #define BSP_STACK_SIZE	16384		/* Stack size for the BSP */
 
@@ -32,7 +35,7 @@
 
 #define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
-#define	LOCALS_SIZE	16		/* Stack region reserved for thread-local storage */
+#define	LOCALS_SIZE	64		/* Stack region reserved for thread-local storage */
 
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */

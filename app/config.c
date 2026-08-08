@@ -486,7 +486,7 @@ static void display_selection_header(int row, int max_num, int offset)
         printc(row, POP_LM+30, 0x19);
     }
     row++;
-    printi(row, POP_LM-2, offset, 3, false, false);
+    printi(row, POP_LM-2, offset, 4, false, false);
     offset++;
     for (i = 1; i < SEL_W && offset < max_num; i++) {
         printc(row, POP_LM+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
@@ -504,7 +504,7 @@ static void display_selection_header(int row, int max_num, int offset)
             offset++;
         }
     }
-    printi(row, POP_LM+i, offset, 3, false, true);
+    printi(row, POP_LM+i, offset, 4, false, true);
 }
 
 static void display_enabled(int row, int n, bool enabled)
