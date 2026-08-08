@@ -26,7 +26,7 @@
 /**
  * The maximum number of APIC IDs.
  */
-#define MAX_APIC_IDS                512
+#define MAX_APIC_IDS                MAX_CPUS
 
 /**
  * The maximum number of NUMA proximity domains.

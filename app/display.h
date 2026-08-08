@@ -133,7 +133,7 @@ typedef enum {
 
 #define display_active_cpu(cpu_num) \
     prints(8, 7, "Core #"); \
-    printi(8, 13, cpu_num, 3, false, true)
+    printi(8, 13, cpu_num, 4, false, true)
 
 #define display_all_active() \
     prints(8, 7, "All Cores")
