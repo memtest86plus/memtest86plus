@@ -696,8 +696,8 @@ void do_trace(int my_cpu, const char *fmt, ...)
     va_start(args, fmt);
     spin_lock(error_mutex);
     scroll();
-    printi(scroll_message_row, 0, my_cpu, 2, false, false);
-    vprintf(scroll_message_row, 4, fmt, args);
+    printi(scroll_message_row, 0, my_cpu, 4, false, false);
+    vprintf(scroll_message_row, 6, fmt, args);
     spin_unlock(error_mutex);
     va_end(args);
 }
