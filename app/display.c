@@ -67,8 +67,8 @@ static int spin_idx = 0;        // current spinner position
 static int pass_ticks = 0;      // current value (ticks_per_pass is final value)
 static int test_ticks = 0;      // current value (ticks_per_test is final value)
 
-static int pass_bar_length = 0; // currently displayed length
-static int test_bar_length = 0; // currently displayed length
+int pass_bar_length = 0; // currently displayed length
+int test_bar_length = 0; // currently displayed length
 
 static uint64_t next_spin_time = 0; // TSC time stamp
 
@@ -395,9 +395,10 @@ void display_start_pass(void)
 void display_start_test(void)
 {
     clear_screen_region(2, 39, 3, SCREEN_WIDTH - 1);    // progress bar, test details
-    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6);    // Avoid erasing paging mode
+    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1);    // Testing line, value and stage
     clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1);
     clear_screen_region(3, 36, 3, 37);                  // test number
+    display_test_stage(0, 0);
     display_test_percentage(0);
     display_test_number(test_num);
     display_test_description(test_list[test_num].description);
@@ -411,6 +412,68 @@ void display_start_test(void)
     int hours = mins / 60; mins %= 60;
     do_trace(0, "T %i: %i:%02i:%02i", test_num, hours, mins, secs);
 #endif
+}
+
+// Renders one progress percentage and advances the matching bar. The bar
+// state stays private to this translation unit.
+void display_test_progress(int pct)
+{
+    display_test_percentage(pct);
+    display_test_bar((BAR_LENGTH * pct) / 100);
+}
+
+void display_pass_progress(int pct)
+{
+    display_pass_percentage(pct);
+    display_pass_bar((BAR_LENGTH * pct) / 100);
+}
+
+// The stage currently shown in the Testing line's right-aligned field.
+static int current_stage = 0;
+static int current_stages = 0;
+
+void display_test_stage(int stage, int stages)
+{
+    current_stage = stage;
+    current_stages = stages;
+    display_test_stage_field();
+}
+
+// The field is redrawn after every Testing-line value update, so a long
+// address string never leaves it blanked or partially overwritten.
+void display_test_stage_field(void)
+{
+    if (current_stages > 1) {
+        printf(4, 71, "Stg %2i/%2i", current_stage, current_stages);
+    } else {
+        clear_screen_region(4, 71, 4, SCREEN_WIDTH - 1);
+    }
+}
+
+// NUMA_PAR Testing line. Shows the active/total execution context (job)
+// count and the aggregate pages tested in this stage, so the line keeps
+// advancing while any team still works and clearly shows a tail wait when
+// some jobs have finished.
+void display_test_addresses_numa(void)
+{
+    unsigned int jobs = num_bound_execution_contexts;
+    if (jobs == 0) {
+        return;
+    }
+    unsigned int done = 0;
+    for (unsigned int c = 0; c < jobs; c++) {
+        if (__atomic_load_n(&test_contexts[c].windows_exhausted, __ATOMIC_ACQUIRE)) {
+            done++;
+        }
+    }
+    uint64_t tested = __atomic_load_n(&test_pages_done, __ATOMIC_ACQUIRE);
+    if (tested > num_pages_to_test) {
+        tested = num_pages_to_test;
+    }
+    int print_end = printf(4, 39, "%i/%i jobs [%kB/%kB]", (uintptr_t)(jobs - done),
+                           (uintptr_t)jobs, tested << 2, num_pages_to_test << 2);
+    clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 1);
+    display_test_stage_field();
 }
 
 void display_error_count(void)
@@ -616,8 +679,7 @@ void do_tick(int my_cpu)
             pct = 100;
         }
     }
-    display_test_percentage(pct);
-    display_test_bar((BAR_LENGTH * pct) / 100);
+    display_test_progress(pct);
 
     pct = 0;
     if (ticks_per_pass[pass_type] > 0) {
@@ -626,8 +688,7 @@ void do_tick(int my_cpu)
             pct = 100;
         }
     }
-    display_pass_percentage(pct);
-    display_pass_bar((BAR_LENGTH * pct) / 100);
+    display_pass_progress(pct);
 
     bool update_spinner = true;
     if (clks_per_msec > 0) {

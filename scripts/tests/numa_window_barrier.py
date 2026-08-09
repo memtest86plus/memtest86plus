@@ -63,6 +63,7 @@ static pthread_mutex_t events = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t changed = PTHREAD_COND_INITIALIZER;
 static _Thread_local int current_cpu;
 static unsigned waits[2], test_calls[2], steps[2], setups;
+static uint64_t test_pages_done;
 static bool peer_held, release_peer, master_exit_waiting, premature_map;
 static bool master_publication_held, release_publication, peer_decision_waiting;
 static bool map_attempted;

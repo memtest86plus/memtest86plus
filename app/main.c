@@ -53,6 +53,8 @@
 #include "test.h"
 
 
+#include "test_funcs.h"
+#include "test_helper.h"
 #include "tests.h"
 
 #include "tsc.h"
@@ -200,6 +202,21 @@ unsigned int num_bound_execution_contexts = 1;
 // at least two selected CPU-backed memory domains).
 bool        numa_run_active = false;
 
+// Aggregate progress counters; test_work_done and test_pages_done are
+// atomic-access-only. test_pages_done is the pages tested in the current
+// stage by all contexts, used by the NUMA_PAR Testing line.
+uint64_t    test_work_done = 0;
+uint64_t    test_work_expected = 0;
+uint64_t    test_pages_done = 0;
+
+// The whole-test progress anchor and expected work: the test percentage is
+// (test_work_done - test_work_done_base) / test_work_expected, while the pass
+// percentage is test_work_done / pass_work_expected. Written by CPU 0 at the
+// test boundary, so the test bar covers all stages and both resident-memory
+// sweeps monotonically, matching the legacy UI.
+uint64_t    test_work_done_base = 0;
+uint64_t    pass_work_expected = 0;
+
 // Cross-context cancellation request; atomic-access-only, 0 or 1.
 uint32_t    global_cancel_requested = 0;
 
@@ -208,6 +225,7 @@ uint32_t    global_cancel_requested = 0;
 // in an early wave is never erased by a later rebind. Cleared at stage
 // start; read after the stage ends to fall back to legacy mode.
 static bool numa_stage_failure = false;
+
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -233,12 +251,24 @@ static bool numa_stage_failure = false;
         barrier_spin_wait(start_barrier); \
     }
 
-static bool test_stage_is_global_once(int test, int stage);
-static bool numa_window_step(int my_cpu, int context, int iterations);
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
+
+// The relocation-resumable phase machine state: current_wave and
+// num_execution_waves are copied by the relocation and read back on re-entry.
+// Legacy modes and the dummy run use one wave.
+
+// The bit-fade test: four rounds of fill/fade/check stages. The fade delay
+// is a global-once stage run by CPU 0 between the all-wave fill and check
+// stages; every other stage visits every wave.
+static bool test_stage_is_global_once(int test, int stage)
+{
+    return test == 10 && (stage % 3) == 1;
+}
+
+
 
 // Records a terminal context status; the first terminal reason wins.
 static void context_record_failure(int context, int reason)
@@ -738,9 +768,6 @@ non_numa_vm_map_entry:
 
 
 
-// Copied global state: relocation re-entry resumes the wave sequence from
-// exactly where it stopped. Legacy modes and the dummy run use one wave.
-
 // Runs the window currently selected by the context master. Every participant
 // maps the same physical window and tests its own chunk of it. Returns false
 // when the phase must be aborted (e.g. the mapping limit was reached).
@@ -778,6 +805,7 @@ static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uint
     }
 }
 
+
 // NUMA_PAR: one window iteration of the calling CPU's context. The context
 // master computes the window and the map; the context barrier publishes
 // them. Returns false when the context must stop (terminal status); every
@@ -808,28 +836,7 @@ static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
 // sleeps through the test's configured fade interval; the other global
 // participants wait at the surrounding global barriers, so no per-context
 // barrier or test helper may be used here.
-static void run_global_stage_once(void)
-{
-    int sleep_secs = test_list[test_num].iterations;
-    if (pass_num == 0) {
-        // Reduced fast pass, matching the window stages.
-        sleep_secs /= 3;
-    }
-    // No context is bound here, so there are no context barriers to enter;
-    // service input, publish per-second progress, run the timed UI/ECC
-    // checks and update the stage description directly. Only CPU 0 runs
-    // this, so no UI lock is needed.
-    display_test_stage_description("fade over %i seconds", sleep_secs);
-    while (sleep_secs > 0) {
-        check_input();
-        if (restart || bail) {
-            // Stop the delay early; the run boundary handles the request.
-            break;
-        }
-        sleep_secs--;
-        sleep(1);
-    }
-}
+
 
 // True when the selected map (pm_map intersected with the selected range)
 // has any memory below LOW_LOAD_LIMIT, i.e. when window 0 must be executed.
@@ -866,10 +873,6 @@ static bool selected_map_has_window_zero(void)
 // is made.
 
 
-
-
-#include "numa_par.c"
-
 // The context master publishes the UI-requested bail as a cross-context
 // cancellation request (release store), so every context converges on the
 // same exit path.
@@ -883,6 +886,10 @@ void test_request_cancel(int context)
 {
     context_record_failure(context, CONTEXT_CANCELLED);
 }
+
+
+
+#include "numa_par.c"
 
 static void test_all_windows(int my_cpu)
 {
@@ -1091,16 +1098,6 @@ bool test_stop_requested(void)
     return load_test_status(test_context_index()) == CONTEXT_CANCELLED;
 }
 
-// The bit-fade test: four rounds of fill/fade/check stages. The fade delay
-// is a global-once stage run by CPU 0 between the all-wave fill and check
-// stages; every other stage visits every wave.
-static bool test_stage_is_global_once(int test, int stage)
-{
-    return test == 10 && (stage % 3) == 1;
-}
-
-
-
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
@@ -1198,11 +1195,20 @@ void main(void)
                 }
                 if (VMEM_MAX_CONTEXTS > 1) {
                     build_numa_domain_list();
+                    build_work_ratios();
                 }
             }
             if (start_pass) {
                 test_num = 0;
                 start_test = true;
+                // The NUMA_PAR pass counters are pass-cumulative: done never
+                // resets within a pass and the expected total covers the
+                // whole pass, so both percentages are monotonic.
+                __atomic_store_n(&test_work_done, 0, __ATOMIC_RELAXED);
+                test_work_done_base = 0;
+                if (VMEM_MAX_CONTEXTS > 1) {
+                    pass_work_expected = pass_expected_work();
+                }
                 if (dummy_run) {
                     ticks_per_pass[pass_num] = 0;
                 } else {
@@ -1216,9 +1222,20 @@ void main(void)
                 rerun_test = true;
                 if (dummy_run) {
                     ticks_per_test[pass_num][test_num] = 0;
-                } else if (test_list[test_num].enabled) {
-                    display_start_test();
-                    serial_log_event(SLOG_TEST_START);
+                } else {
+                    if (test_list[test_num].enabled) {
+                        display_start_test();
+                        serial_log_event(SLOG_TEST_START);
+                    }
+                    if (VMEM_MAX_CONTEXTS > 1 && test_list[test_num].enabled) {
+                        // Whole-test progress: anchor the cumulative counter
+                        // and publish the complete test's expected work
+                        // before its first stage starts. Never recomputed
+                        // for later stages (including the upper sweep) or on
+                        // relocation re-entry.
+                        test_work_done_base = __atomic_load_n(&test_work_done, __ATOMIC_RELAXED);
+                        test_work_expected = test_expected_work(test_num);
+                    }
                 }
                 bail = false;
             }
@@ -1232,8 +1249,15 @@ void main(void)
                                    && test_stage_is_global_once(test_num, test_stage))
                                 ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+                    // A new stage of the same test starts: only the
+                    // cancellation request and the failure latch are reset,
+                    // the whole-test progress anchor is kept.
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
+                    __atomic_store_n(&test_pages_done, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;
+                }
+                if (!dummy_run && test_list[test_num].enabled && test_list[test_num].stages > 1) {
+                    display_test_stage(test_stage + 1, test_list[test_num].stages);
                 }
                 test_contexts[0].window_index = 0;
                 test_contexts[0].window_start = 0;
@@ -1270,6 +1294,7 @@ void main(void)
             restart = true;
         }
 
+        check_input();
         if (restart) {
             // The configuration has been changed.
             master_cpu = 0;

@@ -55,8 +55,10 @@ typedef enum {
         printf(1, 25 - offset, "%i/%i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
     }
 
+#if TESTWORD_WIDTH < 64
 #define display_cpu_addr_mode(str) \
     prints(4, 75, str)
+#endif
 
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))
@@ -167,32 +169,34 @@ typedef enum {
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
-        printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
+        int print_end = printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
+        clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 1); \
+        display_test_stage_field(); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
-        printf(4, 39, __VA_ARGS__); \
+        int print_end = printf(4, 39, __VA_ARGS__); \
+        clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 1); \
+        display_test_stage_field(); \
     }
 
 #define display_test_pattern_name(str) \
     { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        prints(5, 39, str); \
+        int print_end = prints(5, 39, str); \
+        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
     }
 
 #define display_test_pattern_value(pattern) \
     { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
+        int print_end = printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
+        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
     }
 
 #define display_test_pattern_values(pattern, offset) \
     { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
+        int print_end = printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
+        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
     }
 
 #define display_run_time(hours, mins, secs) \
@@ -283,6 +287,40 @@ void check_input(void);
  * scheduler at each wave binding.
  */
 void display_reset_ui_owner(void);
+
+/**
+ * Renders NUMA_PAR aggregate progress from the shared work counters: the
+ * test fields use the current stage, the pass fields the cumulative bases.
+ */
+void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_done, uint64_t pass_expected);
+
+/**
+ * Renders one progress percentage and advances the matching bar, owning the
+ * bar state in this translation unit.
+ */
+void display_test_progress(int pct);
+
+void display_pass_progress(int pct);
+
+/**
+ * Sets the stage shown in the right-aligned "Stg xx/yy" field of the
+ * Testing line, and redraws the field. Called once per stage start.
+ */
+void display_test_stage(int stage, int stages);
+
+/**
+ * Redraws the stage field after a Testing-line value update; a no-op when
+ * the current test has a single stage.
+ */
+void display_test_stage_field(void);
+
+/**
+ * NUMA_PAR Testing line: draws the current window and cumulative progress of
+ * the laggard execution context (the one with the least fraction of its
+ * non-empty windows done), plus the active job count. Only the laggard's
+ * master actually draws.
+ */
+void display_test_addresses_numa(void);
 
 void set_scroll_lock(bool enabled);
 

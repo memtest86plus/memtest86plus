@@ -1,5 +1,5 @@
-// NUMA_PAR scheduler machinery. Included by main.c after the shared
-// helpers and the domain state; dispatched only under numa_run_active.
+// NUMA_PAR scheduler machinery and aggregate work accounting. Included by
+// main.c after the shared helpers; dispatched only under numa_run_active.
 
 typedef enum {
     GLOBAL_STAGE_ONCE,   // test-specific stage run once by CPU 0 (e.g. bit-fade delay)
@@ -15,7 +15,108 @@ static test_scheduler_phase_t scheduler_phase;
 static unsigned int current_wave = 0;
 static unsigned int num_execution_waves = 1;
 
-static bool numa_window_step(int my_cpu, int context, int iterations);
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+
+// The whole-map work ratio for each work class: the dummy calibration
+// measures one team tick per whole-map work unit (a physical segment for
+// segment-fixed tests, a nonempty window for window-fixed tests), while a
+// NUMA_PAR run executes each owner's piece once. work_units counts those
+// owner work units over the selected map and work_denom the dummy's units.
+// The ratios are built by build_work_ratios() after the domain list, so the
+// expected work of every test is one per-test calibration scaled by its
+// class ratio.
+static uint64_t work_units[TEST_WORK_CLASSES];
+static uint64_t work_denom[TEST_WORK_CLASSES];
+
+// The tick-block accounting only applies where NUMA_PAR can run; on i586
+// (32-bit testwords) the equality would not hold.
+#if VMEM_MAX_CONTEXTS > 1
+_Static_assert((VM_WINDOW_SIZE << PAGE_SHIFT) == (uintptr_t)SPIN_SIZE * sizeof(testword_t),
+               "tick block must span at least a whole window");
+#endif
+
+// Scales the per-test memory calibration by the whole-map work ratio. The
+// raw product can exceed 64 bits (2^31 ticks x 64 owner pieces per segment),
+// so split the division: units/denom and units%denom keep both terms below
+// 2^56. The 128-bit division helper is not linkable in this freestanding
+// build. The remainder term keeps the scaling exact when the dummy
+// calibration is not a multiple of the physical segment/window count.
+static uint64_t scale_work(uint64_t cal, uint64_t units, uint64_t denom)
+{
+    if (denom == 0) {
+        return 0;
+    }
+    uint64_t q = units / denom;
+    uint64_t r = units % denom;
+    return cal * q + (cal * r) / denom;
+}
+
+// The expected aggregate work for the whole test: one dummy calibration per
+// test, minus the global-once fade stages, scaled by the test's whole-map
+// work ratio, plus those fade stages. The test percentage is therefore
+// whole-test progress and the bar is monotonic over all stages, matching the
+// legacy UI.
+static uint64_t test_expected_work(int test)
+{
+    pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
+    uint64_t cal = (uint64_t)ticks_per_test[pass_type][test];
+
+    uint64_t fade_cal = 0;
+    for (int stage = 0; stage < test_list[test].stages; stage++) {
+        if (test_stage_is_global_once(test, stage)) {
+            fade_cal += (uint64_t)test_list[test].iterations
+                      / (pass_num == 0 ? 3 : 1);
+        }
+    }
+    // The global-once stages are accounted one work unit per elapsed second
+    // on CPU 0, independent of the memory partition; the dummy calibration
+    // measures them once.
+    uint64_t memory_cal = cal > fade_cal ? cal - fade_cal : 0;
+    int work_class = test_list[test].work_class;
+    uint64_t expected = scale_work(memory_cal, work_units[work_class],
+                                   work_denom[work_class]);
+    return expected + fade_cal;
+}
+
+// The expected aggregate work for the whole pass: the sum over every
+// enabled test, so the pass percentage is whole-pass progress.
+static uint64_t pass_expected_work(void)
+{
+    uint64_t expected = 0;
+    for (int test = 0; test < NUM_TEST_PATTERNS; test++) {
+        if (test_list[test].enabled) {
+            expected += test_expected_work(test);
+        }
+    }
+    return expected;
+}
+
+// Renders NUMA_PAR aggregate progress from the shared work counters: the
+// test fields use the current test's whole-test counters, the pass fields
+// the pass-cumulative bases.
+void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_done, uint64_t pass_expected)
+{
+    int pct = 0;
+    if (expected > 0) {
+        pct = (int)((done * 100) / expected);
+        if (pct > 100) {
+            pct = 100;
+        }
+    }
+    display_test_progress(pct);
+
+    pct = 0;
+    if (pass_expected > 0) {
+        pct = (int)((pass_done * 100) / pass_expected);
+        if (pct > 100) {
+            pct = 100;
+        }
+    }
+    display_pass_progress(pct);
+}
 
 // Master/CPU0-only: binds the current wave's CPU-backed domains to distinct
 // execution contexts, configures their barriers, and publishes the dense
@@ -196,10 +297,90 @@ static void build_numa_domain_list(void)
     }
 
     num_execution_waves = (num_cpu_memory_domains + VMEM_MAX_CONTEXTS - 1) / VMEM_MAX_CONTEXTS;
+    // (see the end of this file for the NUMA_PAR scheduler machinery)
+}
+
+// Computes the whole-map work ratios over the actually tested map (pm_map
+// intersected with the selected range, split by the scheduler's windows).
+// The dummy calibration runs the legacy map once over the same window set
+// and therefore measures work_denom units per test (a physical segment for
+// segment-fixed tests, a nonempty window for window-fixed tests). A
+// NUMA_PAR run splits every physical segment by proximity domain: each
+// piece is one team tick for segment-fixed tests, while window-fixed tests
+// tick once per nonempty owner/window pair. Memory-only domains are owned
+// by the BSP context, like setup_vm_map() assigns them.
+static void build_work_ratios(void)
+{
+    memset(work_units, 0, sizeof(work_units));
+    memset(work_denom, 0, sizeof(work_denom));
+    bool owner_in_window[MAX_PROXIMITY_DOMAINS] = { false };
+
+    for (uint64_t window_index = 0; ; window_index++) {
+        uintptr_t win_start, win_end;
+        window_page_bounds(window_index, &win_start, &win_end);
+
+        // Reduce the window to the selected range, like setup_vm_map().
+        // The unclipped end still drives the termination check below, so
+        // the iteration always covers the whole map.
+        uintptr_t clipped_end = win_end;
+        if (win_start < pm_limit_lower) {
+            win_start = pm_limit_lower;
+        }
+        if (win_end > pm_limit_upper) {
+            clipped_end = pm_limit_upper;
+        }
+
+        if (win_start < clipped_end) {
+            bool window_has_memory = false;
+            for (int seg = 0; seg < pm_map_size; seg++) {
+                uintptr_t s = pm_map[seg].start;
+                uintptr_t e = pm_map[seg].end;
+                if (s <= win_start) {
+                    s = win_start;
+                }
+                if (e >= clipped_end) {
+                    e = clipped_end;
+                }
+                if (s < e) {
+                    work_denom[TEST_WORK_SEGMENT_FIXED]++;
+                    for (int d = 0; d < num_proximity_domains; d++) {
+                        uint32_t pieces =
+                            smp_domain_memory_pieces_in_range(d, s, e);
+                        if (pieces == 0) {
+                            continue;
+                        }
+                        window_has_memory = true;
+                        // Attribute to the execution owner: a memory-only
+                        // domain belongs to the BSP context in wave 0.
+                        int owner = (enabled_cpus_in_proximity_domain[d] > 0)
+                                  ? d : (int)bsp_proximity_domain;
+                        work_units[TEST_WORK_SEGMENT_FIXED] += pieces;
+                        owner_in_window[owner] = true;
+                    }
+                }
+            }
+            if (window_has_memory) {
+                work_denom[TEST_WORK_WINDOW_FIXED]++;
+            }
+        }
+
+        // Window-fixed tests tick once per nonempty owner/window pair, so
+        // each owner is marked at most once per window, even when several
+        // of its owned domains overlap there.
+        for (int d = 0; d < num_proximity_domains; d++) {
+            if (owner_in_window[d]) {
+                work_units[TEST_WORK_WINDOW_FIXED]++;
+                owner_in_window[d] = false;
+            }
+        }
+        if (win_end >= pm_map[pm_map_size - 1].end) {
+            break;
+        }
+    }
 }
 
 
-static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, bool dummy_run_active, int iterations)
+static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (!i_am_active) {
         return true;
@@ -213,9 +394,10 @@ static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, bool
         return true;
     }
 
-    if (dummy_run_active) {
+    if (dummy_run) {
         if (i_am_master) {
-            ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
+            int ticks = run_test(-1, test_num, test_stage, iterations);
+            ticks_per_test[pass_num][test_num] += ticks;
             window_num++;
         }
         return true;
@@ -308,6 +490,8 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
     barrier_spin_wait(test_run_barrier());
 
     if (my_cpu == ctx->master_cpu_num) {
+        // Aggregate pages tested, for the Testing line's progress field.
+        __sync_fetch_and_add(&test_pages_done, num_mapped_pages[context]);
         ctx->window_index++;
     }
     return true;
@@ -332,7 +516,7 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
     }
     SHORT_BARRIER;
 
-    return run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+    return run_test_window(my_cpu, i_am_master, i_am_active, iterations);
 }
 
 static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
@@ -365,8 +549,35 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        running = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        running = run_test_window(my_cpu, i_am_master, i_am_active, iterations);
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
+}
+
+static void run_global_stage_once(void)
+{
+    int sleep_secs = test_list[test_num].iterations;
+    if (pass_num == 0) {
+        // Reduced fast pass, matching the window stages.
+        sleep_secs /= 3;
+    }
+    // No context is bound here, so there are no context barriers to enter;
+    // service input, publish per-second progress, run the timed UI/ECC
+    // checks and update the stage description directly. Only CPU 0 runs
+    // this, so no UI lock is needed.
+    display_test_stage_description("fade over %i seconds", sleep_secs);
+    while (sleep_secs > 0) {
+        check_input();
+        if (restart || bail) {
+            // Stop the delay early; the run boundary handles the request.
+            break;
+        }
+        __sync_fetch_and_add(&test_work_done, 1);
+        if (VMEM_MAX_CONTEXTS > 1) {
+            render_aggregate_progress(test_work_done - test_work_done_base, test_work_expected, test_work_done, pass_work_expected);
+        }
+        sleep_secs--;
+        sleep(1);
+    }
 }
 
 static bool wave_has_window_zero(void)
