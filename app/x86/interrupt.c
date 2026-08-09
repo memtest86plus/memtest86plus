@@ -203,48 +203,55 @@ ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
     }
 
     // Don't wait for the error mutex: it may be held by a stopped CPU, or by
-    // this very CPU if the interrupt was taken inside the error reporting path.
-    spin_trylock(error_mutex);
+    // this very CPU if the interrupt was taken inside the error reporting
+    // path. Render the register dump only when both the error and UI locks
+    // can be acquired; the reboot prompt below always runs.
+    if (spin_trylock(error_mutex)) {
+        if (spin_trylock(ui_mutex)) {
+            clear_message_area();
 
-    clear_message_area();
+            display_pinned_message(0, 0, "Unexpected interrupt on CPU %i", smp_my_cpu_num());
+            if (trap_regs->vect <= 19) {
+                display_pinned_message(2, 0, "Type: %s", codes[trap_regs->vect]);
+            } else {
+                display_pinned_message(2, 0, "Type: %i", trap_regs->vect);
+            }
+            display_pinned_message(3, 0, "  IP: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ip);
+            display_pinned_message(4, 0, "  CS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->cs);
+            display_pinned_message(5, 0, "Flag: %0" REG_DIGITS "x", (uintptr_t)trap_regs->flags);
+            display_pinned_message(6, 0, "Code: %0" REG_DIGITS "x", (uintptr_t)trap_regs->code);
+            display_pinned_message(7, 0, "  DS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ds);
+            display_pinned_message(8, 0, "  ES: %0" REG_DIGITS "x", (uintptr_t)trap_regs->es);
+            display_pinned_message(9, 0, "  SS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ss);
+            if (trap_regs->vect == 14) {
+                display_pinned_message(9, 0, " Addr: %0" REG_DIGITS "x", address);
+            }
 
-    display_pinned_message(0, 0, "Unexpected interrupt on CPU %i", smp_my_cpu_num());
-    if (trap_regs->vect <= 19) {
-        display_pinned_message(2, 0, "Type: %s", codes[trap_regs->vect]);
-    } else {
-        display_pinned_message(2, 0, "Type: %i", trap_regs->vect);
-    }
-    display_pinned_message(3, 0, "  IP: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ip);
-    display_pinned_message(4, 0, "  CS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->cs);
-    display_pinned_message(5, 0, "Flag: %0" REG_DIGITS "x", (uintptr_t)trap_regs->flags);
-    display_pinned_message(6, 0, "Code: %0" REG_DIGITS "x", (uintptr_t)trap_regs->code);
-    display_pinned_message(7, 0, "  DS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ds);
-    display_pinned_message(8, 0, "  ES: %0" REG_DIGITS "x", (uintptr_t)trap_regs->es);
-    display_pinned_message(9, 0, "  SS: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ss);
-    if (trap_regs->vect == 14) {
-        display_pinned_message(9, 0, " Addr: %0" REG_DIGITS "x", address);
-    }
+            display_pinned_message(2, 25, REG_PREFIX "ax: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ax);
+            display_pinned_message(3, 25, REG_PREFIX "bx: %0" REG_DIGITS "x", (uintptr_t)trap_regs->bx);
+            display_pinned_message(4, 25, REG_PREFIX "cx: %0" REG_DIGITS "x", (uintptr_t)trap_regs->cx);
+            display_pinned_message(5, 25, REG_PREFIX "dx: %0" REG_DIGITS "x", (uintptr_t)trap_regs->dx);
+            display_pinned_message(6, 25, REG_PREFIX "di: %0" REG_DIGITS "x", (uintptr_t)trap_regs->di);
+            display_pinned_message(7, 25, REG_PREFIX "si: %0" REG_DIGITS "x", (uintptr_t)trap_regs->si);
+            display_pinned_message(8, 25, REG_PREFIX "bp: %0" REG_DIGITS "x", (uintptr_t)trap_regs->bp);
+            display_pinned_message(9, 25, REG_PREFIX "sp: %0" REG_DIGITS "x", (uintptr_t)trap_regs->sp);
 
-    display_pinned_message(2, 25, REG_PREFIX "ax: %0" REG_DIGITS "x", (uintptr_t)trap_regs->ax);
-    display_pinned_message(3, 25, REG_PREFIX "bx: %0" REG_DIGITS "x", (uintptr_t)trap_regs->bx);
-    display_pinned_message(4, 25, REG_PREFIX "cx: %0" REG_DIGITS "x", (uintptr_t)trap_regs->cx);
-    display_pinned_message(5, 25, REG_PREFIX "dx: %0" REG_DIGITS "x", (uintptr_t)trap_regs->dx);
-    display_pinned_message(6, 25, REG_PREFIX "di: %0" REG_DIGITS "x", (uintptr_t)trap_regs->di);
-    display_pinned_message(7, 25, REG_PREFIX "si: %0" REG_DIGITS "x", (uintptr_t)trap_regs->si);
-    display_pinned_message(8, 25, REG_PREFIX "bp: %0" REG_DIGITS "x", (uintptr_t)trap_regs->bp);
-    display_pinned_message(9, 25, REG_PREFIX "sp: %0" REG_DIGITS "x", (uintptr_t)trap_regs->sp);
+            display_pinned_message(0, 50, "Stack:");
+            for (int i = 0; i < 12; i++) {
+                uintptr_t addr = trap_regs->sp + sizeof(reg_t)*(11 - i);
+                reg_t data = *(reg_t *)addr;
+                display_pinned_message(1 + i, 50, "%0" ADR_DIGITS "x %0" REG_DIGITS "x", addr, (uintptr_t)data);
+            }
 
-    display_pinned_message(0, 50, "Stack:");
-    for (int i = 0; i < 12; i++) {
-        uintptr_t addr = trap_regs->sp + sizeof(reg_t)*(11 - i);
-        reg_t data = *(reg_t *)addr;
-        display_pinned_message(1 + i, 50, "%0" ADR_DIGITS "x %0" REG_DIGITS "x", addr, (uintptr_t)data);
-    }
+            display_pinned_message(11, 0, "CS:IP:");
+            uint8_t *pp = (uint8_t *)((uintptr_t)trap_regs->ip);
+            for (int i = 0; i < 12; i++) {
+                display_pinned_message(11, 7 + 3*i, "%02x", (uintptr_t)pp[i]);
+            }
 
-    display_pinned_message(11, 0, "CS:IP:");
-    uint8_t *pp = (uint8_t *)((uintptr_t)trap_regs->ip);
-    for (int i = 0; i < 12; i++) {
-        display_pinned_message(11, 7 + 3*i, "%02x", (uintptr_t)pp[i]);
+            spin_unlock(ui_mutex);
+        }
+        spin_unlock(error_mutex);
     }
 
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);

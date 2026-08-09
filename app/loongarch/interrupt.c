@@ -187,43 +187,50 @@ void interrupt(struct system_context *system_context)
     ecode = (system_context->estat >> 16) & 0x3F;
 
     // Don't wait for the error mutex: it may be held by a stopped CPU, or by
-    // this very CPU if the interrupt was taken inside the error reporting path.
-    spin_trylock(error_mutex);
+    // this very CPU if the interrupt was taken inside the error reporting
+    // path. Render the register dump only when both the error and UI locks
+    // can be acquired; the reboot prompt below always runs.
+    if (spin_trylock(error_mutex)) {
+        if (spin_trylock(ui_mutex)) {
+            clear_message_area();
 
-    clear_message_area();
+            display_pinned_message(0, 0, "Unexpected interrupt on CPU %i", smp_my_cpu_num());
+            if (__csrrd_w(0x8A) & 0x1) {
+                display_pinned_message(2, 0, "Type: %s", exception_code[19]);
+            } else if (ecode < 19) {
+                display_pinned_message(2, 0, "Type: %s", exception_code[ecode]);
+            } else {
+                display_pinned_message(2, 0, "Type: %i", ecode);
+            }
+            display_pinned_message(3, 0, " BADV: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->badv);
+            display_pinned_message(4, 0, " BADI: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->badi);
+            display_pinned_message(5, 0, "  ERA: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->era);
+            display_pinned_message(6, 0, " EUEN: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->euen);
+            display_pinned_message(7, 0, " ECFG: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->ecfg);
+            display_pinned_message(8, 0, "ESTAT: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->estat);
 
-    display_pinned_message(0, 0, "Unexpected interrupt on CPU %i", smp_my_cpu_num());
-    if (__csrrd_w(0x8A) & 0x1) {
-        display_pinned_message(2, 0, "Type: %s", exception_code[19]);
-    } else if (ecode < 19) {
-        display_pinned_message(2, 0, "Type: %s", exception_code[ecode]);
-    } else {
-        display_pinned_message(2, 0, "Type: %i", ecode);
-    }
-    display_pinned_message(3, 0, " BADV: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->badv);
-    display_pinned_message(4, 0, " BADI: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->badi);
-    display_pinned_message(5, 0, "  ERA: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->era);
-    display_pinned_message(6, 0, " EUEN: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->euen);
-    display_pinned_message(7, 0, " ECFG: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->ecfg);
-    display_pinned_message(8, 0, "ESTAT: %0" CSR_REG_DIGITS "x", (uintptr_t)system_context->estat);
+            display_pinned_message(3, 25, "RA: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r1);
+            display_pinned_message(4, 25, "SP: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r3);
+            display_pinned_message(5, 25, "A0: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r4);
+            display_pinned_message(6, 25, "A1: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r5);
+            display_pinned_message(7, 25, "A2: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r6);
+            display_pinned_message(8, 25, "A3: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r7);
+            display_pinned_message(9, 25, "A4: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r8);
+            display_pinned_message(10, 25, "A5: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r9);
+            display_pinned_message(11, 25, "T0: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r12);
+            display_pinned_message(12, 25, "T1: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r13);
+            display_pinned_message(13, 25, "T2: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r14);
 
-    display_pinned_message(3, 25, "RA: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r1);
-    display_pinned_message(4, 25, "SP: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r3);
-    display_pinned_message(5, 25, "A0: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r4);
-    display_pinned_message(6, 25, "A1: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r5);
-    display_pinned_message(7, 25, "A2: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r6);
-    display_pinned_message(8, 25, "A3: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r7);
-    display_pinned_message(9, 25, "A4: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r8);
-    display_pinned_message(10, 25, "A5: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r9);
-    display_pinned_message(11, 25, "T0: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r12);
-    display_pinned_message(12, 25, "T1: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r13);
-    display_pinned_message(13, 25, "T2: %0" GP_REG_DIGITS "x", (uintptr_t)system_context->r14);
+            display_pinned_message(0, 50, "Stack:");
+            for (int i = 0; i < 12; i++) {
+                uintptr_t addr = system_context->r3 + sizeof(reg_t)*(11 - i);
+                reg_t data = *(reg_t *)addr;
+                display_pinned_message(1 + i, 50, "%0" ADR_DIGITS "x %0" GP_REG_DIGITS "x", addr, (uintptr_t)data);
+            }
 
-    display_pinned_message(0, 50, "Stack:");
-    for (int i = 0; i < 12; i++) {
-        uintptr_t addr = system_context->r3 + sizeof(reg_t)*(11 - i);
-        reg_t data = *(reg_t *)addr;
-        display_pinned_message(1 + i, 50, "%0" ADR_DIGITS "x %0" GP_REG_DIGITS "x", addr, (uintptr_t)data);
+            spin_unlock(ui_mutex);
+        }
+        spin_unlock(error_mutex);
     }
 
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);

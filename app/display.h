@@ -279,13 +279,17 @@ void restore_big_status(void);
 void check_input(void);
 
 /**
+ * Runs the once-per-second timed UI and hardware/error updates, for paths
+ * that own the screen without a context barrier (e.g. the NUMA_PAR
+ * global-once bit-fade delay on CPU 0).
+ */
+void update_timed_ui(void);
+
+/**
  * Renders NUMA_PAR aggregate progress from the shared work counters: the
  * test fields use the current stage, the pass fields the cumulative bases.
  */
-void render_aggregate_progress(uint64_t done, uint64_t expected,
-                               uint64_t pass_done, uint64_t pass_expected);
-
-
+void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_done, uint64_t pass_expected);
 
 void set_scroll_lock(bool enabled);
 

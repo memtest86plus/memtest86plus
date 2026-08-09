@@ -43,6 +43,11 @@ extern barrier_t *run_barrier;
 extern spinlock_t *error_mutex;
 
 /**
+ * A mutex serializing input service and UI rendering by the context masters.
+ */
+extern spinlock_t *ui_mutex;
+
+/**
  * True while a NUMA_PAR run is active (real run, at least two selected
  * CPU-backed memory domains). Legacy modes and the BSP-only dummy run are
  * always false.
