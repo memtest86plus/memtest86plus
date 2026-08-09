@@ -122,6 +122,10 @@ static void bind_execution_wave(int wave, bool parallel_test)
             display_all_active();
         }
 
+        // Emit the lifecycle boundary once the binding and context count are
+        // final, so concurrent multi-wave serial logs stay unambiguous.
+        serial_log_wave_bind(current_wave, num_contexts_in_wave);
+
         return;
     }
 
@@ -466,6 +470,20 @@ static void test_all_windows_numa(int my_cpu)
           case WAVE_FINISH:
             LONG_BARRIER;
             if (my_cpu == 0) {
+                // Promote any fatal context status to the stage-global
+                // failure latch before the next wave rebinds these contexts,
+                // and report every terminal status with its wave/domain
+                // identity while it is still available.
+                for (int context = 0; context < (int)num_bound_execution_contexts;
+                     context++) {
+                    int status = load_test_status(context);
+                    if (status == CONTEXT_MAP_FAILED || status == CONTEXT_MAP_OVERFLOW || status == CONTEXT_TOPOLOGY_FAILED) {
+                        numa_stage_failure = true;
+                    }
+                    if (status != CONTEXT_OK) {
+                        serial_log_context_end(current_wave, context, test_contexts[context].proximity_domain_idx, status);
+                    }
+                }
                 if (++current_wave < num_execution_waves) {
                     scheduler_phase = WAVE_BIND;
                 } else {
