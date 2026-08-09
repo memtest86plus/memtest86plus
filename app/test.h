@@ -48,6 +48,18 @@ extern spinlock_t *error_mutex;
  */
 extern uint16_t test_team_chunk_index[MAX_CPUS];
 
+/**
+ * Cross-context cancellation request (0 or 1); atomic access only.
+ */
+extern uint32_t global_cancel_requested;
+
+/**
+ * Returns true when the calling context has been asked to stop (NUMA_PAR
+ * cancellation published through the context barrier). False in legacy modes,
+ * which use the plain `bail` flag.
+ */
+bool test_stop_requested(void);
+
 #if (ARCH_BITS == 64)
 /**
  * The word width (in bits) used for memory testing.

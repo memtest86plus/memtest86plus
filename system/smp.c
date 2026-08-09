@@ -1344,7 +1344,7 @@ void map_the_numa_memory_range(uint8_t highest_bit)
     //
     // First step, map the pm_map.
     //
-    for (i = 0; i < (unsigned int)pm_map_size; i++) {
+    for (i = 0; i < pm_map_size; i++) {
         node_nu = (pm_map[i].start >> (node_offset - PAGE_SHIFT)) & 0xF;
         if (node_nu != 0) {
             pm_map[i].start &= ~((uint64_t)0xF << (node_offset - PAGE_SHIFT));
@@ -1358,7 +1358,7 @@ void map_the_numa_memory_range(uint8_t highest_bit)
     //
     // Second step, map the memory_affinity_ranges.
     //
-    for (i = 0; i < (unsigned int)num_memory_affinity_ranges; i++) {
+    for (i = 0; i < num_memory_affinity_ranges; i++) {
         if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
             node_nu = (memory_affinity_ranges[i].start >> node_offset) & 0xF;
             if (node_nu != 0) {
@@ -1382,7 +1382,7 @@ void check_if_needs_to_map(void)
     if (num_proximity_domains == 0x0) {
         return;
     } else {
-        for (i = 0; i < (unsigned int)num_memory_affinity_ranges; i++) {
+        for (i = 0; i < num_memory_affinity_ranges; i++) {
             if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
                 local_memory_area_bits = checkout_max_memory_bits_of_this_numa_node(i);
                 if (max_memory_bits < local_memory_area_bits) {

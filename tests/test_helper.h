@@ -41,9 +41,11 @@
 #define SPIN_SIZE (1 << 27)  // in testwords
 
 /**
- * A macro to perform test bailout when requested.
+ * A macro to perform test bailout when requested. In NUMA_PAR the stop
+ * decision is published through the context barrier at the last safe point;
+ * in legacy modes the plain `bail` flag is used.
  */
-#define BAILOUT if (bail) return ticks
+#define BAILOUT if (test_stop_requested()) return ticks
 
 /**
  * A macro to skip the current range without disturbing waits on barriers and creating a deadlock.

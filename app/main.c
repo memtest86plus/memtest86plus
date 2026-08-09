@@ -194,6 +194,14 @@ static unsigned int num_bound_execution_contexts = 1;
 // at least two selected CPU-backed memory domains).
 bool        numa_run_active = false;
 
+// Cross-context cancellation request; atomic-access-only, 0 or 1.
+uint32_t    global_cancel_requested = 0;
+
+// Stage-global fatal-failure latch, promoted by CPU 0 at every wave
+// boundary before the contexts are rebound for the next wave, so a failure
+// in an early wave is never erased by a later rebind. Cleared at stage
+// start; read after the stage ends to fall back to legacy mode.
+static bool numa_stage_failure = false;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -999,6 +1007,20 @@ static bool wave_has_window_zero(void)
     return window_num == 0;
 }
 
+// The context master publishes the UI-requested bail as a cross-context
+// cancellation request (release store), so every context converges on the
+// same exit path.
+void test_publish_cancel_request(void)
+{
+    __atomic_store_n(&global_cancel_requested, 1, __ATOMIC_RELEASE);
+}
+
+// Requests a stop of the given context; the first terminal reason wins.
+void test_request_cancel(int context)
+{
+    context_record_failure(context, CONTEXT_CANCELLED);
+}
+
 static void test_all_windows(int my_cpu)
 {
     bool parallel_test = false;
@@ -1079,6 +1101,20 @@ static void test_all_windows(int my_cpu)
           case WAVE_FINISH:
             LONG_BARRIER;
             if (my_cpu == 0) {
+                // Promote any fatal context status to the stage-global
+                // failure latch before the next wave rebinds these contexts,
+                // and report every terminal status with its wave/domain
+                // identity while it is still available.
+                for (int context = 0; context < (int)num_bound_execution_contexts;
+                     context++) {
+                    int status = load_test_status(context);
+                    if (status == CONTEXT_MAP_FAILED || status == CONTEXT_MAP_OVERFLOW || status == CONTEXT_TOPOLOGY_FAILED) {
+                        numa_stage_failure = true;
+                    }
+                    if (status != CONTEXT_OK) {
+                        serial_log_context_end(current_wave, context, context_to_domain[context], status);
+                    }
+                }
                 if (++current_wave < num_execution_waves) {
                     scheduler_phase = WAVE_BIND;
                 } else {
@@ -1156,6 +1192,18 @@ barrier_t *test_run_barrier(void)
         return &context_barrier[context];
     }
     return run_barrier;
+}
+
+// The calling context has been asked to stop. In legacy modes this is the
+// plain UI bail flag; in NUMA_PAR the stop decision is published through the
+// context barrier at the last safe point, so every team member takes the
+// same exit path.
+bool test_stop_requested(void)
+{
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return bail;
+    }
+    return load_test_status(test_context_index()) == CONTEXT_CANCELLED;
 }
 
 
@@ -1273,6 +1321,10 @@ void main(void)
                 current_wave = 0;
                 num_execution_waves = 1;   // NUMA_PAR computes this from the domains
                 scheduler_phase = WAVE_BIND;
+                if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+                    __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
+                    numa_stage_failure = false;
+                }
                 test_contexts[0].window_index = 0;
                 test_contexts[0].window_start = 0;
                 test_contexts[0].window_end   = 0;
@@ -1292,6 +1344,15 @@ void main(void)
         }
 
         check_input();
+        if (VMEM_MAX_CONTEXTS > 1 && numa_run_active && numa_stage_failure) {
+            // Topology or map construction failure: fall back to legacy
+            // placement and restart the run, never silently omit memory.
+            // Fall through to the restart handler below, which re-runs the
+            // dummy calibration and starts a fresh legacy run.
+            numa_mode = NUMA_ON;
+            restart = true;
+        }
+
         if (restart) {
             // The configuration has been changed.
             master_cpu = 0;
@@ -1309,29 +1370,33 @@ void main(void)
             }
             test_stage = 0;
 
-            switch (cpu_mode) {
-              case PAR:
-                if (test_list[test_num].cpu_mode == SEQ) {
+            if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+                switch (cpu_mode) {
+                  case PAR:
+                    if (test_list[test_num].cpu_mode == SEQ) {
+                        select_next_master();
+                        if (master_cpu != 0) {
+                            rerun_test = true;
+                            continue;
+                        }
+                    }
+                    break;
+                  case ONE:
+                    select_next_master();
+                    break;
+                  case SEQ:
                     select_next_master();
                     if (master_cpu != 0) {
                         rerun_test = true;
                         continue;
                     }
+                    break;
+                  default:
+                    break;
                 }
-                break;
-              case ONE:
-                select_next_master();
-                break;
-              case SEQ:
-                select_next_master();
-                if (master_cpu != 0) {
-                    rerun_test = true;
-                    continue;
-                }
-                break;
-              default:
-                break;
             }
+            // In NUMA_PAR there is no global master rotation; each context
+            // keeps its fixed master for the whole run.
         }
 
         if (dummy_run) {

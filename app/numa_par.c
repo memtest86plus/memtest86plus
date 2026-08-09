@@ -110,6 +110,10 @@ static void bind_execution_wave(int wave, bool parallel_test)
                    && test_contexts[context].active_cpu_count <= test_contexts[context].team_cpu_count);
         }
 
+        // Emit the lifecycle boundary once the binding and context count are
+        // final, so concurrent multi-wave serial logs stay unambiguous.
+        serial_log_wave_bind(current_wave, num_contexts_in_wave);
+
         return;
     }
 
