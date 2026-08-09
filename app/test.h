@@ -60,6 +60,13 @@ extern barrier_t *run_barrier;
 extern spinlock_t *error_mutex;
 
 /**
+ * True while a NUMA_PAR run is active (real run, at least two selected
+ * CPU-backed memory domains). Legacy modes and the BSP-only dummy run are
+ * always false.
+ */
+extern bool numa_run_active;
+
+/**
  * The dense per-CPU chunk index within the current context team, rebuilt at
  * every wave binding.
  */
@@ -76,14 +83,6 @@ extern uint32_t global_cancel_requested;
  * which use the plain `bail` flag.
  */
 bool test_stop_requested(void);
-
-/**
- * True when the given CPU is the primary context master of the current wave,
- * the only context master allowed to update the test-specific display fields
- * without ui_mutex. A negative CPU (the dummy calibration) is never the
- * primary master, so the dummy performs no display updates.
- */
-bool test_is_primary_context_master(int my_cpu);
 
 /**
  * Publishes a cross-context cancellation request (release store) from a
@@ -209,6 +208,23 @@ int execution_context_for_cpu(int cpu);
  */
 barrier_t *test_run_barrier(void);
 
+
+/**
+ * True when the given CPU is the primary context master of the current wave,
+ * the only context master allowed to update the test-specific display fields
+ * without ui_mutex. A negative CPU (the dummy calibration) is never the
+ * primary master, so the dummy performs no display updates.
+ */
+static inline bool test_is_primary_context_master(int my_cpu)
+{
+    if (my_cpu < 0) {
+        return false;
+    }
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return my_cpu == master_cpu;
+    }
+    return my_cpu == test_contexts[0].master_cpu_num;
+}
 
 /**
  * The number of completed test passes.
