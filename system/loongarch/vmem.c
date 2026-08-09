@@ -74,6 +74,11 @@ bool vmem_prepare_execution_contexts(int num_contexts)
     return true;
 }
 
+void vmem_rebase_execution_context(int context_id __attribute__((unused)))
+{
+    // The shared direct mapping has no per-context roots to re-point.
+}
+
 bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
 {
     return true;
@@ -86,7 +91,7 @@ void *first_word_mapping(uintptr_t page)
     if (map_numa_memory_range == true) {
         if ((page >> (highest_map_bit - PAGE_SHIFT)) & 0xF) {
             uintptr_t alias = (((uintptr_t)(page >> (highest_map_bit - PAGE_SHIFT)) & 0xF) << 32) ;
-            alias |= page & ~(0xF << (highest_map_bit - PAGE_SHIFT));
+            alias |= page & ~(0xFULL << (highest_map_bit - PAGE_SHIFT));
             result = (void *)(alias << PAGE_SHIFT);
         } else {
             result = (void *)(page << PAGE_SHIFT);

@@ -202,17 +202,46 @@ startup:
 	addq	$0x3, %rax
 	movq	%rax, 24(%rdx)
 
-	# Select the calling CPU's paging context. Context 0 is the identity
-	# mapped control context used by the AP trampoline and parked CPUs; it
-	# was rebuilt above. Legacy modes bind every CPU to context 0, so this
-	# selects the same root on every CPU.
+	# Rebase the calling CPU's paging context. Context 0 is the identity
+	# mapped control context used by the AP trampoline and parked CPUs and
+	# was rebuilt above; its entries are copied verbatim for any other
+	# context, with the per-context PDP/PD2 roots substituted.
+	#
+	# This runs before BSS is cleared and before the first relocation, so
+	# it may only rely on initialized data: num_bound_execution_contexts
+	# is 1 in .data, which clamps every unbound CPU to context 0, and
+	# run_at() memmoves the whole live image, so both copies carry
+	# identical live BSS until the stale copy is memory-tested.
 
 	call	smp_my_cpu_num
 	movl	%eax, %edi
 	call	execution_context_for_cpu
 	shlq	$12, %rax
+	movq	%rax, %rbx			# byte offset of selected context
+
 	leaq	pml4(%rip), %rcx
-	addq	%rax, %rcx
+	addq	%rbx, %rcx
+	leaq	pdp(%rip), %rdx
+	addq	%rbx, %rdx
+	leaq	pd2(%rip), %r9
+	addq	%rbx, %r9
+
+	leaq	0x3(%rdx), %rax
+	movq	%rax, 0(%rcx)
+	leaq	pd0(%rip), %rax
+	addq	$0x3, %rax
+	movq	%rax, 0(%rdx)
+	leaq	pd1(%rip), %rax
+	addq	$0x3, %rax
+	movq	%rax, 8(%rdx)
+	leaq	0x3(%r9), %rax
+	movq	%rax, 16(%rdx)
+	leaq	pd3(%rip), %rax
+	addq	$0x3, %rax
+	movq	%rax, 24(%rdx)
+
+	# Load the calling CPU's context root.
+
 	movq	%rcx, %cr3
 
 	# Initialise the GDT descriptor.

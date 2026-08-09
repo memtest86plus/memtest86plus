@@ -67,6 +67,14 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 bool vmem_prepare_execution_contexts(int num_contexts);
 
 /**
+ * Re-points one execution context's translation roots at the current program
+ * image. Called by the scheduler at wave binding, between global barriers:
+ * after a program relocation, a context that was not bound to any running
+ * CPU still points at the other image copy, which memory testing overwrites.
+ */
+void vmem_rebase_execution_context(int context_id);
+
+/**
  * Maps a \ref VM_WINDOW_SIZE region of physical memory into the upper 2GB of
  * virtual memory for the given execution context. The physical memory region
  * must be aligned on a \ref VM_WINDOW_SIZE boundary. The virtual address will

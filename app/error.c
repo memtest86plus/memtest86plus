@@ -168,7 +168,10 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     testword_t xor = good ^ bad;
 
     bool new_stats = false;
-    testword_t page   = page_of((void *)addr, 0);
+    // Translate immediately, while the detecting context's mapping epoch is
+    // still stable; deferred code must not consult a later mapped_window.
+    int context = execution_context_for_cpu(smp_my_cpu_num());
+    testword_t page   = page_of((void *)addr, context);
     testword_t offset = addr & (PAGE_SIZE - 1);
 
     switch (type) {

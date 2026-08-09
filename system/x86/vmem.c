@@ -100,7 +100,7 @@ static void load_pdbr(int context_id)
 // also used to re-point a reused context at the current program image, and
 // the existing PD2 content (and its matching mapped_window[] value) must
 // stay consistent until the next map_window() call rebuilds it.
-static __attribute__((unused)) void init_page_table_context(int context_id)
+static void init_page_table_context(int context_id)
 {
     uint64_t *context_pml4 = pml4 + context_id * 512;
     uint64_t *context_pdp  = pdp  + context_id * 512;
@@ -115,6 +115,11 @@ static __attribute__((unused)) void init_page_table_context(int context_id)
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
+
+void vmem_rebase_execution_context(int context_id)
+{
+    init_page_table_context(context_id);
+}
 
 bool vmem_prepare_execution_contexts(int requested_contexts)
 {

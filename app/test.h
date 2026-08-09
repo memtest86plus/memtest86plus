@@ -42,6 +42,12 @@ extern barrier_t *run_barrier;
  */
 extern spinlock_t *error_mutex;
 
+/**
+ * The dense per-CPU chunk index within the current context team, rebuilt at
+ * every wave binding.
+ */
+extern uint16_t test_team_chunk_index[MAX_CPUS];
+
 #if (ARCH_BITS == 64)
 /**
  * The word width (in bits) used for memory testing.
@@ -114,6 +120,7 @@ typedef struct {
     int         window_index;
     uintptr_t   window_start;
     uintptr_t   window_end;
+    bool        windows_exhausted;   // sticky per binding, published by the context barrier
     int         status;
 } test_context_t;
 

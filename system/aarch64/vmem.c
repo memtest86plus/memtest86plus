@@ -345,6 +345,11 @@ bool vmem_prepare_execution_contexts(int num_contexts)
     return true;
 }
 
+void vmem_rebase_execution_context(int context_id __attribute__((unused)))
+{
+    // The shared identity map has no per-context roots to re-point.
+}
+
 bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
 {
     // All of physical memory is permanently identity mapped.
