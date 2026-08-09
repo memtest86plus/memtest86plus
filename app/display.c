@@ -67,8 +67,8 @@ static int spin_idx = 0;        // current spinner position
 static int pass_ticks = 0;      // current value (ticks_per_pass is final value)
 static int test_ticks = 0;      // current value (ticks_per_test is final value)
 
-static int pass_bar_length = 0; // currently displayed length
-static int test_bar_length = 0; // currently displayed length
+int pass_bar_length = 0; // currently displayed length
+int test_bar_length = 0; // currently displayed length
 
 static uint64_t next_spin_time = 0; // TSC time stamp
 
@@ -190,16 +190,7 @@ void display_init(void)
     set_background_colour(palette.footer_background);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
     prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
-    prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
-#if defined (__x86_64__)
-    prints(ROW_FOOTER, 74, ".x64");
-#elif defined (__i386__)
-    prints(ROW_FOOTER, 74, ".x32");
-#elif defined (__loongarch_lp64)
-    prints(ROW_FOOTER, 74, ".la64");
-#elif defined (__aarch64__)
-    prints(ROW_FOOTER, 74, ".arm64");
-#endif
+    display_footer_version();
 
     set_foreground_colour(palette.foreground);
     set_background_colour(palette.background);
@@ -219,9 +210,9 @@ void display_init(void)
 #endif
 #if TESTWORD_WIDTH < 64
     if (cpuid_info.flags.lm) {
-        display_cpu_addr_mode(" [LM]");
+        display_cpu_addr_mode(" LM");
     } else if (cpuid_info.flags.pae) {
-        display_cpu_addr_mode("[PAE]");
+        display_cpu_addr_mode(" PAE");
     }
 #endif
     if (l1_cache) {
@@ -251,6 +242,39 @@ void display_init(void)
     }
 
     scroll_message_row = ROW_SCROLL_T;
+}
+
+// The 32-bit PAE/LM indicator, if any, so the footer version block can be
+// redrawn after the scroll-lock prompt is cleared.
+static const char *footer_addr_mode = NULL;
+
+void display_footer_addr_mode(const char *str)
+{
+    footer_addr_mode = str;
+    if (str != NULL) {
+        set_foreground_colour(RED);
+        prints(ROW_FOOTER, 76, str);
+        set_foreground_colour(palette.footer_foreground);
+    }
+}
+
+void display_footer_version(void)
+{
+    prints(ROW_FOOTER, 60, MT_VERSION "." GIT_HASH);
+#if defined (__x86_64__)
+    prints(ROW_FOOTER, 72, ".x64");
+#elif defined (__i386__)
+    prints(ROW_FOOTER, 72, ".x32");
+#elif defined (__loongarch_lp64)
+    prints(ROW_FOOTER, 72, ".la64");
+#elif defined (__aarch64__)
+    prints(ROW_FOOTER, 72, ".arm64");
+#endif
+    if (footer_addr_mode != NULL) {
+        set_foreground_colour(RED);
+        prints(ROW_FOOTER, 76, footer_addr_mode);
+        set_foreground_colour(palette.footer_foreground);
+    }
 }
 
 void display_cpu_topology(void)
@@ -399,9 +423,10 @@ void display_start_pass(void)
 void display_start_test(void)
 {
     clear_screen_region(2, 39, 3, SCREEN_WIDTH - 1);    // progress bar, test details
-    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6);    // Avoid erasing paging mode
+    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1);    // Testing line, value and stage
     clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1);
     clear_screen_region(3, 36, 3, 37);                  // test number
+    display_test_stage(0, 0);
     display_test_percentage(0);
     display_test_number(test_num);
     display_test_description(test_list[test_num].description);
@@ -415,6 +440,68 @@ void display_start_test(void)
     int hours = mins / 60; mins %= 60;
     do_trace(0, "T %i: %i:%02i:%02i", test_num, hours, mins, secs);
 #endif
+}
+
+// Renders one progress percentage and advances the matching bar. The bar
+// state stays private to this translation unit.
+void display_test_progress(int pct)
+{
+    display_test_percentage(pct);
+    display_test_bar((BAR_LENGTH * pct) / 100);
+}
+
+void display_pass_progress(int pct)
+{
+    display_pass_percentage(pct);
+    display_pass_bar((BAR_LENGTH * pct) / 100);
+}
+
+// The stage currently shown in the Testing line's right-aligned field.
+static int current_stage = 0;
+static int current_stages = 0;
+
+void display_test_stage(int stage, int stages)
+{
+    current_stage = stage;
+    current_stages = stages;
+    display_test_stage_field();
+}
+
+// The field is redrawn after every Testing-line value update, so a long
+// address string never leaves it blanked or partially overwritten.
+void display_test_stage_field(void)
+{
+    if (current_stages > 1) {
+        printf(4, 71, "Stg %2i/%2i", current_stage, current_stages);
+    } else {
+        clear_screen_region(4, 71, 4, SCREEN_WIDTH - 1);
+    }
+}
+
+// NUMA_PAR Testing line. Shows the active/total execution context (job)
+// count and the aggregate pages tested in this stage, so the line keeps
+// advancing while any team still works and clearly shows a tail wait when
+// some jobs have finished.
+void display_test_addresses_numa(void)
+{
+    unsigned int jobs = num_bound_execution_contexts;
+    if (jobs == 0) {
+        return;
+    }
+    unsigned int done = 0;
+    for (unsigned int c = 0; c < jobs; c++) {
+        if (test_contexts[c].windows_exhausted) {
+            done++;
+        }
+    }
+    uint64_t tested = __atomic_load_n(&test_pages_done, __ATOMIC_ACQUIRE);
+    if (tested > num_pages_to_test) {
+        tested = num_pages_to_test;
+    }
+    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1);
+    printf(4, 39, "%i/%i jobs [%kB/%kB]", (uintptr_t)(jobs - done),
+           (uintptr_t)jobs, tested << 2, num_pages_to_test << 2);
+    display_test_stage_field();
 }
 
 void display_error_count(void)
@@ -578,6 +665,7 @@ void scroll(void)
 
             scroll_wait = false;
             clear_footer_message();
+            display_footer_version();
         }
         scroll_screen_region(ROW_SCROLL_T, 0, ROW_SCROLL_B, SCREEN_WIDTH - 1);
     }
@@ -620,8 +708,7 @@ void do_tick(int my_cpu)
             pct = 100;
         }
     }
-    display_test_percentage(pct);
-    display_test_bar((BAR_LENGTH * pct) / 100);
+    display_test_progress(pct);
 
     pct = 0;
     if (ticks_per_pass[pass_type] > 0) {
@@ -630,8 +717,7 @@ void do_tick(int my_cpu)
             pct = 100;
         }
     }
-    display_pass_percentage(pct);
-    display_pass_bar((BAR_LENGTH * pct) / 100);
+    display_pass_progress(pct);
 
     bool update_spinner = true;
     if (clks_per_msec > 0) {
