@@ -67,8 +67,8 @@ static int spin_idx = 0;        // current spinner position
 static int pass_ticks = 0;      // current value (ticks_per_pass is final value)
 static int test_ticks = 0;      // current value (ticks_per_test is final value)
 
-static int pass_bar_length = 0; // currently displayed length
-static int test_bar_length = 0; // currently displayed length
+int pass_bar_length = 0; // currently displayed length
+int test_bar_length = 0; // currently displayed length
 
 static uint64_t next_spin_time = 0; // TSC time stamp
 

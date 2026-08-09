@@ -53,6 +53,8 @@
 #include "test.h"
 
 
+#include "test_funcs.h"
+#include "test_helper.h"
 #include "tests.h"
 
 #include "tsc.h"
@@ -194,6 +196,17 @@ static unsigned int num_bound_execution_contexts = 1;
 // at least two selected CPU-backed memory domains).
 bool        numa_run_active = false;
 
+// Aggregate progress counters; test_work_done is atomic-access-only.
+uint64_t    test_work_done = 0;
+uint64_t    test_work_expected = 0;
+
+// The pass-cumulative work counter offset at the start of the current
+// stage: the test percentage is (test_work_done - stage_work_done_base) /
+// test_work_expected, while the pass percentage is test_work_done /
+// pass_work_expected. Written by CPU 0 at the stage boundary.
+uint64_t    stage_work_done_base = 0;
+uint64_t    pass_work_expected = 0;
+
 // Cross-context cancellation request; atomic-access-only, 0 or 1.
 uint32_t    global_cancel_requested = 0;
 
@@ -202,6 +215,7 @@ uint32_t    global_cancel_requested = 0;
 // in an early wave is never erased by a later rebind. Cleared at stage
 // start; read after the stage ends to fall back to legacy mode.
 static bool numa_stage_failure = false;
+
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -227,12 +241,27 @@ static bool numa_stage_failure = false;
         barrier_spin_wait(start_barrier); \
     }
 
-static bool test_stage_is_global_once(int test, int stage);
 static bool numa_window_step(int my_cpu, int context, int iterations);
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
+
+// The relocation-resumable phase machine state: current_wave and
+// num_execution_waves are copied by the relocation and read back on re-entry.
+// Legacy modes and the dummy run use one wave.
+static unsigned int current_wave = 0;
+static unsigned int num_execution_waves = 1;
+
+// The bit-fade test: four rounds of fill/fade/check stages. The fade delay
+// is a global-once stage run by CPU 0 between the all-wave fill and check
+// stages; every other stage visits every wave.
+static bool test_stage_is_global_once(int test, int stage)
+{
+    return test == 10 && (stage % 3) == 1;
+}
+
+
 
 // Records a terminal context status; the first terminal reason wins.
 static void context_record_failure(int context, int reason)
@@ -734,15 +763,10 @@ typedef enum {
 
 static test_scheduler_phase_t scheduler_phase;
 
-// Copied global state: relocation re-entry resumes the wave sequence from
-// exactly where it stopped. Legacy modes and the dummy run use one wave.
-static unsigned int current_wave = 0;
-static unsigned int num_execution_waves = 1;
-
 // Runs the window currently selected by the context master. Every participant
 // maps the same physical window and tests its own chunk of it. Returns false
 // when the phase must be aborted (e.g. the mapping limit was reached).
-static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, bool dummy_run_active, int iterations)
+static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (!i_am_active) {
         return true;
@@ -756,9 +780,11 @@ static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, bool
         return true;
     }
 
-    if (dummy_run_active) {
+    if (dummy_run) {
         if (i_am_master) {
-            ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
+            int ticks = run_test(-1, test_num, test_stage, iterations);
+            ticks_per_test[pass_num][test_num] += ticks;
+            ticks_per_stage[pass_num][test_num][test_stage] += ticks;
         }
         return true;
     }
@@ -904,7 +930,7 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
     }
     SHORT_BARRIER;
 
-    return run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+    return run_test_window(my_cpu, i_am_master, i_am_active, iterations);
 }
 
 // Windows 1 and above, in ascending order, until the context has enumerated
@@ -939,7 +965,7 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        running = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        running = run_test_window(my_cpu, i_am_master, i_am_active, iterations);
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
@@ -975,6 +1001,10 @@ static void run_global_stage_once(void)
         if (restart || bail) {
             // Stop the delay early; the run boundary handles the request.
             break;
+        }
+        __sync_fetch_and_add(&test_work_done, 1);
+        if (VMEM_MAX_CONTEXTS > 1) {
+            render_aggregate_progress(test_work_done - stage_work_done_base, test_work_expected, test_work_done, pass_work_expected);
         }
         sleep_secs--;
         sleep(1);
@@ -1031,6 +1061,11 @@ static bool wave_has_window_zero(void)
     }
     return window_num == 0;
 }
+
+// The per-segment model relies on a window-clipped vm_map segment fitting
+// within one tick block: the tests tick once per SPIN_SIZE block and the
+
+
 
 // The context master publishes the UI-requested bail as a cross-context
 // cancellation request (release store), so every context converges on the
@@ -1245,14 +1280,6 @@ bool test_is_primary_context_master(void)
     return smp_my_cpu_num() == test_contexts[0].master_cpu_num;
 }
 
-// The bit-fade test: four rounds of fill/fade/check stages. The fade delay
-// is a global-once stage run by CPU 0 between the all-wave fill and check
-// stages; every other stage visits every wave.
-static bool test_stage_is_global_once(int test, int stage)
-{
-    return test == 10 && (stage % 3) == 1;
-}
-
 
 
 //------------------------------------------------------------------------------
@@ -1342,6 +1369,14 @@ void main(void)
             if (start_pass) {
                 test_num = 0;
                 start_test = true;
+                // The NUMA_PAR pass counters are pass-cumulative: done never
+                // resets within a pass and the expected total covers the
+                // whole pass, so both percentages are monotonic.
+                __atomic_store_n(&test_work_done, 0, __ATOMIC_RELAXED);
+                stage_work_done_base = 0;
+                if (VMEM_MAX_CONTEXTS > 1) {
+                    pass_work_expected = pass_expected_work();
+                }
                 if (dummy_run) {
                     ticks_per_pass[pass_num] = 0;
                 } else {
@@ -1355,6 +1390,9 @@ void main(void)
                 rerun_test = true;
                 if (dummy_run) {
                     ticks_per_test[pass_num][test_num] = 0;
+                    for (int s = 0; s < test_list[test_num].stages; s++) {
+                        ticks_per_stage[pass_num][test_num][s] = 0;
+                    }
                 } else if (test_list[test_num].enabled) {
                     display_start_test();
                     serial_log_event(SLOG_TEST_START);
@@ -1371,8 +1409,14 @@ void main(void)
                                    && test_stage_is_global_once(test_num, test_stage))
                                 ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+                    // Anchor the pass-cumulative counter at the stage start
+                    // and publish the stage's expected work; done is never
+                    // reset within the pass.
+                    stage_work_done_base =
+                        __atomic_load_n(&test_work_done, __ATOMIC_RELAXED);
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;
+                    test_work_expected = stage_expected_work(test_num, test_stage);
                 }
                 test_contexts[0].window_index = 0;
                 test_contexts[0].window_start = 0;
@@ -1402,6 +1446,7 @@ void main(void)
             restart = true;
         }
 
+        check_input();
         if (restart) {
             // The configuration has been changed.
             master_cpu = 0;

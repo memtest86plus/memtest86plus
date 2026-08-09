@@ -112,6 +112,14 @@ int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * prox
  */
 bool smp_domain_has_memory(uint32_t domain_idx);
 
+/**
+ * Returns the number of the given domain's SRAT range pieces intersecting
+ * the given page range; each intersection is one vm_map segment.
+ */
+uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page);
+
+
+
 //int count_cpus_for_proximity_domain_corresponding_to_range(uintptr_t start, uintptr_t end, uint32_t proximity_domain_idx);
 
 //void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end);

@@ -1667,6 +1667,26 @@ bool smp_domain_has_memory(uint32_t domain_idx)
 }
 #endif
 
+// Returns the number of the given domain's SRAT range pieces intersecting
+// the given page range; each intersection is one vm_map segment.
+#if VMEM_MAX_CONTEXTS > 1
+uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page)
+{
+    uint32_t pieces = 0;
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        if (memory_affinity_ranges[i].proximity_domain_idx != domain_idx) {
+            continue;
+        }
+        uint64_t s = memory_affinity_ranges[i].start >> PAGE_SHIFT;
+        uint64_t e = memory_affinity_ranges[i].end >> PAGE_SHIFT;
+        if (s < end_page && e > start_page) {
+            pieces++;
+        }
+    }
+    return pieces;
+}
+#endif
+
 #if 0
 void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end)
 {

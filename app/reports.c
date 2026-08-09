@@ -450,11 +450,12 @@ static void slog(const char *event, const char *fmt, ...)
     slog_end(pos);
 }
 
-static int slog_pct(int ticks, int total)
+static int slog_pct(uint64_t ticks, uint64_t total)
 {
     if (total <= 0) return 0;
-    int pct = 100 * ticks / total;
-    return pct > 100 ? 100 : pct;
+    if (ticks >= total) return 100;
+    // The pre-clamp keeps the 100 * ticks product within 64 bits.
+    return (int)((100 * ticks) / total);
 }
 
 //------------------------------------------------------------------------------
@@ -697,7 +698,21 @@ void serial_log_tick(void)
     next_log_time = now + SERIAL_LOG_INTERVAL * 1000 * (uint64_t)clks_per_msec;
 
     // Same progress calculation as do_tick(), from our own tick counters.
+    // In NUMA_PAR the shared aggregate work counters replace the tick counts.
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
+
+    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+        // The test percentage uses the current stage's counters, the pass
+        // percentage the cumulative bases (stages are folded in at each
+        // stage boundary), so pass progress is monotonic.
+        uint64_t done = __atomic_load_n(&test_work_done, __ATOMIC_ACQUIRE);
+        slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
+             pass_num, slog_pct(done, pass_work_expected),
+             test_num, slog_pct(done - stage_work_done_base,
+                                test_work_expected),
+             (uintptr_t)error_count);
+        return;
+    }
 
     slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
          pass_num, slog_pct(log_pass_ticks, ticks_per_pass[pass_type]),

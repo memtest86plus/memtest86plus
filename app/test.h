@@ -56,6 +56,23 @@ extern bool numa_run_active;
 extern uint16_t test_team_chunk_index[MAX_CPUS];
 
 /**
+ * Aggregate work counters used for NUMA_PAR progress display: each context
+ * master adds its active CPU count to test_work_done once per tick, and
+ * test_work_expected is computed for the complete stage (all waves).
+ */
+extern uint64_t test_work_done;
+extern uint64_t test_work_expected;
+
+/**
+ * The pass-cumulative work counter offset at the start of the current stage
+ * and the whole-pass expected work: the test percentage is
+ * (test_work_done - stage_work_done_base) / test_work_expected, the pass
+ * percentage test_work_done / pass_work_expected (both monotonic).
+ */
+extern uint64_t stage_work_done_base;
+extern uint64_t pass_work_expected;
+
+/**
  * Cross-context cancellation request (0 or 1); atomic access only.
  */
 extern uint32_t global_cancel_requested;

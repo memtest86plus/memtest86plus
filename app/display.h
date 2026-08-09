@@ -278,6 +278,15 @@ void restore_big_status(void);
 
 void check_input(void);
 
+/**
+ * Renders NUMA_PAR aggregate progress from the shared work counters: the
+ * test fields use the current stage, the pass fields the cumulative bases.
+ */
+void render_aggregate_progress(uint64_t done, uint64_t expected,
+                               uint64_t pass_done, uint64_t pass_expected);
+
+
+
 void set_scroll_lock(bool enabled);
 
 void toggle_scroll_lock(void);
