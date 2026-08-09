@@ -338,6 +338,8 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
     return run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
 }
 
+static bool legacy_window_running = true;
+
 static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -368,7 +370,16 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        running = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        bool my_result = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        if (i_am_master) {
+            // The map-failure decision must be shared: the inactive CPUs
+            // would otherwise return true here (they take no part in the
+            // window) and diverge from the master through different barrier
+            // generations, deadlocking at the addressability limit.
+            legacy_window_running = my_result;
+        }
+        SHORT_BARRIER;
+        running = legacy_window_running;
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
@@ -415,9 +426,18 @@ static void test_all_windows_numa(int my_cpu)
         switch (scheduler_phase) {
           case GLOBAL_STAGE_ONCE:
             // A test-specific global-once stage (e.g. the bit-fade delay)
-            // runs once on CPU 0 between memory-touching phases.
+            // runs once on CPU 0 between memory-touching phases; the other
+            // global participants wait at the surrounding barriers. No
+            // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
+                int ticks = run_global_stage_once();
+                if (dummy_run) {
+                    // The dummy calibration measures the fade delay without
+                    // sleeping: the expected-work accounting for the
+                    // global-once stage is the measured seconds.
+                    ticks_per_test[pass_num][test_num] += ticks;
+                }
                 scheduler_phase = WAVE_DONE;
             }
             LONG_BARRIER;

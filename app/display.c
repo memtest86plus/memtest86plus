@@ -561,9 +561,9 @@ void scroll(void)
     if (scroll_message_row < ROW_SCROLL_B) {
         scroll_message_row++;
     } else {
-        // Only the master CPU may poll the keyboard, so the scroll-lock
-        // single-step wait is only available to it.
-        if (smp_my_cpu_num() == master_cpu) {
+        // Only the primary context master may poll the keyboard, so the
+        // scroll-lock single-step wait is only available to it.
+        if (test_is_primary_context_master(smp_my_cpu_num())) {
             if (scroll_lock) {
                 display_footer_message("<Enter> Single step     ");
             }

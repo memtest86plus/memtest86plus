@@ -106,7 +106,7 @@ static int pattern_fill(int my_cpu, int round)
         offset = fade_addr_offset();
     }
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master(my_cpu)) {
         display_test_pattern_value(random ? (seed ^ invert) : invert);
     }
 
@@ -211,7 +211,7 @@ static int fade_delay(int my_cpu, int sleep_secs)
 {
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master(my_cpu)) {
         display_test_stage_description("fade over %i seconds", sleep_secs);
     }
     while (sleep_secs > 0) {
@@ -262,6 +262,5 @@ int test_bit_fade(int my_cpu, int stage, int sleep_secs)
         break;
     }
     last_stage = stage;
-
     return ticks;
 }
