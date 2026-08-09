@@ -43,6 +43,13 @@ extern barrier_t *run_barrier;
 extern spinlock_t *error_mutex;
 
 /**
+ * True while a NUMA_PAR run is active (real run, at least two selected
+ * CPU-backed memory domains). Legacy modes and the BSP-only dummy run are
+ * always false.
+ */
+extern bool numa_run_active;
+
+/**
  * The dense per-CPU chunk index within the current context team, rebuilt at
  * every wave binding.
  */

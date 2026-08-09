@@ -716,7 +716,6 @@ static bool find_cpus_in_madt(void)
                 if (apic_id_already_listed(entry->core_id, found_cpus)) {
                     // Skip the duplicate: aborting here would silently drop
                     // every later CPU from the enumeration.
-                    tab_entry_ptr += entry_header->length;
                     continue;
                 }
                 if (num_available_cpus < MAX_CPUS) {
@@ -752,7 +751,6 @@ static bool find_cpus_in_madt(void)
                 if (uid_already_listed) {
                     // Skip the duplicate: aborting the walk here would
                     // silently drop every later CPU from the enumeration.
-                    tab_entry_ptr += entry_header->length;
                     continue;
                 }
                 if (mpidr == bsp_mpidr) {
@@ -887,7 +885,6 @@ static int find_numa_nodes_in_srat(void)
                 if (start == end) {
                     // A zero-length enabled entry claims no memory; discard
                     // it rather than letting it count as domain ownership.
-                    tab_entry_ptr += entry_header->length;
                     continue;
                 }
 #if defined(__loongarch_lp64)

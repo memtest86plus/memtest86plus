@@ -787,8 +787,7 @@ static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uint
     // The end of window 1, in pages. VM_WINDOW_SIZE is in pages, so the
     // aarch64 rounding works on page numbers.
 #if defined(__aarch64__)
-    uintptr_t window_one_end = (low_limit + VM_WINDOW_SIZE)
-                             & ~(VM_WINDOW_SIZE - 1);
+    uintptr_t window_one_end = (low_limit + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
 #else
     uintptr_t window_one_end = VM_WINDOW_SIZE;
 #endif
@@ -910,10 +909,6 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
 
 // Windows 1 and above, in ascending order, until the context has enumerated
 // its owned memory. In legacy modes this is the pre-existing window loop.
-// The shared legacy window result, published by the master at a global
-// barrier so every participant takes the same loop-exit decision.
-static bool legacy_window_running = true;
-
 static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -944,16 +939,7 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        bool my_result = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
-        if (i_am_master) {
-            // The map-failure decision must be shared: the inactive CPUs
-            // would otherwise return true here (they take no part in the
-            // window) and diverge from the master through different barrier
-            // generations, deadlocking at the addressability limit.
-            legacy_window_running = my_result;
-        }
-        SHORT_BARRIER;
-        running = legacy_window_running;
+        running = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
@@ -972,19 +958,12 @@ static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
 // sleeps through the test's configured fade interval; the other global
 // participants wait at the surrounding global barriers, so no per-context
 // barrier or test helper may be used here.
-static int run_global_stage_once(void)
+static void run_global_stage_once(void)
 {
     int sleep_secs = test_list[test_num].iterations;
     if (pass_num == 0) {
         // Reduced fast pass, matching the window stages.
         sleep_secs /= 3;
-    }
-    int ticks = 0;
-    if (dummy_run) {
-        // The dummy calibration measures the delay without sleeping: the
-        // expected-work accounting for the global-once stage is the
-        // measured seconds.
-        return sleep_secs;
     }
     // No context is bound here, so there are no context barriers to enter;
     // service input, publish per-second progress, run the timed UI/ECC
@@ -997,11 +976,9 @@ static int run_global_stage_once(void)
             // Stop the delay early; the run boundary handles the request.
             break;
         }
-        ticks++;
         sleep_secs--;
         sleep(1);
     }
-    return ticks;
 }
 
 // True when the selected map (pm_map intersected with the selected range)
@@ -1099,13 +1076,7 @@ static void test_all_windows(int my_cpu)
             // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
-                int ticks = run_global_stage_once();
-                if (dummy_run) {
-                    // The dummy calibration measures the fade delay without
-                    // sleeping: the expected-work accounting for the
-                    // global-once stage is the measured seconds.
-                    ticks_per_test[pass_num][test_num] += ticks;
-                }
+                run_global_stage_once();
                 scheduler_phase = WAVE_DONE;
             }
             LONG_BARRIER;
@@ -1227,8 +1198,7 @@ int execution_context_for_cpu(int cpu)
         return 0;
     }
     int context = cpu_execution_context[cpu];
-    if (context < 0 || context >= (int)num_bound_execution_contexts
-        || context >= VMEM_MAX_CONTEXTS) {
+    if (context < 0 || context >= (int)num_bound_execution_contexts || context >= VMEM_MAX_CONTEXTS) {
         // Unbound/invalid ordinals use the identity-mapped control context.
         // num_bound_execution_contexts is 1 in .data, so this clamp also
         // protects the first-boot startup reads before BSS has been cleared.
@@ -1397,7 +1367,9 @@ void main(void)
                 // or the scheduler would rebind and reset progress.
                 current_wave = 0;
                 num_execution_waves = 1;   // NUMA_PAR computes this from the domains
-                scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
+                scheduler_phase = (VMEM_MAX_CONTEXTS > 1 && numa_run_active
+                                   && test_stage_is_global_once(test_num, test_stage))
+                                ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;

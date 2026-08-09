@@ -166,8 +166,7 @@ static void build_numa_domain_list(void)
     // otherwise there would be no live BSP context to own those ranges.
     bool have_orphan_memory = false;
     for (int domain = 0; domain < num_proximity_domains; domain++) {
-        if (domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain)
-            && enabled_cpus_in_proximity_domain[domain] == 0) {
+        if (domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain) && enabled_cpus_in_proximity_domain[domain] == 0) {
             have_orphan_memory = true;
             break;
         }
@@ -179,9 +178,7 @@ static void build_numa_domain_list(void)
     for (int domain = 0; domain < num_proximity_domains; domain++) {
         // Orphaned memory domains are covered by the BSP context in wave 0
         // and must not get their own execution context.
-        if (   domain != (int)bsp_proximity_domain
-            && smp_domain_has_memory(domain)
-            && enabled_cpus_in_proximity_domain[domain] != 0) {
+        if (domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain) && enabled_cpus_in_proximity_domain[domain] != 0) {
             cpu_memory_domains[num_cpu_memory_domains++] = domain;
         }
     }
