@@ -278,6 +278,12 @@ void restore_big_status(void);
 
 void check_input(void);
 
+/**
+ * Resets the once-per-second UI ownership to context 0. Called by the
+ * scheduler at each wave binding.
+ */
+void display_reset_ui_owner(void);
+
 void set_scroll_lock(bool enabled);
 
 void toggle_scroll_lock(void);
