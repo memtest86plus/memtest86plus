@@ -78,6 +78,16 @@ static bool timed_update_done = false;  // update cycle status
 bool big_status_displayed = false;
 static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 
+// The once-per-second UI ownership context. Reset to context 0 at every wave
+// binding; the owner may hand over to a still-running context when its team
+// exhausts its windows (see numa_do_tick()).
+static int ui_owner_context = 0;
+
+void display_reset_ui_owner(void)
+{
+    __atomic_store_n(&ui_owner_context, 0, __ATOMIC_RELAXED);
+}
+
 //------------------------------------------------------------------------------
 // Variables
 //------------------------------------------------------------------------------
