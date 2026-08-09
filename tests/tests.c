@@ -50,27 +50,28 @@
 //------------------------------------------------------------------------------
 
 test_pattern_t test_list[NUM_TEST_PATTERNS] = {
-    // ena,  cpu, stgs, itrs, errs, description
-    { true,  ONE,    1,    6,    0, "[Address test, walking ones, no cache] "},
-    {false,  ONE,    1,    6,    0, "[Address test, own address in window]  "},
-    { true,  ONE,    2,    6,    0, "[Address test, own address + window]   "},
-    { true,  PAR,    1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
-    { true,  PAR,    1,    6,    0, "[Moving inversions, 1s & 0s]           "},
-    { true,  PAR,    1,  128,    0, "[Moving inversions, random sequence]   "},
-    { true,  PAR,    1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
-    { true,  PAR,    1,    8,    0, "[Modulo 20, random pattern]            "},
-    { true,  PAR,    1,   81,    0, "[Block move]                           "},
+    // ena,  cpu, wrk, stgs, itrs, errs, description
+    { true,  ONE, TEST_WORK_WINDOW_FIXED,    1,    6,    0, "[Address test, walking ones, no cache] "},
+    {false,  ONE, TEST_WORK_SEGMENT_FIXED,   1,    6,    0, "[Address test, own address in window]  "},
+    { true,  ONE, TEST_WORK_SEGMENT_FIXED,   2,    6,    0, "[Address test, own address + window]   "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,   32,    0, "[Bus stress, R/W turnaround, random]   "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,    6,    0, "[Moving inversions, 1s & 0s]           "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,  128,    0, "[Moving inversions, random sequence]   "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,    3,    0, "[Moving inversions, 8 bit pattern]     "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,    8,    0, "[Modulo 20, random pattern]            "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,   81,    0, "[Block move]                           "},
 #if TESTWORD_WIDTH > 32
-    { true,  PAR,    1,    1,    0, "[Moving inversions, 64 bit pattern]    "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,    1,    0, "[Moving inversions, 64 bit pattern]    "},
 #else
-    { true,  PAR,    1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,   1,    1,    0, "[Moving inversions, 32 bit pattern]    "},
 #endif
-    { true,  PAR,   12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
-    {false,  ONE,    1,   24,    0, "[Rowhammer, Blacksmith-style]          "},
+    { true,  PAR, TEST_WORK_SEGMENT_FIXED,  12,  120,    0, "[Bit fade test, 0s, 1s, random]        "},
+    {false,  ONE, TEST_WORK_WINDOW_FIXED,    1,   24,    0, "[Rowhammer, Blacksmith-style]          "},
 };
 
 int ticks_per_pass[NUM_PASS_TYPES];
 int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
+int ticks_per_stage[NUM_PASS_TYPES][NUM_TEST_PATTERNS][MAX_TEST_STAGES];
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -121,6 +122,28 @@ void test_list_init(void)
     desc[i] = '\0';
 }
 
+// Clamps the low-prefix context's first segment to the global lower limit
+// (and the USB guard below 0x500) in window 0. Only the context owning the
+// low prefix may do this; a context whose owned range starts higher must
+// keep its start, or its map would expand into another team's range and the
+// same physical memory would be tested twice, concurrently.
+static void clamp_low_prefix(int context)
+{
+    if (window_num != 0) {
+        return;
+    }
+    uintptr_t *first_word = first_word_mapping(pm_limit_lower);
+
+    // For USB_WORKAROUND.
+    if (first_word < (uintptr_t *)0x500) {
+        first_word = (uintptr_t *)0x500;
+    }
+
+    if (first_word > vm_map[context][0].start) {
+        vm_map[context][0].start = first_word;
+    }
+}
+
 int run_test(int my_cpu, int test, int stage, int iterations)
 {
     int context = test_context_index();
@@ -128,26 +151,16 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     // Needed on every call: relocation invalidates the stack area.
     stack_canary_arm(my_cpu);
 
-    if (my_cpu == master_cpu) {
-        if (window_num == 0) {
-            // First window, so we need to test all selected lower memory.
-            uintptr_t *first_word = first_word_mapping(pm_limit_lower);
-
-            // For USB_WORKAROUND.
-            if (first_word < (uintptr_t *)0x500) {
-                first_word = (uintptr_t *)0x500;
-            }
-
-            // Only the context owning the low prefix may clamp its first
-            // segment down to the global lower limit (and the USB guard
-            // below 0x500); a context whose owned range starts higher must
-            // keep its start, or its map would expand into another team's
-            // range and the same physical memory would be tested twice,
-            // concurrently.
-            if (first_word > vm_map[context][0].start) {
-                vm_map[context][0].start = first_word;
-            }
+    if (numa_run_active) {
+        // Each context master clamps its own low prefix and the laggard's
+        // master updates the aggregate Testing line (the helper draws only
+        // when the calling context is the laggard).
+        if (my_cpu == test_context()->master_cpu_num) {
+            clamp_low_prefix(context);
+            display_test_addresses_numa();
         }
+    } else if (my_cpu == master_cpu) {
+        clamp_low_prefix(context);
 
         /* Update display of memory segments being tested */
         if (test_is_primary_context_master(my_cpu)) {
