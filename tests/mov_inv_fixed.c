@@ -35,7 +35,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
     int context = test_context_index();
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_value(pattern1);
     }
 

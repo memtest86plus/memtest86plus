@@ -32,7 +32,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
     int context = test_context_index();
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_values(pattern1, offset);
     }
 

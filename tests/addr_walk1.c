@@ -35,7 +35,7 @@ int test_addr_walk1(int my_cpu)
 
     testword_t invert = 0;
     for (int i = 0; i < 2; i++) {
-        if (my_cpu == master_cpu) {
+        if (test_is_primary_context_master()) {
             display_test_pattern_value(invert);
         }
         ticks++;

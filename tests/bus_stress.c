@@ -205,7 +205,7 @@ int test_bus_stress(int my_cpu, int iteration)
     size_t burst_blocks = (size_t)8 << (iteration % 3);
     size_t sleep_period = (iteration & 1) ? BUS_ON_BYTES / (2 * burst_blocks * VEC_BYTES) : 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_value(bus_seed(iteration, 0, 0));
     }
 

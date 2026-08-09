@@ -43,7 +43,11 @@
 /**
  * A macro to perform test bailout when requested. In NUMA_PAR the stop
  * decision is published through the context barrier at the last safe point;
- * in legacy modes the plain `bail` flag is used.
+ * in legacy modes the plain `bail` flag is used. The equalize invariant
+ * keeps every team member at the same do_tick generation, and the barrier's
+ * release/acquire fences publish the context status, so every member
+ * evaluates the same decision after the same generation and none is
+ * stranded in a tick barrier by an early single exit.
  */
 #define BAILOUT if (test_stop_requested()) return ticks
 

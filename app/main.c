@@ -227,8 +227,7 @@ static bool numa_stage_failure = false;
         barrier_spin_wait(start_barrier); \
     }
 
-// The scheduler helpers defined after the state machine below (they depend
-// on the window functions above them).
+static bool test_stage_is_global_once(int test, int stage);
 static bool numa_window_step(int my_cpu, int context, int iterations);
 
 #ifndef MIN
@@ -911,6 +910,10 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
 
 // Windows 1 and above, in ascending order, until the context has enumerated
 // its owned memory. In legacy modes this is the pre-existing window loop.
+// The shared legacy window result, published by the master at a global
+// barrier so every participant takes the same loop-exit decision.
+static bool legacy_window_running = true;
+
 static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -941,7 +944,16 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        running = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        bool my_result = run_test_window(my_cpu, i_am_master, i_am_active, dummy_run, iterations);
+        if (i_am_master) {
+            // The map-failure decision must be shared: the inactive CPUs
+            // would otherwise return true here (they take no part in the
+            // window) and diverge from the master through different barrier
+            // generations, deadlocking at the addressability limit.
+            legacy_window_running = my_result;
+        }
+        SHORT_BARRIER;
+        running = legacy_window_running;
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
@@ -954,6 +966,42 @@ static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
     LONG_BARRIER;
     run_at(addr, my_cpu);
     __builtin_unreachable();
+}
+
+// Runs a test-specific global-once stage on CPU 0. The bit-fade fade delay
+// sleeps through the test's configured fade interval; the other global
+// participants wait at the surrounding global barriers, so no per-context
+// barrier or test helper may be used here.
+static int run_global_stage_once(void)
+{
+    int sleep_secs = test_list[test_num].iterations;
+    if (pass_num == 0) {
+        // Reduced fast pass, matching the window stages.
+        sleep_secs /= 3;
+    }
+    int ticks = 0;
+    if (dummy_run) {
+        // The dummy calibration measures the delay without sleeping: the
+        // expected-work accounting for the global-once stage is the
+        // measured seconds.
+        return sleep_secs;
+    }
+    // No context is bound here, so there are no context barriers to enter;
+    // service input, publish per-second progress, run the timed UI/ECC
+    // checks and update the stage description directly. Only CPU 0 runs
+    // this, so no UI lock is needed.
+    display_test_stage_description("fade over %i seconds", sleep_secs);
+    while (sleep_secs > 0) {
+        check_input();
+        if (restart || bail) {
+            // Stop the delay early; the run boundary handles the request.
+            break;
+        }
+        ticks++;
+        sleep_secs--;
+        sleep(1);
+    }
+    return ticks;
 }
 
 // True when the selected map (pm_map intersected with the selected range)
@@ -1046,9 +1094,18 @@ static void test_all_windows(int my_cpu)
         switch (scheduler_phase) {
           case GLOBAL_STAGE_ONCE:
             // A test-specific global-once stage (e.g. the bit-fade delay)
-            // runs once on CPU 0 between memory-touching phases.
+            // runs once on CPU 0 between memory-touching phases; the other
+            // global participants wait at the surrounding barriers. No
+            // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
+                int ticks = run_global_stage_once();
+                if (dummy_run) {
+                    // The dummy calibration measures the fade delay without
+                    // sleeping: the expected-work accounting for the
+                    // global-once stage is the measured seconds.
+                    ticks_per_test[pass_num][test_num] += ticks;
+                }
                 scheduler_phase = WAVE_DONE;
             }
             LONG_BARRIER;
@@ -1170,7 +1227,8 @@ int execution_context_for_cpu(int cpu)
         return 0;
     }
     int context = cpu_execution_context[cpu];
-    if (context < 0 || context >= (int)num_bound_execution_contexts || context >= VMEM_MAX_CONTEXTS) {
+    if (context < 0 || context >= (int)num_bound_execution_contexts
+        || context >= VMEM_MAX_CONTEXTS) {
         // Unbound/invalid ordinals use the identity-mapped control context.
         // num_bound_execution_contexts is 1 in .data, so this clamp also
         // protects the first-boot startup reads before BSS has been cleared.
@@ -1204,6 +1262,25 @@ bool test_stop_requested(void)
         return bail;
     }
     return load_test_status(test_context_index()) == CONTEXT_CANCELLED;
+}
+
+// True when the calling CPU is the primary context master of the current
+// wave, the only context master allowed to update the test-specific display
+// fields (addresses, patterns, stage descriptions) without ui_mutex.
+bool test_is_primary_context_master(void)
+{
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return smp_my_cpu_num() == master_cpu;
+    }
+    return smp_my_cpu_num() == test_contexts[0].master_cpu_num;
+}
+
+// The bit-fade test: four rounds of fill/fade/check stages. The fade delay
+// is a global-once stage run by CPU 0 between the all-wave fill and check
+// stages; every other stage visits every wave.
+static bool test_stage_is_global_once(int test, int stage)
+{
+    return test == 10 && (stage % 3) == 1;
 }
 
 
@@ -1320,7 +1397,7 @@ void main(void)
                 // or the scheduler would rebind and reset progress.
                 current_wave = 0;
                 num_execution_waves = 1;   // NUMA_PAR computes this from the domains
-                scheduler_phase = WAVE_BIND;
+                scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;

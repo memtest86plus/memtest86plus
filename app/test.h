@@ -60,6 +60,26 @@ extern uint32_t global_cancel_requested;
  */
 bool test_stop_requested(void);
 
+/**
+ * True when the calling CPU is the primary context master of the current
+ * wave, the only context master allowed to update the test-specific display
+ * fields without ui_mutex.
+ */
+bool test_is_primary_context_master(void);
+
+/**
+ * Publishes a cross-context cancellation request (release store) from a
+ * context master after the UI requested a bail; every context converges on
+ * the same exit path at its next safe point.
+ */
+void test_publish_cancel_request(void);
+
+/**
+ * Requests a stop of the given execution context; the first terminal reason
+ * wins.
+ */
+void test_request_cancel(int context);
+
 #if (ARCH_BITS == 64)
 /**
  * The word width (in bits) used for memory testing.

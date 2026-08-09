@@ -35,7 +35,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
     testword_t pattern = (testword_t)1 << offset;
     pattern = inverse ? ~pattern : pattern;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_value(pattern);
     }
 

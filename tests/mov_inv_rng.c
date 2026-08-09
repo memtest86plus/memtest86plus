@@ -65,7 +65,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
     // Round constant used for stray words at unaligned segment edges.
     testword_t epat = st.lane[0];
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_value(st.lane[0]);
     }
 

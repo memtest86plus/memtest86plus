@@ -33,7 +33,7 @@ int test_block_move(int my_cpu, int iterations)
     int context = test_context_index();
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_name("block move");
     }
 

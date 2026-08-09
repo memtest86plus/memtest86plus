@@ -33,7 +33,7 @@ static int pattern_fill(int my_cpu, testword_t offset)
     int context = test_context_index();
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_name("own address");
     }
 

@@ -106,7 +106,7 @@ static int pattern_fill(int my_cpu, int round)
         offset = fade_addr_offset();
     }
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_pattern_value(random ? (seed ^ invert) : invert);
     }
 
@@ -211,7 +211,7 @@ static int fade_delay(int my_cpu, int sleep_secs)
 {
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_stage_description("fade over %i seconds", sleep_secs);
     }
     while (sleep_secs > 0) {
@@ -238,8 +238,6 @@ static int fade_delay(int my_cpu, int sleep_secs)
 
 int test_bit_fade(int my_cpu, int stage, int sleep_secs)
 {
-    static int last_stage = -1;
-
     int ticks = 0;
 
     // Four rounds of three stages each: fill, fade, check.
@@ -250,10 +248,10 @@ int test_bit_fade(int my_cpu, int stage, int sleep_secs)
         ticks = pattern_fill(my_cpu, round);
         break;
       case 1:
-        // Only sleep once.
-        if (stage != last_stage) {
-            ticks = fade_delay(my_cpu, sleep_secs);
-        }
+        // The scheduler enters each stage exactly once (and runs the fade
+        // as a global-once stage in NUMA_PAR), so the delay always runs
+        // here; no shared cross-CPU state is needed.
+        ticks = fade_delay(my_cpu, sleep_secs);
         break;
       case 2:
         ticks = pattern_check(my_cpu, round);
@@ -261,7 +259,5 @@ int test_bit_fade(int my_cpu, int stage, int sleep_secs)
       default:
         break;
     }
-    last_stage = stage;
-
     return ticks;
 }

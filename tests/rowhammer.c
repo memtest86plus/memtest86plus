@@ -450,7 +450,7 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
         return ticks;
     }
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master()) {
         display_test_stage_description("Rowhammer %s, %is/window",
             rh_engine_precise() ? "hammer" : "coarse", time_budget_secs);
     }
@@ -562,7 +562,11 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
             rh_check(site, stride, vic_off, n_vic, vword, seg_start, seg_end);
 
             iter++;
-        } while (!bail && slice_cyc != 0 && (get_tsc() - site_start) < slice_cyc);
+        // Poll the stop decision atomically (the context status in NUMA_PAR,
+        // the bail flag in legacy modes) to shorten stop latency; the team
+        // still converges through the context barrier at the next do_tick().
+        } while (!test_stop_requested() && slice_cyc != 0
+                 && (get_tsc() - site_start) < slice_cyc);
 
         do_tick(my_cpu);
         BAILOUT;
