@@ -32,19 +32,19 @@ SECTIONS {
 		. = ALIGN(512);
 		_file_reloc_end = . ;
 	}
-	.sbat : {
-		_file_sbat_start = . ;
-		*(.sbat)
-		_real_sbat_end = . ;
-		. = ALIGN(512);
-		_file_sbat_end = . ;
-	}
 	.osrel : {
 		_file_osrel_start = . ;
 		*(.osrel)
 		_real_osrel_end = . ;
 		. = ALIGN(512);
 		_file_osrel_end = . ;
+	}
+	.sbat : {
+		_file_sbat_start = . ;
+		*(.sbat)
+		_real_sbat_end = . ;
+		. = ALIGN(512);
+		_file_sbat_end = . ;
 	}
 	.shstrtab : { *(.shstrtab) }
 	/DISCARD/ : { *(*) }
@@ -69,16 +69,18 @@ SECTIONS {
 	_virt_text_size  = ((_real_text_size   + 4095) >> 12) << 12;
 	_virt_data_size  = ((_real_data_size + _bss_size + 4095) >> 12) << 12;
 	_virt_reloc_size = ((_file_reloc_size + 4095) >> 12) << 12;
-	_virt_sbat_size  = ((_file_sbat_size  + 4095) >> 12) << 12;
 	_virt_osrel_size = ((_file_osrel_size + 4095) >> 12) << 12;
+	/* Exact size, no padding: shim requires SizeOfRawData >= VirtualSize
+	 * to parse the SBAT data, so .sbat must remain the last section. */
+	_virt_sbat_size  = _real_sbat_size;
 
 	_virt_text_start  = _virt_head_size;
 	_virt_data_start  = _virt_text_start  + _virt_text_size;
 	_virt_reloc_start = _virt_data_start  + _virt_data_size;
-	_virt_sbat_start  = _virt_reloc_start + _virt_reloc_size;
-	_virt_osrel_start = _virt_sbat_start  + _virt_sbat_size;
+	_virt_osrel_start = _virt_reloc_start + _virt_reloc_size;
+	_virt_sbat_start  = _virt_osrel_start + _virt_osrel_size;
 
-	_virt_img_size = _virt_osrel_start + _virt_osrel_size;
+	_virt_img_size = ((_virt_sbat_start + _virt_sbat_size + 4095) >> 12) << 12;
 
 	_virt_init_size = _virt_data_size + _virt_reloc_size + _virt_sbat_size + _virt_osrel_size;
 
