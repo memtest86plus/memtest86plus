@@ -338,11 +338,13 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup __a
 bool vmem_prepare_execution_contexts(int num_contexts)
 {
     // All of physical memory is permanently identity mapped by paging_init();
-    // there is no per-context translation root to prepare or duplicate.
+    // there is no per-context translation root to prepare or duplicate. The
+    // NUMA isolation boundary is therefore the disjoint physical vm_map
+    // ownership, and NUMA_PAR is only safe when the shared map completed.
     if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
         return false;
     }
-    return true;
+    return !paging_incomplete;
 }
 
 void vmem_rebase_execution_context(int context_id __attribute__((unused)))

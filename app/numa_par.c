@@ -118,6 +118,16 @@ void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_d
     display_pass_bar((BAR_LENGTH * pct) / 100);
 }
 
+// True when the current run executes (or, during the dummy calibration,
+// will execute) the NUMA_PAR scheduler: NUMA_PAR is selected, the mapping
+// model was validated (vmem_prepare_execution_contexts() before AP startup
+// downgraded NUMA_PAR on failure), and enough selected CPU-backed memory
+// domains exist to form independent teams.
+static bool numa_par_runs(void)
+{
+    return VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && num_cpu_memory_domains >= 2;
+}
+
 // Master/CPU0-only: binds the current wave's CPU-backed domains to distinct
 // execution contexts, configures their barriers, and publishes the dense
 // chunk indexes. Runs only between two global barriers.

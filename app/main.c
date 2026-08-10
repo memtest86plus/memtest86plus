@@ -938,6 +938,10 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
 
 // Windows 1 and above, in ascending order, until the context has enumerated
 // its owned memory. In legacy modes this is the pre-existing window loop.
+// The shared legacy window result, published by the master at a global
+// barrier so every participant takes the same loop-exit decision.
+static bool legacy_window_running = true;
+
 static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -968,7 +972,16 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        running = run_test_window(my_cpu, i_am_master, i_am_active, iterations);
+        bool my_result = run_test_window(my_cpu, i_am_master, i_am_active, iterations);
+        if (i_am_master) {
+            // The map-failure decision must be shared: the inactive CPUs
+            // would otherwise return true here (they take no part in the
+            // window) and diverge from the master through different barrier
+            // generations, deadlocking at the addressability limit.
+            legacy_window_running = my_result;
+        }
+        SHORT_BARRIER;
+        running = legacy_window_running;
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
@@ -987,12 +1000,19 @@ static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
 // sleeps through the test's configured fade interval; the other global
 // participants wait at the surrounding global barriers, so no per-context
 // barrier or test helper may be used here.
-static void run_global_stage_once(void)
+static int run_global_stage_once(void)
 {
     int sleep_secs = test_list[test_num].iterations;
     if (pass_num == 0) {
         // Reduced fast pass, matching the window stages.
         sleep_secs /= 3;
+    }
+    int ticks = 0;
+    if (dummy_run) {
+        // The dummy calibration measures the delay without sleeping: the
+        // expected-work accounting for the global-once stage is the
+        // measured seconds.
+        return sleep_secs;
     }
     // No context is bound here, so there are no context barriers to enter;
     // service input, publish per-second progress, run the timed UI/ECC
@@ -1010,9 +1030,11 @@ static void run_global_stage_once(void)
             render_aggregate_progress(test_work_done - stage_work_done_base, test_work_expected, test_work_done, pass_work_expected);
         }
         update_timed_ui();
+        ticks++;
         sleep_secs--;
         sleep(1);
     }
+    return ticks;
 }
 
 // True when the selected map (pm_map intersected with the selected range)
@@ -1050,7 +1072,10 @@ static bool selected_map_has_window_zero(void)
 // is made.
 static bool wave_has_window_zero(void)
 {
-    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+    if (VMEM_MAX_CONTEXTS > 1 && (numa_run_active || (dummy_run && numa_par_runs()))) {
+        // The real run and the prospective-NUMA_PAR dummy calibration use
+        // the same map-based decision, so the dummy measures the same
+        // window set the scheduler will test.
         return selected_map_has_window_zero();
     }
 
@@ -1115,7 +1140,14 @@ static void test_all_windows(int my_cpu)
             // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
-                run_global_stage_once();
+                int ticks = run_global_stage_once();
+                if (dummy_run) {
+                    // The dummy calibration measures the fade delay without
+                    // sleeping: the expected-work accounting for the
+                    // global-once stage is the measured seconds.
+                    ticks_per_test[pass_num][test_num] += ticks;
+                    ticks_per_stage[pass_num][test_num][test_stage] += ticks;
+                }
                 scheduler_phase = WAVE_DONE;
             }
             LONG_BARRIER;
@@ -1407,17 +1439,25 @@ void main(void)
                 // Start a new state-machine sequence for this logical
                 // test/stage. This must not run on relocation re-entry,
                 // or the scheduler would rebind and reset progress.
+                numa_run_active = !dummy_run && VMEM_MAX_CONTEXTS > 1 && numa_par_runs();
+                if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && !numa_run_active) {
+                    // NUMA_PAR cannot run with the current selection; the
+                    // legacy paths below are topology-agnostic in that case
+                    // (never NUMA_ON chunking), so no memory is omitted.
+                    if (test_num == 0 && test_stage == 0) {
+                        trace(0, "NUMA_PAR unavailable with current selection; using legacy mode");
+                    }
+                }
                 current_wave = 0;
-                num_execution_waves = 1;   // NUMA_PAR computes this from the domains
-                scheduler_phase = (VMEM_MAX_CONTEXTS > 1 && numa_run_active
-                                   && test_stage_is_global_once(test_num, test_stage))
-                                ? GLOBAL_STAGE_ONCE : WAVE_BIND;
+                if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+                    num_execution_waves = 1;   // set from the domains otherwise
+                }
+                scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
                     // Anchor the pass-cumulative counter at the stage start
                     // and publish the stage's expected work; done is never
                     // reset within the pass.
-                    stage_work_done_base =
-                        __atomic_load_n(&test_work_done, __ATOMIC_RELAXED);
+                    stage_work_done_base = __atomic_load_n(&test_work_done, __ATOMIC_RELAXED);
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;
                     test_work_expected = stage_expected_work(test_num, test_stage);
