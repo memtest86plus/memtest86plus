@@ -248,9 +248,9 @@ int test_bit_fade(int my_cpu, int stage, int sleep_secs)
         ticks = pattern_fill(my_cpu, round);
         break;
       case 1:
-        // The scheduler enters each stage exactly once (and runs the fade
-        // as a global-once stage in NUMA_PAR), so the delay always runs
-        // here; no shared cross-CPU state is needed.
+        // Legacy modes enter the delay here once per round. NUMA_PAR runs
+        // it globally once per resident-memory sweep in the scheduler;
+        // no shared cross-CPU state is needed in the test.
         ticks = fade_delay(my_cpu, sleep_secs);
         break;
       case 2:

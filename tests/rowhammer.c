@@ -81,6 +81,12 @@ static const rh_pattern_t rh_static_patterns[] = {
 };
 #define RH_NUM_STATIC ((int)(sizeof(rh_static_patterns) / sizeof(rh_static_patterns[0])))
 
+// Per-execution-context materialised aggressor sequence. Kept off the stack:
+// under NUMA_PAR an AP (2 KiB stack) runs this test, and test_rowhammer()'s
+// frame plus the do_tick()/UI chain overflows it. Contexts are disjoint and
+// rowhammer is a ONE-mode test, so one slot per context is safe.
+static void *rh_seq[VMEM_MAX_CONTEXTS][RH_MAX_PERIOD];
+
 //------------------------------------------------------------------------------
 // Portable hammer engine (i586 + LoongArch; x86-64 uses tests/x86/rowhammer_x86.c)
 //------------------------------------------------------------------------------
@@ -527,7 +533,7 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
                 pat = &rh_static_patterns[iter % RH_NUM_STATIC];
             }
 
-            void *seq[RH_MAX_PERIOD];
+            void **seq = rh_seq[context];
             uint32_t seq_len = rh_materialize(pat, site, stride, seg_start, seg_end, seq, period);
             if (seq_len == 0) {
                 iter++;

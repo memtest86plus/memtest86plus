@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (C) 2026 Lionel Debroux.
+//
+// NUMA_PAR scheduler support, textually included into app/main.c (see the
+// #include "numa_par.c" site there): its functions and state are static to
+// that translation unit and it must not be compiled standalone.
+
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
@@ -5,17 +12,17 @@
 
 // The precomputed expected-work weighting over the actually tested map
 // (pm_map ∩ selected range, split by the scheduler's windows): for each
-// work class, the sum over the wave domains of the owner's work units times
-// its active CPU count (parallel tests) or times one (sequential tests),
-// plus the whole-map denominator that the dummy calibration measures. The
-// per-owner statistics themselves are transient scratch inside
-// build_numa_domain_list(): only these small tables are needed afterwards.
-// Memory-only domains are attributed to the BSP owner while the statistics
-// are gathered, so every owner in cpu_memory_domains[] corresponds to one
-// execution context.
-static uint64_t owner_weighted_par[TEST_WORK_CLASSES];
-static uint64_t owner_weighted_seq[TEST_WORK_CLASSES];
-static uint32_t whole_map_denom[TEST_WORK_CLASSES];
+// work class and resident-memory sweep, the sum over the wave domains of
+// the owner's work units times its active CPU count (parallel tests) or
+// times one (sequential tests), plus the whole-map denominator that the
+// dummy calibration measures. The per-owner statistics themselves are
+// transient scratch inside build_numa_domain_list(): only these small
+// tables are needed afterwards. Memory-only domains are attributed to the
+// BSP owner while the statistics are gathered, so every owner in
+// cpu_memory_domains[] corresponds to one execution context.
+static uint64_t owner_weighted_par[TEST_WORK_CLASSES][NUM_TEST_SWEEPS];
+static uint64_t owner_weighted_seq[TEST_WORK_CLASSES][NUM_TEST_SWEEPS];
+static uint32_t whole_map_denom[TEST_WORK_CLASSES][NUM_TEST_SWEEPS];
 
 // The tick-block accounting only applies where NUMA_PAR can run; on i586
 // (32-bit testwords) the equality would not hold.
@@ -30,10 +37,10 @@ _Static_assert((VM_WINDOW_SIZE << PAGE_SHIFT) == (uintptr_t)SPIN_SIZE * sizeof(t
 // scheduler's windows). Every segment/window is counted exactly once in
 // exactly one wave; memory-only domains were attributed to their wave-0
 // owner, the BSP context, when the weights were computed.
-static uint64_t stage_expected_work(int test, int stage)
+static uint64_t stage_expected_work(int test, int stage, test_memory_sweep_t sweep)
 {
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
-    uint64_t cal = (uint64_t)ticks_per_stage[pass_type][test][stage];
+    uint64_t cal = (uint64_t)ticks_per_sweep_stage[pass_type][test][sweep][stage];
 
     // The bit-fade fade delay is a global-once stage: its calibration is the
     // measured delay seconds, accounted one work unit per elapsed second on
@@ -44,9 +51,9 @@ static uint64_t stage_expected_work(int test, int stage)
 
     int work_class = test_list[test].work_class;
     uint64_t weighted = (test_list[test].cpu_mode == PAR)
-                      ? owner_weighted_par[work_class]
-                      : owner_weighted_seq[work_class];
-    uint64_t denom = whole_map_denom[work_class];
+                      ? owner_weighted_par[work_class][sweep]
+                      : owner_weighted_seq[work_class][sweep];
+    uint64_t denom = whole_map_denom[work_class][sweep];
     if (denom == 0) {
         return 0;
     }
@@ -65,14 +72,18 @@ static uint64_t stage_expected_work(int test, int stage)
     return cal * q + (cal * r) / denom;
 }
 
-// The expected aggregate work for the whole test: the sum over its stages,
-// so the test percentage is whole-test progress and the bar is monotonic
-// over all stages, matching the legacy UI.
+// The expected aggregate work for the whole test: the sum over its stages
+// and resident-memory sweeps, so the test percentage is whole-test progress
+// and the bar is monotonic over all stages, matching the legacy UI.
 static uint64_t test_expected_work(int test)
 {
     uint64_t expected = 0;
+    test_memory_sweep_t first = test_first_sweep(test);
     for (int stage = 0; stage < test_list[test].stages; stage++) {
-        expected += stage_expected_work(test, stage);
+        expected += stage_expected_work(test, stage, first);
+        if (first == TEST_SWEEP_LOW && selected_map_has_windows_1_plus()) {
+            expected += stage_expected_work(test, stage, TEST_SWEEP_HIGH);
+        }
     }
     return expected;
 }
@@ -104,19 +115,21 @@ static void validate_calibration(void)
             continue;
         }
         int work_class = test_list[test].work_class;
-        uint64_t denom = whole_map_denom[work_class];
-        if (denom == 0) {
-            continue;
-        }
-        for (int stage = 0; stage < test_list[test].stages; stage++) {
-            if (test_stage_is_global_once(test, stage)) {
+        for (int sweep = 0; sweep < NUM_TEST_SWEEPS; sweep++) {
+            uint64_t denom = whole_map_denom[work_class][sweep];
+            if (denom == 0) {
                 continue;
             }
-            for (int pass_type = 0; pass_type < NUM_PASS_TYPES; pass_type++) {
-                uint64_t cal = (uint64_t)ticks_per_stage[pass_type][test][stage];
-                if (cal % denom != 0) {
-                    trace(0, "NUMA_PAR calibration mismatch: test %i stage %i pass %i",
-                          test, stage, pass_type);
+            for (int stage = 0; stage < test_list[test].stages; stage++) {
+                if (test_stage_is_global_once(test, stage)) {
+                    continue;
+                }
+                for (int pass_type = 0; pass_type < NUM_PASS_TYPES; pass_type++) {
+                    uint64_t cal = (uint64_t)ticks_per_sweep_stage[pass_type][test][sweep][stage];
+                    if (cal % denom != 0) {
+                        trace(0, "NUMA_PAR calibration mismatch: test %i stage %i sweep %i pass %i",
+                              test, stage, sweep, pass_type);
+                    }
                 }
             }
         }
@@ -145,6 +158,16 @@ void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_d
         }
     }
     display_pass_progress(pct);
+}
+
+// True when the current run executes (or, during the dummy calibration,
+// will execute) the NUMA_PAR scheduler: NUMA_PAR is selected, the mapping
+// model was validated (vmem_prepare_execution_contexts() before AP startup
+// downgraded NUMA_PAR on failure), and enough selected CPU-backed memory
+// domains exist to form independent teams.
+static bool numa_par_runs(void)
+{
+    return VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && num_cpu_memory_domains >= 2;
 }
 
 // Master/CPU0-only: binds the current wave's CPU-backed domains to distinct
@@ -176,7 +199,7 @@ static void bind_execution_wave(int wave, bool parallel_test)
             test_contexts[context].master_cpu_num = -1;
             test_contexts[context].team_cpu_count = 0;
             test_contexts[context].active_cpu_count = 0;
-            test_contexts[context].window_index = 0;
+            test_contexts[context].window_index = (test_memory_sweep == TEST_SWEEP_HIGH) ? 1 : 0;
             test_contexts[context].window_start = 0;
             test_contexts[context].window_end = 0;
             test_contexts[context].windows_exhausted = false;
@@ -341,13 +364,14 @@ static void build_numa_domain_list(void)
     // (see the _Static_assert above), so the whole-map segment total equals
     // the per-stage calibration. The statistics are transient: only the
     // reduced tables survive this function.
-    uint32_t owner_work[TEST_WORK_CLASSES][MAX_PROXIMITY_DOMAINS];
-    uint32_t whole_map[TEST_WORK_CLASSES];
+    uint32_t owner_work[TEST_WORK_CLASSES][NUM_TEST_SWEEPS][MAX_PROXIMITY_DOMAINS];
+    uint32_t whole_map[TEST_WORK_CLASSES][NUM_TEST_SWEEPS];
     memset(owner_work, 0, sizeof(owner_work));
     memset(whole_map, 0, sizeof(whole_map));
     bool owner_in_window[MAX_PROXIMITY_DOMAINS] = { false };
 
     for (uint64_t window_index = 0; ; window_index++) {
+        test_memory_sweep_t sweep = (window_index == 0) ? TEST_SWEEP_LOW : TEST_SWEEP_HIGH;
         uintptr_t win_start, win_end;
         window_page_bounds(window_index, &win_start, &win_end);
 
@@ -374,7 +398,7 @@ static void build_numa_domain_list(void)
                     e = win_end;
                 }
                 if (s < e) {
-                    whole_map[TEST_WORK_SEGMENT_FIXED]++;
+                    whole_map[TEST_WORK_SEGMENT_FIXED][sweep]++;
                     for (int d = 0; d < num_proximity_domains; d++) {
                         uint32_t pieces =
                             smp_domain_memory_pieces_in_range(d, s, e);
@@ -385,13 +409,13 @@ static void build_numa_domain_list(void)
                         // Attribute to the execution owner: a memory-only
                         // domain belongs to the BSP context in wave 0.
                         int owner = (enabled_cpus_in_proximity_domain[d] > 0) ? d : (int)bsp_proximity_domain;
-                        owner_work[TEST_WORK_SEGMENT_FIXED][owner] += pieces;
+                        owner_work[TEST_WORK_SEGMENT_FIXED][sweep][owner] += pieces;
                         owner_in_window[owner] = true;
                     }
                 }
             }
             if (window_has_memory) {
-                whole_map[TEST_WORK_WINDOW_FIXED]++;
+                whole_map[TEST_WORK_WINDOW_FIXED][sweep]++;
             }
         }
 
@@ -400,7 +424,7 @@ static void build_numa_domain_list(void)
         // of its owned domains overlap there.
         for (int d = 0; d < num_proximity_domains; d++) {
             if (owner_in_window[d]) {
-                owner_work[TEST_WORK_WINDOW_FIXED][d]++;
+                owner_work[TEST_WORK_WINDOW_FIXED][sweep][d]++;
                 owner_in_window[d] = false;
             }
         }
@@ -411,17 +435,25 @@ static void build_numa_domain_list(void)
 
     // Reduce the per-owner statistics to the weight tables: a parallel test
     // weights each owner by its active CPU count (the per-context team
-    // size), a sequential test by one.
+    // size), a sequential test by one. The ALL sweep is the sum of the two
+    // resident-memory sweeps; it is not accumulated separately.
     for (int wc = 0; wc < TEST_WORK_CLASSES; wc++) {
-        uint64_t par = 0;
-        uint64_t seq = 0;
-        for (unsigned int i = 0; i < num_cpu_memory_domains; i++) {
-            uint32_t domain = cpu_memory_domains[i];
-            par += (uint64_t)owner_work[wc][domain] * enabled_cpus_in_proximity_domain[domain];
-            seq += owner_work[wc][domain];
+        for (int sweep = 0; sweep < NUM_TEST_SWEEPS; sweep++) {
+            uint64_t par = 0;
+            uint64_t seq = 0;
+            for (unsigned int i = 0; i < num_cpu_memory_domains; i++) {
+                uint32_t domain = cpu_memory_domains[i];
+                uint32_t work = (sweep == TEST_SWEEP_ALL)
+                              ? owner_work[wc][TEST_SWEEP_LOW][domain] + owner_work[wc][TEST_SWEEP_HIGH][domain]
+                              : owner_work[wc][sweep][domain];
+                par += (uint64_t)work * enabled_cpus_in_proximity_domain[domain];
+                seq += work;
+            }
+            owner_weighted_par[wc][sweep] = par;
+            owner_weighted_seq[wc][sweep] = seq;
+            whole_map_denom[wc][sweep] = (sweep == TEST_SWEEP_ALL)
+                                        ? whole_map[wc][TEST_SWEEP_LOW] + whole_map[wc][TEST_SWEEP_HIGH]
+                                        : whole_map[wc][sweep];
         }
-        owner_weighted_par[wc] = par;
-        owner_weighted_seq[wc] = seq;
-        whole_map_denom[wc] = whole_map[wc];
     }
 }

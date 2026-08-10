@@ -738,6 +738,12 @@ its complement, probing both fade polarities in each delay, stressing cells
 with opposing-charge neighbours and testing a fresh, reproducible charge
 configuration on every pass.
 
+In NUMA parallel mode, all fill/fade/check rounds finish below the relocation
+boundary while the program resides above it, then finish above the boundary
+while the program resides below it. Each selected region has one fade delay
+per round, shared by all its NUMA waves. This keeps program relocation from
+overwriting a pattern before it is checked.
+
 ### Test 11 : Rowhammer
 
 Disabled by default. Repeatedly activating ("hammering") a DRAM row can leak
