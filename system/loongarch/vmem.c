@@ -9,6 +9,7 @@
 #include "boot.h"
 
 #include "cpuid.h"
+#include "smp.h"
 
 #include "vmem.h"
 
@@ -67,11 +68,12 @@ uintptr_t map_region(uintptr_t base_addr, size_t size __attribute__((unused)), b
 bool vmem_prepare_execution_contexts(int num_contexts)
 {
     // LoongArch64 uses DMW/direct addressing with one shared mapping
-    // configuration; there is no per-context translation root.
+    // configuration; there is no per-context translation root. NUMA_PAR is
+    // only safe when the NUMA address transform cannot alias two teams.
     if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
         return false;
     }
-    return true;
+    return smp_numa_transform_valid();
 }
 
 bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
@@ -81,6 +83,7 @@ bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __a
 
 void *first_word_mapping(uintptr_t page, int context_id)
 {
+    (void)context_id;   /* used by the topology-aware transform added later */
     void *result;
 
     if (map_numa_memory_range == true) {

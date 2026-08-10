@@ -629,8 +629,10 @@ void scroll(void)
     if (scroll_message_row < ROW_SCROLL_B) {
         scroll_message_row++;
     } else {
-        // Only the primary context master may poll the keyboard, so the
-        // scroll-lock single-step wait is only available to it.
+        // Only the master CPU may poll the keyboard, so the scroll-lock
+        // single-step wait is only available to it. In NUMA_PAR this is
+        // further restricted to the wave's primary context-0 master, so the
+        // other teams never stall behind a blocking scroll wait.
         if (test_is_primary_context_master(smp_my_cpu_num())) {
             if (scroll_lock) {
                 display_footer_message("<Enter> Single step     ");

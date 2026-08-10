@@ -42,10 +42,7 @@ extern int num_active_cpus;
  */
 extern int master_cpu;
 
-/* True while a NUMA_PAR run is active. */
-extern bool numa_run_active;
-
-/* Legacy window state (context 0); NUMA_PAR uses test_context() fields. */
+/* Legacy window number (context 0); NUMA_PAR uses test_context() fields. */
 extern int window_num;
 
 /**
@@ -234,7 +231,6 @@ int execution_context_for_cpu(int cpu);
  * otherwise.
  */
 barrier_t *test_run_barrier(void);
-
 
 /**
  * True when the given CPU is the primary context master of the current wave,

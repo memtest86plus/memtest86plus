@@ -125,7 +125,13 @@ bool smp_domain_has_memory(uint32_t domain_idx);
  */
 uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page);
 
-
+/**
+ * Validates the active LoongArch64 NUMA address transform for parallel teams:
+ * canonical spans must round-trip to physical addresses and retain distinct
+ * ownership. Identity fallback is valid. Called after SRAT normalization and
+ * pinned allocations; always true on architectures without the transform.
+ */
+bool smp_numa_transform_valid(void);
 
 //int count_cpus_for_proximity_domain_corresponding_to_range(uintptr_t start, uintptr_t end, uint32_t proximity_domain_idx);
 

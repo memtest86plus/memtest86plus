@@ -10,16 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 
-
-def extract_function(source, signature):
-    start = source.rindex(signature)
-    body = source.index("{", start)
-    depth = 1
-    end = body + 1
-    while depth:
-        depth += (source[end] == "{") - (source[end] == "}")
-        end += 1
-    return source[start:end]
+from c_extract import extract_function  # noqa: E402
 
 
 PREAMBLE = r"""
@@ -111,8 +102,8 @@ int main(void)
 def main():
     helper = (ROOT / "tests/test_helper.c").read_text()
     functions = "\n".join(
-        extract_function(helper, signature)
-        for signature in ("static uintptr_t equalize_block_counts(", "void calculate_chunk(")
+        extract_function(helper, name)
+        for name in ("equalize_block_counts", "calculate_chunk")
     )
     with tempfile.TemporaryDirectory(prefix="numa-chunks-") as directory:
         source = Path(directory) / "regression.c"

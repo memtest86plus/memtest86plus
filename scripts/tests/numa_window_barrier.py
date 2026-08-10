@@ -15,17 +15,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 
-
-def extract_function(source, signature):
-    # main.c also has a forward declaration; the last occurrence is its body.
-    start = source.rindex(signature)
-    body = source.index("{", start)
-    depth = 1
-    end = body + 1
-    while depth:
-        depth += (source[end] == "{") - (source[end] == "}")
-        end += 1
-    return source[start:end]
+from c_extract import extract_function  # noqa: E402
 
 
 PREAMBLE = r"""
@@ -57,13 +47,13 @@ static pm_map_t pm_map[1];
 static int pm_map_size = 1;
 static vm_map_t vm_map[1][2];
 static unsigned num_mapped_pages[1];
+static uint64_t test_pages_done;
 static int test_num, test_stage, scenario;
 static barrier_t barrier;
 static pthread_mutex_t events = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t changed = PTHREAD_COND_INITIALIZER;
 static _Thread_local int current_cpu;
 static unsigned waits[2], test_calls[2], steps[2], setups;
-static uint64_t test_pages_done;
 static bool peer_held, release_peer, master_exit_waiting, premature_map;
 static bool master_publication_held, release_publication, peer_decision_waiting;
 static bool map_attempted;
@@ -265,7 +255,7 @@ int main(void)
 
 def main():
     function = extract_function(
-        (ROOT / "app/numa_par.c").read_text(), "static bool numa_window_step("
+        (ROOT / "app/numa_par.c").read_text(), "numa_window_step"
     )
     with tempfile.TemporaryDirectory(prefix="numa-window-barrier-") as directory:
         source = Path(directory) / "regression.c"

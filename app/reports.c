@@ -658,10 +658,12 @@ void serial_log_tick(void)
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-        // The test percentage is whole-test progress; the pass percentage
-        // uses the pass-cumulative bases. The jobs field reports how many
-        // execution contexts have exhausted their windows, so a serial log
-        // reader can tell whether the remaining time is a tail wait.
+        // The test percentage is whole-test progress from the per-test
+        // calibration scaled by the selected map's work ratio; the pass
+        // percentage uses the pass-cumulative bases. The jobs field reports
+        // how many execution contexts have exhausted their windows, so a
+        // serial log reader can tell whether the remaining time is a tail
+        // wait.
         uint64_t done = __atomic_load_n(&test_work_done, __ATOMIC_ACQUIRE);
         unsigned int jobs = num_bound_execution_contexts;
         unsigned int done_jobs = 0;
