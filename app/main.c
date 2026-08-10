@@ -260,9 +260,34 @@ static bool numa_window_step(int my_cpu, int context, int iterations);
 static unsigned int current_wave = 0;
 static unsigned int num_execution_waves = 1;
 
+// Multi-stage NUMA_PAR tests finish all stages below LOW_LOAD_LIMIT while
+// resident high, then all stages above it while resident low. Relocating
+// between a fill and its check would overwrite patterns in both load areas.
+typedef enum {
+    TEST_SWEEP_ALL,
+    TEST_SWEEP_LOW,
+    TEST_SWEEP_HIGH,
+    NUM_TEST_SWEEPS
+} test_memory_sweep_t;
+
+static test_memory_sweep_t test_memory_sweep = TEST_SWEEP_ALL;
+static int ticks_per_sweep_stage[NUM_PASS_TYPES][NUM_TEST_PATTERNS][NUM_TEST_SWEEPS][MAX_TEST_STAGES];
+
+static test_memory_sweep_t test_first_sweep(int test);
+static bool test_next_sweep(int test);
+static bool selected_map_has_windows_1_plus(void);
+
 // The bit-fade test: four rounds of fill/fade/check stages. The fade delay
-// is a global-once stage run by CPU 0 between the all-wave fill and check
-// stages; every other stage visits every wave.
+// runs once on CPU 0 per resident-memory sweep, between its all-wave fill
+// and check stages; every memory-touching stage visits every wave.
+//
+// In NUMA_PAR the fill/check stages run one execution context per
+// CPU-backed memory domain, concurrently: on a 2-socket machine with one
+// memory domain per socket, the test therefore works on two blocks (e.g.
+// 2 x 64 GB) at once, and the single global fade covers both. The test is
+// multi-stage, so it also runs the two resident sweeps (LOW: window 0, 4 MiB
+// on x86; HIGH: windows 1+, the bulk), each with its own per-round fade; the
+// Testing line only shows the primary context's block.
 static bool test_stage_is_global_once(int test, int stage)
 {
     return test == 10 && (stage % 3) == 1;
@@ -379,10 +404,13 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
         uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
         uintptr_t try_limit = pm_map[i].end   << PAGE_SHIFT;
         if (try_start < lower_limit) try_start = lower_limit;
+        if (try_start >= upper_limit) break;
+        // Each resident sweep tests the other side of this boundary, so
+        // the entire image, including stacks and TLS, must stay within it.
+        if (program_size > upper_limit - try_start) continue;
         uintptr_t try_end   = try_start + program_size;
         if (try_end > try_limit) continue;
 
-        if (try_start >= upper_limit) break;
         if (try_end   <  lower_limit) continue;
 
         *load_addr = try_start;
@@ -793,7 +821,7 @@ static bool run_test_window(int my_cpu, bool i_am_master, bool i_am_active, int 
         if (i_am_master) {
             int ticks = run_test(-1, test_num, test_stage, iterations);
             ticks_per_test[pass_num][test_num] += ticks;
-            ticks_per_stage[pass_num][test_num][test_stage] += ticks;
+            ticks_per_sweep_stage[pass_num][test_num][test_memory_sweep][test_stage] += ticks;
             window_num++;
         }
         return true;
@@ -963,6 +991,10 @@ static bool run_owned_window_zero(int my_cpu, bool i_am_master, bool i_am_active
 
 // Windows 1 and above, in ascending order, until the context has enumerated
 // its owned memory. In legacy modes this is the pre-existing window loop.
+// The shared legacy window result, published by the master at a global
+// barrier so every participant takes the same loop-exit decision.
+static bool legacy_window_running = true;
+
 static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_active, int iterations)
 {
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -993,7 +1025,16 @@ static void run_owned_windows_1_plus(int my_cpu, bool i_am_master, bool i_am_act
         }
         SHORT_BARRIER;
 
-        running = run_test_window(my_cpu, i_am_master, i_am_active, iterations);
+        bool my_result = run_test_window(my_cpu, i_am_master, i_am_active, iterations);
+        if (i_am_master) {
+            // The map-failure decision must be shared: the inactive CPUs
+            // would otherwise return true here (they take no part in the
+            // window) and diverge from the master through different barrier
+            // generations, deadlocking at the addressability limit.
+            legacy_window_running = my_result;
+        }
+        SHORT_BARRIER;
+        running = legacy_window_running;
     } while (running && test_contexts[0].window_end < pm_map[pm_map_size - 1].end);
 }
 
@@ -1012,12 +1053,19 @@ static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
 // sleeps through the test's configured fade interval; the other global
 // participants wait at the surrounding global barriers, so no per-context
 // barrier or test helper may be used here.
-static void run_global_stage_once(void)
+static int run_global_stage_once(void)
 {
     int sleep_secs = test_list[test_num].iterations;
     if (pass_num == 0) {
         // Reduced fast pass, matching the window stages.
         sleep_secs /= 3;
+    }
+    int ticks = 0;
+    if (dummy_run) {
+        // The dummy calibration measures the delay without sleeping: the
+        // expected-work accounting for the global-once stage is the
+        // measured seconds.
+        return sleep_secs;
     }
     // No context is bound here, so there are no context barriers to enter;
     // service input, publish per-second progress, run the timed UI/ECC
@@ -1035,9 +1083,11 @@ static void run_global_stage_once(void)
             render_aggregate_progress(test_work_done - test_work_done_base, test_work_expected, test_work_done, pass_work_expected);
         }
         update_timed_ui();
+        ticks++;
         sleep_secs--;
         sleep(1);
     }
+    return ticks;
 }
 
 // True when the selected map (pm_map intersected with the selected range)
@@ -1066,16 +1116,54 @@ static bool selected_map_has_window_zero(void)
     return false;
 }
 
+static bool selected_map_has_windows_1_plus(void)
+{
+    uintptr_t low_limit = LOW_LOAD_LIMIT >> PAGE_SHIFT;
+    uintptr_t lower = pm_limit_lower > low_limit ? pm_limit_lower : low_limit;
+    for (int i = 0; i < pm_map_size; i++) {
+        uintptr_t s = pm_map[i].start > lower ? pm_map[i].start : lower;
+        uintptr_t e = MIN(pm_map[i].end, pm_limit_upper);
+        if (s < e) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static test_memory_sweep_t test_first_sweep(int test)
+{
+    if (numa_par_runs() && test_list[test].stages > 1) {
+        return selected_map_has_window_zero() ? TEST_SWEEP_LOW : TEST_SWEEP_HIGH;
+    }
+    return TEST_SWEEP_ALL;
+}
+
+static bool test_next_sweep(int test)
+{
+    if (test_list[test].stages > 1 && test_memory_sweep == TEST_SWEEP_LOW
+        && selected_map_has_windows_1_plus()) {
+        test_memory_sweep = TEST_SWEEP_HIGH;
+        return true;
+    }
+    return false;
+}
+
 // Decides whether window 0 will be tested in this stage/wave. In NUMA_PAR
-// every wave executes window 0 whenever the selected map has any memory
-// below LOW_LOAD_LIMIT; a wave whose contexts map nothing there just skips
-// the empty window (and performs one harmless extra relocation). In legacy
+// single-stage tests visit window 0 whenever the selected map has memory
+// below LOW_LOAD_LIMIT; multi-stage tests visit it only in the low sweep.
+// A wave whose contexts map nothing there skips the empty window. In legacy
 // modes the pre-existing window-0 avoidance rules (multi-stage tests and
 // pm_limit_lower above LOW_LOAD_LIMIT) apply before any relocation decision
 // is made.
 static bool wave_has_window_zero(void)
 {
-    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+    if (test_memory_sweep != TEST_SWEEP_ALL) {
+        return test_memory_sweep == TEST_SWEEP_LOW;
+    }
+    if (VMEM_MAX_CONTEXTS > 1 && (numa_run_active || (dummy_run && numa_par_runs()))) {
+        // The real run and the prospective-NUMA_PAR dummy calibration use
+        // the same map-based decision, so the dummy measures the same
+        // window set the scheduler will test.
         return selected_map_has_window_zero();
     }
 
@@ -1135,7 +1223,14 @@ static void test_all_windows(int my_cpu)
             // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
-                run_global_stage_once();
+                int ticks = run_global_stage_once();
+                if (dummy_run) {
+                    // The dummy calibration measures the fade delay without
+                    // sleeping: the expected-work accounting for the
+                    // global-once stage is the measured seconds.
+                    ticks_per_test[pass_num][test_num] += ticks;
+                    ticks_per_sweep_stage[pass_num][test_num][test_memory_sweep][test_stage] += ticks;
+                }
                 scheduler_phase = WAVE_DONE;
             }
             LONG_BARRIER;
@@ -1167,7 +1262,8 @@ static void test_all_windows(int my_cpu)
                 // A window-0 map failure (the PAE limit was reached) aborts
                 // the stage: the following windows would fail identically,
                 // and the run boundary falls back to legacy placement.
-                scheduler_phase = window_zero_ok ? WAVE_WINDOWS_1_PLUS : WAVE_FINISH;
+                scheduler_phase = window_zero_ok && test_memory_sweep != TEST_SWEEP_LOW
+                                ? WAVE_WINDOWS_1_PLUS : WAVE_FINISH;
             }
             SHORT_BARRIER;
             continue;
@@ -1384,7 +1480,7 @@ void main(void)
                 test_work_done_base = 0;
                 if (VMEM_MAX_CONTEXTS > 1) {
                     pass_work_expected = pass_expected_work();
-                    if (!dummy_run && pass_num == 0 && VMEM_MAX_CONTEXTS > 1) {
+                    if (!dummy_run && pass_num == 0 && numa_par_runs()) {
                         // Both pass types are calibrated by the dummy run;
                         // check the expected-work invariant once.
                         validate_calibration();
@@ -1400,12 +1496,12 @@ void main(void)
             if (start_test) {
                 trace(my_cpu, "start test %i", test_num);
                 test_stage = 0;
+                test_memory_sweep = test_first_sweep(test_num);
                 rerun_test = true;
                 if (dummy_run) {
                     ticks_per_test[pass_num][test_num] = 0;
-                    for (int s = 0; s < test_list[test_num].stages; s++) {
-                        ticks_per_stage[pass_num][test_num][s] = 0;
-                    }
+                    memset(ticks_per_sweep_stage[pass_num][test_num], 0,
+                           sizeof(ticks_per_sweep_stage[pass_num][test_num]));
                 } else {
                     if (test_list[test_num].enabled) {
                         display_start_test();
@@ -1427,11 +1523,20 @@ void main(void)
                 // Start a new state-machine sequence for this logical
                 // test/stage. This must not run on relocation re-entry,
                 // or the scheduler would rebind and reset progress.
+                numa_run_active = !dummy_run && VMEM_MAX_CONTEXTS > 1 && numa_par_runs();
+                if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && !numa_run_active) {
+                    // NUMA_PAR cannot run with the current selection; the
+                    // legacy paths below are topology-agnostic in that case
+                    // (never NUMA_ON chunking), so no memory is omitted.
+                    if (test_num == 0 && test_stage == 0) {
+                        trace(0, "NUMA_PAR unavailable with current selection; using legacy mode");
+                    }
+                }
                 current_wave = 0;
-                num_execution_waves = 1;   // NUMA_PAR computes this from the domains
-                scheduler_phase = (VMEM_MAX_CONTEXTS > 1 && numa_run_active
-                                   && test_stage_is_global_once(test_num, test_stage))
-                                ? GLOBAL_STAGE_ONCE : WAVE_BIND;
+                if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+                    num_execution_waves = 1;   // set from the domains otherwise
+                }
+                scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
                     // A new stage of the same test starts: only the
                     // cancellation request and the failure latch are reset,
@@ -1443,7 +1548,7 @@ void main(void)
                 if (!dummy_run && test_list[test_num].enabled && test_list[test_num].stages > 1) {
                     display_test_stage(test_stage + 1, test_list[test_num].stages);
                 }
-                test_contexts[0].window_index = 0;
+                test_contexts[0].window_index = (test_memory_sweep == TEST_SWEEP_HIGH) ? 1 : 0;
                 test_contexts[0].window_start = 0;
                 test_contexts[0].window_end   = 0;
             }
@@ -1491,6 +1596,13 @@ void main(void)
                 continue;
             }
             test_stage = 0;
+
+            if (test_next_sweep(test_num)) {
+                // Keep the same test/calibration totals, but start every
+                // stage of the upper sweep after one relocation to low.
+                rerun_test = true;
+                continue;
+            }
 
             if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
                 switch (cpu_mode) {

@@ -54,13 +54,6 @@ typedef enum { FAST_PASS, FULL_PASS, NUM_PASS_TYPES } pass_type_t;
 extern int ticks_per_pass[NUM_PASS_TYPES];
 extern int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
 
-/**
- * The per-stage portion of the dummy-run calibration: accumulated per window
- * and per stage, so each stage's expected work can use its own calibration
- * instead of the whole-test total.
- */
-extern int ticks_per_stage[NUM_PASS_TYPES][NUM_TEST_PATTERNS][MAX_TEST_STAGES];
-
 int run_test(int my_cpu, int test, int stage, int iterations);
 
 /**

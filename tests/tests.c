@@ -71,7 +71,6 @@ test_pattern_t test_list[NUM_TEST_PATTERNS] = {
 
 int ticks_per_pass[NUM_PASS_TYPES];
 int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
-int ticks_per_stage[NUM_PASS_TYPES][NUM_TEST_PATTERNS][MAX_TEST_STAGES];
 
 //------------------------------------------------------------------------------
 // Public Functions
