@@ -359,15 +359,15 @@ bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __a
     return true;
 }
 
-void *first_word_mapping(uintptr_t page, int context_id)
+void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
+    // All of physical memory is permanently identity mapped, so the alias
+    // does not depend on the calling context's test window.
     return (void *)(page << PAGE_SHIFT);
 }
 
 void *last_word_mapping(uintptr_t page, size_t word_size, int context_id)
 {
-    (void)context_id;
-
     return (uint8_t *)first_word_mapping(page, context_id) + (PAGE_SIZE - word_size);
 }
 

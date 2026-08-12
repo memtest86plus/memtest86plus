@@ -81,9 +81,9 @@ bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __a
     return true;
 }
 
-void *first_word_mapping(uintptr_t page, int context_id)
+void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
-    (void)context_id;   /* used by the topology-aware transform added later */
+    // The direct mapping does not depend on the calling context's test window.
     void *result;
 
     if (map_numa_memory_range == true) {
@@ -102,8 +102,6 @@ void *first_word_mapping(uintptr_t page, int context_id)
 
 void *last_word_mapping(uintptr_t page, size_t word_size, int context_id)
 {
-    (void)context_id;
-
     return (uint8_t *)first_word_mapping(page, context_id) + (PAGE_SIZE - word_size);
 }
 

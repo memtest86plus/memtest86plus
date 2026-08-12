@@ -38,5 +38,6 @@
 // MPIDR_EL1 affinity fields. This mask extract Aff3/2/1/0
 
 #define MPIDR_AFFINITY_MASK     UINT64_C(0xFF00FFFFFF)
+#define MPIDR_MT_BIT            UINT64_C(0x1000000)
 
 #endif // ARM64_REGISTERS_H
