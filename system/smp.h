@@ -62,6 +62,28 @@ extern int num_proximity_domains;
 extern bool smp_topology_too_large;
 
 /**
+ * The per-CPU topology decomposition used by the NUMA core-subset picking
+ * policy (numa=par,topology,N / numa=on,topology,N). Filled once by
+ * smp_decompose_topology() after the CPUs have been enumerated;
+ * cpu_topo_data_available reports whether the architecture provided usable
+ * data (the ordinal picking policy applies otherwise).
+ */
+typedef struct {
+    int core_group_id;   // the core group (CCD/CCX/die/cluster) within the package
+    int core_id;         // the physical core identity; the SMT siblings share it
+    int smt_id;          // the thread within the core (0 = no SMT)
+} cpu_topo_id_t;
+extern cpu_topo_id_t cpu_topo_id[MAX_CPUS];
+extern bool cpu_topo_data_available;
+
+/**
+ * Decomposes the per-CPU topology (APIC IDs / MPIDR / core IDs) into the
+ * core-group structure used by the NUMA core-subset picking. Called once
+ * after smp_init(), before any subset is derived.
+ */
+void smp_decompose_topology(void);
+
+/**
  * Initialises the SMP state and detects the number of available CPU cores.
  */
 void smp_init(bool smp_enable);

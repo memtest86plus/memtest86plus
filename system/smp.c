@@ -409,6 +409,9 @@ static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS];
 
 uint16_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
+cpu_topo_id_t            cpu_topo_id[MAX_CPUS];
+bool                     cpu_topo_data_available = false;
+
 static uintptr_t         smp_heap_page = 0;
 
 static uintptr_t         alloc_addr = 0;
@@ -1482,6 +1485,120 @@ bool smp_numa_transform_valid(void)
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
+
+#if defined(__x86_64__)
+// CPUID leaf 0x1F (extended topology), with the legacy 0xB fallback: the
+// SMT and core level shifts, plus the shift of the first level above the
+// core (the core group). The grouping is by APIC-ID bit position and is
+// deliberately vendor-neutral: AMD CCD/CCX and Intel die/module alike, the
+// level's type name is not assumed.
+// Scans the topology subleaves of the given leaf for the SMT and core
+// level shifts. Returns true when both were found.
+static bool x86_scan_topology_shifts(uint32_t leaf, int *smt_shift, int *core_shift)
+{
+    uint32_t eax, ebx, ecx, edx;
+    int smt = -1, core = -1;
+    for (int sub = 0; sub < 32; sub++) {
+        cpuid(leaf, sub, &eax, &ebx, &ecx, &edx);
+        // CPUID topology leaves encode the shift in EAX[4:0] and the level
+        // type in ECX[15:8]: 0 = end of the enumeration, 1 = SMT, 2 = core,
+        // then the higher levels (the same values the cpuid.c topology
+        // decoder reads from the same field).
+        int shift = eax & 0x1F;
+        int type = (ecx >> 8) & 0xFF;
+        if (type == 0) {
+            // The end-of-enumeration marker.
+            break;
+        } else if (type == 1) {
+            smt = shift;
+        } else if (type == 2) {
+            core = shift;
+        }
+    }
+    if (smt < 0 || core < 0) {
+        return false;
+    }
+    *smt_shift = smt;
+    *core_shift = core;
+    return true;
+}
+
+static void x86_topology_decompose(void)
+{
+    if (cpuid_info.topology.is_hybrid) {
+        // P/E hybrids use different SMT shifts per core type, so a single
+        // decomposition would mis-group the cores; use the ordinal policy.
+        return;
+    }
+    int smt_shift, core_shift;
+    // A basic leaf above the maximum returns the highest supported leaf's
+    // data rather than zeros, so guard 0x1F like the 0xB retry; a present
+    // but empty 0x1F still falls through to the legacy leaf.
+    if ((cpuid_info.max_cpuid < 0x1F || !x86_scan_topology_shifts(0x1F, &smt_shift, &core_shift))
+     && (cpuid_info.max_cpuid < 0xB  || !x86_scan_topology_shifts(0xB,  &smt_shift, &core_shift))) {
+        // No usable topology data; the ordinal policy applies.
+        return;
+    }
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        uint32_t apic_id = cpu_num_to_apic_id[cpu];
+        cpu_topo_id[cpu].smt_id = (smt_shift > 0) ? (int)(apic_id & ((1u << smt_shift) - 1)) : 0;
+        cpu_topo_id[cpu].core_id = (int)(apic_id >> smt_shift);
+        // The core group (CCD/CCX/die) is the APIC-ID region above the core
+        // level, so its id comes from the core shift; using the next
+        // level's shift would collapse the whole package into one group.
+        cpu_topo_id[cpu].core_group_id = (int)(apic_id >> core_shift);
+    }
+    cpu_topo_data_available = true;
+}
+#elif defined(__aarch64__)
+// The MPIDR affinity fields (fixed architecture layout): depending on the
+// MT bit, Aff0 denotes either an SMT thread (MT=1) or the core (MT=0).
+static void aarch64_topology_decompose(void)
+{
+    // The MPIDR MT bit (whether Aff0 denotes an SMT thread or the core) is
+    // not preserved by the affinity-masked stored values, so read it from
+    // the BSP's own MPIDR; the MT flag is a uniform system property.
+    bool mt = (read_sysreg(mpidr_el1) & MPIDR_MT_BIT) != 0;
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        uint64_t mpidr = cpu_num_to_apic_id[cpu];
+        if (mt) {
+            // Aff0 = thread, Aff1 = core, Aff2+ = the core group.
+            cpu_topo_id[cpu].smt_id = (int)(mpidr & 0xFF);
+            cpu_topo_id[cpu].core_id = (int)(mpidr >> 8);
+            cpu_topo_id[cpu].core_group_id = (int)(mpidr >> 16);
+        } else {
+            // No SMT: Aff0 = core, Aff1+ = the core group.
+            cpu_topo_id[cpu].smt_id = 0;
+            cpu_topo_id[cpu].core_id = (int)(mpidr & 0xFF);
+            cpu_topo_id[cpu].core_group_id = (int)(mpidr >> 8);
+        }
+    }
+    cpu_topo_data_available = true;
+}
+#elif defined(__loongarch_lp64)
+// LoongArch has no SMT. The core-group (cluster) encoding of the MADT
+// core IDs / CPUCFG leaf 0x10 is not yet identified against the PRM, so
+// the decomposition data stays unavailable and the ordinal policy applies.
+static void loongarch_topology_decompose(void)
+{
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        cpu_topo_id[cpu].smt_id = 0;
+        cpu_topo_id[cpu].core_id = (int)cpu_num_to_apic_id[cpu];
+        cpu_topo_id[cpu].core_group_id = 0;
+    }
+}
+#endif
+
+void smp_decompose_topology(void)
+{
+#if defined(__x86_64__)
+    x86_topology_decompose();
+#elif defined(__aarch64__)
+    aarch64_topology_decompose();
+#elif defined(__loongarch_lp64)
+    loongarch_topology_decompose();
+#endif
+}
 
 void smp_init(bool smp_enable)
 {

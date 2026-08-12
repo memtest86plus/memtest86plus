@@ -171,6 +171,86 @@ static bool run_cpu_selected[MAX_CPUS];
 bool        numa_boot_cpu_subset[MAX_CPUS];
 static bool numa_run_cpu_selected[MAX_CPUS];
 
+// The topology picking policy: per proximity domain, deduplicate the SMT
+// siblings (one logical CPU per physical core), group the cores by
+// core_group_id, and round-robin one core per group until the budget is
+// spent, so every core group is represented when the budget covers the
+// group count. Falls back to the ordinal order when the topology data is
+// unavailable. The scratch arrays are shared: this runs on CPU 0 only, at
+// the run boundary and at boot.
+typedef struct { int group; int core; int cpu; } numa_core_entry_t;
+static numa_core_entry_t numa_pick_cores[MAX_CPUS];
+static int numa_pick_group_id[MAX_CPUS];
+
+static void numa_pick_topology(int domain, const bool selection[], bool mask[])
+{
+    if (!cpu_topo_data_available) {
+        // The ordinal fallback: the first selected CPU ordinals of the
+        // domain, in CPU ordinal order.
+        int kept = 0;
+        for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+            if (selection[cpu] && (int)smp_get_proximity_domain_idx(cpu) == domain && kept < numa_cores_per_domain) {
+                mask[cpu] = true;
+                kept++;
+            }
+        }
+        return;
+    }
+    int core_count = 0;
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        if (!(selection[cpu] && (int)smp_get_proximity_domain_idx(cpu) == domain)) {
+            continue;
+        }
+        // SMT-dedupe: keep the first logical CPU of each physical core.
+        bool seen = false;
+        for (int i = 0; i < core_count; i++) {
+            if (numa_pick_cores[i].group == cpu_topo_id[cpu].core_group_id
+             && numa_pick_cores[i].core  == cpu_topo_id[cpu].core_id) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen) {
+            numa_pick_cores[core_count].group = cpu_topo_id[cpu].core_group_id;
+            numa_pick_cores[core_count].core  = cpu_topo_id[cpu].core_id;
+            numa_pick_cores[core_count].cpu   = cpu;
+            core_count++;
+        }
+    }
+    // The distinct groups, in the first-core ordinal order (deterministic).
+    int group_count = 0;
+    for (int i = 0; i < core_count; i++) {
+        bool seen = false;
+        for (int j = 0; j < group_count; j++) {
+            if (numa_pick_group_id[j] == numa_pick_cores[i].group) {
+                seen = true;
+                break;
+            }
+        }
+        if (!seen) {
+            numa_pick_group_id[group_count++] = numa_pick_cores[i].group;
+        }
+    }
+    // Round-robin: one core per group first, then the next core of each
+    // group, until the budget is spent.
+    int picked = 0;
+    for (int round = 0; round < core_count && picked < numa_cores_per_domain; round++) {
+        for (int j = 0; j < group_count && picked < numa_cores_per_domain; j++) {
+            int in_group = 0;
+            for (int i = 0; i < core_count; i++) {
+                if (numa_pick_cores[i].group == numa_pick_group_id[j]) {
+                    if (in_group == round) {
+                        mask[numa_pick_cores[i].cpu] = true;
+                        picked++;
+                        break;
+                    }
+                    in_group++;
+                }
+            }
+        }
+    }
+}
+
 // Fills mask[] from selection[]: the full selection when no per-domain
 // subset was configured (numa=par / numa=on without a suffix), otherwise
 // at most numa_cores_per_domain selected CPUs per proximity domain. The
@@ -183,15 +263,18 @@ static void numa_build_test_subset(const bool selection[], bool mask[])
         mask[cpu] = false;
     }
     if (numa_cores_per_domain > 0 && VMEM_MAX_CONTEXTS > 1) {
-        // The topology picking policy currently degrades to the ordinal
-        // order until the topology decomposition lands on top of this
-        // commit; it then replaces this loop with the policy switch.
         for (int domain = 0; domain < num_proximity_domains; domain++) {
-            int kept = 0;
-            for (int cpu = 0; cpu < num_available_cpus; cpu++) {
-                if (selection[cpu] && (int)smp_get_proximity_domain_idx(cpu) == domain && kept < numa_cores_per_domain) {
-                    mask[cpu] = true;
-                    kept++;
+            if (numa_core_pick_policy == NUMA_PICK_TOPOLOGY) {
+                numa_pick_topology(domain, selection, mask);
+            } else {
+                // Ordinal: the first selected CPU ordinals of the domain,
+                // in CPU ordinal order.
+                int kept = 0;
+                for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+                    if (selection[cpu] && (int)smp_get_proximity_domain_idx(cpu) == domain && kept < numa_cores_per_domain) {
+                        mask[cpu] = true;
+                        kept++;
+                    }
                 }
             }
         }
@@ -541,6 +624,7 @@ static void global_init(void)
     }
 
     num_enabled_cpus = 0;
+    smp_decompose_topology();
     numa_build_boot_subset();
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
