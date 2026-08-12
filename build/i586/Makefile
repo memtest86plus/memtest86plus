@@ -112,7 +112,7 @@ debug: check memtest.debug mt86plus
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
 
-boot/x86/header.o : | ../../boot/sbat.csv
+boot/x86/header.o : ../../boot/sbat_csv.h
 
 boot/x86/startup.o: ../../boot/x86/startup32.S ../../boot/boot.h
 	@mkdir -p boot/x86

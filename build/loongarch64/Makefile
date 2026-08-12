@@ -109,7 +109,7 @@ debug: check memtest.debug memtestloongarch.efi
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
 
-boot/header.o : | ../../boot/sbat.csv
+boot/header.o : ../../boot/sbat_csv.h
 
 boot/startup.o: ../../boot/loongarch/startup64.S ../../boot/boot.h
 	@mkdir -p boot

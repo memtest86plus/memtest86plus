@@ -120,7 +120,7 @@ debug: check memtest.debug
 -include $(subst .o,.d,$(TST_OBJS))
 -include $(subst .o,.d,$(APP_OBJS))
 
-boot/header.o : | ../../boot/sbat.csv
+boot/header.o : ../../boot/sbat_csv.h
 
 boot/startup.o: ../../boot/aarch64/startup.S ../../boot/boot.h
 	@mkdir -p boot

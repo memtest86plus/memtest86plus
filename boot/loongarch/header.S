@@ -182,7 +182,7 @@ section_table:
 	.short	(IMAGE_REL_BASED_ABSOLUTE << 12) + 0	// reloc 0 -> 0
 
 .section ".sbat", "a", @progbits
-.incbin "../boot/sbat.csv"
+#include "sbat_csv.h"
 
 .section ".osrel", "a", @progbits
 	.ascii	"ID=memtest86plus\n"
