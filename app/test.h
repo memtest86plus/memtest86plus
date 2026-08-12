@@ -55,6 +55,14 @@ extern spinlock_t *ui_mutex;
 extern bool numa_run_active;
 
 /**
+ * The boot-time core subset for the NUMA modes (numa=on,policy,N): the
+ * NUMA_ON chunking tests only these CPUs (their chunk ordinals are the
+ * only ones assigned), while NUMA_PAR re-derives its own per-run subset.
+ * Equal to the boot selection when no subset was configured.
+ */
+extern bool numa_boot_cpu_subset[MAX_CPUS];
+
+/**
  * The dense per-CPU chunk index within the current context team, rebuilt at
  * every wave binding.
  */

@@ -120,7 +120,17 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
     } else {
         // Legacy NUMA_ON chunking only; a requested-but-inactive NUMA_PAR
         // uses the topology-agnostic path below.
-        if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
+        // The boot-time subset excludes the CPUs dropped by
+        // numa=on,policy,N; they skip every segment like the CPUs of the
+        // other domains (one tick per segment, keeping the barrier
+        // generations balanced).
+        if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON && !numa_boot_cpu_subset[my_cpu]) {
+            // Excluded by the numa=on,policy,N subset: never test this
+            // segment (the retained CPUs already cover the whole domain).
+            // The empty range keeps the per-segment tick balance.
+            *start = (testword_t *)1;
+            *end = (testword_t *)0;
+        } else if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON && numa_boot_cpu_subset[my_cpu]) {
             uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(my_cpu);
 
             // Is this CPU in the same proximity domain as the current segment ?
