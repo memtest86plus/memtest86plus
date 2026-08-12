@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (C) 2026 Lionel Debroux.
+//
+// NUMA_PAR scheduler support, textually included into app/main.c (see the
+// #include "numa_par.c" site there): its functions and state are static to
+// that translation unit and it must not be compiled standalone.
 extern int pass_bar_length;
 extern int test_bar_length;
 
@@ -169,7 +175,7 @@ static void bind_execution_wave(int wave, bool parallel_test)
         for (int cpu = 0; cpu < num_available_cpus; cpu++) {
             uint32_t domain = smp_get_proximity_domain_idx(cpu);
             int context = domain_to_context[domain];
-            bool in_team = cpu_is_global_participant[cpu] && run_cpu_selected[cpu] && context != CONTEXT_NONE;
+            bool in_team = cpu_is_global_participant[cpu] && numa_run_cpu_selected[cpu] && context != CONTEXT_NONE;
             if (in_team) {
                 cpu_execution_context[cpu] = context;
                 if (test_contexts[context].team_cpu_count == 0) {
@@ -223,7 +229,7 @@ static void bind_execution_wave(int wave, bool parallel_test)
             uint32_t domain = smp_get_proximity_domain_idx(cpu);
             int context = domain_to_context[domain];
             bool in_team =    cpu_is_global_participant[cpu]
-                           && run_cpu_selected[cpu]
+                           && numa_run_cpu_selected[cpu]
                            && context != CONTEXT_NONE;
             if (in_team) {
                 cpu_is_test_participant[cpu] = parallel_test || cpu == test_contexts[context].master_cpu_num;
@@ -275,7 +281,7 @@ static void build_numa_domain_list(void)
     memset(enabled_cpus_in_proximity_domain, 0, sizeof(enabled_cpus_in_proximity_domain));
 
     for (int cpu = 0; cpu < num_available_cpus; cpu++) {
-        if (!cpu_is_global_participant[cpu] || !run_cpu_selected[cpu]) {
+        if (!cpu_is_global_participant[cpu] || !numa_run_cpu_selected[cpu]) {
             continue;
         }
         uint32_t domain = smp_get_proximity_domain_idx(cpu);

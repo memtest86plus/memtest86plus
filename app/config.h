@@ -75,6 +75,20 @@ extern bool         enable_mch_read;
 extern bool         enable_ecc_polling;
 extern numa_mode_t  numa_mode;
 
+/**
+ * The core-picking policy for the NUMA modes' automatic core subset
+ * (numa=par,policy,N / numa=on,policy,N): which cores of each proximity
+ * domain are selected when the subset is smaller than the domain's core
+ * count.
+ */
+typedef enum {
+    NUMA_PICK_ORDINAL,   // the first N selected CPU ordinals per domain
+    NUMA_PICK_TOPOLOGY   // N cores spread across the core groups (CCD/CCX/die/cluster)
+} numa_pick_policy_t;
+
+extern numa_pick_policy_t numa_core_pick_policy;
+extern int  numa_cores_per_domain;   // 0 = every core, no subset
+
 extern bool         pause_at_start;
 extern bool         dark_mode;
 

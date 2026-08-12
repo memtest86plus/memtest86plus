@@ -164,6 +164,56 @@ static bool cpu_is_global_participant[MAX_CPUS];
 // here at run boundaries.
 static bool run_cpu_selected[MAX_CPUS];
 
+// The automatic per-run core subset for NUMA_PAR (numa=par,policy,N):
+// derived from run_cpu_selected[] at every run boundary, so the UI's CPU
+// selection changes between runs are honored. The NUMA_ON mode uses the
+// boot-time numa_boot_cpu_subset[] instead (its chunk ordinals are static).
+bool        numa_boot_cpu_subset[MAX_CPUS];
+static bool numa_run_cpu_selected[MAX_CPUS];
+
+// Fills mask[] from selection[]: the full selection when no per-domain
+// subset was configured (numa=par / numa=on without a suffix), otherwise
+// at most numa_cores_per_domain selected CPUs per proximity domain. The
+// BSP is always kept. The masks drive the team membership and the
+// per-domain counts, so the memory coverage, the wave structure and the
+// work accounting are unchanged by the subset.
+static void numa_build_test_subset(const bool selection[], bool mask[])
+{
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        mask[cpu] = false;
+    }
+    if (numa_cores_per_domain > 0 && VMEM_MAX_CONTEXTS > 1) {
+        // The topology picking policy currently degrades to the ordinal
+        // order until the topology decomposition lands on top of this
+        // commit; it then replaces this loop with the policy switch.
+        for (int domain = 0; domain < num_proximity_domains; domain++) {
+            int kept = 0;
+            for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+                if (selection[cpu] && (int)smp_get_proximity_domain_idx(cpu) == domain && kept < numa_cores_per_domain) {
+                    mask[cpu] = true;
+                    kept++;
+                }
+            }
+        }
+        // The BSP can never be disabled, so the subset must never drop it.
+        mask[0] = true;
+    } else {
+        for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+            mask[cpu] = selection[cpu];
+        }
+    }
+}
+
+// The boot-time subset, from the boot-time CPU selection.
+static void numa_build_boot_subset(void)
+{
+    bool boot_selection[MAX_CPUS];
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        boot_selection[cpu] = (cpu_state[cpu] != CPU_STATE_DISABLED);
+    }
+    numa_build_test_subset(boot_selection, numa_boot_cpu_subset);
+}
+
 // The CPUs that enter test-internal barriers in the current wave (all team
 // CPUs for a parallel test, only the context master for a sequential one).
 bool        cpu_is_test_participant[MAX_CPUS];
@@ -491,13 +541,15 @@ static void global_init(void)
     }
 
     num_enabled_cpus = 0;
+    numa_build_boot_subset();
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == CPU_STATE_ENABLED) {
             // NUMA-aware chunk indexes only for the legacy NUMA_ON mode; in
             // NUMA_PAR the dense per-context indexes are assigned at wave
             // binding, and when NUMA_PAR is requested but unavailable the
-            // topology-agnostic path needs the global ordinals.
-            if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
+            // topology-agnostic path needs the global ordinals. The boot
+            // subset excludes the CPUs dropped by numa=on,policy,N.
+            if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON && numa_boot_cpu_subset[i]) {
                 uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
                 chunk_index[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
             } else {
@@ -1398,6 +1450,7 @@ void main(void)
                 for (int cpu = 0; cpu < num_available_cpus; cpu++) {
                     run_cpu_selected[cpu] = (cpu_state[cpu] != CPU_STATE_DISABLED);
                 }
+                numa_build_test_subset(run_cpu_selected, numa_run_cpu_selected);
                 if (VMEM_MAX_CONTEXTS > 1) {
                     build_numa_domain_list();
                 }

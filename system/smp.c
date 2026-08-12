@@ -1354,14 +1354,14 @@ bool map_the_numa_memory_range(unsigned int highest_bit)
     // Validate every span before mutating anything: the transform must be
     // atomic, or a failure in a later span would leave the earlier entries
     // canonicalized while the identity mapping is selected.
-    for (i = 0; i < pm_map_size; i++) {
+    for (i = 0; i < (unsigned int)pm_map_size; i++) {
         uint8_t node_s = (pm_map[i].start >> (NUMA_NODE_OFFSET - PAGE_SHIFT)) & 0xF;
         uint8_t node_e = (pm_map[i].end >> (NUMA_NODE_OFFSET - PAGE_SHIFT)) & 0xF;
         if (node_s != node_e) {
             return false;
         }
     }
-    for (i = 0; i < num_memory_affinity_ranges; i++) {
+    for (i = 0; i < (unsigned int)num_memory_affinity_ranges; i++) {
         if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
             uint8_t node_s = (memory_affinity_ranges[i].start >> NUMA_NODE_OFFSET) & 0xF;
             uint8_t node_e = (memory_affinity_ranges[i].end >> NUMA_NODE_OFFSET) & 0xF;
@@ -1372,7 +1372,7 @@ bool map_the_numa_memory_range(unsigned int highest_bit)
     }
 
     // All spans validated: now mutate.
-    for (i = 0; i < pm_map_size; i++) {
+    for (i = 0; i < (unsigned int)pm_map_size; i++) {
         uint8_t node_s = (pm_map[i].start >> (NUMA_NODE_OFFSET - PAGE_SHIFT)) & 0xF;
         if (node_s != 0) {
             pm_map[i].start &= ~((uint64_t)0xF << (NUMA_NODE_OFFSET - PAGE_SHIFT));
@@ -1382,7 +1382,7 @@ bool map_the_numa_memory_range(unsigned int highest_bit)
             pm_map[i].end |= (uint64_t)node_s << (highest_bit - PAGE_SHIFT);
         }
     }
-    for (i = 0; i < num_memory_affinity_ranges; i++) {
+    for (i = 0; i < (unsigned int)num_memory_affinity_ranges; i++) {
         if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
             uint8_t node_s = (memory_affinity_ranges[i].start >> NUMA_NODE_OFFSET) & 0xF;
             if (node_s != 0) {
@@ -1407,7 +1407,7 @@ void check_if_needs_to_map(void)
     if (num_proximity_domains == 0x0) {
         return;
     } else {
-        for (i = 0; i < num_memory_affinity_ranges; i++) {
+        for (i = 0; i < (unsigned int)num_memory_affinity_ranges; i++) {
             if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
                 local_memory_area_bits = checkout_max_memory_bits_of_this_numa_node(i);
                 if (max_memory_bits < local_memory_area_bits) {
