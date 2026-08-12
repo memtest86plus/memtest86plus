@@ -189,6 +189,7 @@ static const uint16_t intel_ich5_dids[] =
     //0xA822,  // Lunar Lake
     0xE322,  // Panther Lake-H (SOC)
     //0xE422,  // Panther Lake-P (SOC)
+    0x4D22   // Wildcat Lake (SOC)
 };
 
 static bool find_in_did_array(uint16_t did, const uint16_t * ids, unsigned int size)
