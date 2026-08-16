@@ -133,9 +133,9 @@ typedef union {
     uint32_t        raw[4];
     struct {
         uint32_t                : 24;
-        uint32_t    l1_i_size   : 8;
-        uint32_t                : 24;
         uint32_t    l1_d_size   : 8;
+        uint32_t                : 24;
+        uint32_t    l1_i_size   : 8;
         uint32_t                : 16;
         uint32_t    l2_size     : 16;
         uint32_t                : 18;
