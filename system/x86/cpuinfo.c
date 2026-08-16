@@ -92,6 +92,11 @@ static void determine_cache_size()
         }
         /* fall through */
       case 'G':
+        if (cpuid_info.vendor_id.str[7] == 'T') {
+          l1_cache = cpuid_info.cache_info.l1_d_size;
+          l2_cache = cpuid_info.cache_info.l2_size;
+          break;
+        }
         if (cpuid_info.vendor_id.str[9] == 'N') {
           // National Semiconductor
           if (cpuid_info.version.family == 5) {
@@ -157,6 +162,10 @@ static void determine_cache_size()
         }
 
         // No CPUID(4) so we use the older CPUID(2) method.
+        if (cpuid_info.max_cpuid < 2) {
+            break;
+        }
+
         uint32_t v[4];
         uint8_t *dp = (uint8_t *)v;
         int i = 0;
@@ -721,8 +730,6 @@ static void determine_cpu_model(void)
             } else if (cpuid_info.version.family == 15) {
                 cpu_model = "Transmeta TM 8x00";
             }
-            l1_cache = cpuid_info.cache_info.l1_i_size + cpuid_info.cache_info.l1_d_size;
-            l2_cache = cpuid_info.cache_info.l2_size;
             break;
         }
         // Intel Processors - vendor_id starts with "GenuineIntel"
