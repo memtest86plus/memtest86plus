@@ -1503,6 +1503,12 @@ bool usb_serial_print(const char *str)
             // console keeps working after transient glitches.
             if (!usb_clear_endpoint_stall() ||
                 !print_hcd->methods->out_data_request(print_hcd, &print_ep, NULL, packet, i)) {
+                // The stall could not be cleared, or the retried transfer
+                // failed as well: the adapter is not coming back (it has
+                // probably been unplugged). Give up on it permanently
+                // instead of retrying the same packet in a tight loop on
+                // every subsequent write.
+                print_ep.reserved = (uint8_t) DEV_UNKNOWN;
                 return false;
             }
         }
