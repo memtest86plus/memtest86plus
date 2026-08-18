@@ -87,7 +87,15 @@ static void serial_echo_print(const char *p)
     }
 
     if (port->is_usb) {
-        usb_serial_print(p);
+        // Surfacing the write failure: a failed usb_serial_print() means
+        // the adapter is dead (unplugged, or given up on by
+        // usb_clear_endpoint_stall / the DEV_UNKNOWN marking). Disable the
+        // console permanently so that every subsequent screen update does
+        // not keep re-attempting writes to the dead adapter, which would
+        // slow down the whole test output path.
+        if (!usb_serial_print(p)) {
+            port->enable = false;
+        }
         return;
     }
 
