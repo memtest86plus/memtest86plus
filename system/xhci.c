@@ -592,6 +592,8 @@ static bool get_xhci_event(workspace_t *ws, xhci_trb_t *event)
     return true;
 }
 
+static void handle_xhci_transfer_event(const usb_hcd_t *hcd, const xhci_trb_t *event);
+
 static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int max_time, xhci_trb_t *event)
 {
     int timer = max_time >> 3;
@@ -1141,6 +1143,31 @@ static bool reset_endpoint(const usb_hcd_t *hcd, const usb_ep_t *ep)
     return true;
 }
 
+// Process one completed keyboard transfer event: feed the received report
+// to the keymap code, then re-issue the IN transfer so that the next key
+// press is captured.
+static void handle_xhci_transfer_event(const usb_hcd_t *hcd, const xhci_trb_t *event)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    int kbd_idx = identify_keyboard(ws, event_slot_id(event), event_ep_id(event));
+    if (kbd_idx < 0) return;
+    if (!IS_EP_KEYBOARD((usb_ep_t *)(ws->kbd_ep[kbd_idx]))) return;
+
+    // Only the first 8 bytes hold the boot protocol report.
+    hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+    *kbd_rpt = *(hid_kbd_rpt_t *)ws->kbd_xfer[kbd_idx];
+
+    hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
+    if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+        *prev_kbd_rpt = *kbd_rpt;
+    }
+
+    ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
+    issue_normal_trb(kbd_tr, ws->kbd_xfer[kbd_idx], XHCI_TRB_DIR_IN, ws->kbd_xfer_len[kbd_idx]);
+    ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
+}
+
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -1166,22 +1193,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
             continue;
         }
 
-        int kbd_idx = identify_keyboard(ws, event_slot_id(&event), event_ep_id(&event));
-        if (kbd_idx < 0) continue;
-        if (!IS_EP_KEYBOARD((usb_ep_t *)(ws->kbd_ep[kbd_idx]))) continue;
-
-        // Only the first 8 bytes hold the boot protocol report.
-        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
-        *kbd_rpt = *(hid_kbd_rpt_t *)ws->kbd_xfer[kbd_idx];
-
-        hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
-        if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
-            *prev_kbd_rpt = *kbd_rpt;
-        }
-
-        ep_tr_t *kbd_tr = &ws->kbd_tr[kbd_idx];
-        issue_normal_trb(kbd_tr, ws->kbd_xfer[kbd_idx], XHCI_TRB_DIR_IN, ws->kbd_xfer_len[kbd_idx]);
-        ring_device_doorbell(ws->db_regs, ws->kbd_slot_id[kbd_idx], ws->kbd_ep_id[kbd_idx]);
+        handle_xhci_transfer_event(hcd, &event);
     }
 }
 
