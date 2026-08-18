@@ -295,6 +295,7 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
                 kbd->interval        = endpoint->interval;
+                kbd->data_toggle     = 0;
                 kbd->reserved        = (uint8_t) *device_type;
                 kbd = NULL;
 
@@ -304,6 +305,7 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
                 kbd->interval        = 0; // not interrupt endpoint
+                kbd->data_toggle     = 0;
                 kbd->reserved        = (uint8_t) *device_type;
 
                 kbd = NULL;
@@ -1196,6 +1198,14 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
         }
         if (!configure_device(hcd, &ep0, config_num)) {
             return false;
+        }
+
+        // A successful SET_CONFIGURATION resets the data toggles of every
+        // endpoint in the device, so all the endpoints we just registered
+        // come back to DATA0. This is what keeps the software toggle in
+        // sync with the device toggle.
+        for (int kbd_idx = old_num_keyboards; kbd_idx < new_num_keyboards; kbd_idx++) {
+            keyboards[kbd_idx].data_toggle = 0;
         }
 
         // Complete the new entries in the keyboard info table and configure the keyboard interfaces.
