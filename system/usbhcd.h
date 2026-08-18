@@ -285,6 +285,18 @@ bool wait_until_clr(const volatile uint32_t *reg, uint32_t bit_mask, int max_tim
 bool wait_until_set(const volatile uint32_t *reg, uint32_t bit_mask, int max_time);
 
 /**
+ * The maximum time to wait for a transfer to complete. USB devices that
+ * are busy (e.g. a serial adapter whose FIFO is full because the far end
+ * is not draining) respond with a NAK for every retry, and a NAK is not
+ * an error, so the error counters of the EHCI, OHCI and UHCI controllers
+ * never expire the transfer. Without a software timeout, the driver
+ * would spin forever on such a device.
+ *
+ * Used internally by the various HCI drivers.
+ */
+#define USB_TRANSFER_TIMEOUT    500*MILLISEC  // in microseconds
+
+/**
  * Displays an informational message, scrolling the screen if necessary.
  * Takes the same arguments as the printf function.
  *
