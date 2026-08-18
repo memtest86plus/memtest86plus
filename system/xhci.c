@@ -594,7 +594,7 @@ static bool get_xhci_event(workspace_t *ws, xhci_trb_t *event)
 
 static void handle_xhci_transfer_event(const usb_hcd_t *hcd, const xhci_trb_t *event);
 
-static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int max_time, xhci_trb_t *event)
+static uint32_t wait_for_xhci_event(const usb_hcd_t *hcd, workspace_t *ws, uint32_t wanted_type, int max_time, xhci_trb_t *event)
 {
     int timer = max_time >> 3;
     while (true) {
@@ -605,6 +605,16 @@ static uint32_t wait_for_xhci_event(workspace_t *ws, uint32_t wanted_type, int m
             note_discarded_event(ws, event);
         }
         if (timer == 0) return XHCI_EVENT_CC_TIMEOUT;
+
+        // The event just read is not of the wanted type. If it is a
+        // completed transfer, serve it to the keyboard handler rather than
+        // dropping it: a keyboard report would otherwise be lost whenever a
+        // bulk or control transfer is being waited on (the event ring
+        // dequeue pointer has already moved past it).
+        if (event_type(event) == XHCI_TRB_TRANSFER_EVENT) {
+            handle_xhci_transfer_event(hcd, event);
+        }
+
         usleep(8);
         timer--;
     }
@@ -717,7 +727,7 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
         issue_normal_trb(ep_tr, buffer, XHCI_TRB_DIR_OUT, length);
     }
     ring_device_doorbell(ws->db_regs, ep->device_id, ep_id);
-    return (wait_for_xhci_event(ws, XHCI_TRB_TRANSFER_EVENT, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    return (wait_for_xhci_event(hcd, ws, XHCI_TRB_TRANSFER_EVENT, 5000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
 static bool reset_root_hub_port(const usb_hcd_t *hcd, int port_num)
@@ -751,7 +761,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
 
     enqueue_xhci_command(ws, XHCI_TRB_ENABLE_SLOT | XHCI_TRB_USB2_SLOT, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    if (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
         goto free_memory;
     }
     int slot_id = event_slot_id(&event);
@@ -773,7 +783,7 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
 
     enqueue_xhci_command(ws, XHCI_TRB_DISABLE_SLOT | slot_id << 24, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    if (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
         return false;
     }
 
@@ -866,7 +876,7 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
   set_address:
     enqueue_xhci_command(ws, XHCI_TRB_ADDRESS_DEVICE | command_flags | device_id << 24, ws->input_context_addr, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 5000*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
+    if (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 5000*MILLISEC, &event) != XHCI_EVENT_CC_SUCCESS) {
         return false;
     }
     if (command_flags == 0) {
@@ -907,7 +917,7 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
 }
 
 
-static bool configure_bulk_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
+static bool configure_bulk_endpoint(const usb_hcd_t *hcd, workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
                                          int tt_think_time, uintptr_t tr_addr, size_t a_size)
 {
     xhci_trb_t event;
@@ -936,10 +946,10 @@ static bool configure_bulk_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub
 
     enqueue_xhci_command(ws, XHCI_TRB_CONFIGURE_ENDPOINT | ep->device_id << 24, ws->input_context_addr, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    return (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    return (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
-static bool configure_interrupt_endpoint(workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
+static bool configure_interrupt_endpoint(const usb_hcd_t *hcd, workspace_t *ws, const usb_ep_t *ep, int hub_flag, int num_ports,
                                          int tt_think_time, uintptr_t tr_addr, size_t rpt_size)
 {
     xhci_trb_t event;
@@ -971,14 +981,14 @@ static bool configure_interrupt_endpoint(workspace_t *ws, const usb_ep_t *ep, in
 
     enqueue_xhci_command(ws, XHCI_TRB_CONFIGURE_ENDPOINT | ep->device_id << 24, ws->input_context_addr, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    return (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    return (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 100*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
 static bool configure_hub_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_hub_t *hub)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    return configure_interrupt_endpoint(ws, ep, 1, hub->num_ports, hub->tt_think_time,
+    return configure_interrupt_endpoint(hcd, ws, ep, 1, hub->num_ports, hub->tt_think_time,
                                         ws->interrupt_ep_tr_addr, (hub->num_ports + 7) / 8);
 }
 
@@ -992,7 +1002,7 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
     ws->kbd_ep     [kbd_idx] = (uintptr_t) ep; // for looking up events
 
     if (!IS_EP_INT(ep))
-        return configure_bulk_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), ep->max_packet_size);
+        return configure_bulk_endpoint(hcd, ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), ep->max_packet_size);
 
     // Request whole packets, as some devices send packets longer than the
     // boot protocol report (a shorter request would cause a babble error).
@@ -1006,7 +1016,7 @@ static bool configure_kbd_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int kbd_i
     ws->kbd_xfer_len[kbd_idx] = xfer_len;
 
     // Configure the controller.
-    return configure_interrupt_endpoint(ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), sizeof(hid_kbd_rpt_t));
+    return configure_interrupt_endpoint(hcd, ws, ep, 0, 0, 0, (uintptr_t)(&ws->kbd_tr[kbd_idx]), sizeof(hid_kbd_rpt_t));
 }
 
 
@@ -1042,11 +1052,11 @@ static bool reset_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id)
     // error depending on whether the endpoint was Running or Halted - ignore that.
     enqueue_xhci_command(ws, XHCI_TRB_STOP_ENDPOINT | ep_id << 16 | ep->device_id << 24, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    (void)wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event);
+    (void)wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event);
 
     enqueue_xhci_command(ws, XHCI_TRB_RESET_ENDPOINT | ep_id << 16 | ep->device_id << 24, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    (void)wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event);
+    (void)wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event);
 
     // Re-sync the controller's dequeue pointer (and cycle state) with our enqueue state.
     uint32_t cycle = ep_tr->enqueue_state / EP_TR_SIZE;
@@ -1054,7 +1064,7 @@ static bool reset_bulk_ep(const usb_hcd_t *hcd, const usb_ep_t *ep, int ep_id)
     uint64_t dequeue_ptr = (uintptr_t)&ep_tr->tr[index] | cycle;
     enqueue_xhci_command(ws, XHCI_TRB_SET_TR_DEQUEUE | ep_id << 16 | ep->device_id << 24, dequeue_ptr, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    return (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
+    return (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, 1000*MILLISEC, &event) == XHCI_EVENT_CC_SUCCESS);
 }
 
 static int identify_keyboard(workspace_t *ws, int slot_id, int ep_id)
@@ -1117,7 +1127,7 @@ static bool reset_endpoint(const usb_hcd_t *hcd, const usb_ep_t *ep)
     // below.
     enqueue_xhci_command(ws, XHCI_TRB_RESET_ENDPOINT | ep_id << 16 | ep->device_id << 24, 0, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, USB_TRANSFER_TIMEOUT, &event) != XHCI_EVENT_CC_SUCCESS) {
+    if (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, USB_TRANSFER_TIMEOUT, &event) != XHCI_EVENT_CC_SUCCESS) {
         return false;
     }
 
@@ -1133,7 +1143,7 @@ static bool reset_endpoint(const usb_hcd_t *hcd, const usb_ep_t *ep)
 
     enqueue_xhci_command(ws, XHCI_TRB_SET_TR_DEQUEUE | ep_id << 16 | ep->device_id << 24, dequeue_ptr, 0);
     ring_host_controller_doorbell(ws->db_regs);
-    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, USB_TRANSFER_TIMEOUT, &event) != XHCI_EVENT_CC_SUCCESS) {
+    if (wait_for_xhci_event(hcd, ws, XHCI_TRB_COMMAND_COMPLETE, USB_TRANSFER_TIMEOUT, &event) != XHCI_EVENT_CC_SUCCESS) {
         return false;
     }
 
