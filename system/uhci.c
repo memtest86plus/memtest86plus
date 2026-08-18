@@ -387,14 +387,22 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
         build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, buffer, length); pkt_num++;
         build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_IN, UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
     } else {
-        // FIXME store toggle per endpoint
-        static int bulk_pkt_num;
+        // The UHCI controller keeps no toggle state of its own: the data
+        // toggle for each packet is fixed in its TD at build time, so it
+        // must be tracked in software, per endpoint. Each packet carries
+        // an explicit toggle, alternating between DATA0 and DATA1. The
+        // toggle is reset to DATA0 by the stall recovery path (clear
+        // endpoint stall), which also resets the device toggle, keeping
+        // the two in sync.
+        int pkt_toggle = ep->data_toggle;
         while (length > packet_size) {
-            build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_N, buffer, packet_size); pkt_num++;
+            build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(pkt_toggle & 1), UHCI_TD_IOC_N, buffer, packet_size); pkt_num++;
+            pkt_toggle++;
             buffer = (uint8_t *)buffer + packet_size;
             length -= packet_size;
         }
-        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(bulk_pkt_num++ & 1), UHCI_TD_IOC_Y, buffer, length);
+        build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(pkt_toggle & 1), UHCI_TD_IOC_Y, buffer, length); pkt_num++;
+        ep->data_toggle = (pkt_toggle + 1) & 1;
     }
     write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
     return wait_for_uhci_done(ws);
