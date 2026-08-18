@@ -113,6 +113,7 @@ static usb_msd_t usb_msd_info;
 static int usb_msd_hcd_idx = -1;
 static int print_idx = -1;
 static usb_ep_t print_ep = {0};
+static usb_ep_t print_ep0 = {0};
 static const usb_hcd_t *print_hcd = &hcd_list[0];
 
 //------------------------------------------------------------------------------
@@ -552,7 +553,7 @@ static bool configure_cp210x(const usb_hcd_t *hcd, const usb_ep_t *ep0, int inte
 
     const uint32_t baud_le = 921600; // really 923076 on CP2104, CP2105, CP2110
     build_setup_packet(&setup_pkt, USB_REQ_TO_INTERFACE | USB_REQ_VENDOR, CP210X_SET_BAUDRATE, 0, interface_num, 4);
-    if (!hcd->methods->out_data_request(hcd, ep0, &setup_pkt, &baud_le, 4)) {
+    if (!hcd->methods->out_data_request(hcd, (usb_ep_t *)ep0, &setup_pkt, &baud_le, 4)) {
         return false;
     }
 
@@ -599,7 +600,7 @@ static bool configure_pl2303(const usb_hcd_t *hcd, const usb_ep_t *ep0)
     uint8_t setline[7] = {0, 0x10, 0x0e, 0, 0, 0, 8};
 
     build_setup_packet(&setup_pkt, 0x21, 0x20, 0, 0, 7);
-    if (!hcd->methods->out_data_request(hcd, ep0, &setup_pkt, setline, 7)) {
+    if (!hcd->methods->out_data_request(hcd, (usb_ep_t *)ep0, &setup_pkt, setline, 7)) {
         return false;
     }
 
@@ -1230,6 +1231,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                 if (!configure_ch341(hcd, &ep0)) break;
                 print_hcd = hcd;
                 print_idx = kbd_idx;
+                print_ep0 = ep0;
 
                 print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i (via %s)",
                                port_num, kbd->interface_num, kbd->endpoint_num, hcd->methods->name);
@@ -1238,6 +1240,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                 if (!configure_cp210x(hcd, &ep0, kbd->interface_num)) break;
                 print_hcd = hcd;
                 print_idx = kbd_idx;
+                print_ep0 = ep0;
 
                 print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i (via %s)",
                                port_num, kbd->interface_num, kbd->endpoint_num, hcd->methods->name);
@@ -1246,6 +1249,7 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                 if (!configure_pl2303(hcd, &ep0)) break;
                 print_hcd = hcd;
                 print_idx = kbd_idx;
+                print_ep0 = ep0;
 
                 print_usb_info(" PL2303 serial adapter found on port %i interface %i endpoint %i (via %s)",
                                port_num, kbd->interface_num, kbd->endpoint_num, hcd->methods->name);
@@ -1435,6 +1439,42 @@ bool usb_scan_for_msd(void)
     return usb_mass_storage_found;
 }
 
+bool usb_clear_endpoint_stall(void)
+{
+    usb_setup_pkt_t setup_pkt;
+
+    // The serial adapter has not been found, or has already been disabled
+    // after repeated failures, or the control method is unavailable.
+    if (print_ep.max_packet_size == 0 ||
+        print_ep.reserved == (uint8_t) DEV_UNKNOWN ||
+        !print_hcd->methods->setup_request)
+        return false;
+
+    // When an endpoint is Halted, no transfer can be issued until both the
+    // host controller and the device have been reset:
+    //
+    // - the host-side state (transfer ring dequeue pointer, or toggle state,
+    //   depending on the controller) is reset via the optional
+    //   reset_endpoint method, which the xHCI driver implements;
+    //
+    // - the device-side halt is cleared with a CLEAR_FEATURE(ENDPOINT_HALT)
+    //   request on the default control pipe; the USB specification makes
+    //   this the ONLY way the host can force the device data toggle back to
+    //   DATA0, which is why print_ep.data_toggle is reset here as well.
+    if (print_hcd->methods->reset_endpoint) {
+        if (!print_hcd->methods->reset_endpoint(print_hcd, &print_ep))
+            return false;
+    }
+    print_ep.data_toggle = 0;
+
+    build_setup_packet(&setup_pkt, USB_REQ_TO_ENDPOINT, USB_CLR_FEATURE,
+                       USB_ENDPOINT_HALT, print_ep.endpoint_num, 0);
+    if (!print_hcd->methods->setup_request(print_hcd, &print_ep0, &setup_pkt))
+        return false;
+
+    return true;
+}
+
 bool usb_serial_print(const char *str)
 {
     const char *packet = str;
@@ -1455,7 +1495,16 @@ bool usb_serial_print(const char *str)
         for (i = 0; packet[i] != '\0' && i < print_ep.max_packet_size; i++)
             ;
         if (!print_hcd->methods->out_data_request(print_hcd, &print_ep, NULL, packet, i)) {
-            return false;
+            // A failed transfer usually left the endpoint stalled (the
+            // device rejected the packet, most commonly because a previously
+            // unplugged USB-to-serial adapter is half-removed). Clear the
+            // stall on both the host controller and the device once, then
+            // retry the same packet: the adapter may recover, and the serial
+            // console keeps working after transient glitches.
+            if (!usb_clear_endpoint_stall() ||
+                !print_hcd->methods->out_data_request(print_hcd, &print_ep, NULL, packet, i)) {
+                return false;
+            }
         }
         packet = &packet[i];
     }

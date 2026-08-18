@@ -86,6 +86,10 @@
 #define USB_MSC_SUBCLASS_SCSI   6
 #define USB_MSC_PROTOCOL_BOT    0x50
 
+// Feature selectors.
+
+#define USB_ENDPOINT_HALT       0
+
 // Hub feature selectors.
 
 #define HUB_PORT_ENABLE         1
