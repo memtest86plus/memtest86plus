@@ -598,6 +598,7 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
     // Initialise the interrupt QH and TD for each keyboard interface and find the minimum interval.
     int min_interval = UHCI_FL_LENGTH;
     uint32_t first_qh_ptr = UHCI_LP_TERMINATE;
+    uhci_qh_t *tail_qh = NULL;
     for (int kbd_idx = 0; kbd_idx < num_keyboards; kbd_idx++) {
         usb_ep_t *kbd = &keyboards[kbd_idx];
 
@@ -617,6 +618,11 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
         kbd_qh->qe_link_ptr = (uintptr_t)kbd_td | UHCI_LP_TYPE_TD;
 
         kbd_qh->qh_link_ptr = first_qh_ptr;
+        if (first_qh_ptr == UHCI_LP_TERMINATE) {
+            // This is the first keyboard queue head of the chain, so it is
+            // the last one the controller will visit: the tail of the chain.
+            tail_qh = kbd_qh;
+        }
         first_qh_ptr = (uintptr_t)kbd_qh | UHCI_LP_TYPE_QH;
 
         if (kbd->interval < min_interval) {
@@ -624,13 +630,28 @@ bool uhci_probe(uint16_t io_base, usb_hcd_t *hcd)
         }
     }
 
-    // Re-initialise the frame list to execute the periodic schedule.
-    // Leave the last slots for any control or bulk transfers
-    for (int i = 0; i < UHCI_FL_LENGTH - 96; i++) {
-        write32(&fl[i], UHCI_LP_TERMINATE);
+    // Re-initialise the frame list to execute the asynchronous queue head
+    // once per frame. Previously the asynchronous queue was only reachable
+    // from the last 96 frame slots, so control and bulk transfers (e.g.
+    // serial console output) were serviced in a single burst at the end of
+    // every 1024-frame window, throttling them to about 96 transfers per
+    // second with an up-to-1-second worst-case latency. Pointing every
+    // frame at the asynchronous queue head gives a control or bulk transfer
+    // one service opportunity every ~1 ms.
+    //
+    // The keyboard queues are still inserted into the frames spaced by the
+    // minimum keyboard interval, and the tail of their queue head chain is
+    // linked into the asynchronous queue head, so a keyboard frame visits
+    // the keyboard queues first (at their poll interval) and then executes
+    // any pending control or bulk transfer.
+    for (int i = 0; i < UHCI_FL_LENGTH; i++) {
+        write32(&fl[i], (uintptr_t)(&ws->qh[0]) | UHCI_LP_TYPE_QH);
     }
-    for (int i = 0; i < UHCI_FL_LENGTH - 96; i += min_interval) {
-        write32(&fl[i], first_qh_ptr);
+    if (first_qh_ptr != UHCI_LP_TERMINATE) {
+        for (int i = 0; i < UHCI_FL_LENGTH; i += min_interval) {
+            write32(&fl[i], first_qh_ptr);
+        }
+        write32(&tail_qh->qh_link_ptr, (uintptr_t)(&ws->qh[0]) | UHCI_LP_TYPE_QH);
     }
 
     return true;
