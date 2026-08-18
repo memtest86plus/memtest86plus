@@ -285,38 +285,47 @@ static void build_uhci_td(uhci_td_t *td, const usb_ep_t *ep, uint32_t pid, uint3
     td->buffer_ptr     = (uintptr_t)buffer;
 }
 
-static uint16_t get_uhci_done(workspace_t *ws)
+static bool wait_for_uhci_done(const workspace_t *ws, int first_td_idx, int num_tds)
 {
-    uint16_t io_base = ws->io_base;
-
-    uint16_t status = inw(UHCI_USBSTS) & (UHCI_USBSTS_INT | UHCI_USBSTS_ERR);
-    if (status != 0) {
-        if (status & UHCI_USBSTS_ERR || ws->qh[0].qe_link_ptr != UHCI_LP_TERMINATE) {
-#if 1
-            uintptr_t td_addr = ws->qh[0].qe_link_ptr & 0xfffffff0;
-            uhci_td_t *td = (uhci_td_t *)td_addr;
-            print_usb_info(" transfer failed TD %08x status %08x token %08x",
-                           td_addr, (uintptr_t)td->control_status, (uintptr_t)td->token);
-#endif
-            write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
-            status |= UHCI_USBSTS_ERR;
-        }
-        outw(UHCI_USBSTS_INT | UHCI_USBSTS_ERR, UHCI_USBSTS);
-    }
-    return status;
-}
-
-static bool wait_for_uhci_done(workspace_t *ws)
-{
-    // Rely on the controller to timeout if the device doesn't respond.
-    uint16_t status = 0;
+    // Poll the transfer TDs directly, bounded by a software timeout, rather
+    // than relying on the controller to time out on its own (a busy device
+    // answers every retry with a NAK, and a NAKed TD is re-executed forever
+    // without ever leaving the ACTIVE state).
+    //
+    // The old completion logic also read the status of the current queue in
+    // the asynchronous queue head and treated any non-terminated element
+    // pointer as an error. That is wrong: the controller leaves the element
+    // pointer pointing at the TD while the queue is still being serviced,
+    // and the INT status bit is asserted by *unrelated* keyboard
+    // completions too, so a keyboard interrupt that landed while a control
+    // or bulk transfer was in flight produced a spurious 'transfer failed'
+    // message and a spurious failure return.
+    //
+    // The controller clears ACTIVE in a TD only when the TD has completed
+    // (either successfully, or with the error bits below, after which the
+    // error counters are exhausted), so examining each TD of the transfer
+    // is a race-free way to detect completion.
+    int timer = USB_TRANSFER_TIMEOUT / 10;
     while (true) {
-        status = get_uhci_done(ws);
-        if (status != 0) break;
-        usleep(10);
-    }
+        bool all_done = true;
+        for (int idx = 0; idx < num_tds; idx++) {
+            const uhci_td_t *td = &ws->td[first_td_idx + idx];
+            uint32_t status = td->control_status;
 
-    return ~status & UHCI_USBSTS_ERR;
+            if (status & UHCI_TD_ACTIVE) {
+                all_done = false;
+                break;
+            }
+            if (status & (UHCI_TD_STALLED | UHCI_TD_DB_ERR | UHCI_TD_BABBLE | UHCI_TD_CRC_TO | UHCI_TD_BS_ERR)) {
+                return false;
+            }
+        }
+        if (all_done) return true;
+
+        if (timer == 0) return false;
+        usleep(10);
+        timer--;
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -338,7 +347,7 @@ static bool setup_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_se
     build_uhci_td(&ws->td[0], ep, UHCI_TD_PID_SETUP, UHCI_TD_DT(0), UHCI_TD_IOC_N, setup_pkt, sizeof(usb_setup_pkt_t));
     build_uhci_td(&ws->td[1], ep, UHCI_TD_PID_IN,    UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
     write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
-    return wait_for_uhci_done(ws);
+    return wait_for_uhci_done(ws, 0, 2);
 }
 
 static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
@@ -362,7 +371,7 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_IN, UHCI_TD_DT(pkt_num & 1), UHCI_TD_IOC_N, buffer, length); pkt_num++;
     build_uhci_td(&ws->td[pkt_num], ep, UHCI_TD_PID_OUT, UHCI_TD_DT(1), UHCI_TD_IOC_Y, 0, 0);
     write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
-    return wait_for_uhci_done(ws);
+    return wait_for_uhci_done(ws, 0, pkt_num);
 }
 
 static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
@@ -405,7 +414,7 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
         ep->data_toggle = (pkt_toggle + 1) & 1;
     }
     write32(&ws->qh[0].qe_link_ptr, (uintptr_t)(&ws->td[0]) | UHCI_LP_TYPE_TD);
-    return wait_for_uhci_done(ws);
+    return wait_for_uhci_done(ws, 0, pkt_num);
 }
 
 static void poll_keyboards(const usb_hcd_t *hcd)
