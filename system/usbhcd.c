@@ -1492,7 +1492,17 @@ bool usb_serial_print(const char *str)
     while (*packet != '\0') {
         int i;
 
-        for (i = 0; packet[i] != '\0' && i < print_ep.max_packet_size; i++)
+        // Batch as much of the string as possible into a single transfer.
+        // The full-speed serial adapters supported here advertise a
+        // max_packet_size of 64 bytes, and splitting a long line into
+        // 64-byte transfers would multiply the transfers, the associated
+        // waits and the stall-retry churn by up to 8. All of the driver
+        // implementations handle multi-packet transfers (the toggle is
+        // advanced per packet), so the only remaining bound is a sane
+        // transfer size: 512 bytes covers the whole screen rows and escape
+        // sequences sent by the console, in a single transfer for
+        // high-speed devices.
+        for (i = 0; packet[i] != '\0' && i < 512; i++)
             ;
         if (!print_hcd->methods->out_data_request(print_hcd, &print_ep, NULL, packet, i)) {
             // A failed transfer usually left the endpoint stalled (the
