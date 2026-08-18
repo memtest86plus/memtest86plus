@@ -904,7 +904,20 @@ static bool assign_address(const usb_hcd_t *hcd, const usb_hub_t *hub, int port_
         ep_context->max_packet_size = (device_speed == USB_SPEED_SUPER)
                                     ? (1 << device->max_packet_size)
                                     : device->max_packet_size;
-        ep_context->tr_dequeue_ptr += 3 * sizeof(xhci_trb_t);
+
+        // The GET_DESCRIPTOR request just completed consumed three TRBs on
+        // the control ring, so the ring's enqueue state (and the hardware
+        // dequeue with it) has moved on. The input context is about to be
+        // copied into the slot context by the second ADDRESS_DEVICE
+        // command, which would otherwise reset the control endpoint
+        // dequeue pointer to the head of the ring and make the controller
+        // re-execute the three stale TRBs. Reposition the dequeue pointer
+        // at the current enqueue state instead of hard-coding the number
+        // of TRBs consumed; the same decomposition of the enqueue state
+        // into ring index and cycle is used when repositioning a halted
+        // endpoint (see reset_endpoint).
+        ep_context->tr_dequeue_ptr = (uintptr_t)(&ep_tr->tr[ep_tr->enqueue_state % EP_TR_SIZE])
+                                   | (ep_tr->enqueue_state / EP_TR_SIZE);
 
         fetch_length  = sizeof(usb_device_desc_t);
         command_flags = 0;
