@@ -72,6 +72,7 @@ typedef struct __attribute__ ((packed)) {
     uint8_t         endpoint_num;
     uint16_t        max_packet_size;
     uint8_t         interval;
+    uint8_t         data_toggle;
     uint8_t         reserved;
 } usb_ep_t;
 
