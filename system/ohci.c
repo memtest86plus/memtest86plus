@@ -461,7 +461,20 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
         return wait_for_ohci_done(hcd, 0, 3);
     } else {
         uint32_t dt = (ep->data_toggle & 1) ? OHCI_TD_DT_1 : OHCI_TD_DT_0;
+
+        // A bulk OUT transfer needs the OUT TD linked into the endpoint
+        // descriptor for the host controller to execute it. We cannot rely
+        // on the head/tail pointers left behind by the previous control
+        // transfer: when a control transfer finishes, the controller has
+        // advanced the head pointer through its TDs, so a subsequent bulk
+        // transfer must rebuild the whole ED, with the transfer TD at the
+        // head and the tail set just past it. Rebuilding is safe because
+        // build_ohci_ed drops the SKIP bit last, so the controller can
+        // never see a half-updated descriptor.
         build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | dt | OHCI_TD_DI_NO_INT, buffer, length);
+        build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[1], &ws->td[2]);
+
+        // The bulk endpoint descriptor is serviced from the control list.
         write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
         if (!wait_for_ohci_done(hcd, 1, 1)) {
             return false;
