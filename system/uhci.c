@@ -365,7 +365,7 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return wait_for_uhci_done(ws);
 }
 
-static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
                              const void *buffer, size_t length)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;

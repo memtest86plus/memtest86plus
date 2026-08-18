@@ -302,8 +302,17 @@ static void enable_async_schedule(ehci_op_regs_t *op_regs)
 
 static bool disable_async_schedule(ehci_op_regs_t *op_regs)
 {
+    // Clearing the Asynchronous Schedule Enable bit takes the controller
+    // only a few microframes normally. Some controllers have errata that
+    // delay the ASS status bit far longer, and a few chipsets can wedge it
+    // permanently (e.g. after a device has been unplugged mid-transfer).
+    // Never let a stuck status bit wedge the whole driver: treat the wait
+    // as best effort, since re-enabling the schedule on the next transfer
+    // re-asserts ASE regardless.
+
     write32(&op_regs->usb_command, read32(&op_regs->usb_command) & ~EHCI_USBCMD_ASE);
-    return wait_until_clr(&op_regs->usb_status, EHCI_USBSTS_ASS, 1000*MILLISEC);
+    (void)wait_until_clr(&op_regs->usb_status, EHCI_USBSTS_ASS, 100*MILLISEC);
+    return true;
 }
 
 static bool reset_ehci_port(ehci_op_regs_t *op_regs, int port_idx)
@@ -456,7 +465,7 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
     return do_async_transfer(ws, 3);
 }
 
-static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
+static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
                              const void *buffer, size_t length)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -468,11 +477,22 @@ static bool out_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
         build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
         return do_async_transfer(ws, 3);
     } else {
-        // TODO toggle per endpoint, reset on clear stall
-        static int toggle;
-        build_ehci_qtd(&ws->qtd[0], &ws->qtd[0], EHCI_QTD_PID_OUT,   EHCI_QTD_DT(toggle++ & 1), buffer, length);
+        uint16_t dt = EHCI_QTD_DT(ep->data_toggle & 1);
+        build_ehci_qtd(&ws->qtd[0], &ws->qtd[0], EHCI_QTD_PID_OUT, dt, buffer, length);
         build_ehci_qhd(&ws->qhd[0], &ws->qtd[0], ep, false);
-        return do_async_transfer(ws, 1);
+        if (!do_async_transfer(ws, 1)) {
+            return false;
+        }
+        // The data toggle only advances on a completed transaction. A single
+        // QTD may carry more than one packet, and the hardware toggles the
+        // data PID for each additional packet within the QTD, so advance the
+        // software toggle by the number of packets transmitted.
+        int num_packets = 1;
+        if (ep->max_packet_size > 0) {
+            num_packets = (length + ep->max_packet_size - 1) / ep->max_packet_size;
+        }
+        ep->data_toggle ^= num_packets & 1;
+        return true;
     }
 }
 

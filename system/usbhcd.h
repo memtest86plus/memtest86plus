@@ -132,7 +132,7 @@ typedef struct {
     bool    (*bulk_transfer)        (usb_hcd_r, const usb_ep_t *, void *, size_t, bool);
     bool    (*reset_bulk_ep)        (usb_hcd_r, const usb_ep_t *, int);
     bool    (*scan_for_msd)         (usb_hcd_r);
-    bool    (*out_data_request)     (usb_hcd_r, const usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
+    bool    (*out_data_request)     (usb_hcd_r, usb_ep_t *, const usb_setup_pkt_t *, const void *, size_t);
 } hcd_methods_t;
 
 /**
