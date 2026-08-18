@@ -302,8 +302,17 @@ static void enable_async_schedule(ehci_op_regs_t *op_regs)
 
 static bool disable_async_schedule(ehci_op_regs_t *op_regs)
 {
+    // Clearing the Asynchronous Schedule Enable bit takes the controller
+    // only a few microframes normally. Some controllers have errata that
+    // delay the ASS status bit far longer, and a few chipsets can wedge it
+    // permanently (e.g. after a device has been unplugged mid-transfer).
+    // Never let a stuck status bit wedge the whole driver: treat the wait
+    // as best effort, since re-enabling the schedule on the next transfer
+    // re-asserts ASE regardless.
+
     write32(&op_regs->usb_command, read32(&op_regs->usb_command) & ~EHCI_USBCMD_ASE);
-    return wait_until_clr(&op_regs->usb_status, EHCI_USBSTS_ASS, 1000*MILLISEC);
+    (void)wait_until_clr(&op_regs->usb_status, EHCI_USBSTS_ASS, 100*MILLISEC);
+    return true;
 }
 
 static bool reset_ehci_port(ehci_op_regs_t *op_regs, int port_idx)
