@@ -118,6 +118,7 @@ typedef const struct usb_hcd_s *usb_hcd_r;
  * A USB host controller driver method table.
  */
 typedef struct {
+    const char *name;
     bool    (*reset_root_hub_port)  (usb_hcd_r, int);
     int     (*allocate_slot)        (usb_hcd_r);
     bool    (*release_slot)         (usb_hcd_r, int);

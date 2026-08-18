@@ -688,6 +688,7 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
 //------------------------------------------------------------------------------
 
 static const hcd_methods_t methods = {
+    .name                = "EHCI",
     .reset_root_hub_port = reset_root_hub_port,
     .allocate_slot       = NULL,
     .release_slot        = NULL,

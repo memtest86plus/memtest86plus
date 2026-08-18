@@ -502,6 +502,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 //------------------------------------------------------------------------------
 
 static const hcd_methods_t methods = {
+    .name                = "OHCI",
     .reset_root_hub_port = reset_root_hub_port,
     .allocate_slot       = NULL,
     .release_slot        = NULL,

@@ -1231,24 +1231,24 @@ bool find_attached_usb_keyboards(const usb_hcd_t *hcd, const usb_hub_t *hub, int
                 print_hcd = hcd;
                 print_idx = kbd_idx;
 
-                print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i",
-                               port_num, kbd->interface_num, kbd->endpoint_num);
+                print_usb_info(" CH341 serial adapter found on port %i interface %i endpoint %i (via %s)",
+                               port_num, kbd->interface_num, kbd->endpoint_num, hcd->methods->name);
 
             } else if (kbd->reserved == (uint8_t) DEV_SERIAL_CP210X) {
                 if (!configure_cp210x(hcd, &ep0, kbd->interface_num)) break;
                 print_hcd = hcd;
                 print_idx = kbd_idx;
 
-                print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i",
-                               port_num, kbd->interface_num, kbd->endpoint_num);
+                print_usb_info(" CP210x serial adapter found on port %i interface %i endpoint %i (via %s)",
+                               port_num, kbd->interface_num, kbd->endpoint_num, hcd->methods->name);
 
             } else if (kbd->reserved == (uint8_t) DEV_SERIAL_PL2303) {
                 if (!configure_pl2303(hcd, &ep0)) break;
                 print_hcd = hcd;
                 print_idx = kbd_idx;
 
-                print_usb_info(" PL2303 serial adapter found on port %i interface %i endpoint %i",
-                               port_num, kbd->interface_num, kbd->endpoint_num);
+                print_usb_info(" PL2303 serial adapter found on port %i interface %i endpoint %i (via %s)",
+                               port_num, kbd->interface_num, kbd->endpoint_num, hcd->methods->name);
             }
 
             keyboard_found = true;
