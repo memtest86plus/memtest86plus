@@ -1098,6 +1098,49 @@ static void rearm_keyboards(const usb_hcd_t *hcd)
     }
 }
 
+static bool reset_endpoint(const usb_hcd_t *hcd, const usb_ep_t *ep)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    ep_tr_t *ep_tr = (ep_tr_t *)ep->driver_data;
+
+    int ep_id = 2 * ep->endpoint_num + (ep->endpoint_num == 0 ? 1 : 0);
+
+    xhci_trb_t event;
+
+    // The RESET_ENDPOINT command moves the endpoint out of the Halted state
+    // (where a stall or error event has left it) into the Stopped state.
+    // The dequeue pointer flag is left clear, which keeps the ring dequeue
+    // where it is until we reposition it with the SET_TR_DEQUEUE command
+    // below.
+    enqueue_xhci_command(ws, XHCI_TRB_RESET_ENDPOINT | ep_id << 16 | ep->device_id << 24, 0, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, USB_TRANSFER_TIMEOUT, &event) != XHCI_EVENT_CC_SUCCESS) {
+        return false;
+    }
+
+    // Point the transfer ring dequeue at the next free TRB, discarding the
+    // TRB that failed (the controller retains it, but we must not re-execute
+    // it: the data it carries was rejected by the device, and re-running it
+    // would resend stale data). The LSB of the dequeue address is the
+    // Dequeue Cycle State, which must match the cycle of the ring slot it
+    // points at.
+    uint32_t ring_cycle = ep_tr->enqueue_state / EP_TR_SIZE;
+    uint32_t ring_index = ep_tr->enqueue_state % EP_TR_SIZE;
+    uint32_t dequeue_ptr = (uintptr_t)(&ep_tr->tr[ring_index]) | ring_cycle;
+
+    enqueue_xhci_command(ws, XHCI_TRB_SET_TR_DEQUEUE | ep_id << 16 | ep->device_id << 24, dequeue_ptr, 0);
+    ring_host_controller_doorbell(ws->db_regs);
+    if (wait_for_xhci_event(ws, XHCI_TRB_COMMAND_COMPLETE, USB_TRANSFER_TIMEOUT, &event) != XHCI_EVENT_CC_SUCCESS) {
+        return false;
+    }
+
+    // Once the device-side stall has been cleared (CLEAR_FEATURE ENDPOINT
+    // HALT via the control pipe, see usb_clear_endpoint_stall), the ring is
+    // empty and the endpoint accepts new transfers.
+    return true;
+}
+
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
@@ -1234,6 +1277,7 @@ static const hcd_methods_t methods = {
     .reset_bulk_ep       = reset_bulk_ep,
     .scan_for_msd        = scan_for_msd,
     .out_data_request    = out_data_request,
+    .reset_endpoint      = reset_endpoint
 };
 
 //------------------------------------------------------------------------------
