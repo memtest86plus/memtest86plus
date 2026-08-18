@@ -301,27 +301,14 @@ static ohci_td_t *get_ohci_done_head(const workspace_t *ws)
     return (ohci_td_t *)done_head;
 }
 
-static bool wait_for_ohci_done(const workspace_t *ws, int td_expected)
-{
-    int td_completed = 0;
 
-    // Rely on the controller to timeout if the device doesn't respond.
-    while (true) {
-        ohci_td_t *td = get_ohci_done_head(ws);
-        while (td != NULL) {
-            td_completed++;
-            if ((td->control & OHCI_TD_CC) != OHCI_TD_CC_NO_ERR) {
-                return false;
-            }
-            td = (ohci_td_t *)((uintptr_t)td->next_td);
-        }
-        if (td_completed == td_expected) break;
-        usleep(10);
-    }
-
-    return true;
-}
-
+// Services a Writeback Done Head event by walking the done list exactly as
+// the old poll_keyboards() did: hand each completed keyboard transfer
+// descriptor's report to the HID report processor and immediately re-arm the
+// descriptor for the next poll. This is shared between poll_keyboards() and
+// wait_for_ohci_done() so that keyboard interrupts that fire while a
+// synchronous control/bulk transfer is in flight are still serviced, keeping
+// the WDH camera and the done list free of stale entries.
 static void build_ohci_td(ohci_td_t *td, uint32_t control, const void *buffer, size_t length)
 {
     td->control   = OHCI_TD_CC_NEW | control;
@@ -354,6 +341,77 @@ static uint32_t ohci_ed_control(const usb_ep_t *ep)
     return control;
 }
 
+
+static void service_ohci_done_list(const usb_hcd_t *hcd)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    ohci_td_t *td = get_ohci_done_head(ws);
+    while (td != NULL) {
+        // Remember the next entry before re-arming the TD: re-arming rewrites
+        // the next_td link the controller used to chain the done list.
+        ohci_td_t *next_td = (ohci_td_t *)((uintptr_t)td->next_td);
+
+        int kbd_idx = td - ws->td - 3;
+        if (kbd_idx >= 0 && kbd_idx < MAX_KEYBOARDS) {
+            hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
+
+            if ((td->control & OHCI_TD_CC) == OHCI_TD_CC_NO_ERR) {
+                hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
+                if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
+                    *prev_kbd_rpt = *kbd_rpt;
+                }
+            }
+
+            ohci_ed_t *ed = &ws->ed[1 + kbd_idx];
+            build_ohci_td(td, td->control & ~OHCI_TD_CC, kbd_rpt, sizeof(hid_kbd_rpt_t));
+            build_ohci_ed(ed, ed->control, td+0, td+1);
+        }
+
+        td = next_td;
+    }
+}
+
+
+static bool wait_for_ohci_done(const usb_hcd_t *hcd, int first_td_idx, int num_tds)
+{
+    const workspace_t *ws = (const workspace_t *)hcd->ws;
+
+    // Don't rely on the controller to timeout if the device doesn't respond:
+    // a busy device answers every retry with a NAK, NAKs do not advance the
+    // TD, and the condition code stays Not Accessed forever. Also don't use
+    // the Writeback Done Head mechanism to count completions: the done list
+    // is a snapshot that can race with the previous transfer, and keyboard
+    // completions that land mid-transfer would corrupt the count and hang
+    // the wait. Instead, poll the condition codes of the transfer TDs we
+    // have built, bounded by a software timeout.
+    int timer = USB_TRANSFER_TIMEOUT / 10;
+    while (true) {
+        // Service any keyboard interrupts raised during the transfer.
+        service_ohci_done_list(hcd);
+
+        // Check the condition codes of our transfer TDs. The controller
+        // leaves them Not Accessed while it is retrying the transaction
+        // (e.g. NAKs) and writes the condition code back on completion.
+        bool all_done = true;
+        for (int idx = 0; idx < num_tds; idx++) {
+            uint32_t cc = ws->td[first_td_idx + idx].control & OHCI_TD_CC;
+            if (cc == OHCI_TD_CC_NEW) {
+                all_done = false;
+                break;
+            }
+            if (cc != OHCI_TD_CC_NO_ERR) {
+                return false;
+            }
+        }
+        if (all_done) return true;
+
+        if (timer == 0) return false;
+        usleep(10);
+        timer--;
+    }
+}
+
 //------------------------------------------------------------------------------
 // Driver Methods
 //------------------------------------------------------------------------------
@@ -370,10 +428,10 @@ static bool setup_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_se
     workspace_t *ws = (workspace_t *)hcd->ws;
 
     build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
+    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, 0, 0);
     build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[2]);
     write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
-    return wait_for_ohci_done(ws, 2);
+    return wait_for_ohci_done(hcd, 0, 2);
 }
 
 static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
@@ -383,10 +441,10 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
 
     build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
     build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, buffer, length);
-    build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
+    build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, 0, 0);
     build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[3]);
     write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
-    return wait_for_ohci_done(ws, 3);
+    return wait_for_ohci_done(hcd, 0, 3);
 }
 
 static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup_pkt_t *setup_pkt,
@@ -397,15 +455,15 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
     if (setup_pkt) {
         build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
         build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, buffer, length);
-        build_ohci_td(&ws->td[2], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
+        build_ohci_td(&ws->td[2], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, 0, 0);
         build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[3]);
         write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
-        return wait_for_ohci_done(ws, 3);
+        return wait_for_ohci_done(hcd, 0, 3);
     } else {
         uint32_t dt = (ep->data_toggle & 1) ? OHCI_TD_DT_1 : OHCI_TD_DT_0;
-        build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | dt | OHCI_TD_DI_NO_DLY, buffer, length);
+        build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | dt | OHCI_TD_DI_NO_INT, buffer, length);
         write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
-        if (!wait_for_ohci_done(ws, 1)) {
+        if (!wait_for_ohci_done(hcd, 1, 1)) {
             return false;
         }
         // The data toggle only advances on a completed transaction. A single
@@ -423,29 +481,7 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
 
 static void poll_keyboards(const usb_hcd_t *hcd)
 {
-    workspace_t *ws = (workspace_t *)hcd->ws;
-
-    ohci_td_t *td = get_ohci_done_head(ws);
-    while (td != NULL) {
-        int kbd_idx = td - ws->td - 3;
-
-        hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
-
-        if ((td->control & OHCI_TD_CC) == OHCI_TD_CC_NO_ERR) {
-            hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
-            if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
-                *prev_kbd_rpt = *kbd_rpt;
-            }
-        }
-
-        ohci_td_t *next_td = (ohci_td_t *)((uintptr_t)td->next_td);
-
-        ohci_ed_t *ed = &ws->ed[1 + kbd_idx];
-        build_ohci_td(td, td->control & ~OHCI_TD_CC, kbd_rpt, sizeof(hid_kbd_rpt_t));
-        build_ohci_ed(ed, ed->control, td+0, td+1);
-
-        td = next_td;
-    }
+    service_ohci_done_list(hcd);
 }
 
 //------------------------------------------------------------------------------
