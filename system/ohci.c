@@ -402,11 +402,22 @@ static bool out_data_request(const usb_hcd_t *hcd, usb_ep_t *ep, const usb_setup
         write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
         return wait_for_ohci_done(ws, 3);
     } else {
-        static int bulk_dt;
-        uint32_t dt = (bulk_dt & 1) ? OHCI_TD_DT_1 : OHCI_TD_DT_0;
+        uint32_t dt = (ep->data_toggle & 1) ? OHCI_TD_DT_1 : OHCI_TD_DT_0;
         build_ohci_td(&ws->td[1], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | dt | OHCI_TD_DI_NO_DLY, buffer, length);
         write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
-        return wait_for_ohci_done(ws, 1);
+        if (!wait_for_ohci_done(ws, 1)) {
+            return false;
+        }
+        // The data toggle only advances on a completed transaction. A single
+        // TD may carry more than one packet, and the controller toggles the
+        // data PID for each additional packet within the TD, so advance the
+        // software toggle by the number of packets transmitted.
+        int num_packets = 1;
+        if (ep->max_packet_size > 0) {
+            num_packets = (length + ep->max_packet_size - 1) / ep->max_packet_size;
+        }
+        ep->data_toggle ^= num_packets & 1;
+        return true;
     }
 }
 
