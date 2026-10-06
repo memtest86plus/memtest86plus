@@ -7,6 +7,15 @@
  * Integrated Memory Controler (IMC) Settings Detection Code
  */
 
+/* Memory configuration Detection for AMD Family 0Fh models */
+void get_imc_config_amd_0fh(void);
+
+/* Memory configuration Detection for AMD Family 10h models */
+void get_imc_config_amd_10h(void);
+
+/* Memory configuration Detection for AMD Family 15h models 00h-0Fh, 10h-1Fh, 30h-3Fh, 60h-6Fh and 70h-7Fh, as well as Family 16h models 00h-0Fh and 30h-3Fh */
+void get_imc_config_amd_15h_16h(uint16_t imc_family);
+
 /* Memory configuration Detection for AMD Zen CPUs */
 void get_imc_config_amd_zen(void);
 
