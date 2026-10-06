@@ -51,6 +51,10 @@ void memctrl_init(void)
       case IMC_IVB:
         get_imc_config_intel_snb();
         break;
+      case IMC_SNB_E:
+      case IMC_IVB_E:
+        get_imc_config_intel_snb_ep();
+        break;
       case IMC_HSW:
         get_imc_config_intel_hsw();
         break;
@@ -75,7 +79,7 @@ void memctrl_init(void)
     }
 
     // Consistency check
-    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRCD == 0) {
+    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRAS == 0) {
         imc.freq = 0;
     }
 }
