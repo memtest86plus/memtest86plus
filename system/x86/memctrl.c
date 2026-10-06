@@ -33,6 +33,16 @@ void memctrl_init(void)
     }
 
     switch(imc.family) {
+
+      case IMC_K8:
+        get_imc_config_amd_0fh();
+        break;
+      case IMC_K10:
+        get_imc_config_amd_10h();
+        break;
+      case IMC_K15:
+        get_imc_config_amd_15h();
+        break;
       case IMC_K17:
       case IMC_K19_VRM:
       case IMC_K19_CZN:
