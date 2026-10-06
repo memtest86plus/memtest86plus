@@ -317,8 +317,10 @@ static void determine_imc(void)
             imc.family = IMC_K8;  // Old K8
             break;
           case 0x1:
+            imc.family = IMC_K10; // K10 (Family 10h)
+            break;
           case 0x2:
-            imc.family = IMC_K10; // K10 (Family 10h & 11h)
+            imc.family = IMC_K11; // Family 11h
             break;
           case 0x3:
             imc.family = IMC_K12; // A-Series APU (Family 12h)

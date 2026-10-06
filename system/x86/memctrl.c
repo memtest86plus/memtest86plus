@@ -33,6 +33,21 @@ void memctrl_init(void)
     }
 
     switch(imc.family) {
+#if 0
+      case IMC_K8:
+#endif
+      case IMC_K10:
+#if 0
+      case IMC_K11:
+#endif
+#if 0
+      case IMC_K12:
+      case IMC_K14:
+#endif
+      case IMC_K15:
+      case IMC_K16:
+        get_imc_config_amd_prezen(imc.family);
+        break;
       case IMC_K17:
       case IMC_K19_VRM:
       case IMC_K19_CZN:

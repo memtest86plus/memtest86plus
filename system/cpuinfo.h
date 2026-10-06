@@ -63,16 +63,17 @@
 #define IMC_NVL_H       0x5010  // Nova Lake-H
 
 #define IMC_K8          0x8000  // Old K8
-#define IMC_K10         0x8010  // K10 (Family 10h & 11h)
-#define IMC_K12         0x8020  // A-Series APU (Family 12h)
-#define IMC_K14         0x8030  // C- / E- / Z- Series APU (Family 14h)
-#define IMC_K15         0x8040  // FX Series (Family 15h)
-#define IMC_K16         0x8050  // Kabini & related (Family 16h)
-#define IMC_K17         0x8060  // Zen & Zen2 (Family 17h)
-#define IMC_K18         0x8070  // Hygon (Family 18h)
-#define IMC_K19_VRM     0x8080  // Zen3 (Family 19h - Vermeer)
-#define IMC_K19_CZN     0x8081  // Cezanne APU
-#define IMC_K19_CHL     0x8090  // Zen3 Chagall TR
+#define IMC_K10         0x8010  // K10 (Family 10h)
+#define IMC_K11         0x8020  // Family 11h
+#define IMC_K12         0x8030  // A-Series APU (Family 12h)
+#define IMC_K14         0x8040  // C- / E- / Z- Series APU (Family 14h)
+#define IMC_K15         0x8050  // FX Series (Family 15h)
+#define IMC_K16         0x8060  // Kabini & related (Family 16h)
+#define IMC_K17         0x8070  // Zen & Zen2 (Family 17h)
+#define IMC_K18         0x8080  // Hygon (Family 18h)
+#define IMC_K19_VRM     0x8090  // Zen3 (Family 19h - Vermeer)
+#define IMC_K19_CZN     0x8091  // Cezanne APU
+#define IMC_K19_CHL     0x80A0  // Zen3 Chagall TR
 
 #define IMC_K19_RBT     0x8100  // Zen3+ (Rembrandt)
 #define IMC_K19_RPL     0x8110  // Zen4 (Raphael)
