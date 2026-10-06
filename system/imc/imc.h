@@ -16,6 +16,12 @@ void get_imc_config_intel_nhm(void);
 /* Memory configuration Detection for Intel Sandy Bridge */
 void get_imc_config_intel_snb(void);
 
+/* Memory configuration Detection for Intel Sandy Bridge-EP */
+void get_imc_config_intel_snb_ep(void);
+
+/* DRAM clock measurement for Intel SNB/IVB/HSW/BDW EP channel PMON registers */
+uint16_t get_imc_freq_intel_ep(int bus, int dev, int func);
+
 /* Memory configuration Detection for Intel Haswell */
 void get_imc_config_intel_hsw(void);
 
