@@ -7,16 +7,6 @@
 // Platform-specific code for Intel Sandy Bridge CPUs (SNB)
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-#include "tsc.h"
-#include "unistd.h"
-#include "vmem.h"
-
-#include "imc.h"
-
 #define PCI_DID_SNB_EP_TARGET_ADDRESS_DECODER 0x3CAA
 #define PCI_DID_IVB_EP_TARGET_ADDRESS_DECODER 0x0EAA
 #define PCI_DID_IVB_EP_TARGET_ADDRESS_REGISTERS 0x0E68
@@ -45,7 +35,7 @@ static bool read_dram_clocks_pci(int bus, int dev, int func, uint64_t *clocks)
     return false;
 }
 
-uint16_t get_imc_freq_intel_ep(int bus, int dev, int func)
+static uint16_t get_imc_freq_intel_ep(int bus, int dev, int func)
 {
     uint32_t ctl = pci_config_read32(bus, dev, func, 0xF0);
     uint32_t box = pci_config_read32(bus, dev, func, 0xF4);
@@ -71,7 +61,7 @@ uint16_t get_imc_freq_intel_ep(int bus, int dev, int func)
     return (freq >= 350 && freq <= 5000) ? freq + 0.5f : 0;
 }
 
-void get_imc_config_intel_snb_ep(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_snb_ep(void)
 {
     uint16_t tad_id = imc.family == IMC_SNB_E ? PCI_DID_SNB_EP_TARGET_ADDRESS_DECODER : PCI_DID_IVB_EP_TARGET_ADDRESS_DECODER;
     unsigned int channels = 0;
@@ -121,7 +111,7 @@ void get_imc_config_intel_snb_ep(void)
     }
 }
 
-void get_imc_config_intel_snb(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_snb(void)
 {
     uint32_t mmio_reg, offset;
     uint32_t mch_cfg, reg0, reg1;

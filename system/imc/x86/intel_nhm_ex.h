@@ -6,14 +6,6 @@
 // Platform-specific code for Intel Nehalem-EX (Xeon 7500) and Westmere-EX (Xeon E7) CPUs
 //
 
-#include "cpuinfo.h"
-#include "cpuid.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "tsc.h"
-#include "unistd.h"
-
-#include "imc.h"
 
 // The SMI2 memory controller configuration registers of these CPUs have no
 // public register reference (they are in the NDA-only BIOS Writer's Guide,
@@ -29,7 +21,7 @@
 
 #define NHMEX_M_CYCLES           0x1B    // M-Box CYCLES event (323535 Table 2-84)
 
-void get_imc_config_intel_nhm_ex(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_nhm_ex(void)
 {
     unsigned int model = cpuid_info.version.extendedModel << 4 | cpuid_info.version.model;
     switch (model) {

@@ -6,14 +6,6 @@
 // Platform-specific code for Intel Haswell CPUs (HSW)
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-#include "vmem.h"
-
-#include "imc.h"
-
 #define PCI_DID_HSW_EP_TARGET_ADDRESS_REGISTERS 0x2FA8
 #define PCI_DID_BDW_EP_TARGET_ADDRESS_REGISTERS 0x6FA8
 
@@ -30,7 +22,7 @@
 // still, the timing register is read opportunistically.
 // Width comes from the TAD channel DIMMMTR registers and the type from the MCMTR, both standard
 // config space; the frequency is measured independently through the PMON counter.
-void get_imc_config_intel_hsw_ep(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_hsw_ep(void)
 {
     uint16_t id = imc.family == IMC_HSW_E ? PCI_DID_HSW_EP_TARGET_ADDRESS_REGISTERS : PCI_DID_BDW_EP_TARGET_ADDRESS_REGISTERS;
     unsigned int channels = 0;
@@ -85,7 +77,7 @@ void get_imc_config_intel_hsw_ep(void)
     }
 }
 
-void get_imc_config_intel_hsw(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_hsw(void)
 {
     uint32_t mmio_reg, mch_cfg, offset;
     uint32_t reg0, reg1;

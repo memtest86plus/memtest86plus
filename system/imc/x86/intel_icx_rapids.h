@@ -6,15 +6,6 @@
 // Read-only Ice Lake-SP / Sapphire Rapids / Emerald Rapids / Granite Rapids DDR4 & DDR5 frequency and population.
 //
 
-#include "cpuinfo.h"
-#include "cpuid.h"
-#include "memctrl.h"
-#include "pci.h"
-#include "tsc.h"
-#include "unistd.h"
-#include "vmem.h"
-
-#include "imc.h"
 
 // Ice Lake-SP is DDR4 with a 0x4000 channel stride and a stepping-dependent
 // DECS bus-number register (i10nm_base.c i10nm_cfg0 vs i10nm_cfg1).
@@ -126,7 +117,7 @@ static int icx_channel(uintptr_t addr, uint32_t mcmtr_offset, uint32_t mtr_offse
     return populated ? 1 : 0;
 }
 
-void get_imc_config_intel_icx(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_icx(void)
 {
     unsigned int model = cpuid_info.version.extendedModel << 4 | cpuid_info.version.model;
     if (model != 0x6A && model != 0x6C && model != 0x8F && model != 0xCF) return;
@@ -174,7 +165,7 @@ void get_imc_config_intel_icx(void)
     }
 }
 
-void get_imc_config_intel_gnr(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_gnr(void)
 {
     unsigned int model = cpuid_info.version.extendedModel << 4 | cpuid_info.version.model;
     if (model != 0xAD && model != 0xAE) return;

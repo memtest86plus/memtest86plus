@@ -12,7 +12,6 @@
 #include "cpuinfo.h"
 
 #include "memctrl.h"
-#include "imc/imc.h"
 
 #include "display.h"
 

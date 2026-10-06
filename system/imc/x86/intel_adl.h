@@ -6,14 +6,6 @@
 // Platform-specific code for Intel Alder Lake CPUs (ADL-S)
 //
 
-#include "cpuinfo.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-#include "vmem.h"
-
-#include "imc.h"
-
 #define ADL_MMR_BASE_REG_LOW    0x48
 #define ADL_MMR_BASE_REG_HIGH   0x4C
 
@@ -33,7 +25,7 @@
 #define ADL_MMR_MC_BIOS_REG     0x5E04
 #define ADL_MMR_BLCK_REG        0x5F60
 
-void get_imc_config_intel_adl(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_adl(void)
 {
     uint64_t mmio_reg;
     uint32_t cha, chb, offset;

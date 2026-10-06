@@ -6,17 +6,10 @@
 // Read-only Skylake / Cascade Lake / Cooper Lake Xeon DDR4 frequency, population and timings.
 //
 
-#include "cpuinfo.h"
-#include "cpuid.h"
-#include "memctrl.h"
-#include "pci.h"
-#include "vmem.h"
-
-#include "imc.h"
 
 /* Channel functions: DID 2040h fn0 / 2044h fn4 / 2048h fn0 (device 0x0B/0x0D).
  * PMON function: fn2 (DID 2042h) on each channel device. */
-void get_imc_config_intel_skx(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_skx(void)
 {
     unsigned int model = cpuid_info.version.extendedModel << 4 | cpuid_info.version.model;
     if (model != 0x55) return;

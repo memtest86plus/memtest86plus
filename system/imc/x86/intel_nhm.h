@@ -5,16 +5,9 @@
 //
 // Platform-specific code for Intel Nehalem (NHM) and Westmere (WMR) CPUs
 
-#include "cpuinfo.h"
-#include "cpuid.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-
-#include "imc.h"
 
 // EP register references and channel numbering: 320835-003, 321322-002.
-void get_imc_config_intel_nhm(void)
+static /*__attribute__((noinline))*/ void get_imc_config_intel_nhm(void)
 {
     // Exclude Clarkdale/Arrandale (0x25/0x26) and Nehalem-EX/Westmere-EX (0x2E/0x2F),
     // which have different IMCs.

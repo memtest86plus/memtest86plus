@@ -11,18 +11,6 @@
 //   Later APUs (10h-1Fh, 30h-3Fh, 60h+) have different DCT layouts.
 //
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
-
-#include "cpuinfo.h"
-#include "cpuid.h"
-#include "memctrl.h"
-#include "msr.h"
-#include "pci.h"
-
-#include "imc.h"
-
 #if 0
 #define AMD_0FH_DRAM_TIMING 0x88
 #define AMD_0FH_MODE        0x90
@@ -357,7 +345,7 @@ static void get_imc_config_amd_nb_dct(enum amd_family family, const struct amd_d
 // -----------------------------------------------------------------------------
 // High-level entry points.
 #if 0
-void get_imc_config_amd_0fh(void)
+static /*__attribute__((noinline)) */ void get_imc_config_amd_0fh(void)
 {
     static const struct amd_dct_caps amd_0fh_caps[2] = {
         { // Revisions B-E (DDR1, sockets 940/939/754). F2x90[10] DramEnable
@@ -411,7 +399,7 @@ void get_imc_config_amd_0fh(void)
 #endif
 
 #if 0
-void get_imc_config_amd_10h(void)
+static /*__attribute__((noinline)) */ void get_imc_config_amd_10h(void)
 {
     static const struct amd_dct_caps amd_10h_caps[1] = {
         {
@@ -444,7 +432,7 @@ void get_imc_config_amd_10h(void)
     get_imc_config_amd_nb_dct(AMD_FAM_10, &amd_10h_caps[0]);
 }
 #endif
-void get_imc_config_amd_15h(void)
+static /*__attribute__((noinline)) */ void get_imc_config_amd_15h(void)
 {
     static const struct amd_dct_caps amd_15h_caps[1] = {
         { // Models 00h-0Fh: DCT1 selected by F1x10C[2:0] = 1; dual-die packages
