@@ -25,6 +25,9 @@ uint16_t get_imc_freq_intel_ep(int bus, int dev, int func);
 /* Memory configuration Detection for Intel Haswell */
 void get_imc_config_intel_hsw(void);
 
+/* Memory configuration Detection for Intel Haswell-EP */
+void get_imc_config_intel_hsw_ep(void);
+
 /* Memory configuration Detection for Intel Skylake */
 void get_imc_config_intel_skl(void);
 
