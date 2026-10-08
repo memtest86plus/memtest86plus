@@ -58,6 +58,10 @@ void memctrl_init(void)
       case IMC_HSW:
         get_imc_config_intel_hsw();
         break;
+      case IMC_HSW_E:
+      case IMC_BDW_E:
+        get_imc_config_intel_hsw_ep();
+        break;
       case IMC_SKL:
       case IMC_KBL:
         get_imc_config_intel_skl();
