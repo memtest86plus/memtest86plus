@@ -505,6 +505,9 @@ static void determine_imc(void)
               case 0x3:
                 imc.family = IMC_HSW;         // Core 4th Gen (Haswell)
                 break;
+              case 0x6:
+                imc.family = IMC_ICL_SP;      // Ice Lake-DE (Xeon D-1700/D-2700)
+                break;
               case 0x8:
                 imc.family = IMC_TGL;         // Core 11th Gen (Tiger Lake-U)
                 break;
@@ -579,6 +582,9 @@ static void determine_imc(void)
                 break;
               case 0x8:
                 imc.family = IMC_SPR;         // Sapphire Rapids (Server)
+                break;
+              case 0xC:
+                imc.family = IMC_EMR;         // Emerald Rapids (Server)
                 break;
               default:
                 break;

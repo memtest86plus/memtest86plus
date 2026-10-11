@@ -34,6 +34,9 @@ void get_imc_config_intel_skl(void);
 /* DDR4 channel population for Skylake / Cascade Lake / Cooper Lake Xeons */
 void get_imc_config_intel_skx(void);
 
+/* DDR5 channel population for Ice Lake / Sapphire Rapids / Emerald Rapids Xeons */
+void get_imc_config_intel_icx(void);
+
 /* Memory configuration Detection for Intel Ice Lake */
 void get_imc_config_intel_icl(void);
 

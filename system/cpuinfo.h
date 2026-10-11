@@ -42,6 +42,7 @@
 #define IMC_BDW_DE      0x2070  // Broadwell-DE (Server)
 #define IMC_ICL_SP      0x2080  // Ice Lake-SP/DE (Server)
 #define IMC_SPR         0x2090  // Sapphire Rapids (Server)
+#define IMC_EMR         0x20A0  // Emerald Rapids (Server)
 
 #define IMC_HSW_ULT     0x3010  // Core 4th Gen (Haswell-ULT)
 #define IMC_SKL_UY      0x3020  // Core 6th Gen (Sky Lake-U/Y)
