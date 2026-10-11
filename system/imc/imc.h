@@ -10,6 +10,9 @@
 /* Memory configuration Detection for AMD Zen CPUs */
 void get_imc_config_amd_zen(void);
 
+/* Memory configuration detection for Nehalem / Westmere-EP */
+void get_imc_config_intel_nhm(void);
+
 /* Memory configuration Detection for Intel Sandy Bridge */
 void get_imc_config_intel_snb(void);
 

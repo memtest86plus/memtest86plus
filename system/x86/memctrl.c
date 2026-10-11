@@ -42,6 +42,11 @@ void memctrl_init(void)
       case IMC_K1A_GRG:
         get_imc_config_amd_zen();
         break;
+      case IMC_NHM:
+      case IMC_NHM_E:
+      case IMC_WMR:
+        get_imc_config_intel_nhm();
+        break;
       case IMC_SNB:
       case IMC_IVB:
         get_imc_config_intel_snb();
