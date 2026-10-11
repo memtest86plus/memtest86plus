@@ -86,6 +86,11 @@ void memctrl_init(void)
       case IMC_SKL_SP:
         get_imc_config_intel_skx();
         break;
+      case IMC_ICL_SP:
+      case IMC_SPR:
+      case IMC_EMR:
+        get_imc_config_intel_icx();
+        break;
       case IMC_RKL:
         get_imc_config_intel_icl();
         break;
