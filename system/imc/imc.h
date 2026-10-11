@@ -31,6 +31,9 @@ void get_imc_config_intel_hsw_ep(void);
 /* Memory configuration Detection for Intel Skylake */
 void get_imc_config_intel_skl(void);
 
+/* DDR4 channel population for Skylake / Cascade Lake / Cooper Lake Xeons */
+void get_imc_config_intel_skx(void);
+
 /* Memory configuration Detection for Intel Ice Lake */
 void get_imc_config_intel_icl(void);
 
