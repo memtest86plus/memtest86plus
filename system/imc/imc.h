@@ -51,6 +51,9 @@ void get_imc_config_intel_skx(void);
 /* DDR5 channel population for Ice Lake / Sapphire Rapids / Emerald Rapids Xeons */
 void get_imc_config_intel_icx(void);
 
+/* DDR5 channel population for Granite Rapids / Granite Rapids-D Xeons */
+void get_imc_config_intel_gnr(void);
+
 /* Memory configuration Detection for Intel Ice Lake */
 void get_imc_config_intel_icl(void);
 

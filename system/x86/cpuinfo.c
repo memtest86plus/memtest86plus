@@ -539,6 +539,9 @@ static void determine_imc(void)
               case 0xB:
                 imc.family = IMC_LNL;         // Core Ultra Serie 2 (Lunar Lake)
                 break;
+              case 0xA:
+                imc.family = IMC_GNR;         // Granite Rapids (Server)
+                break;
               default:
                 break;
             }
@@ -572,6 +575,9 @@ static void determine_imc(void)
                 break;
               case 0xB:
                 imc.family = IMC_ADL_N;       // Core 12th Gen (Alder Lake-N - Gracemont E-Cores only)
+                break;
+              case 0xA:
+                imc.family = IMC_GNR_D;       // Granite Rapids-D (Server)
                 break;
               default:
                 break;

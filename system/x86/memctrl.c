@@ -91,6 +91,10 @@ void memctrl_init(void)
       case IMC_EMR:
         get_imc_config_intel_icx();
         break;
+      case IMC_GNR:
+      case IMC_GNR_D:
+        get_imc_config_intel_gnr();
+        break;
       case IMC_RKL:
         get_imc_config_intel_icl();
         break;
