@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Read-only Ice Lake-SP / Sapphire Rapids / Emerald Rapids DDR4 & DDR5 population and frequency.
+// Read-only Ice Lake-SP / Sapphire Rapids / Emerald Rapids / Granite Rapids DDR4 & DDR5 population and frequency.
 // Register provenance and coverage limits: doc/imc-registers.md.
 
 #include "cpuinfo.h"
@@ -23,7 +23,7 @@ static const struct __attribute__((packed)) {
 } icx_cfg[] = {
     [0] = { 0x3452, 0xCC, 0x4000, "DDR4" },  // ICX-SP stepping <= 3 (Tremont-D layout)
     [1] = { 0x3452, 0xD0, 0x4000, "DDR4" },  // ICX-SP stepping >= 4
-    [2] = { 0x3252, 0xD0, 0x8000, "DDR5" },  // SPR-SP / EMR-SP
+    [2] = { 0x3252, 0xD0, 0x8000, "DDR5" },  // SPR-SP / EMR-SP / GNR-SP
 };
 
 static bool read_dram_clocks_mmio(uintptr_t addr, uint64_t *value)
@@ -166,6 +166,48 @@ void get_imc_config_intel_icx(void)
         if (!freq) continue;   // unreadable/frozen: keep the SPD/DMI fallback
         // DCLK MHz -> MT/s, matching the EP readers' unit
         imc = (imc_info_t){.type = icx_cfg[cfg].type, .family = imc.family, .width = channels * 64, .freq = freq };
+        return;
+    }
+}
+
+void get_imc_config_intel_gnr(void)
+{
+    unsigned int model = cpuid_info.version.extendedModel << 4 | cpuid_info.version.model;
+    if (model != 0xAD && model != 0xAE) return;
+
+    unsigned int next = 0;
+    int bus0, bus1;
+    uint64_t base;
+    // Granite Rapids uses the same DECS (3252h) and bus-number register (D0h)
+    // as Sapphire Rapids: i10nm_base.c gnr_cfg == spr_cfg for these fields.
+    // The controller arrangement below is GNR-specific and must not use the
+    // SPR per-IMC BARs at D8h-E4h.
+    while (icx_socket(&next, 2, &bus0, &bus1, &base)) {
+        if (!intel_function(bus0, 5, 0)) continue;
+        // CAPID5 at 298h needs ECAM; legacy CF8/CFC cannot read this on Intel.
+        uintptr_t cfg = pci_config_mmio_addr(bus0, 5, 0);
+        if (!cfg || *(volatile uint32_t *)cfg != pci_config_read32(bus0, 5, 0, 0)) continue;
+        uint32_t capid5 = *(volatile uint32_t *)(cfg + 0x298);
+        unsigned int expected = (capid5 >> 21) & 0xF;
+        if (capid5 == UINT32_MAX || !expected || expected > 12) continue;
+        uint32_t bar = pci_config_read32(bus0, 0, 1, 0xD4);
+        if (bar == UINT32_MAX) continue;
+        uint32_t offset = ((bar & 0x7FF) << 12) + (model == 0xAE ? 0x206000 : 0x24C000);
+        unsigned int seen = 0, channels = 0;
+        bool valid = true;
+        // Physical PCI positions must stay distinct from compact logical IDs.
+        // Fused-off gaps do not change the MMIO offset of later controllers.
+        for (unsigned int physical = 0; physical < 28; physical++) {
+            if (!intel_function(bus0, 5 + physical / 7, 1 + physical % 7)) continue;
+            if (++seen > expected) { valid = false; break; }
+            uintptr_t addr = icx_map(base, offset + physical * 0x4000, 0x4000);
+            if (!addr) { valid = false; break; }
+            int populated = icx_channel(addr, 0xAF8, 0xC0C);
+            if (populated < 0) { valid = false; break; }
+            channels += populated;
+        }
+        if (!valid || seen != expected || !channels) continue;
+        imc = (imc_info_t){.type = "DDR5", .family = imc.family, .width = channels * 64};
         return;
     }
 }
