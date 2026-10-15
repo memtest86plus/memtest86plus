@@ -1,2 +1,7 @@
 # Normalize all text files to LF; keeps Windows checkouts from committing CRLF
 * text=auto eol=lf
+
+# Secure Boot certificates: keep byte-exact so the published SHA-256 sums stay valid
+secureboot/*.cer   binary
+secureboot/*.pem   -text
+secureboot/SHA256SUMS -text

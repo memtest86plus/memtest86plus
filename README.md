@@ -22,6 +22,7 @@ Binary releases (both stable and nightly dev builds) are available on
   * [Origins](#origins)
   * [Licensing](#licensing)
   * [Build and Installation](#build-and-installation)
+  * [Secure Boot](#secure-boot)
   * [Boot Options](#boot-options)
   * [Keyboard Selection](#keyboard-selection)
   * [Operation](#operation)
@@ -162,6 +163,19 @@ environment.
 The GRUB configuration files contained in the `grub` directory are there for
 use on the test ISO, but also serve as an example of how to boot Memtest86+
 from GRUB.
+
+## Secure Boot
+
+Starting with v9.00, the Memtest86+ EFI images are signed with the Memtest86+
+Secure Boot key. To boot them with UEFI Secure Boot enabled, add the Memtest86+
+root CA certificate to your firmware's `db`. The certificate, its fingerprint
+and enrollment instructions are in the [secureboot](secureboot/README.md)
+directory.
+
+We are working on a simpler solution: a Microsoft-signed shim for Memtest86+.
+Once it is available, Memtest86+ will boot with Secure Boot enabled, without any
+manual enrollment (on machines that trust Microsoft's third-party UEFI CA, which
+is present on almost all PCs).
 
 ## Boot Options
 
