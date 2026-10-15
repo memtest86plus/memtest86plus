@@ -20,7 +20,7 @@
 // Constants
 //------------------------------------------------------------------------------
 
-#define MAP_BUFFER_HEADROOM     8       // number of descriptors
+#define MAP_BUFFER_HEADROOM     16       // number of descriptors
 
 #define MIN_H_RESOLUTION        640     // as required by our main display
 #define MIN_V_RESOLUTION        400
