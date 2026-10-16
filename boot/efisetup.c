@@ -778,6 +778,14 @@ boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg,
 
         // Allocate below 3GB to avoid having to remap.
         status = alloc_memory((void **)&boot_params, sizeof(boot_params_t) + cmd_line_length + 1, 0xbfffffff);
+
+#if defined(__aarch64__)
+        // On AArch64, RAM may start above 4GB (ie: sbsa-ref)
+        if (status != EFI_SUCCESS) {
+            status = alloc_memory((void **)&boot_params, sizeof(boot_params_t) + cmd_line_length + 1, ~0ULL);
+        }
+#endif
+
         if (status != EFI_SUCCESS) {
             print_string("failed to allocate low memory for boot params\n");
             goto fail;
@@ -788,11 +796,14 @@ boot_params_t *efi_setup(efi_handle_t handle, efi_system_table_t *sys_table_arg,
         get_cmd_line(image, cmd_line_length, (char *)cmd_line_addr);
         boot_params->cmd_line_ptr  = cmd_line_addr;
         boot_params->cmd_line_size = cmd_line_length + 1;
+#if defined(__aarch64__)
+        boot_params->ext_cmd_line_ptr = (uint64_t)cmd_line_addr >> 32;
+#endif
     }
 
     boot_params->code32_start = (uintptr_t)startup32;
 
-    parse_cmd_line(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
+    parse_cmd_line(get_cmd_line_ptr(boot_params), boot_params->cmd_line_size);
 
     status = set_screen_info(boot_params);
     if (status != EFI_SUCCESS) {

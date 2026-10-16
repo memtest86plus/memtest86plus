@@ -1012,7 +1012,7 @@ void config_init(void)
 
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 
-    uintptr_t cmd_line_addr = boot_params->cmd_line_ptr;
+    uintptr_t cmd_line_addr = get_cmd_line_ptr(boot_params);
     if (cmd_line_addr != 0) {
         int cmd_line_size = boot_params->cmd_line_size;
         if (cmd_line_size == 0) cmd_line_size = 255;
