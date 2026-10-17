@@ -255,8 +255,8 @@ void paging_init(void)
         }
         memcpy(e820_copy, boot_params->e820_map, e820_copy_entries * sizeof(e820_entry_t));
 
-        if (boot_params->cmd_line_ptr != 0) {
-            cmd_line_start = boot_params->cmd_line_ptr;
+        cmd_line_start = get_cmd_line_ptr(boot_params);
+        if (cmd_line_start != 0) {
             cmd_line_end   = cmd_line_start + boot_params->cmd_line_size;
         }
 
