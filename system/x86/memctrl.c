@@ -60,6 +60,10 @@ void memctrl_init(void)
       case IMC_WMR:
         get_imc_config_intel_nhm();
         break;
+      case IMC_NHM_EX:
+      case IMC_WMR_EX:
+        get_imc_config_intel_nhm_ex();
+        break;
       case IMC_SNB:
       case IMC_IVB:
         get_imc_config_intel_snb();

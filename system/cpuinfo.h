@@ -43,6 +43,9 @@
 #define IMC_ICL_SP      0x2080  // Ice Lake-SP/DE (Server)
 #define IMC_SPR         0x2090  // Sapphire Rapids (Server)
 
+#define IMC_NHM_EX      0x20D0  // Xeon 7500 Series (Nehalem-EX)
+#define IMC_WMR_EX      0x20E0  // Xeon E7 Family (Westmere-EX)
+
 #define IMC_HSW_ULT     0x3010  // Core 4th Gen (Haswell-ULT)
 #define IMC_SKL_UY      0x3020  // Core 6th Gen (Sky Lake-U/Y)
 #define IMC_KBL_UY      0x3030  // Core 7/8/9th Gen (Kaby/Coffee/Comet/Amber Lake-U/Y)

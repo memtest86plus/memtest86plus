@@ -547,7 +547,7 @@ static void determine_imc(void)
                 imc.family = IMC_NHM;         // Core i7 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
               case 0x2:
-                imc.family = IMC_NHM;         // Xeon (Nehalem-EX)
+                imc.family = IMC_NHM_EX;      // Xeon 7500 Series (Nehalem-EX)
                 break;
               case 0x3:
                 imc.family = IMC_IVB_E;       // Core 3rd Gen (Ivy Bridge-E)
@@ -577,6 +577,9 @@ static void determine_imc(void)
 
           case 0xF:
             switch (cpuid_info.version.extendedModel) {
+              case 0x2:
+                imc.family = IMC_WMR_EX;      // Xeon E7 Family (Westmere-EX)
+                break;
               case 0x3:
                 imc.family = IMC_HSW_E;       // Core 3rd Gen (Haswell-E)
                 break;
