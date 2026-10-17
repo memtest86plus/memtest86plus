@@ -622,7 +622,17 @@ static void test_all_windows(int my_cpu)
                 break;
               default:
                 window_start = window_end;
-                window_end  += VM_WINDOW_SIZE;
+                // Skip address space holes spanning whole windows.
+                for (int i = 0; i < pm_map_size; i++) {
+                    if (pm_map[i].end > window_start) {
+                        uintptr_t seg_window = pm_map[i].start & ~(VM_WINDOW_SIZE - 1);
+                        if (seg_window > window_start) {
+                            window_start = seg_window;
+                        }
+                        break;
+                    }
+                }
+                window_end   = window_start + VM_WINDOW_SIZE;
             }
             setup_vm_map(window_start, window_end);
         }
