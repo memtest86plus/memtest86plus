@@ -216,6 +216,8 @@ recognised:
     * rotates the display clockwise by 90 degrees
   * screen.lhs-up (graphics mode only)
     * rotates the display anti-clockwise by 90 degrees
+  * nosplash (EFI framebuffer only)
+    * disables the splash screen and native screen resolution
   * efidebug
     * displays information about the EFI framebuffer
   * usbdebug
@@ -312,10 +314,12 @@ take care of this automatically.
 When booted in legacy mode, Memtest86+ will use the screen resolution that
 has been set by the BIOS or by the intermediate bootloader. When booted in
 UEFI mode, Memtest86+ will normally select the smallest available screen
-resolution that encompasses its 640x400 pixel display. Some BIOSs return
-incorrect information about the available display modes, so you can
-override this by adding the "screen.mode=" option on the boot command
-line.
+resolution that encompasses its 640x400 pixel display. On x86-64, it instead
+selects the largest available resolution (up to 1920x1200), shows the splash
+screen and scales the display to fit the screen. Some BIOSs return incorrect
+information about the available display modes, so you can override this by
+adding the "screen.mode=" option on the boot command line (or use the
+smallest resolution with "nosplash").
 
 Note that when using display rotation, the specified screen resolution is
 for the unrotated display.
