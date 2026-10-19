@@ -15,6 +15,12 @@
 #include "screen.h"
 
 //------------------------------------------------------------------------------
+// Constants
+//------------------------------------------------------------------------------
+
+#define MAX_SCALE_X2    6       // twice the maximum display scale factor
+
+//------------------------------------------------------------------------------
 // Private Types
 //------------------------------------------------------------------------------
 
@@ -66,6 +72,15 @@ static uintptr_t lfb_stride;
 static uint32_t lfb_pallete[16];
 
 static lfb_rotate_t lfb_rotate = LFB_TOP_UP;
+
+static screen_fb_t native_fb;
+
+static int cell_width  = FONT_WIDTH;
+static int cell_height = FONT_HEIGHT;
+
+// Source font column/row for each pixel of a scaled character cell.
+static uint8_t cell_src_x[FONT_WIDTH  * MAX_SCALE_X2 / 2];
+static uint8_t cell_src_y[FONT_HEIGHT * MAX_SCALE_X2 / 2];
 
 static uint8_t current_attr = WHITE | BLUE << 4;
 
@@ -268,6 +283,15 @@ static void lfb32_put_char(int row, int col, uint8_t ch, uint8_t attr)
                 font_row <<= 1;
             }
         }
+    } else if (cell_width != FONT_WIDTH) {
+        uint32_t *pixel_row = (uint32_t *)lfb_base + row * cell_height * lfb_stride + col * cell_width;
+        for (int y = 0; y < cell_height; y++) {
+            uint8_t font_row = font_data[ch][cell_src_y[y]];
+            for (int x = 0; x < cell_width; x++) {
+                pixel_row[x] = (font_row << cell_src_x[x]) & 0x80 ? fg_colour : bg_colour;
+            }
+            pixel_row += lfb_stride;
+        }
     } else {
         uint32_t *pixel_row = (uint32_t *)lfb_base + row * FONT_HEIGHT * lfb_stride + col * FONT_WIDTH;
         for (int y = 0; y < FONT_HEIGHT; y++) {
@@ -281,7 +305,15 @@ static void lfb32_put_char(int row, int col, uint8_t ch, uint8_t attr)
     }
 }
 
+static void hold_put_char(int row, int col, uint8_t ch, uint8_t attr)
+{
+    shadow_buffer[row][col].ch   = ch;
+    shadow_buffer[row][col].attr = attr;
+}
+
 static void (*put_char)(int, int, uint8_t, uint8_t) = vga_put_char;
+
+static void (*held_put_char)(int, int, uint8_t, uint8_t) = vga_put_char;
 
 static void put_value(int row, int col, uint16_t value)
 {
@@ -343,6 +375,31 @@ void screen_init(void)
         // The above clipping should guarantee the mapping never fails.
         lfb_base = map_region(lfb_base, lfb_height * lfb_stride, false);
 
+        if ((screen_info->capabilities & LFB_CAPABILITY_MT_NATIVE) && lfb_bytes_per_pixel == 4 && !lfb_rotate) {
+            native_fb.base      = lfb_base;
+            native_fb.width     = lfb_width;
+            native_fb.height    = lfb_height;
+            native_fb.stride    = lfb_stride / 4;
+            native_fb.red_pos   = screen_info->red_pos;
+            native_fb.green_pos = screen_info->green_pos;
+            native_fb.blue_pos  = screen_info->blue_pos;
+
+            // Scale the display by the largest half-integer factor that fits.
+            int scale_x2 = MAX_SCALE_X2;
+            while (scale_x2 > 2 && (SCREEN_WIDTH  * FONT_WIDTH  * scale_x2 / 2 > lfb_width
+                                 || SCREEN_HEIGHT * FONT_HEIGHT * scale_x2 / 2 > lfb_height)) {
+                scale_x2--;
+            }
+            cell_width  = FONT_WIDTH  * scale_x2 / 2;
+            cell_height = FONT_HEIGHT * scale_x2 / 2;
+            for (int x = 0; x < cell_width; x++) {
+                cell_src_x[x] = x * FONT_WIDTH / cell_width;
+            }
+            for (int y = 0; y < cell_height; y++) {
+                cell_src_y[y] = y * FONT_HEIGHT / cell_height;
+            }
+        }
+
         // Blank the whole framebuffer.
         int pixels_per_word = sizeof(uint32_t) / lfb_bytes_per_pixel;
         uint32_t *line = (uint32_t *)lfb_base;
@@ -363,11 +420,11 @@ void screen_init(void)
                 lfb_base += (excess_height / 2) * lfb_stride;
             }
         } else {
-            int excess_width = lfb_width - (SCREEN_WIDTH * FONT_WIDTH);
+            int excess_width = lfb_width - (SCREEN_WIDTH * cell_width);
             if (excess_width > 0) {
                 lfb_base += (excess_width / 2) * lfb_bytes_per_pixel;
             }
-            int excess_height = lfb_height - (SCREEN_HEIGHT * FONT_HEIGHT);
+            int excess_height = lfb_height - (SCREEN_HEIGHT * cell_height);
             if (excess_height > 0) {
                 lfb_base += (excess_height / 2) * lfb_stride;
             }
@@ -389,6 +446,38 @@ void screen_init(void)
         }
     } else if (screen_info->orig_video_isVGA != VIDEO_TYPE_NONE) {
         vga_buffer = (vga_buffer_t *)(0xb8000);
+    }
+}
+
+bool screen_hold(screen_fb_t *fb)
+{
+    if (native_fb.base == 0) {
+        return false;
+    }
+    *fb = native_fb;
+    held_put_char = put_char;
+    put_char = hold_put_char;
+    return true;
+}
+
+void screen_release(void)
+{
+    put_char = held_put_char;
+
+    uint32_t *line = (uint32_t *)native_fb.base;
+    for (int y = 0; y < native_fb.height; y++) {
+        for (int x = 0; x < native_fb.width; x++) {
+            line[x] = 0;
+        }
+        line += native_fb.stride;
+    }
+    // Invert the shadow copy so that put_char() can't skip any cell.
+    for (int row = 0; row < SCREEN_HEIGHT; row++) {
+        for (int col = 0; col < SCREEN_WIDTH; col++) {
+            vga_char_t cell = shadow_buffer[row][col];
+            shadow_buffer[row][col].value = ~cell.value;
+            put_char(row, col, cell.ch, cell.attr);
+        }
     }
 }
 

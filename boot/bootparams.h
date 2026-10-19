@@ -61,6 +61,7 @@ typedef struct {
 #define VIDEO_TYPE_NONE             0xff    // no video display (added for Memtest86+)
 
 #define LFB_CAPABILITY_64BIT_BASE   (1 << 1)
+#define LFB_CAPABILITY_MT_NATIVE    (1U << 31)  // native mode selected by efi_setup
 
 typedef struct {
     uint32_t    loader_signature;

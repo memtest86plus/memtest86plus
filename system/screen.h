@@ -11,6 +11,7 @@
  * Copyright (C) 2020-2024 Martin Whitaker.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /**
@@ -30,6 +31,19 @@ typedef union {
 } vga_char_t;
 
 typedef vga_char_t vga_buffer_t[SCREEN_HEIGHT][SCREEN_WIDTH];
+
+/**
+ * Description of a native-mode 32bpp framebuffer, for direct graphics drawing.
+ */
+typedef struct {
+    uintptr_t   base;
+    int         width;
+    int         height;
+    int         stride;         // in pixels
+    uint8_t     red_pos;
+    uint8_t     green_pos;
+    uint8_t     blue_pos;
+} screen_fb_t;
 
 /**
  * Colours that can be used for the foreground or background.
@@ -73,6 +87,17 @@ extern vga_buffer_t shadow_buffer;
  * Initialise the display interface.
  */
 void screen_init(void);
+
+/**
+ * If in native graphics mode, fills in *fb and diverts text output to the shadow
+ * buffer until screen_release(), leaving the framebuffer free for drawing.
+ */
+bool screen_hold(screen_fb_t *fb);
+
+/**
+ * Ends a successful screen_hold(): clears the framebuffer and repaints the text display.
+ */
+void screen_release(void);
 
 /**
  * Set the foreground colour used for subsequent drawing operations.
