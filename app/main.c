@@ -48,6 +48,7 @@
 #include "display.h"
 #include "error.h"
 #include "reports.h"
+#include "splash.h"
 #include "test.h"
 
 #include "tests.h"
@@ -316,11 +317,17 @@ static void global_init(void)
 
     config_init();
 
+    splash_start();
+
+    splash_status("Reading memory configuration...");
+
     memctrl_init();
 
     tty_init();
 
     serial_log_start();
+
+    splash_status("Starting CPU cores...");
 
     smp_init(smp_enabled);
 
@@ -335,6 +342,8 @@ static void global_init(void)
     // boot loader, e.g. the boot parameters, boot command line, and ACPI
     // tables. So do not access those data structures after this point.
 
+    splash_status("Initializing keyboard...");
+
     keyboard_init();
 
     display_init();
@@ -344,6 +353,8 @@ static void global_init(void)
     cpu_temp_init();
 
     initial_config();
+
+    splash_end();
 
     clear_message_area();
 

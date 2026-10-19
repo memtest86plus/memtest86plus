@@ -167,32 +167,32 @@ typedef enum {
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
-        printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
+        int print_end = printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
+        clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 6); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
-        printf(4, 39, __VA_ARGS__); \
+        int print_end = printf(4, 39, __VA_ARGS__); \
+        clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 6); \
     }
 
 #define display_test_pattern_name(str) \
     { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        prints(5, 39, str); \
+        int print_end = prints(5, 39, str); \
+        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
     }
 
 #define display_test_pattern_value(pattern) \
     { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
+        int print_end = printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
+        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
     }
 
 #define display_test_pattern_values(pattern, offset) \
     { \
-        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
-        printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
+        int print_end = printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
+        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
     }
 
 #define display_run_time(hours, mins, secs) \

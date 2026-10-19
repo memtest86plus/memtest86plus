@@ -35,6 +35,7 @@
 
 #include "display.h"
 #include "reports.h"
+#include "splash.h"
 #include "test.h"
 
 #include "tests.h"
@@ -419,11 +420,11 @@ static void parse_command_line(char *cmd_line, int cmd_line_size)
 
 static void display_initial_notice(void)
 {
-    if (smp_enabled) {
-        display_notice("Press <F1> to configure, <F2> to disable SMP, <Enter> to start testing");
-    } else {
-        display_notice("Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ");
-    }
+    const char *notice = smp_enabled
+        ? "Press <F1> to configure, <F2> to disable SMP, <Enter> to start testing"
+        : "Press <F1> to configure, <F2> to enable SMP, <Enter> to start testing ";
+    display_notice(notice);
+    splash_notice(notice);
 }
 
 static void update_num_pages_to_test(void)
@@ -1156,11 +1157,13 @@ void initial_config(void)
             usleep(1000);
             switch (get_key()) {
               case ESC:
+                splash_end();
                 clear_message_area();
                 display_notice("Rebooting...");
                 reboot();
                 break;
               case '1':
+                splash_end();
                 config_menu(true);
                 got_key = true;
                 break;
