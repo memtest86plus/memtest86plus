@@ -18,8 +18,9 @@ else
   GIT_AVAILABLE = true
 endif
 
-CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -march=armv8-a -mno-outline-atomics -fpic \
-         -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -DARCH_BITS=64
+CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -march=armv8-a -DARCH_BITS=64 \
+         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -fvisibility=hidden \
+         -mno-outline-atomics
 
 LDFLAGS = -z max-page-size=4096
 

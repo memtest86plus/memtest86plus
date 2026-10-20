@@ -12,7 +12,8 @@ else
 endif
 
 CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -m64 -march=x86-64 -DARCH_BITS=64 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -fexcess-precision=standard
+         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -fvisibility=hidden \
+         -fexcess-precision=standard
 
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
