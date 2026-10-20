@@ -381,7 +381,7 @@ static void determine_imc(void)
                 imc.family = IMC_K1A_STH; // Zen5 APU (Family 1Ah - Strix Halo)
                 break;
               case 8:
-                imc.family = IMC_K1A_MDS; // Zen6 CPU (Family 1Ah - Medusa)
+                imc.family = IMC_K1A_MDS; // Zen6 (Family 1Ah - Medusa 80h-87h / Olympic Ridge 88h-8Fh)
                 break;
             }
             break;
@@ -410,6 +410,9 @@ static void determine_imc(void)
               case 0x5:
                 imc.family = IMC_SKL_SP;      // Skylake/Cascade Lake/Cooper Lake (Server)
                 break;
+              case 0xA:
+                imc.family = IMC_KBL;         // Core 10th Gen (Comet Lake-S/H)
+                break;
               default:
                 break;
             }
@@ -433,6 +436,9 @@ static void determine_imc(void)
                 break;
               case 0x6:
                 imc.family = IMC_CNL;         // Cannon Lake
+                break;
+              case 0xA:
+                imc.family = IMC_KBL_UY;      // Core 10th Gen (Comet Lake-U)
                 break;
               case 0xC:
                 imc.family = IMC_ARL;         // Core 15th Gen (Arrow Lake)
