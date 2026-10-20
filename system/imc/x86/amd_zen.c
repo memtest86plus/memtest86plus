@@ -28,17 +28,48 @@
 #define AMD_SMN_UMC_ECC_ERR_CNT_SEL AMD_SMN_UMC_BAR + 0xD80
 #define AMD_SMN_UMC_ECC_ERR_CNT     AMD_SMN_UMC_BAR + 0xD84
 
-#define AMD_UMC_OFFSET              0x10
+#define AMD_SMCA_BANK_STRIDE        0x10
+#define AMD_SMCA_UMC_HWID           0x96
+#define AMD_SMCA_MAX_UMC            16
 #define AMD_UMC_VALID_ERROR_BIT     (1 << 31)
 #define AMD_UMC_ERROR_CECC_BIT      (1 << 14)
 #define AMD_UMC_ERROR_UECC_BIT      (1 << 13)
+#define AMD_UMC_ERROR_CORE_ID_VAL   (1 << 24)
 #define AMD_UMC_ERR_CNT_EN          (1 << 15)
-#define AMD_MCG_CTL_2_BANKS         (1 << 16) | (1 << 15)
-#define AMD_MCG_CTL_4_BANKS         (1 << 18) | (1 << 17) | (1 << 16) | (1 << 15)
 #define AMD_MCA_STATUS_WR_ENABLE    (1 << 18)
 
 #define ECC_RD_EN (1 << 10)
 #define ECC_WR_EN (1 << 0)
+
+// UMC MCA banks discovered via MCA_IPID (bank numbers differ between dies)
+static struct {
+    uint8_t bank;
+    uint8_t umc;
+} umc_banks[AMD_SMCA_MAX_UMC];
+static uint8_t umc_bank_count = 0;
+
+#if TESTWORD_WIDTH > 32
+static void amd_smca_find_umc_banks(void)
+{
+    uint32_t regl, regh, nbanks;
+
+    rdmsr(MSR_IA32_MCG_CAP, regl, regh);
+    nbanks = regl & 0xFF;
+    if (nbanks > 64) nbanks = 64;
+
+    umc_bank_count = 0;
+    for (uint32_t bank = 0; bank < nbanks && umc_bank_count < AMD_SMCA_MAX_UMC; bank++) {
+        rdmsr(MSR_AMD64_SMCA_MC0_IPID + bank * AMD_SMCA_BANK_STRIDE, regl, regh);
+
+        // IPID[43:32] HardwareID 0x96 with McaType[63:48] 0 (UMC) or 1 (UMC_V2); InstanceId[31:20] = UMC#
+        if ((regh & 0xFFF) != AMD_SMCA_UMC_HWID || (regh >> 16) > 1) continue;
+
+        umc_banks[umc_bank_count].bank = bank;
+        umc_banks[umc_bank_count].umc  = (regl >> 20) & 0xFF;
+        umc_bank_count++;
+    }
+}
+#endif
 
 void get_imc_config_amd_zen(void)
 {
@@ -93,46 +124,39 @@ void get_imc_config_amd_zen(void)
     // Detect ECC (x64 only)
 #if TESTWORD_WIDTH > 32
 
-    /* Select UMC MCA MSR base */
-    uint32_t mca_ctrl_base = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_CTRL : MSR_AMD64_K17_UMC_MCA_CTRL;
-
     if (enable_ecc_polling) {
         uint32_t regl, regh;
 
         smn_reg = amd_smn_read(AMD_SMN_UMC_DRAM_ECC_CTRL + offset);
         if (smn_reg & (ECC_RD_EN | ECC_WR_EN)) {
+            amd_smca_find_umc_banks();
+        }
+
+        if (umc_bank_count) {
             ecc_status.ecc_enabled = true;
 
-            // Number of UMC to init
-            uint8_t umc = 0, umc_max = 0;
-            uint32_t umc_banks_bits = 0;
-
-            if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL || imc.family == IMC_K19_RBT) {
-                umc_max = 4;
-                umc_banks_bits = AMD_MCG_CTL_4_BANKS;
-            } else {
-                umc_max = 2;
-                umc_banks_bits = AMD_MCG_CTL_2_BANKS;
+            uint64_t mcg_ctl_bits = 0;
+            for (uint8_t i = 0; i < umc_bank_count; i++) {
+                mcg_ctl_bits |= 1ULL << umc_banks[i].bank;
             }
 
             // Enable ECC reporting
             rdmsr(MSR_IA32_MCG_CTL, regl, regh);
-            wrmsr(MSR_IA32_MCG_CTL, regl | umc_banks_bits, regh);
+            wrmsr(MSR_IA32_MCG_CTL, regl | (uint32_t)mcg_ctl_bits, regh | (uint32_t)(mcg_ctl_bits >> 32));
 
             rdmsr(MSR_AMD64_HW_CONF, regl, regh);
             wrmsr(MSR_AMD64_HW_CONF, regl | AMD_MCA_STATUS_WR_ENABLE, regh); // Enable Write to MCA STATUS Register
 
-            for (umc = 0; umc < umc_max; umc++)
-            {
-                rdmsr(mca_ctrl_base + (umc * AMD_UMC_OFFSET), regl, regh);
-                wrmsr(mca_ctrl_base + (umc * AMD_UMC_OFFSET), regl | 1, regh);
+            for (uint8_t i = 0; i < umc_bank_count; i++) {
+                uint32_t ctl_msr = MSR_AMD64_SMCA_MC0_CTL + umc_banks[i].bank * AMD_SMCA_BANK_STRIDE;
+                uint32_t cnt_sel = AMD_SMN_UMC_ECC_ERR_CNT_SEL + umc_banks[i].umc * AMD_SMN_UMC_CHB_OFFSET;
+
+                rdmsr(ctl_msr, regl, regh);
+                wrmsr(ctl_msr, regl | 1, regh);
+
+                smn_reg = amd_smn_read(cnt_sel);
+                amd_smn_write(cnt_sel, smn_reg | AMD_UMC_ERR_CNT_EN); // Enable UMC Error CNT
             }
-
-            smn_reg = amd_smn_read(AMD_SMN_UMC_ECC_ERR_CNT_SEL);
-            amd_smn_write(AMD_SMN_UMC_ECC_ERR_CNT_SEL, smn_reg | AMD_UMC_ERR_CNT_EN); // Enable CH0 Error CNT
-
-            smn_reg = amd_smn_read(AMD_SMN_UMC_ECC_ERR_CNT_SEL + AMD_SMN_UMC_CHB_OFFSET);
-            amd_smn_write(AMD_SMN_UMC_ECC_ERR_CNT_SEL + AMD_SMN_UMC_CHB_OFFSET, smn_reg | AMD_UMC_ERR_CNT_EN); // Enable CH1 Error CNT
 
             poll_ecc_amd_zen(false); // Clear ECC registers
         }
@@ -142,28 +166,26 @@ void get_imc_config_amd_zen(void)
 
 void poll_ecc_amd_zen(bool report)
 {
-    uint8_t umc = 0, umc_max = 0;
     uint32_t regh, regl;
 
-    /* Select UMC MCA MSR base */
-    uint32_t mca_status_base = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_STATUS : MSR_AMD64_K17_UMC_MCA_STATUS;
-    uint32_t mca_addr_base   = (imc.family >= IMC_K1A_GRG) ? MSR_AMD64_K1A_UMC_MCA_ADDR   : MSR_AMD64_K17_UMC_MCA_ADDR;
-
-    // Number of UMC to check
-    if (imc.family == IMC_K19_VRM || imc.family == IMC_K19_RPL || imc.family == IMC_K19_RBT) {
-        umc_max = 4;
-    } else {
-        umc_max = 2;
-    }
-
     // Check all UMCs
-    for (umc = 0; umc < umc_max; umc++)
+    for (uint8_t i = 0; i < umc_bank_count; i++)
     {
+        uint32_t status_msr = MSR_AMD64_SMCA_MC0_STATUS + umc_banks[i].bank * AMD_SMCA_BANK_STRIDE;
+        uint32_t addr_msr   = MSR_AMD64_SMCA_MC0_ADDR   + umc_banks[i].bank * AMD_SMCA_BANK_STRIDE;
+        uint8_t  umc        = umc_banks[i].umc;
+
         // Get Status Register
-        rdmsr(mca_status_base + (AMD_UMC_OFFSET * umc), regl, regh);
+        rdmsr(status_msr, regl, regh);
 
         // Check if ECC error happened
         if (regh & AMD_UMC_VALID_ERROR_BIT) {
+
+            // ErrorCodeExt 0 = DRAM ECC error (others are UMC-internal: clear without touching ECC count)
+            if ((regl >> 16) & 0x3F) {
+                wrmsr(status_msr, regl, regh & ~AMD_UMC_VALID_ERROR_BIT);
+                continue;
+            }
 
             // Check the type or error. Currently, we only report Corrected ECC error
             // Uncorrected ECC errors are skipped to avoid double detection
@@ -179,10 +201,10 @@ void poll_ecc_amd_zen(bool report)
             ecc_status.channel = umc;
 
             // Get Core# associated with the error
-            ecc_status.core = regh & 0x3F;
+            ecc_status.core = (regh & AMD_UMC_ERROR_CORE_ID_VAL) ? regh & 0x3F : 0;
 
             // Get address
-            rdmsr(mca_addr_base + (AMD_UMC_OFFSET * umc), regl, regh);
+            rdmsr(addr_msr, regl, regh);
 
             ecc_status.addr = (uint64_t)(regh & 0x00FFFFFF) << 32;
             ecc_status.addr |= regl;
@@ -200,8 +222,8 @@ void poll_ecc_amd_zen(bool report)
             }
 
             // Clear Error
-            rdmsr(mca_status_base + (AMD_UMC_OFFSET * umc), regl, regh);
-            wrmsr(mca_status_base + (AMD_UMC_OFFSET * umc), regl, regh & ~AMD_UMC_VALID_ERROR_BIT);
+            rdmsr(status_msr, regl, regh);
+            wrmsr(status_msr, regl, regh & ~AMD_UMC_VALID_ERROR_BIT);
             amd_smn_write(AMD_SMN_UMC_ECC_ERR_CNT + (AMD_SMN_UMC_CHB_OFFSET * umc), 0x0);
 
             // Clear Internal ECC Error status

@@ -40,6 +40,7 @@ void memctrl_init(void)
       case IMC_K19_RBT:
       case IMC_K19_PHX:
       case IMC_K1A_GRG:
+      case IMC_K1A_KRN:
         get_imc_config_amd_zen();
         break;
       case IMC_SNB:
@@ -84,9 +85,12 @@ void memctrl_poll_ecc(void)
     switch(imc.family) {
       case IMC_K17:
       case IMC_K19_VRM:
+      case IMC_K19_CZN:
       case IMC_K19_RPL:
       case IMC_K19_RBT:
+      case IMC_K19_PHX:
       case IMC_K1A_GRG:
+      case IMC_K1A_KRN:
         poll_ecc_amd_zen(true);
         break;
       default:
