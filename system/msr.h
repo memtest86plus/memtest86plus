@@ -19,6 +19,7 @@
 #define MSR_IA32_APIC_BASE              0x1b
 #define MSR_IA32_EBL_CR_POWERON         0x2a
 #define MSR_IA32_PLATFORM_INFO          0xce
+#define MSR_IA32_MCG_CAP                0x179
 #define MSR_IA32_MCG_CTL                0x17b
 #define MSR_IA32_PERF_STATUS            0x198
 #define MSR_IA32_THERM_STATUS           0x19c
@@ -33,13 +34,11 @@
 
 #define MSR_AMD64_NB_CFG                0xc001001f
 #define MSR_AMD64_COFVID_STATUS         0xc0010071
-#define MSR_AMD64_K17_UMC_MCA_CTRL      0xc00020f0
-#define MSR_AMD64_K17_UMC_MCA_STATUS    0xc00020f1
-#define MSR_AMD64_K17_UMC_MCA_ADDR      0xc00020f2
-#define MSR_AMD64_K1A_UMC_MCA_CTRL      0xc0002150
-#define MSR_AMD64_K1A_UMC_MCA_STATUS    0xc0002151
-#define MSR_AMD64_K1A_UMC_MCA_ADDR      0xc0002152
 #define MSR_AMD64_HW_CONF               0xc0010015
+#define MSR_AMD64_SMCA_MC0_CTL          0xc0002000  // SMCA bank n = MC0 + n * 0x10
+#define MSR_AMD64_SMCA_MC0_STATUS       0xc0002001
+#define MSR_AMD64_SMCA_MC0_ADDR         0xc0002002
+#define MSR_AMD64_SMCA_MC0_IPID         0xc0002005
 
 #define MSR_VIA_TEMP_C7                 0x1169
 #define MSR_VIA_TEMP_NANO               0x1423
