@@ -32,4 +32,5 @@ latex
 # OVMF
 OVMF*
 
-
+# python bytecode of tools/mtqemu.py
+__pycache__/
