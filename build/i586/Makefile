@@ -186,12 +186,10 @@ memtest_shared: $(OBJS) $(MS_LDS) Makefile
 	$(LD) -shared -Bsymbolic -T $(MS_LDS) -o $@ $(OBJS)
 
 memtest_shared.bin: memtest_shared
-	$(OBJCOPY) -O binary $< memtest_shared.bin
+	$(OBJCOPY) -O binary -R .eh_frame -R .comment $< memtest_shared.bin
 
 memtest.debug: memtest_shared
-	objcopy --only-keep-debug memtest_shared memtest.debug
-	strip -R .eh_frame memtest_shared
-	strip -R .comment memtest_shared
+	$(OBJCOPY) --only-keep-debug memtest_shared memtest.debug
 
 # Build the PE/EFI binary with W^X sections
 # The flat binary is split at the _etext_ro boundary (page-aligned in
