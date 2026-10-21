@@ -53,7 +53,10 @@ SECTIONS {
 		*(.got.plt)
 		*(.got)
 	} :data
-	.dynamic    : { *(.dynamic) } :data :dynamic
+	.dynamic    : { /* Define _DYNAMIC here so the sanity-check static link
+	                   (which has no dynamic section) still resolves the
+	                   reference in reloc64.c. */
+		_DYNAMIC = .; *(.dynamic) } :data :dynamic
 	_edata = . ;
 	. = ALIGN(4);
 	.bss : {

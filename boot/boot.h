@@ -70,38 +70,54 @@
 
 #include <stdint.h>
 
-extern uint8_t	_start[];
+/* All of the symbols declared below are defined by the startup assembly code
+ * or by the linker script, i.e. outside of the C world. The program image is
+ * a single, self-contained object at run time, so they should never be
+ * preemptible. Declaring them with hidden visibility keeps the compiler from
+ * emitting GOT-based accesses, which saves size; it is also required for LTO
+ * building, because with LTO the linker trusts the compiler's symbol
+ * resolution information, and a PC-relative access cannot be given a dynamic
+ * relocation while a GOT-based access for a preemptible symbol would become
+ * a GLOB_DAT relocation, which the runtime relocation processor does not
+ * handle. Symbols that are not referenced from the C code at all are
+ * claimed by the LTO build through boot/x86/lto_anchor.c (and the per
+ * architecture equivalents) instead. */
+#define MT_HIDDEN __attribute__((visibility("hidden")))
 
-extern uint8_t	startup32[];
+extern uint8_t	_start[] MT_HIDDEN;
 
-extern uint8_t	startup64[];
+extern uint8_t	startup32[] MT_HIDDEN;
 
-extern uint8_t	startup[];
+extern uint8_t	startup64[] MT_HIDDEN;
 
-extern uint64_t	pml4[];
+extern uint8_t	startup[] MT_HIDDEN;
 
-extern uint64_t	pdp[];
+extern uint64_t	pml4[] MT_HIDDEN;
 
-extern uint64_t	pd0[];
-extern uint64_t	pd1[];
-extern uint64_t	pd2[];
-extern uint64_t	pd3[];
+extern uint64_t	pdp[] MT_HIDDEN;
 
-extern uintptr_t boot_params_addr;
+extern uint64_t	pd0[] MT_HIDDEN;
+extern uint64_t	pd1[] MT_HIDDEN;
+extern uint64_t	pd2[] MT_HIDDEN;
+extern uint64_t	pd3[] MT_HIDDEN;
 
-extern uint8_t	ap_trampoline[];
+extern uintptr_t boot_params_addr MT_HIDDEN;
+
+extern uint8_t	ap_trampoline[] MT_HIDDEN;
 
 #if defined(__loongarch_lp64) || defined(__aarch64__)
-extern uintptr_t ap_startup_addr;
+extern uintptr_t ap_startup_addr MT_HIDDEN;
 #else
-extern uint32_t	ap_startup_addr;
+extern uint32_t	ap_startup_addr MT_HIDDEN;
 #endif
 
-extern uint8_t	ap_trampoline_end[];
+extern uint8_t	ap_trampoline_end[] MT_HIDDEN;
 
-extern uint8_t	_stacks[];
+extern uint8_t	_stacks[] MT_HIDDEN;
 
-extern uint8_t	_end[];
+extern uint8_t	_end[] MT_HIDDEN;
+
+#undef MT_HIDDEN
 
 #endif /* ! __ASSEMBLY__ */
 

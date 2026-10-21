@@ -74,29 +74,16 @@ typedef struct
 static inline Elf64_Addr __attribute__ ((unused)) get_load_address(void)
 {
     Elf64_Addr addr;
-#if defined(__x86_64__)
-    __asm__ __volatile__ (
-        "leaq _start(%%rip), %0"
-        : "=r" (addr)
-        :
-        : "cc"
-    );
-#elif defined(__loongarch_lp64)
-    __asm__ __volatile__ (
-        "la.pcrel %0, _start"
-        : "=r" (addr)
-        :
-        : "memory"
-    );
-#elif defined(__aarch64__)
-    __asm__ __volatile__ (
-        "adrp %0, _start            \n\t"
-        "add  %0, %0, :lo12:_start"
-        : "=r" (addr)
-        :
-        : "memory"
-    );
-#endif
+    // _start is defined by the linker script, i.e. outside of the C world.
+    // Reference it through C so that the compiler decides how to access it;
+    // with hidden visibility that becomes a PC-relative access, which gets
+    // bound statically at link time and does not need a dynamic relocation.
+    // A direct reference from inline assembly would also work, but it would
+    // bond the access to PC-relative relocation, which cannot receive a
+    // dynamic relocation; that breaks LTO builds in which linker-script
+    // symbols are not visible to the compiler's symbol resolution.
+    extern char _start[] __attribute__((visibility("hidden")));
+    addr = (Elf64_Addr)_start;
     return addr;
 }
 
@@ -114,35 +101,15 @@ static inline Elf64_Addr __attribute__ ((unused)) get_dynamic_section_offset(voi
         :
         : "cc"
     );
-#elif defined(__loongarch_lp64)
-    __asm__ __volatile__ (
-        "la.pcrel $t0, _GLOBAL_OFFSET_TABLE_ \n\t"
-        "ld.d %0, $t0, 0x0"
-        : "=r" (offs)
-        :
-        : "$t0", "memory"
-    );
-#elif defined(__aarch64__)
-    // On AArch64 the GOT[0] convention is not reliable (the entry itself
-    // needs a dynamic relocation), so compute the link-time offset of
-    // _DYNAMIC PC-relatively instead. The program is linked at address 0,
-    // so the offset is basically the distance from _start
-    Elf64_Addr start_addr;
-    __asm__ __volatile__ (
-        "adrp %0, _DYNAMIC          \n\t"
-        "add  %0, %0, :lo12:_DYNAMIC"
-        : "=r" (offs)
-        :
-        : "memory"
-    );
-    __asm__ __volatile__ (
-        "adrp %0, _start            \n\t"
-        "add  %0, %0, :lo12:_start"
-        : "=r" (start_addr)
-        :
-        : "memory"
-    );
-    offs -= start_addr;
+#elif defined(__aarch64__) || defined(__loongarch_lp64)
+    // The program is linked at address 0, so the offset is the distance
+    // from _start. As above, refer to the linker-script symbols through
+    // C instead of inline assembly, so that LTO builds bind the accesses
+    // statically. (On AArch64 the GOT[0] convention is not reliable: the
+    // GOT entry itself needs a dynamic relocation.)
+    extern char _DYNAMIC[] __attribute__((visibility("hidden")));
+    extern char _start[] __attribute__((visibility("hidden")));
+    offs = (Elf64_Addr)_DYNAMIC - (Elf64_Addr)_start;
 #endif
     return offs;
 }

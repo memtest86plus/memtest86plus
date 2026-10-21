@@ -18,11 +18,14 @@ else
   GIT_AVAILABLE = true
 endif
 
-CFLAGS = -std=gnu11 -Wall -Wextra -Wshadow -march=armv8-a -DARCH_BITS=64 \
-         -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -fvisibility=hidden \
-         -mno-outline-atomics
+CCFLAGS  = -march=armv8-a \
+           -fpic -fno-builtin -ffreestanding -fomit-frame-pointer -fno-stack-protector -fvisibility=hidden \
+           -mno-outline-atomics
+CLDFLAGS = -z max-page-size=4096
+LTO ?= 0
 
-LDFLAGS = -z max-page-size=4096
+CFLAGS   = -std=gnu11 -Wall -Wextra -Wshadow -DARCH_BITS=64 $(CCFLAGS)
+LDFLAGS  = $(CLDFLAGS)
 
 ifeq ($(DEBUG), 1)
   CFLAGS+=-ggdb3 -DDEBUG_GDB
@@ -104,6 +107,13 @@ APP_OBJS = app/badram.o \
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)
 
+ifeq ($(LTO),1)
+  LTO_CFLAGS = -flto=auto
+  CFLAGS += $(LTO_CFLAGS)
+  LDFLAGS = $(CCFLAGS) $(CLDFLAGS) $(LTO_CFLAGS) -nostdlib
+  OBJS += boot/aarch64/lto_anchor.o
+endif
+
 all: mt86plus
 
 check:
@@ -126,6 +136,10 @@ boot/header.o : ../../boot/sbat_csv.h
 boot/startup.o: ../../boot/aarch64/startup.S ../../boot/boot.h
 	@mkdir -p boot
 	$(CC) -x assembler-with-cpp -c -I../../boot -I../../system/aarch64 -o $@ $<
+
+boot/aarch64/lto_anchor.o: ../../boot/aarch64/lto_anchor.c ../../boot/boot.h
+	@mkdir -p boot/aarch64
+	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
 boot/%.o: ../../boot/%.S ../../boot/boot.h app/build_version.h
 	@mkdir -p boot
@@ -160,6 +174,17 @@ system/imc/aarch64/%.o: ../../system/imc/aarch64/%.c
 lib/%.o: ../../lib/%.c
 	@mkdir -p lib
 	$(CC) -c $(CFLAGS) $(OPT_SMALL)  $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+
+ifeq ($(LTO),1)
+# memcpy/memset are compiler libfuncs: under LTO the compiler transparently
+# discards our definitions (it assumes that the standard library provides them)
+# and keeps emitting calls to them, which would be unresolved. Compile the
+# definitions without LTO, with hidden visibility so that they bind statically.
+NOLTO_CFLAGS = $(filter-out $(LTO_CFLAGS),$(CFLAGS))
+lib/string.o: ../../lib/string.c
+	@mkdir -p lib
+	$(CC) -c $(NOLTO_CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
+endif
 
 tests/%.o: ../../tests/%.c
 	@mkdir -p tests
@@ -197,10 +222,19 @@ FORCE:
 
 # Link it statically once so I know I don't have undefined symbols and
 # then link it dynamically so I have full relocation information.
+#
+# With LTO=1 the two links are driven by $(CC) instead of $(LD): only the
+# compiler driver knows how to resolve the LTO bytecode.
 
+ifeq ($(LTO),1)
+memtest_shared: $(OBJS) $(MS_LDS) Makefile
+	$(CC) $(LDFLAGS) -static -no-pie -T $(MS_LDS) -o $@ $(OBJS) && \
+	$(CC) $(LDFLAGS) -shared -Bsymbolic -T $(MS_LDS) -o $@ $(OBJS)
+else
 memtest_shared: $(OBJS) $(MS_LDS) Makefile
 	$(LD) $(LDFLAGS) --warn-common -static -T $(MS_LDS) -o $@ $(OBJS) && \
 	$(LD) $(LDFLAGS) -shared -Bsymbolic -T $(MS_LDS) -o $@ $(OBJS)
+endif
 
 memtest_shared.bin: memtest_shared
 	$(OBJCOPY) -O binary -R .eh_frame -R .comment $< memtest_shared.bin
