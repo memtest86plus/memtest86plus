@@ -14,8 +14,10 @@
 #include <stdint.h>
 
 #include "boot.h"
+#include "assert.h"
 
 #include "cpuid.h"
+#include "spinlock.h"
 
 #include "vmem.h"
 
@@ -49,14 +51,33 @@ bool paging_incomplete = false;     // never set on this architecture
 
 static unsigned int device_pages_used = 0;
 
-static uintptr_t    mapped_window = 2;
+static int      num_contexts = 1;
+
+static uintptr_t    mapped_window[VMEM_MAX_CONTEXTS] = { 2 };
+
+// Serialises PD2 reconstruction within a context. Initialized before AP
+// startup: after relocation the copied BSS is not re-zeroed, so an explicit
+// init is required.
+static spinlock_t   window_mutex[VMEM_MAX_CONTEXTS] = { 0 };
 
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
 
-static void load_pdbr()
+static void load_pdbr(int context_id)
 {
+#ifdef __x86_64__
+    assert(context_id >= 0 && context_id < num_contexts);
+    void *page_table = pml4 + context_id * 512;
+    __asm__ __volatile__(
+        "movq %0, %%cr3\n\t"
+        :
+        : "r" (page_table)
+        : "rax", "memory"
+    );
+#else
+    // Preserve the current i586 PAE/non-long-mode CR3 path exactly.
+    assert(context_id == 0);
     void *page_table;
     if (cpuid_info.flags.lm == 1) {
         page_table = pml4;
@@ -65,20 +86,81 @@ static void load_pdbr()
     }
 
     __asm__ __volatile__(
-#ifdef __x86_64__
-        "movq %0, %%cr3\n\t"
-#else
         "movl %0, %%cr3\n\t"
-#endif
         :
         : "r" (page_table)
-        : "rax"
+        : "rax", "memory"
     );
+#endif
+}
+
+// Builds the top-level entries of one x86-64 paging context: its own PML4,
+// PDP and PD2 roots, plus the shared PD0/PD1/PD3 tables. The context's
+// mapped_window[] bookkeeping is deliberately left alone: this function is
+// also used to re-point a reused context at the current program image, and
+// the existing PD2 content (and its matching mapped_window[] value) must
+// stay consistent until the next map_window() call rebuilds it.
+static void init_page_table_context(int context_id)
+{
+    uint64_t *context_pml4 = pml4 + context_id * 512;
+    uint64_t *context_pdp  = pdp  + context_id * 512;
+
+    context_pml4[0] = (uintptr_t)context_pdp + 0x3;
+    context_pdp[0] = (uintptr_t)pd0 + 0x3;
+    context_pdp[1] = (uintptr_t)pd1 + 0x3;
+    context_pdp[2] = (uintptr_t)(pd2 + context_id * 512) + 0x3;
+    context_pdp[3] = (uintptr_t)pd3 + 0x3;
 }
 
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
+
+void vmem_rebase_execution_context(int context_id)
+{
+    init_page_table_context(context_id);
+}
+
+void vmem_select_execution_context(int context_id)
+{
+    // Every test participant reloads its own CR3 at each window, so a CPU
+    // rebound to a different context without an intervening relocation never
+    // walks the previous context's window mapping.
+    load_pdbr(context_id);
+}
+
+bool vmem_prepare_execution_contexts(int requested_contexts)
+{
+#ifndef __x86_64__
+    if (requested_contexts != 1) {
+        return false;
+    }
+    num_contexts = 1;
+    load_pdbr(0);
+    return true;
+#else
+    if (requested_contexts < 1 || requested_contexts > VMEM_MAX_CONTEXTS) {
+        num_contexts = 1;
+        return false;
+    }
+
+    num_contexts = requested_contexts;
+    for (int context_id = 0; context_id < num_contexts; context_id++) {
+        init_page_table_context(context_id);
+    }
+    // First boot: every context's PD2 still carries the initial window-2
+    // mappings from the image, so the bookkeeping must agree with them.
+    for (int context_id = 0; context_id < num_contexts; context_id++) {
+        mapped_window[context_id] = 2;
+    }
+
+    // All CPUs initially use the identity-mapped control context 0. The
+    // scheduler selects their test context later, at a globally quiescent
+    // point.
+    load_pdbr(0);
+    return true;
+#endif
+}
 
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
 {
@@ -108,24 +190,32 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
         if (device_pages_used == MAX_REGION_PAGES) return 0;
         pd3[device_pages_used++] = (curr_phys_page++ << VM_PAGE_SHIFT) + 0x83;
     }
-    // Reload the PDBR to flush any remnants of the old mapping.
-    load_pdbr();
+    // Reload the PDBR to flush any remnants of the old mapping. Legacy modes
+    // use context 0; NUMA_PAR binds the calling CPU's context at quiescent
+    // wave boundaries.
+    load_pdbr(0);
     // Return the mapped address.
     return VM_REGION_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
-bool map_window(uintptr_t start_page)
+bool map_window(int context_id, uintptr_t start_page)
 {
     uintptr_t window = start_page >> (30 - PAGE_SHIFT);
 
     if (window < 2) {
-        // Less than 2 GB so no mapping is required.
+#ifdef __x86_64__
+        // CR3 is per CPU, so even an identity-mapped window must select the
+        // calling CPU's paging context.
+        load_pdbr(context_id);
+#else
+        assert(context_id == 0);  // retain the legacy i586 no-reload path
+#endif
         return true;
     }
     if (cpuid_info.flags.pae == 0) {
         // No PAE, so we can only access 4GB.
         if (window < 4) {
-            mapped_window = window;
+            mapped_window[context_id] = window;
             return true;
         }
         return false;
@@ -135,14 +225,20 @@ bool map_window(uintptr_t start_page)
          // for PAE and no long mode (ie. 32 bit CPU).
         return false;
     }
-    // Compute the page table entries.
-    for (uintptr_t i = 0; i < 512; i++) {
-        pd2[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + 0x83;
-    }
-    // Reload the PDBR to flush any remnants of the old mapping.
-    load_pdbr();
 
-    mapped_window = window;
+    spin_lock(&window_mutex[context_id]);
+    if (mapped_window[context_id] != window) {
+        // Compute the page table entries for this context's PD2 root.
+        uint64_t *context_pd2 = pd2 + context_id * 512;
+        for (int i = 0; i < 512; i++) {
+            context_pd2[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + 0x83;
+        }
+        mapped_window[context_id] = window;
+    }
+    // Every CPU must reload its own PDBR to flush any remnants of the old
+    // mapping, even when another CPU rebuilt the PD2 table.
+    load_pdbr(context_id);
+    spin_unlock(&window_mutex[context_id]);
     return true;
 }
 
@@ -165,12 +261,12 @@ void *last_word_mapping(uintptr_t page, size_t word_size)
     return (uint8_t *)first_word_mapping(page) + (PAGE_SIZE - word_size);
 }
 
-uintptr_t page_of(void *addr)
+uintptr_t page_of(void *addr, int context_id)
 {
     uintptr_t page = (uintptr_t)addr >> PAGE_SHIFT;
     if (page >= PAGE_C(2,GB)) {
         page = page % PAGE_C(1,GB);
-        page += mapped_window << (30 - PAGE_SHIFT);
+        page += mapped_window[context_id] << (30 - PAGE_SHIFT);
     }
     return page;
 }

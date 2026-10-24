@@ -264,6 +264,30 @@ recognised:
       For example: `testlist=0,1` would only run tests 0 and 1.
   * ecc
     * Enable ECC polling
+  * numa=*mode*[,*policy*,*N*]
+    * *mode* is one of
+      * off
+        * disables NUMA placement
+      * on
+        * enables NUMA-aware placement
+      * par
+        * NUMA parallel: per-domain execution teams (needs more than one
+          execution context and at least two selected CPU-backed memory
+          domains)
+    * `numa` alone behaves like `numa=on`; `nonuma` like `numa=off`
+    * the optional *policy*,*N* suffix selects at most *N* cores per
+      proximity domain
+      * ordinal
+        * the first *N* selected logical CPUs of each domain
+      * topology
+        * *N* physical cores per domain, one per core group
+          (CCD/CCX/die/cluster) where possible; without usable topology
+          data (or on hybrid CPUs, whose per-core-type SMT shifts cannot
+          be represented by a single decomposition) it silently degrades
+          to the ordinal picking
+    * `,0` selects every core (no subset); a malformed suffix is ignored
+    * the subset is re-derived at every run boundary for `par`, but fixed
+      at boot for `on` (which uses boot-time chunk ordinals)
 
 ## Keyboard Selection
 
@@ -751,6 +775,12 @@ per pass: solid zeros, solid ones, then an address-seeded random pattern and
 its complement, probing both fade polarities in each delay, stressing cells
 with opposing-charge neighbours and testing a fresh, reproducible charge
 configuration on every pass.
+
+In NUMA parallel mode, all fill/fade/check rounds finish below the relocation
+boundary while the program resides above it, then finish above the boundary
+while the program resides below it. Each selected region has one fade delay
+per round, shared by all its NUMA waves. This keeps program relocation from
+overwriting a pattern before it is checked.
 
 ### Test 11 : Rowhammer
 

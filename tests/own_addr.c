@@ -30,16 +30,17 @@
 
 static int pattern_fill(int my_cpu, testword_t offset)
 {
+    int context = test_context_index();
     int ticks = 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master(my_cpu)) {
         display_test_pattern_name("own address");
     }
 
     // Write each address with it's own address.
-    for (int i = 0; i < vm_map_size; i++) {
-        testword_t *start = vm_map[i].start;
-        testword_t *end   = vm_map[i].end;
+    for (int i = 0; i < vm_map_size[context]; i++) {
+        testword_t *start = vm_map[context][i].start;
+        testword_t *end   = vm_map[context][i].end;
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -73,12 +74,13 @@ static int pattern_fill(int my_cpu, testword_t offset)
 
 static int pattern_check(int my_cpu, testword_t offset)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     // Check each address has its own address.
-    for (int i = 0; i < vm_map_size; i++) {
-        testword_t *start = vm_map[i].start;
-        testword_t *end   = vm_map[i].end;
+    for (int i = 0; i < vm_map_size[context]; i++) {
+        testword_t *start = vm_map[context][i].start;
+        testword_t *end   = vm_map[context][i].end;
 
         testword_t *p  = start;
         testword_t *pe = start;
@@ -128,12 +130,13 @@ int test_own_addr1(int my_cpu)
 
 int test_own_addr2(int my_cpu, int stage)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     testword_t offset;
 
     // Calculate the offset (in pages) between the virtual address and the physical address.
-    offset = (vm_map[0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
+    offset = (vm_map[context][0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
     offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
 #if (ARCH_BITS == 64)
     // Convert to a byte address offset. This will translate the virtual address into a physical address.

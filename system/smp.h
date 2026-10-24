@@ -26,12 +26,15 @@
 /**
  * The maximum number of APIC IDs.
  */
-#define MAX_APIC_IDS                512
+#define MAX_APIC_IDS                MAX_CPUS
 
 /**
- * The maximum number of NUMA proximity domains.
+ * The maximum number of NUMA proximity domains. Independent of MAX_APIC_IDS:
+ * it bounds immutable/discovery-side SRAT topology data, not CPU ordinals.
+ * 128 domains covers 32 sockets with four clusters per socket (AMD NPS4 /
+ * Intel SNC4); larger topologies fall back cleanly to topology-agnostic mode.
  */
-#define MAX_PROXIMITY_DOMAINS       MAX_APIC_IDS
+#define MAX_PROXIMITY_DOMAINS       128
 
 /**
  * The current state of a CPU core.
@@ -53,6 +56,37 @@ extern int num_available_cpus;
  * may increase after calling smp_init().
  */
 extern int num_proximity_domains;
+
+/**
+ * Set if the SRAT declares more distinct proximity domains than
+ * MAX_PROXIMITY_DOMAINS; NUMA placement is disabled entirely in that case.
+ */
+extern bool smp_topology_too_large;
+
+#if VMEM_MAX_CONTEXTS > 1
+/**
+ * The per-CPU topology decomposition used by the NUMA core-subset picking
+ * policy (numa=par,topology,N / numa=on,topology,N). Filled once by
+ * smp_decompose_topology() after the CPUs have been enumerated;
+ * cpu_topo_data_available reports whether the architecture provided usable
+ * data (the ordinal picking policy applies otherwise). Only compiled when
+ * more than one execution context exists (i586 uses the ordinal policy).
+ */
+typedef struct {
+    int core_group_id;   // the core group (CCD/CCX/die/cluster) within the package
+    int core_id;         // the physical core identity; the SMT siblings share it
+    int smt_id;          // the thread within the core (0 = no SMT)
+} cpu_topo_id_t;
+extern cpu_topo_id_t cpu_topo_id[MAX_CPUS];
+extern bool cpu_topo_data_available;
+
+/**
+ * Decomposes the per-CPU topology (APIC IDs / MPIDR / core IDs) into the
+ * core-group structure used by the NUMA core-subset picking. Called once
+ * after smp_init(), before any subset is derived.
+ */
+void smp_decompose_topology(void);
+#endif
 
 /**
  * Initialises the SMP state and detects the number of available CPU cores.
@@ -99,14 +133,50 @@ static inline uint16_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_doma
  */
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end);
 
+/**
+ * Returns true if the given proximity-domain index owns at least one
+ * accepted SRAT memory range.
+ */
+bool smp_domain_has_memory(uint32_t domain_idx);
+
+/**
+ * Returns the number of the given domain's SRAT range pieces intersecting
+ * the given page range; each intersection is one vm_map segment.
+ */
+uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page);
+
+/**
+ * Validates the active LoongArch64 NUMA address transform for parallel teams:
+ * canonical spans must round-trip to physical addresses and retain distinct
+ * ownership. Identity fallback is valid. Called after SRAT normalization and
+ * pinned allocations; always true on architectures without the transform.
+ */
+bool smp_numa_transform_valid(void);
+
 //int count_cpus_for_proximity_domain_corresponding_to_range(uintptr_t start, uintptr_t end, uint32_t proximity_domain_idx);
 
 //void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end);
 
 /**
- * Allocates and initialises a barrier object in pinned memory.
+ * Allocates and initialises num_barriers barrier objects in pinned memory.
+ * Both counts must be strictly positive; the wrapper validates them at
+ * compile time (every call site passes constants). Returns NULL if the
+ * pinned synchronization arena is exhausted.
  */
-barrier_t *smp_alloc_barrier(int num_threads);
+#define smp_alloc_barriers(num_barriers, num_threads)                       \
+    ({                                                                      \
+        _Static_assert((num_barriers) > 0,                                  \
+                       "barrier count must be strictly positive");          \
+        _Static_assert((num_threads) > 0,                                   \
+                       "barrier thread count must be strictly positive");   \
+        smp_alloc_barriers_((num_barriers), (num_threads));                 \
+    })
+
+/**
+ * The pinned-arena allocation behind smp_alloc_barriers(); the wrapper
+ * validates the strictly-positive counts at compile time.
+ */
+barrier_t *smp_alloc_barriers_(unsigned int num_barriers, unsigned int num_threads);
 
 /**
  * Allocates and initialises a spinlock object in pinned memory.

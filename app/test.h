@@ -31,19 +31,9 @@ extern uint16_t chunk_index[MAX_CPUS];
  */
 extern uint16_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
- /*
-  * The number of CPU cores being used for the current test. This is always
-  * either 1 or the full number of enabled CPU cores.
-  */
-extern int num_active_cpus;
-
 /**
- * The current master CPU core.
- */
-extern int master_cpu;
-
-/**
- * A barrier used when running tests.
+ * A barrier used when running tests. Only the scheduler/control code may use
+ * it directly; test implementations use test_run_barrier().
  */
 extern barrier_t *run_barrier;
 
@@ -51,6 +41,78 @@ extern barrier_t *run_barrier;
  * A mutex used when reporting errors or printing trace information.
  */
 extern spinlock_t *error_mutex;
+
+/**
+ * A mutex serializing input service and UI rendering by the context masters.
+ */
+extern spinlock_t *ui_mutex;
+
+/**
+ * True while a NUMA_PAR run is active (real run, at least two selected
+ * CPU-backed memory domains). Legacy modes and the BSP-only dummy run are
+ * always false.
+ */
+extern bool numa_run_active;
+
+/**
+ * The boot-time core subset for the NUMA modes (numa=on,policy,N): the
+ * NUMA_ON chunking tests only these CPUs (their chunk ordinals are the
+ * only ones assigned), while NUMA_PAR re-derives its own per-run subset.
+ * Equal to the boot selection when no subset was configured.
+ */
+extern bool numa_boot_cpu_subset[MAX_CPUS];
+
+/**
+ * The dense per-CPU chunk index within the current context team, rebuilt at
+ * every wave binding.
+ */
+extern uint16_t test_team_chunk_index[MAX_CPUS];
+
+/**
+ * Aggregate work counters used for NUMA_PAR progress display: each context
+ * master adds its active CPU count to test_work_done once per tick, and
+ * test_work_expected is computed for the complete stage (all waves).
+ */
+extern uint64_t test_work_done;
+extern uint64_t test_work_expected;
+
+/**
+ * Aggregate pages tested in the current NUMA_PAR stage, by all contexts.
+ */
+extern uint64_t test_pages_done;
+
+/**
+ * The whole-test work counter offset and expected work: the test percentage
+ * is (test_work_done - test_work_done_base) / test_work_expected, the pass
+ * percentage test_work_done / pass_work_expected (both monotonic).
+ */
+extern uint64_t test_work_done_base;
+extern uint64_t pass_work_expected;
+
+/**
+ * Cross-context cancellation request (0 or 1); atomic access only.
+ */
+extern uint32_t global_cancel_requested;
+
+/**
+ * Returns true when the calling context has been asked to stop (NUMA_PAR
+ * cancellation published through the context barrier). False in legacy modes,
+ * which use the plain `bail` flag.
+ */
+bool test_stop_requested(void);
+
+/**
+ * Publishes a cross-context cancellation request (release store) from a
+ * context master after the UI requested a bail; every context converges on
+ * the same exit path at its next safe point.
+ */
+void test_publish_cancel_request(void);
+
+/**
+ * Requests a stop of the given execution context; the first terminal reason
+ * wins.
+ */
+void test_request_cancel(int context);
 
 #if (ARCH_BITS == 64)
 /**
@@ -96,13 +158,93 @@ typedef struct {
 } vm_map_t;
 
 /**
- * The list of memory segments currently mapped into virtual memory.
+ * The list of memory segments currently mapped into virtual memory for each
+ * execution context.
  */
-extern vm_map_t vm_map[MAX_MEM_SEGMENTS];
+extern vm_map_t vm_map[VMEM_MAX_CONTEXTS][MAX_MEM_SEGMENTS];
 /**
- * The number of memory segments currently mapped into virtual memory.
+ * The number of memory segments currently mapped into virtual memory for each
+ * execution context.
  */
-extern int vm_map_size;
+extern int vm_map_size[VMEM_MAX_CONTEXTS];
+
+/**
+ * The number of pages currently mapped into virtual memory for each execution
+ * context.
+ */
+extern size_t num_mapped_pages[VMEM_MAX_CONTEXTS];
+
+/**
+ * The mutable per-execution-context state needed by the test scheduler and
+ * test implementations. Context 0 is the legacy-mode context.
+ */
+typedef struct {
+    uint32_t    proximity_domain_idx;
+    int         master_cpu_num;
+    unsigned int team_cpu_count;
+    unsigned int active_cpu_count;
+    int         window_index;
+    uintptr_t   window_start;
+    uintptr_t   window_end;
+    bool        windows_exhausted;   // sticky per binding, published by the context barrier
+    int         status;
+} test_context_t;
+
+/**
+ * The number of execution contexts bound in the current wave (the active
+ * NUMA_PAR job count). 1 in legacy modes and during the dummy run.
+ */
+extern unsigned int num_bound_execution_contexts;
+
+/**
+ * The per-execution-context test state.
+ */
+extern test_context_t test_contexts[VMEM_MAX_CONTEXTS];
+
+/**
+ * Returns the execution context of the calling CPU. In legacy modes and
+ * during the BSP-only dummy run this is always context 0.
+ */
+test_context_t *test_context(void);
+
+/**
+ * Returns the index of the execution context of the calling CPU.
+ */
+int test_context_index(void);
+
+/**
+ * Returns the execution context currently bound to the given CPU, clamped
+ * to 0 for unbound or invalid ordinals.
+ */
+int execution_context_for_cpu(int cpu);
+
+/**
+ * Returns the barrier to use for test-internal waits from the calling CPU:
+ * the current context barrier in active NUMA_PAR, the legacy run_barrier
+ * otherwise.
+ */
+barrier_t *test_run_barrier(void);
+
+#define master_cpu       (test_context()->master_cpu_num)
+#define num_active_cpus  (test_context()->active_cpu_count)
+#define window_num       (test_context()->window_index)
+
+/**
+ * True when the given CPU is the primary context master of the current wave,
+ * the only context master allowed to update the test-specific display fields
+ * without ui_mutex. A negative CPU (the dummy calibration) is never the
+ * primary master, so the dummy performs no display updates.
+ */
+static inline bool test_is_primary_context_master(int my_cpu)
+{
+    if (my_cpu < 0) {
+        return false;
+    }
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return my_cpu == master_cpu;
+    }
+    return my_cpu == test_contexts[0].master_cpu_num;
+}
 
 /**
  * The number of completed test passes.
@@ -112,10 +254,6 @@ extern int pass_num;
  * The current test number.
  */
 extern int test_num;
-/**
- * The current window number.
- */
-extern int window_num;
 
 /**
  * A flag indicating that testing should be restarted due to a configuration

@@ -126,15 +126,25 @@
 #define SRAT_PROCESSOR_APIC_AFFINITY   0
 #define SRAT_MEMORY_AFFINITY           1
 #define SRAT_PROCESSOR_X2APIC_AFFINITY 2
+#define SRAT_PROCESSOR_GICC_AFFINITY   3
 
 // SRAT flag values
 #define SRAT_PAAF_ENABLED              1
 #define SRAT_MAF_ENABLED               1
 #define SRAT_PXAAF_ENABLED             1
+#define SRAT_GICC_AAF_ENABLED          1
 
 // Private memory heap used for AP trampoline and synchronisation objects
 
 #define HEAP_BASE_ADDR              (smp_heap_page << PAGE_SHIFT)
+
+// The pinned synchronization arena is two pages: the first page holds the
+// AP trampoline on x86, the rest is carved up for barrier objects, mutexes
+// and future synchronization state. Both pages are excluded from pm_map
+// testing by the heap allocator.
+
+#define SYNC_ARENA_PAGES            2
+#define SYNC_ARENA_LIMIT            (HEAP_BASE_ADDR + SYNC_ARENA_PAGES * PAGE_SIZE)
 
 #define AP_TRAMPOLINE_PAGE          (smp_heap_page)
 
@@ -351,6 +361,17 @@ typedef struct __attribute__((packed)) {
     uint32_t        reserved2;
 } srat_processor_lx2apic_affinity_entry_t;
 
+// SRAT subtable type 03: Processor Local GICC Affinity (AArch64).
+// The CPU is identified by its ACPI Processor UID, not by the MPIDR.
+typedef struct __attribute__((packed)) {
+    uint8_t         type;
+    uint8_t         length;
+    uint32_t        proximity_domain;
+    uint32_t        acpi_processor_uid;
+    uint32_t        flags;
+    uint32_t        clock_domain;
+} srat_processor_gicc_affinity_entry_t;
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -359,20 +380,47 @@ typedef struct __attribute__((packed)) {
 static apic_register_t   *apic = NULL;
 #endif
 
+#if VMEM_MAX_CONTEXTS > 1
 static uint32_t          cpu_num_to_proximity_domain_idx[MAX_CPUS];
+#endif
 
 static cpu_apic_id_t     cpu_num_to_apic_id[MAX_CPUS];
 
-static memory_affinity_t memory_affinity_ranges[MAX_APIC_IDS];
+#if defined(__aarch64__)
+// The ACPI Processor UID of each CPU, retained alongside the MPIDR because
+// SRAT type 3 (GICC affinity) identifies CPUs by UID rather than by MPIDR.
+static uint32_t          cpu_num_to_acpi_uid[MAX_CPUS];
+
+// Whether the cpu_num_to_acpi_uid slot has been assigned; UID 0 is a
+// legitimate ACPI Processor UID and must not be mistaken for unassigned.
+static bool              cpu_num_to_uid_assigned[MAX_CPUS];
+#endif
+
+// Whether cpu_num_to_proximity_domain_idx[] has been assigned yet in the
+// current SRAT pass; domain index 0 is a valid assignment, so a separate
+// marker is required to detect conflicting affinities.
+#if VMEM_MAX_CONTEXTS > 1
+static bool              cpu_num_to_domain_assigned[MAX_CPUS];
+
+static memory_affinity_t memory_affinity_ranges[2 * MAX_PROXIMITY_DOMAINS];
 
 static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS];
+#endif
 
-static uint16_t           cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 uint16_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+
+#if VMEM_MAX_CONTEXTS > 1
+cpu_topo_id_t            cpu_topo_id[MAX_CPUS];
+bool                     cpu_topo_data_available = false;
+#endif
 
 static uintptr_t         smp_heap_page = 0;
 
 static uintptr_t         alloc_addr = 0;
+
+// Fallback mutex used if the pinned synchronization arena is exhausted; a
+// shared global lock remains correct, it only serializes more broadly.
+static spinlock_t        fallback_mutex = 0;
 
 #if !defined(__aarch64__)
 static bool              apic_x2apic = false;
@@ -383,10 +431,18 @@ static bool              apic_x2apic = false;
 //------------------------------------------------------------------------------
 
 int     num_available_cpus = 1;  // There is always at least one CPU, the BSP
+#if VMEM_MAX_CONTEXTS > 1
 int     num_memory_affinity_ranges = 0;
 int     num_proximity_domains = 0;
+#endif
 bool    map_numa_memory_range = false;
 uint8_t highest_map_bit = 0;
+
+// Set when the SRAT declares more distinct proximity domains than
+// MAX_PROXIMITY_DOMAINS; NUMA placement is then disabled entirely.
+#if VMEM_MAX_CONTEXTS > 1
+bool    smp_topology_too_large = false;
+#endif
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -562,8 +618,10 @@ static bool find_cpus_in_floating_mp_struct(void)
 }
 #endif
 
-#if defined(__i386__) || defined(__x86_64__)
-// Firmware may list the same core as both a local APIC and an x2APIC entry.
+#if defined(__i386__) || defined(__x86_64__) || defined(__loongarch_lp64)
+// Firmware may list the same core twice (e.g. as both a local APIC and an
+// x2APIC entry on x86, or with a duplicated core ID on LoongArch). Reject
+// duplicates so the SRAT affinity mapping stays unambiguous.
 static bool apic_id_already_listed(cpu_apic_id_t apic_id, int found_cpus)
 {
     int count = found_cpus < MAX_CPUS ? found_cpus : MAX_CPUS;
@@ -658,6 +716,14 @@ static bool find_cpus_in_madt(void)
         if (entry_header->type == MADT_CORE_PIC) {
             madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
+                // Reject duplicate core IDs: the SRAT affinity mapping would
+                // be ambiguous.
+                if (apic_id_already_listed(entry->core_id, found_cpus)) {
+                    // Skip the duplicate: aborting here would silently drop
+                    // every later CPU from the enumeration.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
+                }
                 if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[found_cpus] = entry->core_id;
                     // The first CPU is the BSP, don't increment.
@@ -678,8 +744,29 @@ static bool find_cpus_in_madt(void)
             madt_gicc_entry_t *entry = (madt_gicc_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_GICC_ENABLED|MADT_GICC_ONLINE_CAPABLE)) {
                 uint64_t mpidr = entry->mpidr & MPIDR_AFFINITY_MASK;
-                if (mpidr != bsp_mpidr && num_available_cpus < MAX_CPUS) {
+                uint32_t uid = entry->acpi_processor_uid;
+                // Reject duplicate Processor UIDs: SRAT type 3 resolves CPUs
+                // by UID, so a duplicated UID would make the mapping ambiguous.
+                bool uid_already_listed = false;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if (cpu_num_to_uid_assigned[i] && cpu_num_to_acpi_uid[i] == uid) {
+                        uid_already_listed = true;
+                        break;
+                    }
+                }
+                if (uid_already_listed) {
+                    // Skip the duplicate: aborting the walk here would
+                    // silently drop every later CPU from the enumeration.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
+                }
+                if (mpidr == bsp_mpidr) {
+                    cpu_num_to_acpi_uid[0] = uid;
+                    cpu_num_to_uid_assigned[0] = true;
+                } else if (num_available_cpus < MAX_CPUS) {
                     cpu_num_to_apic_id[num_available_cpus] = mpidr;
+                    cpu_num_to_acpi_uid[num_available_cpus] = uid;
+                    cpu_num_to_uid_assigned[num_available_cpus] = true;
                     num_available_cpus++;
                 }
                 found_cpus++;
@@ -727,26 +814,52 @@ static void verify_bsp_is_cpu0(void)
 }
 #endif
 
-static bool find_numa_nodes_in_srat(void)
+#if VMEM_MAX_CONTEXTS > 1
+// Returns the index of proximity_domain in proximity_domains[], allocating a
+// new slot when necessary, or -1 when the topology declares more than
+// MAX_PROXIMITY_DOMAINS distinct domains (the caller then disables NUMA).
+static int find_or_add_proximity_domain(uint32_t proximity_domain)
+{
+    for (int i = 0; i < num_proximity_domains; i++) {
+        if (proximity_domains[i] == proximity_domain) {
+            return i;
+        }
+    }
+    if (num_proximity_domains >= (int)(ARRAY_SIZE(proximity_domains))) {
+        return -1;
+    }
+    proximity_domains[num_proximity_domains] = proximity_domain;
+    return num_proximity_domains++;
+}
+#endif
+
+// Parses the SRAT and populates the proximity-domain arrays.
+// Returns 1 on success, 0 if the SRAT is absent or invalid, and -1 if the
+// topology declares more than MAX_PROXIMITY_DOMAINS distinct domains. The
+// caller must treat any non-1 result as "NUMA disabled" and must not keep
+// partially accumulated topology state.
+#if VMEM_MAX_CONTEXTS > 1
+static int find_numa_nodes_in_srat(void)
 {
     uint8_t * tab_entry_ptr;
     // The caller will do fixups.
     if (acpi_config.srat_addr == 0) {
-        return false;
+        return 0;
     }
 
     srat_table_header_t * srat = (srat_table_header_t *)map_region(acpi_config.srat_addr, sizeof(rsdt_header_t), true);
-    if (srat == NULL) return false;
+    if (srat == NULL) return 0;
 
     srat = (srat_table_header_t *)map_region(acpi_config.srat_addr, srat->h.length, true);
-    if (srat == NULL) return false;
+    if (srat == NULL) return 0;
 
     if (acpi_checksum(srat, srat->h.length) != 0) {
-        return false;
+        return 0;
     }
-    // A table which contains fewer bytes than header + 1 processor local APIC entry + 1 memory affinity entry would be very weird.
-    if (srat->h.length < sizeof(*srat) + sizeof(srat_processor_lapic_affinity_entry_t) + sizeof(srat_memory_affinity_entry_t)) {
-        return false;
+    // A table which contains fewer bytes than header + 1 processor affinity
+    // entry + 1 memory affinity entry would be very weird.
+    if (srat->h.length < sizeof(*srat) + sizeof(srat_memory_affinity_entry_t)) {
+        return 0;
     }
 
     tab_entry_ptr = (uint8_t *)srat + sizeof(*srat);
@@ -754,44 +867,69 @@ static bool find_numa_nodes_in_srat(void)
     // Pass 1: parse memory affinity entries and allocate proximity domains for each of them, while validating input a little bit.
     while (tab_entry_ptr < srat_table_end) {
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
-        if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
-            if (entry_header->length != sizeof(srat_processor_lapic_affinity_entry_t)) {
-                return false;
+        if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
+         || entry_header->length < sizeof(srat_entry_header_t)
+         || tab_entry_ptr + entry_header->length > srat_table_end) {
+            // A truncated trailing entry must not be parsed: its length byte
+            // could match an accepted size and push the read past the end of
+            // the table.
+            return 0;
+        }
+#if defined(__aarch64__)
+        if (entry_header->type == SRAT_PROCESSOR_GICC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_gicc_affinity_entry_t)) {
+                return 0;
             }
         }
+#else
+        if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_lapic_affinity_entry_t)) {
+                return 0;
+            }
+        }
+        else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
+            if (entry_header->length != sizeof(srat_processor_lx2apic_affinity_entry_t)) {
+                return 0;
+            }
+        }
+#endif
         else if (entry_header->type == SRAT_MEMORY_AFFINITY) {
             if (entry_header->length != sizeof(srat_memory_affinity_entry_t)) {
-                return false;
+                return 0;
             }
             srat_memory_affinity_entry_t *entry = (srat_memory_affinity_entry_t *)tab_entry_ptr;
             if (entry->flags & SRAT_MAF_ENABLED) {
                 uint32_t proximity_domain = entry->proximity_domain;
                 uint64_t start = entry->base_address;
                 uint64_t end = entry->base_address + entry->address_length;
-                int found = -1;
 
                 if (start > end) {
                     // We've found a wraparound, that's not good.
-                    return false;
+                    return 0;
                 }
+                if (start == end) {
+                    // A zero-length enabled entry claims no memory; discard
+                    // it rather than letting it count as domain ownership.
+                    tab_entry_ptr += entry_header->length;
+                    continue;
+                }
+#if defined(__loongarch_lp64)
+                // The NUMA address transform relocates the range start's
+                // four-bit node field; a range spanning two encoded node
+                // values cannot be represented and would alias after the
+                // transform. Check the original encoding before any
+                // transform has run.
+                if (end > 0 && (start >> 44) != ((end - 1) >> 44)) {
+                    return 0;
+                }
+#endif
 
                 // Allocate entry in proximity_domains, if necessary. Linear search for now.
-                for (int i = 0; i < num_proximity_domains; i++) {
-                    if (proximity_domains[i] == proximity_domain) {
-                        found = i;
-                        break;
-                    }
-                }
-                if (found == -1) {
-                    // Not found, allocate entry.
-                    if (num_proximity_domains < (int)(ARRAY_SIZE(proximity_domains))) {
-                        proximity_domains[num_proximity_domains] = proximity_domain;
-                        found = num_proximity_domains;
-                        num_proximity_domains++;
-                    } else {
-                        // TODO Display message ?
-                        return false;
-                    }
+                int found = find_or_add_proximity_domain(proximity_domain);
+                if (found < 0) {
+                    // Topology too large: do not truncate the domain list
+                    // and continue with inconsistent CPU/memory ownership.
+                    return -1;
                 }
 
                 // Now that we have the index of the entry in proximity_domains in found, use it.
@@ -801,27 +939,69 @@ static bool find_numa_nodes_in_srat(void)
                     memory_affinity_ranges[num_memory_affinity_ranges].end = end;
                     num_memory_affinity_ranges++;
                 } else {
-                    // TODO Display message ?
-                    return false;
+                    // Too many affinity ranges: same clean-fallback policy.
+                    return -1;
                 }
             }
         }
-        else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
-            if (entry_header->length != sizeof(srat_processor_lx2apic_affinity_entry_t)) {
-                return false;
-            }
-        } else {
-            return false;
+        // SRAT type 2 (x2APIC affinity) is x86-only; on AArch64 it is not a
+        // valid entry type and must be rejected, so it falls through below.
+        else {
+            return 0;
         }
         tab_entry_ptr += entry_header->length;
     }
 
     tab_entry_ptr = (uint8_t *)srat + sizeof(*srat);
-    // Pass 2: parse processor APIC / x2APIC affinity entries.
+    // Pass 2: parse processor affinity entries and map them to internal CPU
+    // ordinals. On x86/LoongArch the CPU is identified by its APIC ID, on
+    // AArch64 by its ACPI Processor UID (SRAT type 3).
     while (tab_entry_ptr < srat_table_end) {
+        // Pass 1 validated every entry header, so re-reading it here is safe.
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
         uint32_t proximity_domain;
         uint32_t apic_id;
+#if defined(__aarch64__)
+        if (entry_header->type == SRAT_PROCESSOR_GICC_AFFINITY) {
+            srat_processor_gicc_affinity_entry_t *entry = (srat_processor_gicc_affinity_entry_t *)tab_entry_ptr;
+            if (entry->flags & SRAT_GICC_AAF_ENABLED) {
+                proximity_domain = entry->proximity_domain;
+                apic_id = entry->acpi_processor_uid;
+
+                // A CPU-only domain (no memory entry) is represented so its
+                // CPUs are parked instead of invalidating the whole topology.
+                int found1 = find_or_add_proximity_domain(proximity_domain);
+                if (found1 < 0) {
+                    // Topology too large: do not truncate the domain list
+                    // and continue with inconsistent CPU/memory ownership.
+                    return -1;
+                }
+
+                // Do we know about that ACPI Processor UID ? Only populated
+                // slots count; an unassigned slot still carries UID 0.
+                int found2 = -1;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if (cpu_num_to_uid_assigned[i] && cpu_num_to_acpi_uid[i] == apic_id) {
+                        found2 = i;
+                        break;
+                    }
+                }
+
+                if (found2 == -1) {
+                    // We've found an affinity entry whose CPU we don't know about.
+                    return 0;
+                }
+
+                // Reject a second affinity entry for the same CPU: duplicate or
+                // conflicting affinities both make the mapping ambiguous.
+                if (cpu_num_to_domain_assigned[found2]) {
+                    return 0;
+                }
+                cpu_num_to_domain_assigned[found2] = true;
+                cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
+            }
+        }
+#else
         if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
             srat_processor_lapic_affinity_entry_t *entry = (srat_processor_lapic_affinity_entry_t *)tab_entry_ptr;
             if (entry->flags & SRAT_PAAF_ENABLED) {
@@ -830,17 +1010,13 @@ static bool find_numa_nodes_in_srat(void)
                 apic_id = (uint32_t)entry->apic_id;
 
 find_proximity_domain:
-                found1 = -1;
-                // Find entry in proximity_domains, if necessary. Linear search for now.
-                for (int i = 0; i < num_proximity_domains; i++) {
-                    if (proximity_domains[i] == proximity_domain) {
-                        found1 = i;
-                        break;
-                    }
-                }
-                if (found1 == -1) {
-                    // We've found an affinity entry whose proximity domain we don't know about.
-                    return false;
+                // A CPU-only domain (no memory entry) is represented so its
+                // CPUs are parked instead of invalidating the whole topology.
+                found1 = find_or_add_proximity_domain(proximity_domain);
+                if (found1 < 0) {
+                    // Topology too large: do not truncate the domain list
+                    // and continue with inconsistent CPU/memory ownership.
+                    return -1;
                 }
 
                 // Do we know about that APIC ID ?
@@ -854,9 +1030,15 @@ find_proximity_domain:
 
                 if (found2 == -1) {
                     // We've found an affinity entry whose APIC ID we don't know about.
-                    return false;
+                    return 0;
                 }
 
+                // Reject a second affinity entry for the same CPU: duplicate or
+                // conflicting affinities both make the mapping ambiguous.
+                if (cpu_num_to_domain_assigned[found2]) {
+                    return 0;
+                }
+                cpu_num_to_domain_assigned[found2] = true;
                 cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
             }
         }
@@ -868,13 +1050,83 @@ find_proximity_domain:
                 goto find_proximity_domain;
             }
         }
+#endif
         tab_entry_ptr += entry_header->length;
     }
 
-    // TODO sort on proximity address, like in pm_map.
+    return 1;
+}
+#endif
 
+// Sorts the accepted memory-affinity ranges by (start, end) and validates
+// that ranges of different proximity domains never overlap. Returns false
+// (and leaves the caller to disable NUMA) when ownership is ambiguous.
+// Called after any architecture-specific range transform.
+#if VMEM_MAX_CONTEXTS > 1
+static bool sort_and_validate_memory_affinity_ranges(void)
+{
+    // Insertion sort by (start, end).
+    for (int i = 1; i < num_memory_affinity_ranges; i++) {
+        memory_affinity_t key = memory_affinity_ranges[i];
+        int j = i - 1;
+        while (j >= 0 && (   memory_affinity_ranges[j].start > key.start
+                          || (memory_affinity_ranges[j].start == key.start && memory_affinity_ranges[j].end > key.end))) {
+            memory_affinity_ranges[j + 1] = memory_affinity_ranges[j];
+            j--;
+        }
+        memory_affinity_ranges[j + 1] = key;
+    }
+
+    // An empty enabled set (after discarding zero-length entries) must not
+    // manufacture a phantom range: the merge below would promote the
+    // initialized [0,0) slot to a real entry. Disable NUMA instead.
+    if (num_memory_affinity_ranges == 0) {
+        return false;
+    }
+
+    // Merge overlapping or adjacent ranges of the same domain: the mapping
+    // consumes the union of a domain's spans, so the progress accounting
+    // must operate on the same interval set. The ranges are sorted by
+    // (start, end), so a single pass suffices.
+    int out = 0;
+    for (int i = 1; i < num_memory_affinity_ranges; i++) {
+        memory_affinity_t *prev = &memory_affinity_ranges[out];
+        memory_affinity_t *cur  = &memory_affinity_ranges[i];
+        bool same_mapping_span = true;
+#if defined(__loongarch_lp64)
+        // Adjacent canonical nodes can decode to noncontiguous physical
+        // memory. Keep their pieces separate even if their SRAT owner is
+        // the same; a vm_map segment must remain a linear physical span.
+        if (map_numa_memory_range) {
+            same_mapping_span = (cur->start >> highest_map_bit) == (prev->start >> highest_map_bit);
+        }
+#endif
+        if (same_mapping_span && cur->proximity_domain_idx == prev->proximity_domain_idx && cur->start <= prev->end) {
+            if (cur->end > prev->end) {
+                prev->end = cur->end;
+            }
+        } else {
+            memory_affinity_ranges[++out] = *cur;
+        }
+    }
+    num_memory_affinity_ranges = out + 1;
+
+    // Overlapping ranges of different domains make physical ownership
+    // ambiguous; two contexts must never test aliases of the same span.
+    // With sorted starts, range i overlaps any previous range j with
+    // start_i < end_j, not only the immediately preceding one: nested or
+    // chained same-domain ranges must not hide a cross-domain overlap.
+    for (int i = 1; i < num_memory_affinity_ranges; i++) {
+        for (int j = 0; j < i; j++) {
+            if (   memory_affinity_ranges[i].start < memory_affinity_ranges[j].end
+                && memory_affinity_ranges[i].proximity_domain_idx != memory_affinity_ranges[j].proximity_domain_idx) {
+                return false;
+            }
+        }
+    }
     return true;
 }
+#endif
 
 #if 0
 static bool parse_slit(uintptr_t slit_addr)
@@ -1051,81 +1303,189 @@ static bool start_cpu(int cpu_num)
 #endif
 
 #if defined(__loongarch_lp64)
-uint8_t checkout_max_memory_bits_of_this_numa_node(uint8_t range)
+#if VMEM_MAX_CONTEXTS > 1
+// The node bits of the LoongArch64 node-in-address encoding.
+#define NUMA_NODE_OFFSET 44
+
+// Move the four-bit node field while retaining the offset within its node.
+// Spans are half-open: an end at the next node boundary belongs to the
+// start's node, and must be translated by its length rather than its end's
+// node field. Both layouts keep the node above every local address bit.
+static bool numa_transform_span(uint64_t start, uint64_t end, unsigned int from_bit, unsigned int to_bit,
+                                uint64_t *new_start, uint64_t *new_end)
 {
-    uint64_t max_memory_range = memory_affinity_ranges[range].end & (~(0xFULL << 44));
-    uint8_t  bits = 0;
-
-    if (max_memory_range > 0x0) {
-        do {
-            bits++;
-            max_memory_range = max_memory_range >> 1;
-        } while (max_memory_range > 0x1);
-    } else {
-        return 0;
+    if (from_bit < PAGE_SHIFT || from_bit > NUMA_NODE_OFFSET
+     || to_bit < PAGE_SHIFT || to_bit > NUMA_NODE_OFFSET
+     || start >= end || (start >> from_bit) != ((end - 1) >> from_bit)) {
+        return false;
     }
-
-    return bits;
+    uint64_t node = (start >> from_bit) & 0xF;
+    uint64_t local_start = start & ~(0xFULL << from_bit);
+    uint64_t length = end - start;
+    uint64_t local_limit = 1ULL << to_bit;
+    if (local_start >= local_limit || length > local_limit - local_start) {
+        return false;
+    }
+    *new_start = local_start | (node << to_bit);
+    *new_end = *new_start + length;
+    return true;
 }
 
-void map_the_numa_memory_range(uint8_t highest_bit)
+// Validate the actual direction of the mapping. Before mutation the input
+// spans are physical; after mutation they are canonical and must be decoded
+// first. In both cases the round trip must reproduce the complete span.
+static bool numa_canonical_span(uint64_t start, uint64_t end, unsigned int highest_bit, bool transformed,
+                                uint64_t *canonical_start, uint64_t *canonical_end)
 {
-    uint8_t i, node_nu;
-    uint8_t node_offset = 44;
-
-    //
-    // First step, map the pm_map.
-    //
-    for (i = 0; i < pm_map_size; i++) {
-        node_nu = (pm_map[i].start >> (node_offset - PAGE_SHIFT)) & 0xF;
-        if (node_nu != 0) {
-            pm_map[i].start &= ~((uint64_t)0xF << (node_offset - PAGE_SHIFT));
-            pm_map[i].start |= node_nu << (highest_bit - PAGE_SHIFT);
-
-            pm_map[i].end &= ~((uint64_t)0xF << (node_offset - PAGE_SHIFT));
-            pm_map[i].end |= node_nu << (highest_bit - PAGE_SHIFT);
-        }
+    uint64_t original_start, original_end;
+    if (transformed) {
+        return numa_transform_span(start, end, highest_bit, NUMA_NODE_OFFSET, &original_start, &original_end)
+            && numa_transform_span(original_start, original_end, NUMA_NODE_OFFSET, highest_bit, canonical_start, canonical_end)
+            && *canonical_start == start && *canonical_end == end;
     }
+    return numa_transform_span(start, end, NUMA_NODE_OFFSET, highest_bit, canonical_start, canonical_end)
+        && numa_transform_span(*canonical_start, *canonical_end, highest_bit, NUMA_NODE_OFFSET, &original_start, &original_end)
+        && original_start == start && original_end == end;
+}
 
-    //
-    // Second step, map the memory_affinity_ranges.
-    //
-    for (i = 0; i < num_memory_affinity_ranges; i++) {
-        if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
-            node_nu = (memory_affinity_ranges[i].start >> node_offset) & 0xF;
-            if (node_nu != 0) {
-                memory_affinity_ranges[i].start &= ~((uint64_t)0xF << node_offset);
-                memory_affinity_ranges[i].start |= node_nu << highest_bit;
-                memory_affinity_ranges[i].end   &= ~((uint64_t)0xF << node_offset);
-                memory_affinity_ranges[i].end   |= node_nu << highest_bit;
+static bool numa_transform_ranges_valid(unsigned int highest_bit, bool transformed)
+{
+    uint64_t previous_end = 0;
+    for (int i = 0; i < pm_map_size; i++) {
+        // Pinned allocations can consume a whole segment after the
+        // transform. An empty segment contributes no testable memory.
+        if (pm_map[i].start == pm_map[i].end) {
+            continue;
+        }
+        if (pm_map[i].start > (UINT64_MAX >> PAGE_SHIFT) || pm_map[i].end > (UINT64_MAX >> PAGE_SHIFT)) {
+            return false;
+        }
+        uint64_t start, end;
+        if (!numa_canonical_span((uint64_t)pm_map[i].start << PAGE_SHIFT, (uint64_t)pm_map[i].end << PAGE_SHIFT,
+                                 highest_bit, transformed, &start, &end)
+         || start < previous_end) {
+            return false;
+        }
+        previous_end = end;
+    }
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        uint64_t start, end;
+        if (!numa_canonical_span(memory_affinity_ranges[i].start, memory_affinity_ranges[i].end,
+                                 highest_bit, transformed, &start, &end)) {
+            return false;
+        }
+        for (int j = 0; j < i; j++) {
+            // Same-domain overlaps are merged by SRAT normalization.
+            if (memory_affinity_ranges[i].proximity_domain_idx == memory_affinity_ranges[j].proximity_domain_idx) {
+                continue;
+            }
+            uint64_t j_start, j_end;
+            if (!numa_canonical_span(memory_affinity_ranges[j].start, memory_affinity_ranges[j].end,
+                                     highest_bit, transformed, &j_start, &j_end)
+             || (j_start < end && j_end > start)) {
+                return false;
             }
         }
     }
+    return true;
+}
+
+// Validate before mutation so a failed transform retains the physical map
+// intact. Transform every domain: SRAT domain ordinals have no relationship
+// to the four-bit node encoded in a physical address.
+static bool map_the_numa_memory_range(unsigned int highest_bit)
+{
+    if (!numa_transform_ranges_valid(highest_bit, false)) {
+        return false;
+    }
+    for (int i = 0; i < pm_map_size; i++) {
+        if (pm_map[i].start == pm_map[i].end) {
+            continue;
+        }
+        uint64_t start, end;
+        numa_canonical_span((uint64_t)pm_map[i].start << PAGE_SHIFT, (uint64_t)pm_map[i].end << PAGE_SHIFT,
+                            highest_bit, false, &start, &end);
+        pm_map[i].start = start >> PAGE_SHIFT;
+        pm_map[i].end = end >> PAGE_SHIFT;
+    }
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        uint64_t start, end;
+        numa_canonical_span(memory_affinity_ranges[i].start, memory_affinity_ranges[i].end,
+                            highest_bit, false, &start, &end);
+        memory_affinity_ranges[i].start = start;
+        memory_affinity_ranges[i].end = end;
+    }
+    // With all local offsets below highest_bit <= 44, the transform
+    // preserves physical-map order. Keep the entries in place: heap_init()
+    // has already retained their indexes. The SRAT spans are sorted by the
+    // caller, independently of their firmware encounter order.
+    return true;
+}
+
+static unsigned int numa_local_address_bits(uint64_t end)
+{
+    uint64_t last = (end - 1) & ~(0xFULL << NUMA_NODE_OFFSET);
+    unsigned int bits = 0;
+    while (last != 0) {
+        bits++;
+        last >>= 1;
+    }
+    return bits;
 }
 
 void check_if_needs_to_map(void)
 {
-    uint8_t  i, local_memory_area_bits;
-    uint8_t  max_memory_bits = 0x0;
-
-    if (num_proximity_domains == 0x0) {
+    if (map_numa_memory_range) {
         return;
-    } else {
-        for (i = 0; i < num_memory_affinity_ranges; i++) {
-            if (memory_affinity_ranges[i].proximity_domain_idx != 0) {
-                local_memory_area_bits = checkout_max_memory_bits_of_this_numa_node(i);
-                if (max_memory_bits < local_memory_area_bits) {
-                    max_memory_bits = local_memory_area_bits;
-                }
-            }
+    }
+    highest_map_bit = 0;
+    if (num_proximity_domains == 0 || num_memory_affinity_ranges == 0) {
+        return;
+    }
+    // Control code and relocation targets use the pinned identity region
+    // directly. Keep every nonzero node above it so canonical node addresses
+    // cannot be mistaken for identity-mapped program or heap addresses.
+    unsigned int bits = numa_local_address_bits((uint64_t)VM_PINNED_SIZE << PAGE_SHIFT);
+    if (bits < PAGE_SHIFT) bits = PAGE_SHIFT;
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        if (memory_affinity_ranges[i].start >= memory_affinity_ranges[i].end) {
+            return;
         }
-        if (max_memory_bits > 0) {
-            map_numa_memory_range = true;
-            highest_map_bit = max_memory_bits + 1;
-            map_the_numa_memory_range(highest_map_bit);
+        unsigned int local_bits = numa_local_address_bits(memory_affinity_ranges[i].end);
+        if (local_bits > bits) bits = local_bits;
+    }
+    for (int i = 0; i < pm_map_size; i++) {
+        if (pm_map[i].start == pm_map[i].end) {
+            continue;
         }
+        if (pm_map[i].start > pm_map[i].end || pm_map[i].end > (UINT64_MAX >> PAGE_SHIFT)) {
+            return;
+        }
+        unsigned int local_bits = numa_local_address_bits((uint64_t)pm_map[i].end << PAGE_SHIFT);
+        if (local_bits > bits) bits = local_bits;
+    }
+    // Relocate the node field only into the original local-address area.
+    // Wider offsets cannot be compacted without changing physical-map order
+    // and invalidating the heap's saved segment indexes; retain identity.
+    if (bits <= NUMA_NODE_OFFSET && map_the_numa_memory_range(bits)) {
+        highest_map_bit = bits;
+        map_numa_memory_range = true;
     }
 }
+#endif
+
+bool smp_numa_transform_valid(void)
+{
+#if VMEM_MAX_CONTEXTS > 1
+    // Called after SRAT normalization and pinned allocations. Identity
+    // fallback is already safe; an active transform must still round-trip
+    // the canonical map, rather than applying the transform a second time.
+    return !map_numa_memory_range || numa_transform_ranges_valid(highest_map_bit, true);
+#else
+    return true;
+#endif
+}
+
 #else
 void check_if_needs_to_map(void)
 {
@@ -1134,19 +1494,154 @@ void check_if_needs_to_map(void)
     //
     return;
 }
+
+bool smp_numa_transform_valid(void)
+{
+    return true;
+}
 #endif
 
 //------------------------------------------------------------------------------
 // Public Functions
 //------------------------------------------------------------------------------
 
+#if VMEM_MAX_CONTEXTS > 1
+#if defined(__x86_64__)
+// CPUID leaf 0x1F (extended topology), with the legacy 0xB fallback: the
+// SMT and core level shifts, plus the shift of the first level above the
+// core (the core group). The grouping is by APIC-ID bit position and is
+// deliberately vendor-neutral: AMD CCD/CCX and Intel die/module alike, the
+// level's type name is not assumed.
+// Scans the topology subleaves of the given leaf for the SMT and core
+// level shifts. Returns true when both were found.
+static bool x86_scan_topology_shifts(uint32_t leaf, int *smt_shift, int *core_shift)
+{
+    uint32_t eax, ebx, ecx, edx;
+    int smt = -1, core = -1;
+    for (int sub = 0; sub < 32; sub++) {
+        cpuid(leaf, sub, &eax, &ebx, &ecx, &edx);
+        // CPUID topology leaves encode the shift in EAX[4:0] and the level
+        // type in ECX[15:8]: 0 = end of the enumeration, 1 = SMT, 2 = core,
+        // then the higher levels (the same values the cpuid.c topology
+        // decoder reads from the same field).
+        int shift = eax & 0x1F;
+        int type = (ecx >> 8) & 0xFF;
+        if (type == 0) {
+            // The end-of-enumeration marker.
+            break;
+        } else if (type == 1) {
+            smt = shift;
+        } else if (type == 2) {
+            core = shift;
+        }
+    }
+    if (smt < 0 || core < 0) {
+        return false;
+    }
+    *smt_shift = smt;
+    *core_shift = core;
+    return true;
+}
+
+static void x86_topology_decompose(void)
+{
+    if (cpuid_info.topology.is_hybrid) {
+        // P/E hybrids use different SMT shifts per core type, so a single
+        // decomposition would mis-group the cores; use the ordinal policy.
+        return;
+    }
+    int smt_shift, core_shift;
+    // A basic leaf above the maximum returns the highest supported leaf's
+    // data rather than zeros, so guard 0x1F like the 0xB retry; a present
+    // but empty 0x1F still falls through to the legacy leaf.
+    if ((cpuid_info.max_cpuid < 0x1F || !x86_scan_topology_shifts(0x1F, &smt_shift, &core_shift))
+     && (cpuid_info.max_cpuid < 0xB  || !x86_scan_topology_shifts(0xB,  &smt_shift, &core_shift))) {
+        // No usable topology data; the ordinal policy applies.
+        return;
+    }
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        uint32_t apic_id = cpu_num_to_apic_id[cpu];
+        cpu_topo_id[cpu].smt_id = (smt_shift > 0) ? (int)(apic_id & ((1u << smt_shift) - 1)) : 0;
+        cpu_topo_id[cpu].core_id = (int)(apic_id >> smt_shift);
+        // The core group (CCD/CCX/die) is the APIC-ID region above the core
+        // level, so its id comes from the core shift; using the next
+        // level's shift would collapse the whole package into one group.
+        cpu_topo_id[cpu].core_group_id = (int)(apic_id >> core_shift);
+    }
+    cpu_topo_data_available = true;
+}
+#elif defined(__aarch64__)
+// The MPIDR affinity fields (fixed architecture layout): depending on the
+// MT bit, Aff0 denotes either an SMT thread (MT=1) or the core (MT=0).
+static void aarch64_topology_decompose(void)
+{
+    // The MPIDR MT bit (whether Aff0 denotes an SMT thread or the core) is
+    // not preserved by the affinity-masked stored values, so read it from
+    // the BSP's own MPIDR; the MT flag is a uniform system property.
+    bool mt = (read_sysreg(mpidr_el1) & MPIDR_MT_BIT) != 0;
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        uint64_t mpidr = cpu_num_to_apic_id[cpu];
+        if (mt) {
+            // Aff0 = thread, Aff1 = core, Aff2+ = the core group.
+            cpu_topo_id[cpu].smt_id = (int)(mpidr & 0xFF);
+            cpu_topo_id[cpu].core_id = (int)(mpidr >> 8);
+            cpu_topo_id[cpu].core_group_id = (int)(mpidr >> 16);
+        } else {
+            // No SMT: Aff0 = core, Aff1+ = the core group.
+            cpu_topo_id[cpu].smt_id = 0;
+            cpu_topo_id[cpu].core_id = (int)(mpidr & 0xFF);
+            cpu_topo_id[cpu].core_group_id = (int)(mpidr >> 8);
+        }
+    }
+    cpu_topo_data_available = true;
+}
+#elif defined(__loongarch_lp64)
+// LoongArch has no SMT. The core-group (cluster) encoding of the MADT
+// core IDs / CPUCFG leaf 0x10 is not yet identified against the PRM, so
+// the decomposition data stays unavailable and the ordinal policy applies.
+static void loongarch_topology_decompose(void)
+{
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        cpu_topo_id[cpu].smt_id = 0;
+        cpu_topo_id[cpu].core_id = (int)cpu_num_to_apic_id[cpu];
+        cpu_topo_id[cpu].core_group_id = 0;
+    }
+}
+#endif
+
+void smp_decompose_topology(void)
+{
+#if defined(__x86_64__)
+    x86_topology_decompose();
+#elif defined(__aarch64__)
+    aarch64_topology_decompose();
+#elif defined(__loongarch_lp64)
+    loongarch_topology_decompose();
+#endif
+}
+#endif
+
 void smp_init(bool smp_enable)
 {
+#if VMEM_MAX_CONTEXTS > 1
     for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_proximity_domain_idx)); i++) {
         cpu_num_to_proximity_domain_idx[i] = 0;
     }
+#endif
     for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_apic_id)); i++) {
         cpu_num_to_apic_id[i] = 0;
+    }
+#if defined(__aarch64__) && VMEM_MAX_CONTEXTS > 1
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_acpi_uid)); i++) {
+        cpu_num_to_acpi_uid[i] = 0;
+    }
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_uid_assigned)); i++) {
+        cpu_num_to_uid_assigned[i] = false;
+    }
+#endif
+#if VMEM_MAX_CONTEXTS > 1
+    for (int i = 0; i < (int)(ARRAY_SIZE(cpu_num_to_domain_assigned)); i++) {
+        cpu_num_to_domain_assigned[i] = false;
     }
 
     for (int i = 0; i < (int)(ARRAY_SIZE(memory_affinity_ranges)); i++) {
@@ -1154,18 +1649,17 @@ void smp_init(bool smp_enable)
         memory_affinity_ranges[i].start = 0;
         memory_affinity_ranges[i].end = 0;
     }
-
-    for (int i = 0; i < (int)(ARRAY_SIZE(cpus_in_proximity_domain)); i++) {
-        cpus_in_proximity_domain[i] = 0;
-    }
+#endif
 
     for (int i = 0; i < (int)(ARRAY_SIZE(used_cpus_in_proximity_domain)); i++) {
         used_cpus_in_proximity_domain[i] = 0;
     }
 
     num_available_cpus = 1;
+#if VMEM_MAX_CONTEXTS > 1
     num_memory_affinity_ranges = 0;
     num_proximity_domains = 0;
+#endif
 
 #if defined(__i386__) || defined(__x86_64__)
     apic_x2apic = false;
@@ -1195,22 +1689,31 @@ void smp_init(bool smp_enable)
 #endif
     }
 
+#if VMEM_MAX_CONTEXTS > 1
     if (smp_enable) {
-        if (find_numa_nodes_in_srat()) {
+        int srat_status = find_numa_nodes_in_srat();
+        if (srat_status > 0) {
             check_if_needs_to_map();
-        } else {
-            // Do nothing.
+            // Sort and validate after any architecture-specific range
+            // transform; ambiguous ownership disables NUMA entirely.
+            if (!sort_and_validate_memory_affinity_ranges()) {
+                srat_status = 0;
+            }
+        }
+        if (srat_status <= 0) {
+            // Do not keep partially accumulated topology state: NUMA must
+            // never run with inconsistent CPU/memory ownership.
+            num_proximity_domains = 0;
+            num_memory_affinity_ranges = 0;
+            smp_topology_too_large = (srat_status < 0);
         }
     }
+#endif
 
-    for (int i = 0; i < num_available_cpus; i++) {
-        uint32_t proximity_domain_idx = cpu_num_to_proximity_domain_idx[i];
-        cpus_in_proximity_domain[proximity_domain_idx]++;
-    }
 
-    // Allocate a page of low memory for AP trampoline and sync objects.
-    // These need to remain pinned in place during relocation.
-    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
+    // Allocate two pages of low memory for the AP trampoline and sync
+    // objects. These need to remain pinned in place during relocation.
+    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, SYNC_ARENA_PAGES * PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
 #if defined(__i386__) || defined(__x86_64__)
     alloc_addr = HEAP_BASE_ADDR + (ap_trampoline_end - ap_trampoline);
@@ -1313,62 +1816,77 @@ int smp_my_cpu_num(void)
 #endif
 }
 
+#if VMEM_MAX_CONTEXTS > 1
 uint32_t smp_get_proximity_domain_idx(int cpu_num)
 {
     return num_available_cpus > 1 ? cpu_num_to_proximity_domain_idx[cpu_num] : 0;
 }
+#endif
 
+// Computes the first span, limited to a single proximity domain, of the given
+// memory range. The memory-affinity ranges are sorted by (start, end): a
+// range that starts after the query is proof of an uncovered gap, so a gap
+// never falls through to be misattributed to a later range.
+#if VMEM_MAX_CONTEXTS > 1
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end)
 {
     for (int i = 0; i < num_memory_affinity_ranges; i++) {
         uint64_t range_start = memory_affinity_ranges[i].start;
         uint64_t range_end = memory_affinity_ranges[i].end;
 
-        if (start >= range_start) {
-            if (start < range_end) {
-                if (end <= range_end) {
-                    // range_start start end range_end.
-                    // The given vm_map range is entirely within a single memory affinity range. Nothing to split.
-                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
-                    *new_start = start;
-                    *new_end = end;
-                    return 1;
-                } else {
-                    // range_start start range_end end.
-                    // The given vm_map range needs to be shortened.
-                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
-                    *new_start = start;
-                    *new_end = range_end;
-                    return 1;
-                }
-            } else {
-                // range_start range_end start end
-                // Do nothing, skip to next memory affinity range.
-            }
-        } else {
-            if (end < range_start) {
-                // start end range_start range_end.
-                // Do nothing, skip to next memory affinity range.
-            } else {
-                if (end <= range_end) {
-                    // start range_start end range_end.
-                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
-                    *new_start = start;
-                    *new_end = range_start;
-                    return 1;
-                } else {
-                    // start range_start range_end end.
-                    *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
-                    *new_start = start;
-                    *new_end = range_start;
-                    return 1;
-                }
-            }
+        if (range_end <= start) {
+            // The range lies entirely before the query.
+            continue;
         }
+        if (range_start >= end) {
+            // Sorted ranges: no further range can intersect the query.
+            break;
+        }
+        if (start < range_start) {
+            // [start, range_start) is an uncovered gap, not memory of this
+            // range. The caller falls back to legacy topology-agnostic
+            // handling for the remaining span.
+            return 0;
+        }
+        // range_start <= start < range_end: the query overlaps this range.
+        *proximity_domain_idx = memory_affinity_ranges[i].proximity_domain_idx;
+        *new_start = start;
+        *new_end = end <= range_end ? end : range_end;
+        return 1;
     }
-    // If we come here, we haven't found a proximity domain which contains the given range. That shouldn't happen !
+    // No range intersects the query.
     return 0;
 }
+#endif
+
+// Returns true if the given proximity-domain index owns at least one
+// accepted SRAT memory range.
+#if VMEM_MAX_CONTEXTS > 1
+bool smp_domain_has_memory(uint32_t domain_idx)
+{
+    return smp_domain_memory_pieces_in_range(domain_idx, 0, UINTPTR_MAX) != 0;
+}
+#endif
+
+// Returns the number of the given domain's SRAT range pieces intersecting
+// the given page range; each intersection is one vm_map segment.
+#if VMEM_MAX_CONTEXTS > 1
+uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page)
+{
+    uint32_t pieces = 0;
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        if (memory_affinity_ranges[i].proximity_domain_idx != domain_idx) {
+            continue;
+        }
+        uint64_t s = memory_affinity_ranges[i].start >> PAGE_SHIFT;
+        uint64_t e = memory_affinity_ranges[i].end >> PAGE_SHIFT;
+        if (s < end_page && e > start_page) {
+            pieces++;
+        }
+    }
+    return pieces;
+}
+#endif
 
 #if 0
 void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end)
@@ -1379,16 +1897,29 @@ void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_
 }
 #endif
 
-barrier_t *smp_alloc_barrier(int num_threads)
+barrier_t *smp_alloc_barriers_(unsigned int num_barriers, unsigned int num_threads)
 {
-    barrier_t *barrier = (barrier_t *)(alloc_addr);
-    alloc_addr += sizeof(barrier_t);
-    barrier_init(barrier, num_threads);
-    return barrier;
+    size_t size = (size_t)num_barriers * sizeof(barrier_t);
+    if (alloc_addr + size > SYNC_ARENA_LIMIT) {
+        // Do not overwrite adjacent low memory; report exhaustion so the
+        // caller can disable SMP/NUMA_PAR cleanly.
+        alloc_addr = SYNC_ARENA_LIMIT;
+        return NULL;
+    }
+    barrier_t *barriers = (barrier_t *)(alloc_addr);
+    alloc_addr += size;
+    for (unsigned int i = 0; i < num_barriers; i++) {
+        barrier_init(&barriers[i], num_threads);
+    }
+    return barriers;
 }
 
 spinlock_t *smp_alloc_mutex()
 {
+    if (alloc_addr + sizeof(spinlock_t) > SYNC_ARENA_LIMIT) {
+        // A shared global lock remains correct if the arena is exhausted.
+        return &fallback_mutex;
+    }
     spinlock_t *mutex = (spinlock_t *)(alloc_addr);
     alloc_addr += sizeof(spinlock_t);
     spin_unlock(mutex);

@@ -392,11 +392,12 @@ static void slog(const char *event, const char *fmt, ...)
     slog_end(pos);
 }
 
-static int slog_pct(int ticks, int total)
+static int slog_pct(uint64_t ticks, uint64_t total)
 {
     if (total <= 0) return 0;
-    int pct = 100 * ticks / total;
-    return pct > 100 ? 100 : pct;
+    if (ticks >= total) return 100;
+    // The pre-clamp keeps the 100 * ticks product within 64 bits.
+    return (int)((100 * ticks) / total);
 }
 
 //------------------------------------------------------------------------------
@@ -618,6 +619,23 @@ void serial_log_event(slog_event_t event)
     }
 }
 
+// Emits the wave-binding event so the machine-parseable serial log stays
+// unambiguous with concurrent contexts. Called by CPU 0 at WAVE_BIND.
+void serial_log_wave_bind(int wave, unsigned int num_contexts)
+{
+    if (!log_running) return;
+    slog("wave_bind", " wave=%i contexts=%u", wave, num_contexts);
+}
+
+// Emits the terminal status of a context at a wave boundary, with its wave
+// and domain identity while the binding is still valid.
+void serial_log_context_end(int wave, int context, int domain, int status)
+{
+    if (!log_running) return;
+    slog("context_end", " wave=%i context=%i domain=%i status=%i",
+         wave, context, domain, status);
+}
+
 void serial_log_tick(void)
 {
     if (!log_running || clks_per_msec == 0) return;
@@ -630,7 +648,29 @@ void serial_log_tick(void)
     next_log_time = now + SERIAL_LOG_INTERVAL * 1000 * (uint64_t)clks_per_msec;
 
     // Same progress calculation as do_tick(), from our own tick counters.
+    // In NUMA_PAR the shared aggregate work counters replace the tick counts.
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
+
+    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+        // The test percentage is whole-test progress; the pass percentage
+        // uses the pass-cumulative bases. The jobs field reports how many
+        // execution contexts have exhausted their windows, so a serial log
+        // reader can tell whether the remaining time is a tail wait.
+        uint64_t done = __atomic_load_n(&test_work_done, __ATOMIC_ACQUIRE);
+        unsigned int jobs = num_bound_execution_contexts;
+        unsigned int done_jobs = 0;
+        for (unsigned int c = 0; c < jobs; c++) {
+            if (test_contexts[c].windows_exhausted) {
+                done_jobs++;
+            }
+        }
+        slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i jobs=%u/%u errors=%u",
+             pass_num, slog_pct(done, pass_work_expected),
+             test_num, slog_pct(done - test_work_done_base,
+                                test_work_expected),
+             (uintptr_t)done_jobs, (uintptr_t)jobs, (uintptr_t)error_count);
+        return;
+    }
 
     slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
          pass_num, slog_pct(log_pass_ticks, ticks_per_pass[pass_type]),

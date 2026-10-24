@@ -56,7 +56,7 @@ typedef enum {
     }
 
 #define display_cpu_addr_mode(str) \
-    prints(4, 75, str)
+    display_footer_addr_mode(str)
 
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))
@@ -133,7 +133,7 @@ typedef enum {
 
 #define display_active_cpu(cpu_num) \
     prints(8, 7, "Core #"); \
-    printi(8, 13, cpu_num, 3, false, true)
+    printi(8, 13, cpu_num, 4, false, true)
 
 #define display_all_active() \
     prints(8, 7, "All Cores")
@@ -167,14 +167,16 @@ typedef enum {
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
         printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
+        display_test_stage_field(); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 1); \
         printf(4, 39, __VA_ARGS__); \
+        display_test_stage_field(); \
     }
 
 #define display_test_pattern_name(str) \
@@ -277,6 +279,65 @@ void display_big_status(bool pass);
 void restore_big_status(void);
 
 void check_input(void);
+
+/**
+ * Resets the once-per-second UI ownership to context 0. Called by the
+ * scheduler at each wave binding.
+ */
+void display_reset_ui_owner(void);
+
+/**
+ * Runs the once-per-second timed UI and hardware/error updates, for paths
+ * that own the screen without a context barrier (e.g. the NUMA_PAR
+ * global-once bit-fade delay on CPU 0).
+ */
+void update_timed_ui(void);
+
+/**
+ * Renders NUMA_PAR aggregate progress from the shared work counters: the
+ * test fields use the current stage, the pass fields the cumulative bases.
+ */
+void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_done, uint64_t pass_expected);
+
+/**
+ * Renders one progress percentage and advances the matching bar, owning the
+ * bar state in this translation unit.
+ */
+void display_test_progress(int pct);
+
+void display_pass_progress(int pct);
+
+/**
+ * Sets the stage shown in the right-aligned "Stg xx/yy" field of the
+ * Testing line, and redraws the field. Called once per stage start.
+ */
+void display_test_stage(int stage, int stages);
+
+/**
+ * Redraws the stage field after a Testing-line value update; a no-op when
+ * the current test has a single stage.
+ */
+void display_test_stage_field(void);
+
+/**
+ * NUMA_PAR Testing line: draws the current window and cumulative progress of
+ * the laggard execution context (the one with the least fraction of its
+ * non-empty windows done), plus the active job count. Only the laggard's
+ * master actually draws.
+ */
+void display_test_addresses_numa(void);
+
+/**
+ * Draws the footer version block (version, hash, architecture suffix and
+ * the 32-bit PAE/LM indicator). Called at init and after the footer prompt
+ * is cleared, so the block survives the scroll-lock prompt.
+ */
+void display_footer_version(void);
+
+/**
+ * Draws the 32-bit addressing-mode indicator in the footer, in red.
+ */
+void display_footer_addr_mode(const char *str);
 
 void set_scroll_lock(bool enabled);
 

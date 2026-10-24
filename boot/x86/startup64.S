@@ -188,7 +188,45 @@ startup:
 	addq	$0x3, %rax
 	movq	%rax, 24(%rdx)
 
-	# Set the page directory base address.
+	# Rebase the calling CPU's paging context. Context 0 is the identity
+	# mapped control context used by the AP trampoline and parked CPUs and
+	# was rebuilt above; its entries are copied verbatim for any other
+	# context, with the per-context PDP/PD2 roots substituted.
+	#
+	# This runs before BSS is cleared and before the first relocation, so
+	# it may only rely on initialized data: num_bound_execution_contexts
+	# is 1 in .data, which clamps every unbound CPU to context 0, and
+	# run_at() memmoves the whole live image, so both copies carry
+	# identical live BSS until the stale copy is memory-tested.
+
+	call	smp_my_cpu_num
+	movl	%eax, %edi
+	call	execution_context_for_cpu
+	shlq	$12, %rax
+	movq	%rax, %rbx			# byte offset of selected context
+
+	leaq	pml4(%rip), %rcx
+	addq	%rbx, %rcx
+	leaq	pdp(%rip), %rdx
+	addq	%rbx, %rdx
+	leaq	pd2(%rip), %r9
+	addq	%rbx, %r9
+
+	leaq	0x3(%rdx), %rax
+	movq	%rax, 0(%rcx)
+	leaq	pd0(%rip), %rax
+	addq	$0x3, %rax
+	movq	%rax, 0(%rdx)
+	leaq	pd1(%rip), %rax
+	addq	$0x3, %rax
+	movq	%rax, 8(%rdx)
+	leaq	0x3(%r9), %rax
+	movq	%rax, 16(%rdx)
+	leaq	pd3(%rip), %rax
+	addq	$0x3, %rax
+	movq	%rax, 24(%rdx)
+
+	# Load the calling CPU's context root.
 
 	movq	%rcx, %cr3
 
@@ -551,24 +589,30 @@ gdt_end:
 	.align	4096
 	.globl	pml4
 pml4:
-	.quad	0			# filled in at run time
+	.rept	VMEM_MAX_CONTEXTS
+		.quad	0			# filled in at run time
+		.fill	511, 8, 0
+	.endr
 
 # Page Directory Pointer Table:
-# 4 Entries, pointing to the Page Directory Tables.
+# 4 Entries per context, pointing to the Page Directory Tables.
 
 	.align	4096
 	.globl	pdp
 pdp:
-	.quad	0			# filled in at run time
-	.quad	0			# filled in at run time
-	.quad	0			# filled in at run time
-	.quad	0			# filled in at run time
+	.rept	VMEM_MAX_CONTEXTS
+		.quad	0			# filled in at run time
+		.quad	0			# filled in at run time
+		.quad	0			# filled in at run time
+		.quad	0			# filled in at run time
+		.fill	508, 8, 0
+	.endr
 
 # Page Directory Tables:
-# There are 4 tables. The first two map the first 2 GB of memory. The third
-# is used with PAE to map the rest of memory in 1 GB segments. The fourth is
-# reserved for mapping the video frame buffer. We use 2 MB pages so only the
-# Page Directory Table is used (no page tables).
+# There are 4 tables per context. The first two map the first 2 GB of memory.
+# The third is used with PAE to map the rest of memory in 1 GB segments. The
+# fourth is reserved for mapping the video frame buffer. We use 2 MB pages so
+# only the Page Directory Table is used (no page tables).
 
 	.align	4096
 	.globl	pd0
@@ -583,7 +627,9 @@ pd1:
 	.align	4096
 	.globl	pd2
 pd2:
-	ptes512	0x0000000080000000, 0x0000000000000083
+	.rept	VMEM_MAX_CONTEXTS
+		ptes512	0x0000000080000000, 0x0000000000000083
+	.endr
 
 	.align	4096
 	.globl	pd3

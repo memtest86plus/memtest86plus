@@ -9,6 +9,7 @@
 #include "boot.h"
 
 #include "cpuid.h"
+#include "smp.h"
 
 #include "vmem.h"
 
@@ -64,7 +65,28 @@ uintptr_t map_region(uintptr_t base_addr, size_t size __attribute__((unused)), b
     }
 }
 
-bool map_window(uintptr_t start_page __attribute__((unused)))
+bool vmem_prepare_execution_contexts(int num_contexts)
+{
+    // LoongArch64 uses DMW/direct addressing with one shared mapping
+    // configuration; there is no per-context translation root. NUMA_PAR is
+    // only safe when the NUMA address transform cannot alias two teams.
+    if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
+        return false;
+    }
+    return smp_numa_transform_valid();
+}
+
+void vmem_rebase_execution_context(int context_id __attribute__((unused)))
+{
+    // The shared direct mapping has no per-context roots to re-point.
+}
+
+void vmem_select_execution_context(int context_id __attribute__((unused)))
+{
+    // The shared direct mapping has no per-context root to select.
+}
+
+bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
 {
     return true;
 }
@@ -76,7 +98,7 @@ void *first_word_mapping(uintptr_t page)
     if (map_numa_memory_range == true) {
         if ((page >> (highest_map_bit - PAGE_SHIFT)) & 0xF) {
             uintptr_t alias = (((uintptr_t)(page >> (highest_map_bit - PAGE_SHIFT)) & 0xF) << 32) ;
-            alias |= page & ~(0xF << (highest_map_bit - PAGE_SHIFT));
+            alias |= page & ~(0xFULL << (highest_map_bit - PAGE_SHIFT));
             result = (void *)(alias << PAGE_SHIFT);
         } else {
             result = (void *)(page << PAGE_SHIFT);
@@ -92,8 +114,9 @@ void *last_word_mapping(uintptr_t page, size_t word_size)
     return (uint8_t *)first_word_mapping(page) + (PAGE_SIZE - word_size);
 }
 
-uintptr_t page_of(void *addr)
+uintptr_t page_of(void *addr, int context_id)
 {
+    (void)context_id;
     uintptr_t page = (uintptr_t)addr >> PAGE_SHIFT;
     return page;
 }

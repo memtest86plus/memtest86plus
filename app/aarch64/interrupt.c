@@ -88,36 +88,45 @@ static const char *exception_class_name(uint64_t esr)
 
 void interrupt(struct trap_regs *trap_regs)
 {
-    spin_lock(error_mutex);
+    // Never block on the error mutex: the interrupted CPU may already hold
+    // it (e.g. inside the error reporting path), which would self-deadlock.
+    // Render the register dump only when both the error and UI locks can be
+    // acquired; the reboot prompt below always runs.
+    if (spin_trylock(error_mutex)) {
+        if (spin_trylock(ui_mutex)) {
+            clear_message_area();
 
-    clear_message_area();
+            display_pinned_message(0, 0, "Unexpected exception on CPU %i", smp_my_cpu_num());
+            display_pinned_message(2, 0, "Type: %s %s (%s)", vector_type_name[trap_regs->vec & 0x3],
+                                                             vector_origin_name[(trap_regs->vec >> 2) & 0x3],
+                                                             exception_class_name(trap_regs->esr));
+            display_pinned_message(3, 0, "  PC: %016x", (uintptr_t)trap_regs->elr);
+            display_pinned_message(4, 0, " FAR: %016x", (uintptr_t)trap_regs->far);
+            display_pinned_message(5, 0, " ESR: %016x", (uintptr_t)trap_regs->esr);
+            display_pinned_message(6, 0, "SPSR: %016x", (uintptr_t)trap_regs->spsr);
 
-    display_pinned_message(0, 0, "Unexpected exception on CPU %i", smp_my_cpu_num());
-    display_pinned_message(2, 0, "Type: %s %s (%s)", vector_type_name[trap_regs->vec & 0x3],
-                                                     vector_origin_name[(trap_regs->vec >> 2) & 0x3],
-                                                     exception_class_name(trap_regs->esr));
-    display_pinned_message(3, 0, "  PC: %016x", (uintptr_t)trap_regs->elr);
-    display_pinned_message(4, 0, " FAR: %016x", (uintptr_t)trap_regs->far);
-    display_pinned_message(5, 0, " ESR: %016x", (uintptr_t)trap_regs->esr);
-    display_pinned_message(6, 0, "SPSR: %016x", (uintptr_t)trap_regs->spsr);
+            display_pinned_message(3, 25,  "LR: %016x", (uintptr_t)trap_regs->x[30]);
+            display_pinned_message(4, 25,  "SP: %016x", (uintptr_t)trap_regs->sp);
+            display_pinned_message(5, 25,  "X0: %016x", (uintptr_t)trap_regs->x[0]);
+            display_pinned_message(6, 25,  "X1: %016x", (uintptr_t)trap_regs->x[1]);
+            display_pinned_message(7, 25,  "X2: %016x", (uintptr_t)trap_regs->x[2]);
+            display_pinned_message(8, 25,  "X3: %016x", (uintptr_t)trap_regs->x[3]);
+            display_pinned_message(9, 25,  "X4: %016x", (uintptr_t)trap_regs->x[4]);
+            display_pinned_message(10, 25, "X5: %016x", (uintptr_t)trap_regs->x[5]);
+            display_pinned_message(11, 25, "X6: %016x", (uintptr_t)trap_regs->x[6]);
+            display_pinned_message(12, 25, "X7: %016x", (uintptr_t)trap_regs->x[7]);
+            display_pinned_message(13, 25, "X8: %016x", (uintptr_t)trap_regs->x[8]);
 
-    display_pinned_message(3, 25,  "LR: %016x", (uintptr_t)trap_regs->x[30]);
-    display_pinned_message(4, 25,  "SP: %016x", (uintptr_t)trap_regs->sp);
-    display_pinned_message(5, 25,  "X0: %016x", (uintptr_t)trap_regs->x[0]);
-    display_pinned_message(6, 25,  "X1: %016x", (uintptr_t)trap_regs->x[1]);
-    display_pinned_message(7, 25,  "X2: %016x", (uintptr_t)trap_regs->x[2]);
-    display_pinned_message(8, 25,  "X3: %016x", (uintptr_t)trap_regs->x[3]);
-    display_pinned_message(9, 25,  "X4: %016x", (uintptr_t)trap_regs->x[4]);
-    display_pinned_message(10, 25, "X5: %016x", (uintptr_t)trap_regs->x[5]);
-    display_pinned_message(11, 25, "X6: %016x", (uintptr_t)trap_regs->x[6]);
-    display_pinned_message(12, 25, "X7: %016x", (uintptr_t)trap_regs->x[7]);
-    display_pinned_message(13, 25, "X8: %016x", (uintptr_t)trap_regs->x[8]);
+            display_pinned_message(0, 50, "Stack:");
+            for (int i = 0; i < 12; i++) {
+                uintptr_t addr = trap_regs->sp + sizeof(uint64_t)*(11 - i);
+                uint64_t data = *(uint64_t *)addr;
+                display_pinned_message(1 + i, 50, "%012x %016x", addr, (uintptr_t)data);
+            }
 
-    display_pinned_message(0, 50, "Stack:");
-    for (int i = 0; i < 12; i++) {
-        uintptr_t addr = trap_regs->sp + sizeof(uint64_t)*(11 - i);
-        uint64_t data = *(uint64_t *)addr;
-        display_pinned_message(1 + i, 50, "%012x %016x", addr, (uintptr_t)data);
+            spin_unlock(ui_mutex);
+        }
+        spin_unlock(error_mutex);
     }
 
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);

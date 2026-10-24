@@ -102,7 +102,9 @@ bool            enable_sm          = true;
 bool            enable_spd_crc     = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
-bool            enable_numa        = false;
+numa_mode_t     numa_mode          = NUMA_OFF;
+numa_pick_policy_t numa_core_pick_policy = NUMA_PICK_ORDINAL;
+int             numa_cores_per_domain = 0;
 
 bool            enable_ecc_polling = false;
 
@@ -358,10 +360,76 @@ static void parse_option(const char *option, const char *params)
         smp_enabled = false;
     } else if (strncmp(option, "nospdcrc", 9) == 0) {
         enable_spd_crc = false;
-    } else if (strncmp(option, "numa", 5) == 0) {
-        enable_numa = true;
-    } else if (strncmp(option, "nonuma", 7) == 0) {
-        enable_numa = false;
+    } else if (strncmp(option, "numa", 4) == 0 && option[4] == '\0') {
+        // Each numa= option establishes the complete NUMA configuration
+        // atomically: the mode, plus the optional "policy,N" suffix (at
+        // most N selected cores per proximity domain). Any unrecognised
+        // or malformed form resets the whole configuration.
+        numa_cores_per_domain = 0;
+        numa_core_pick_policy = NUMA_PICK_ORDINAL;
+        char *comma = NULL;
+        for (char *p = (char *)params; *p; p++) {
+            if (*p == ',') {
+                comma = p;
+                break;
+            }
+        }
+        size_t mode_len = comma ? (size_t)(comma - params) : strlen(params);
+        bool mode_accepts_subset = false;
+        if (mode_len == 3 && strncmp(params, "off", 3) == 0) {
+            numa_mode = NUMA_OFF;
+        } else if (mode_len == 3 && strncmp(params, "par", 3) == 0 && VMEM_MAX_CONTEXTS > 1) {
+            numa_mode = NUMA_PAR;
+            mode_accepts_subset = true;
+        } else if (mode_len == 2 && strncmp(params, "on", 2) == 0) {
+            numa_mode = NUMA_ON;
+            mode_accepts_subset = true;
+        } else if (mode_len == 0) {
+            // Bare "numa" keeps its legacy meaning: enable NUMA-aware
+            // placement.
+            numa_mode = NUMA_ON;
+        } else {
+            // An unrecognised mode resets NUMA to off, rather than silently
+            // enabling it (e.g. a typo such as "numa=oon").
+            numa_mode = NUMA_OFF;
+        }
+        if (comma && mode_accepts_subset) {
+            // Suffix grammar: {ordinal|topology},N
+            char *policy_end = NULL;
+            for (char *p = comma + 1; *p; p++) {
+                if (*p == ',') {
+                    policy_end = p;
+                    break;
+                }
+            }
+            if (policy_end) {
+                size_t policy_len = (size_t)(policy_end - (comma + 1));
+                bool ordinal = policy_len == 7 && strncmp(comma + 1, "ordinal", 7) == 0;
+                bool topology = policy_len == 8 && strncmp(comma + 1, "topology", 8) == 0;
+                const char *n = policy_end + 1;
+                const char *p = n;
+                unsigned int value = 0;
+                bool digits = false;
+                bool too_large = false;
+                while (*p >= '0' && *p <= '9') {
+                    digits = true;
+                    unsigned int digit = (unsigned int)(*p - '0');
+                    if (value > (unsigned int)MAX_CPUS / 10
+                     || (value == (unsigned int)MAX_CPUS / 10 && digit > (unsigned int)MAX_CPUS % 10)) {
+                        too_large = true;
+                        break;
+                    }
+                    value = value * 10 + digit;
+                    p++;
+                }
+                if ((ordinal || topology) && digits && *p == '\0' && !too_large && value > 0 && value <= MAX_CPUS) {
+                    numa_core_pick_policy = ordinal ? NUMA_PICK_ORDINAL : NUMA_PICK_TOPOLOGY;
+                    numa_cores_per_domain = (int)value;
+                }
+            }
+        }
+    } else if (strncmp(option, "nonuma", 6) == 0 && option[6] == '\0') {
+        numa_mode = NUMA_OFF;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             power_save = POWER_SAVE_OFF;
@@ -486,7 +554,7 @@ static void display_selection_header(int row, int max_num, int offset)
         printc(row, POP_LM+30, 0x19);
     }
     row++;
-    printi(row, POP_LM-2, offset, 3, false, false);
+    printi(row, POP_LM-2, offset, 4, false, false);
     offset++;
     for (i = 1; i < SEL_W && offset < max_num; i++) {
         printc(row, POP_LM+i, i%8 || (max_num < 16) ? 0xc4 : 0xc2);
@@ -504,7 +572,7 @@ static void display_selection_header(int row, int max_num, int offset)
             offset++;
         }
     }
-    printi(row, POP_LM+i, offset, 3, false, true);
+    printi(row, POP_LM+i, offset, 4, false, true);
 }
 
 static void display_enabled(int row, int n, bool enabled)
@@ -702,6 +770,11 @@ static void address_range_menu(void)
 
 static void set_cpu_mode(cpu_mode_t mode)
 {
+    if (mode != PAR && VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR) {
+        // Selecting a legacy sequencing mode suspends NUMA_PAR; legacy NUMA
+        // placement may still apply. Selecting Parallel (PAR) keeps it.
+        numa_mode = NUMA_ON;
+    }
     printc(POP_R+3+cpu_mode, POP_LM, ' ');
     cpu_mode = mode;
     printc(POP_R+3+cpu_mode, POP_LM, '*');

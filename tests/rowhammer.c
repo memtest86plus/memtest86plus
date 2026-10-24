@@ -81,6 +81,12 @@ static const rh_pattern_t rh_static_patterns[] = {
 };
 #define RH_NUM_STATIC ((int)(sizeof(rh_static_patterns) / sizeof(rh_static_patterns[0])))
 
+// Per-execution-context materialised aggressor sequence. Kept off the stack:
+// under NUMA_PAR an AP (2 KiB stack) runs this test, and test_rowhammer()'s
+// frame plus the do_tick()/UI chain overflows it. Contexts are disjoint and
+// rowhammer is a ONE-mode test, so one slot per context is safe.
+static void *rh_seq[VMEM_MAX_CONTEXTS][RH_MAX_PERIOD];
+
 //------------------------------------------------------------------------------
 // Portable hammer engine (i586 + LoongArch; x86-64 uses tests/x86/rowhammer_x86.c)
 //------------------------------------------------------------------------------
@@ -426,6 +432,7 @@ static void rh_fuzz_pattern(testword_t *state, rh_pattern_t *pat, uint32_t perio
 
 int test_rowhammer(int my_cpu, int time_budget_secs)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     rh_engine_init();
@@ -436,8 +443,8 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
 
     // Total testable bytes across the segments mapped in this window.
     uintptr_t total_bytes = 0;
-    for (int s = 0; s < vm_map_size; s++) {
-        total_bytes += ((uintptr_t)vm_map[s].end - (uintptr_t)vm_map[s].start) + sizeof(testword_t);
+    for (int s = 0; s < vm_map_size[context]; s++) {
+        total_bytes += ((uintptr_t)vm_map[context][s].end - (uintptr_t)vm_map[context][s].start) + sizeof(testword_t);
     }
     if (total_bytes < sizeof(testword_t)) {
         for (int i = 0; i < RH_SITES; i++) {
@@ -449,15 +456,15 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
         return ticks;
     }
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master(my_cpu)) {
         display_test_stage_description("Rowhammer %s, %is/window",
             rh_engine_precise() ? "hammer" : "coarse", time_budget_secs);
     }
 
     // Per-window row-stride discovery and activation-period calibration, using
     // the first segment's base as the timing probe. Skipped on the dummy run.
-    uintptr_t probe    = (uintptr_t)vm_map[0].start;
-    uintptr_t seg0_end = (uintptr_t)vm_map[0].end + sizeof(testword_t);
+    uintptr_t probe    = (uintptr_t)vm_map[context][0].start;
+    uintptr_t seg0_end = (uintptr_t)vm_map[context][0].end + sizeof(testword_t);
     uintptr_t discovered = 0;
     uint32_t  period     = RH_DEFAULT_PERIOD;
     if (my_cpu >= 0) {
@@ -489,13 +496,13 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
         // Map site index i to a segment and an aligned base address.
         uintptr_t target = (total_bytes / RH_SITES) * (uintptr_t)i
                          + (total_bytes / RH_SITES) / 2;
-        uintptr_t seg_start = (uintptr_t)vm_map[0].start;
-        uintptr_t seg_end   = (uintptr_t)vm_map[0].end + sizeof(testword_t);
+        uintptr_t seg_start = (uintptr_t)vm_map[context][0].start;
+        uintptr_t seg_end   = (uintptr_t)vm_map[context][0].end + sizeof(testword_t);
         uintptr_t site      = seg_start;
         uintptr_t acc = 0;
-        for (int s = 0; s < vm_map_size; s++) {
-            uintptr_t ss = (uintptr_t)vm_map[s].start;
-            uintptr_t se = (uintptr_t)vm_map[s].end + sizeof(testword_t);
+        for (int s = 0; s < vm_map_size[context]; s++) {
+            uintptr_t ss = (uintptr_t)vm_map[context][s].start;
+            uintptr_t se = (uintptr_t)vm_map[context][s].end + sizeof(testword_t);
             uintptr_t sb = se - ss;
             if (target < acc + sb) {
                 seg_start = ss;
@@ -526,7 +533,7 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
                 pat = &rh_static_patterns[iter % RH_NUM_STATIC];
             }
 
-            void *seq[RH_MAX_PERIOD];
+            void **seq = rh_seq[context];
             uint32_t seq_len = rh_materialize(pat, site, stride, seg_start, seg_end, seq, period);
             if (seq_len == 0) {
                 iter++;
@@ -561,7 +568,11 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
             rh_check(site, stride, vic_off, n_vic, vword, seg_start, seg_end);
 
             iter++;
-        } while (!bail && slice_cyc != 0 && (get_tsc() - site_start) < slice_cyc);
+        // Poll the stop decision atomically (the context status in NUMA_PAR,
+        // the bail flag in legacy modes) to shorten stop latency; the team
+        // still converges through the context barrier at the next do_tick().
+        } while (!test_stop_requested() && slice_cyc != 0
+                 && (get_tsc() - site_start) < slice_cyc);
 
         do_tick(my_cpu);
         BAILOUT;
