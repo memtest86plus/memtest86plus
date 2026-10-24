@@ -15,6 +15,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "assert.h"
+
 #include "boot.h"
 #include "bootparams.h"
 
@@ -49,6 +51,7 @@
 #include "error.h"
 #include "reports.h"
 #include "test.h"
+
 
 #include "tests.h"
 
@@ -96,7 +99,7 @@ static bool             start_pass = false;
 static bool             start_test = false;
 static bool             rerun_test = false;
 
-static bool             dummy_run  = false;
+static bool dummy_run  = false;
 
 static int              test_stage = 0;
 
@@ -113,7 +116,6 @@ int         num_enabled_cpus = 1;
 int         num_active_cpus = 0;
 int         master_cpu = 0;
 int         window_num = 0;
-bool        numa_run_active = false;
 static uintptr_t window_start = 0;
 static uintptr_t window_end   = 0;
 
@@ -127,6 +129,9 @@ size_t      num_mapped_pages[VMEM_MAX_CONTEXTS];
 
 test_context_t test_contexts[VMEM_MAX_CONTEXTS] = { 0 };
 
+// Per-context barriers, allocated from the pinned synchronization arena.
+static barrier_t *context_barrier = NULL;
+
 int         pass_num = 0;
 int         test_num = 0;
 
@@ -134,6 +139,67 @@ bool        restart = false;
 bool        bail    = false;
 
 uintptr_t   test_addr[MAX_CPUS];
+
+//------------------------------------------------------------------------------
+// NUMA_PAR scheduling state
+//------------------------------------------------------------------------------
+
+// Terminal context statuses; transitions are monotonic within a binding
+// epoch and only CPU 0 reinitializes status after global quiescence.
+enum {
+    CONTEXT_OK = 0,
+    CONTEXT_CANCELLED,
+    CONTEXT_MAP_FAILED,
+    CONTEXT_MAP_OVERFLOW,
+    CONTEXT_TOPOLOGY_FAILED
+};
+
+#define CONTEXT_NONE (-1)
+
+// The set of CPUs that successfully entered the main control loop; fixed
+// after AP startup, immutable for the run.
+static bool cpu_is_global_participant[MAX_CPUS];
+
+// The immutable per-run CPU selection snapshot; the UI edits
+// pending_cpu_selected[] (packed in cpu_state for now) and CPU 0 copies it
+// here at run boundaries.
+static bool run_cpu_selected[MAX_CPUS];
+
+// The CPUs that enter test-internal barriers in the current wave (all team
+// CPUs for a parallel test, only the context master for a sequential one).
+bool        cpu_is_test_participant[MAX_CPUS];
+
+// The execution context bound to each CPU for the current wave; parked CPUs
+// use context 0 only for identity-mapped control flow.
+static uint8_t cpu_execution_context[MAX_CPUS];
+
+// The dense per-context chunk index, rebuilt at every wave binding.
+uint16_t    test_team_chunk_index[MAX_CPUS];
+
+// CPU-backed memory domains that need an execution team, BSP first; their
+// memory is owned by exactly one context in exactly one wave.
+static uint32_t cpu_memory_domains[MAX_PROXIMITY_DOMAINS];
+static unsigned int num_cpu_memory_domains = 0;
+
+// Enabled (run_cpu_selected) CPUs per proximity domain.
+static uint16_t enabled_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
+
+// Wave binding: domain -> context (or CONTEXT_NONE), and the execution
+// owner of each domain's memory in the current wave. The reverse mapping is
+// test_contexts[context].proximity_domain_idx.
+static int8_t domain_to_context[MAX_PROXIMITY_DOMAINS];
+static int8_t memory_owner_context[MAX_PROXIMITY_DOMAINS];
+
+static unsigned int bsp_proximity_domain = 0;
+
+// Clamps cpu_execution_context[] to context 0 on the first boot, before BSS
+// has been cleared: initialized data survives the early startup reads.
+unsigned int num_bound_execution_contexts = 1;
+
+// True while a NUMA_PAR run is active (real run, available mapping model,
+// at least two selected CPU-backed memory domains).
+bool        numa_run_active = false;
+
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -158,6 +224,28 @@ uintptr_t   test_addr[MAX_CPUS];
     } else { \
         barrier_spin_wait(start_barrier); \
     }
+
+// The scheduler helpers defined after the state machine below (they depend
+// on the window functions above them).
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+// Records a terminal context status; the first terminal reason wins.
+static void context_record_failure(int context, int reason)
+{
+    int expected = CONTEXT_OK;
+    __atomic_compare_exchange_n(&test_contexts[context].status, &expected, reason,
+                                false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+}
+
+static int load_test_status(int context)
+{
+    return __atomic_load_n(&test_contexts[context].status, __ATOMIC_ACQUIRE);
+}
+
+
 
 static void run_at(uintptr_t addr, int my_cpu)
 {
@@ -277,7 +365,11 @@ static void assign_test_cpus(cpu_state_t state)
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == state) {
-            if (numa_mode != NUMA_OFF) {
+            // NUMA-aware chunk indexes only for the legacy NUMA_ON mode; in
+            // NUMA_PAR the dense per-context indexes are assigned at wave
+            // binding, and when NUMA_PAR is requested but unavailable the
+            // topology-agnostic path needs the global ordinals.
+            if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
                 uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
                 chunk_index[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
             } else {
@@ -344,13 +436,13 @@ static void global_init(void)
     smp_init(smp_enabled);
 
     // Force disable the NUMA code paths when no proximity domain was found.
-    if (num_proximity_domains == 0) {
+    if (VMEM_MAX_CONTEXTS > 1 && num_proximity_domains == 0) {
         numa_mode = NUMA_OFF;
     }
-    if (smp_topology_too_large) {
+    if (VMEM_MAX_CONTEXTS > 1 && smp_topology_too_large) {
         trace(0, "WARNING: SRAT declares more than %i proximity domains; NUMA disabled", MAX_PROXIMITY_DOMAINS);
     }
-    if (numa_mode == NUMA_PAR && (VMEM_MAX_CONTEXTS <= 1 || num_proximity_domains < 2)) {
+    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && (VMEM_MAX_CONTEXTS <= 1 || num_proximity_domains < 2)) {
         // NUMA_PAR needs independent CPU-backed memory teams; fall back to
         // legacy NUMA-aware placement with a clear message.
         trace(0, "NUMA_PAR unavailable (need 2+ memory domains); using NUMA_ON");
@@ -361,7 +453,8 @@ static void global_init(void)
     // execution contexts before the APs start. On x86-64 this initializes
     // the shared paging root and every context's test window mapping;
     // i586 keeps a single context.
-    if (!vmem_prepare_execution_contexts(VMEM_MAX_CONTEXTS)
+    if (VMEM_MAX_CONTEXTS > 1
+        && !vmem_prepare_execution_contexts(VMEM_MAX_CONTEXTS)
         && numa_mode == NUMA_PAR) {
         numa_mode = NUMA_ON;
     }
@@ -433,10 +526,12 @@ static void global_init(void)
 
     start_barrier = smp_alloc_barriers(1, 1);
     run_barrier   = smp_alloc_barriers(1, 1);
+    context_barrier = smp_alloc_barriers(VMEM_MAX_CONTEXTS, 1);
 
     error_mutex   = smp_alloc_mutex();
 
-    if (start_barrier == NULL || run_barrier == NULL || error_mutex == NULL) {
+    if (start_barrier == NULL || run_barrier == NULL
+        || context_barrier == NULL || error_mutex == NULL) {
         // The pinned synchronization arena is exhausted; do not run without
         // synchronization objects.
         display_notice("Insufficient pinned memory for synchronization objects. Rebooting...");
@@ -508,13 +603,69 @@ static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
         }
         if (seg_start < seg_end && seg_start < win_end && seg_end > win_start) {
             // We need to test part of that physical memory segment.
-            if (numa_mode != NUMA_OFF) {
-                // Now also pay attention to proximity domains, which are based on physical addresses.
-                uint64_t orig_start = (uint64_t)seg_start << PAGE_SHIFT;
-                uint64_t orig_end = (uint64_t)seg_end << PAGE_SHIFT;
-                uint32_t proximity_domain_idx;
-                uint64_t new_start;
-                uint64_t new_end;
+            uint64_t orig_start;
+            uint64_t orig_end;
+            uint32_t proximity_domain_idx;
+            uint64_t new_start;
+            uint64_t new_end;
+
+            if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+                // NUMA_PAR: split by physical-memory proximity domain and
+                // keep only the spans owned by this team.
+                orig_start = (uint64_t)seg_start << PAGE_SHIFT;
+                orig_end = (uint64_t)seg_end << PAGE_SHIFT;
+
+                while (1) {
+                    if (orig_start >= orig_end) {
+                        // The window's remaining range is exhausted, even
+                        // when its last span belongs to another team.
+                        break;
+                    }
+                    if (vm_map_size[context] >= MAX_MEM_SEGMENTS) {
+                        context_record_failure(context, CONTEXT_MAP_OVERFLOW);
+                        break;
+                    }
+                    if (smp_narrow_to_proximity_domain(orig_start, orig_end, &proximity_domain_idx, &new_start, &new_end)) {
+                        if (new_end <= orig_start) {
+                            // Defensive progress check: malformed topology
+                            // data must not make this loop process the same
+                            // span forever.
+                            context_record_failure(context, CONTEXT_TOPOLOGY_FAILED);
+                            break;
+                        }
+                        if (memory_owner_context[proximity_domain_idx] != context) {
+                            // Not owned by this team: skip to the next span.
+                            orig_start = new_end;
+                            continue;
+                        }
+                        // Create a new entry in the virtual memory map.
+                        num_mapped_pages[context] += (new_end - new_start) >> PAGE_SHIFT;
+                        vm_map[context][vm_map_size[context]].pm_base_addr = new_start >> PAGE_SHIFT;
+                        vm_map[context][vm_map_size[context]].start        = first_word_mapping(new_start >> PAGE_SHIFT, context);
+                        vm_map[context][vm_map_size[context]].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t), context);
+                        vm_map[context][vm_map_size[context]].proximity_domain_idx = proximity_domain_idx;
+                        vm_map_size[context]++;
+                        if (new_start != orig_start || new_end != orig_end) {
+                            // Proceed to the next part of the range.
+                            orig_start = new_end; // No shift here, we already have a physical address.
+                            orig_end = (uint64_t)seg_end << PAGE_SHIFT;
+                        } else {
+                            // We're done with this range.
+                            break;
+                        }
+                    } else {
+                        // An uncovered gap or ambiguous ownership would
+                        // let two contexts alias the same span.
+                        context_record_failure(context, CONTEXT_TOPOLOGY_FAILED);
+                        break;
+                    }
+                }
+            } else if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
+                // Legacy NUMA_ON: split by proximity domain for NUMA-aware
+                // chunk placement. A requested-but-inactive NUMA_PAR runs
+                // the topology-agnostic path below.
+                orig_start = (uint64_t)seg_start << PAGE_SHIFT;
+                orig_end = (uint64_t)seg_end << PAGE_SHIFT;
 
                 while (1) {
                     if (vm_map_size[context] >= MAX_MEM_SEGMENTS) {
@@ -564,13 +715,43 @@ non_numa_vm_map_entry:
 #endif
 }
 
+// The scheduler is a relocation-resumable state machine: run_at() never
+// returns, so after every relocation main() calls test_all_windows() again,
+// which resumes from the copied scheduler_phase/current_wave globals. Each
+// logical test stage starts one state-machine sequence (wave 0..N-1 per
+// stage); NUMA_PAR binds execution contexts to CPU-backed proximity domains
+// at WAVE_BIND, while legacy modes run the single legacy context.
+//
+// Every reconfiguration (barrier_reset, context rebind, status reset,
+// relocation) happens only between the LONG/SHORT_BARRIER pairs that bracket
+// each phase, so no running barrier generation or context wait is ever
+// reconfigured concurrently: the barriers are the quiescence protocol.
+
+
+
+
+// Copied global state: relocation re-entry resumes the wave sequence from
+// exactly where it stopped. Legacy modes and the dummy run use one wave.
+
+// Runs the window currently selected by the context master. Every participant
+// maps the same physical window and tests its own chunk of it. Returns false
+// when the phase must be aborted (e.g. the mapping limit was reached).
+
+
+// The scheduler's window boundaries in pages: window 0 covers the low
+// region [0, LOW_LOAD_LIMIT); window 1 ends at the next 1 GiB boundary
+// (on aarch64 LOW_LOAD_LIMIT may be above VM_WINDOW_SIZE, so the end is
+// rounded up to avoid rechecking the region containing the low copy);
+// the following windows step by VM_WINDOW_SIZE. Every window is at most
+// one tick block, which the work accounting relies on.
 static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uintptr_t *win_end)
 {
     uintptr_t low_limit = LOW_LOAD_LIMIT >> PAGE_SHIFT;
     // The end of window 1, in pages. VM_WINDOW_SIZE is in pages, so the
     // aarch64 rounding works on page numbers.
 #if defined(__aarch64__)
-    uintptr_t window_one_end = (low_limit + VM_WINDOW_SIZE) & ~(VM_WINDOW_SIZE - 1);
+    uintptr_t window_one_end = (low_limit + VM_WINDOW_SIZE)
+                             & ~(VM_WINDOW_SIZE - 1);
 #else
     uintptr_t window_one_end = VM_WINDOW_SIZE;
 #endif
@@ -590,12 +771,68 @@ static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uint
     }
 }
 
+// NUMA_PAR: one window iteration of the calling CPU's context. The context
+// master computes the window and the map; the context barrier publishes
+// them. Returns false when the context must stop (terminal status); every
+// participant rendezvouses at the barrier before exiting, so a terminal
+// status never strands a team.
+
+
+// Window 0 covers [0, LOW_LOAD_LIMIT). The master computes the window and
+// the map; the publication barrier makes them visible before test access.
+
+
+// Windows 1 and above, in ascending order, until the context has enumerated
+// its owned memory. In legacy modes this is the pre-existing window loop.
+
+
+// Reaches a pre-copy global rendezvous, then relocates the whole program.
+// run_at() performs its own post-copy barrier before the CPUs jump to the
+// newly copied image; the resume phase is already published in the copied
+// globals, so main() re-enters the same phase after the jump.
 static void relocate_all_and_resume(uintptr_t addr, int my_cpu)
 {
     LONG_BARRIER;
     run_at(addr, my_cpu);
     __builtin_unreachable();
 }
+
+// True when the selected map (pm_map intersected with the selected range)
+// has any memory below LOW_LOAD_LIMIT, i.e. when window 0 must be executed.
+// The decision is purely map-based: a decision based on the accepted SRAT
+// ranges could skip window 0 when selected usable memory sits in an
+// uncovered SRAT gap, silently omitting it, because setup_vm_map(), which
+// would record CONTEXT_TOPOLOGY_FAILED and fall back to legacy mode, would
+// never inspect the window.
+static bool selected_map_has_window_zero(void)
+{
+    uintptr_t limit = MIN(pm_limit_upper, LOW_LOAD_LIMIT >> PAGE_SHIFT);
+    for (int i = 0; i < pm_map_size; i++) {
+        uintptr_t s = pm_map[i].start;
+        uintptr_t e = pm_map[i].end;
+        if (s < pm_limit_lower) {
+            s = pm_limit_lower;
+        }
+        if (e > limit) {
+            e = limit;
+        }
+        if (s < e) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Decides whether window 0 will be tested in this stage/wave. In NUMA_PAR
+// every wave executes window 0 whenever the selected map has any memory
+// below LOW_LOAD_LIMIT; a wave whose contexts map nothing there just skips
+// the empty window (and performs one harmless extra relocation). In legacy
+// modes the pre-existing window-0 avoidance rules (multi-stage tests and
+// pm_limit_lower above LOW_LOAD_LIMIT) apply before any relocation decision
+// is made.
+
+
+
 
 #include "numa_par.c"
 
@@ -750,24 +987,54 @@ static void select_next_master(void)
 
 test_context_t *test_context(void)
 {
-    return &test_contexts[0];
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return &test_contexts[0];
+    }
+    return &test_contexts[execution_context_for_cpu(smp_my_cpu_num())];
 }
 
 int test_context_index(void)
 {
-    return 0;
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return 0;
+    }
+    return execution_context_for_cpu(smp_my_cpu_num());
 }
 
 int execution_context_for_cpu(int cpu)
 {
-    (void)cpu;
-    return 0;
+    if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
+        return 0;
+    }
+    if (cpu < 0 || cpu >= MAX_CPUS) {
+        return 0;
+    }
+    int context = cpu_execution_context[cpu];
+    if (context < 0 || context >= (int)num_bound_execution_contexts || context >= VMEM_MAX_CONTEXTS) {
+        // Unbound/invalid ordinals use the identity-mapped control context.
+        // num_bound_execution_contexts is 1 in .data, so this clamp also
+        // protects the first-boot startup reads before BSS has been cleared.
+        return 0;
+    }
+    return context;
 }
 
 barrier_t *test_run_barrier(void)
 {
+    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+        int cpu = smp_my_cpu_num();
+        // A parked CPU (including one whose wave is not bound yet) must never
+        // enter a test-internal barrier.
+        assert(cpu_is_test_participant[cpu]);
+        int context = execution_context_for_cpu(cpu);
+        assert(context >= 0 && context < VMEM_MAX_CONTEXTS);
+        assert(test_contexts[context].active_cpu_count > 0);
+        return &context_barrier[context];
+    }
     return run_barrier;
 }
+
+
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -801,6 +1068,11 @@ void main(void)
                 display_notice_with_args(strlen(message), message, failed);
                 while (get_key() == 0) { }
                 reboot();
+            }
+            // The CPUs that successfully entered the main loop form the
+            // immutable global control set for the run.
+            for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+                cpu_is_global_participant[cpu] = (cpu_state[cpu] != CPU_STATE_DISABLED);
             }
             if (enable_trace && num_enabled_cpus > 1) {
                 trace(0, "all other CPUs started");
@@ -854,6 +1126,14 @@ void main(void)
                     error_init();
                     serial_log_run_start();
                 }
+                // Snapshot the CPU selection for this run and materialize
+                // the domain metadata used by the NUMA_PAR scheduler.
+                for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+                    run_cpu_selected[cpu] = (cpu_state[cpu] != CPU_STATE_DISABLED);
+                }
+                if (VMEM_MAX_CONTEXTS > 1) {
+                    build_numa_domain_list();
+                }
             }
             if (start_pass) {
                 test_num = 0;
@@ -878,15 +1158,12 @@ void main(void)
                 bail = false;
             }
             if (rerun_test) {
-                // Transitional NUMA_PAR activation; 66ce1c4 replaces this
-                // with the domain-derived decision.
-                numa_run_active = !dummy_run && VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR;
+                // Start a new state-machine sequence for this logical
+                // test/stage. This must not run on relocation re-entry,
+                // or the scheduler would rebind and reset progress.
                 current_wave = 0;
-                num_execution_waves = 1;
+                num_execution_waves = 1;   // NUMA_PAR computes this from the domains
                 scheduler_phase = WAVE_BIND;
-                window_num   = 0;
-                window_start = 0;
-                window_end   = 0;
                 test_contexts[0].window_index = 0;
                 test_contexts[0].window_start = 0;
                 test_contexts[0].window_end   = 0;
