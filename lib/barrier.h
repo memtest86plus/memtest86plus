@@ -31,6 +31,7 @@ void barrier_init(barrier_t *barrier, int num_threads);
 
 /**
  * Resets an existing barrier to block the specified number of threads.
+ * Only safe while no CPU is waiting on, or about to enter, the barrier.
  */
 void barrier_reset(barrier_t *barrier, int num_threads);
 
