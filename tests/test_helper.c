@@ -52,7 +52,9 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
                 *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * chunk_index[my_cpu]);
                 *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
 
-                if (*end > vm_map[segment].end) {
+                // The last CPU also takes the rounding remainder.
+                if (*end > vm_map[segment].end
+                 || chunk_index[my_cpu] == used_cpus_in_proximity_domain[proximity_domain_idx] - 1) {
                     *end = vm_map[segment].end;
                 }
             } else {
@@ -68,7 +70,8 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
             *start = (testword_t *)((uintptr_t)vm_map[segment].start + chunk_size * chunk_index[my_cpu]);
             *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
 
-            if (*end > vm_map[segment].end) {
+            // The last CPU also takes the rounding remainder.
+            if (*end > vm_map[segment].end || chunk_index[my_cpu] == num_active_cpus - 1) {
                 *end = vm_map[segment].end;
             }
         }
