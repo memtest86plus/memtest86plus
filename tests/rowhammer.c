@@ -526,7 +526,7 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
                 pat = &rh_static_patterns[iter % RH_NUM_STATIC];
             }
 
-            void *seq[RH_MAX_PERIOD];
+            static void *seq[RH_MAX_PERIOD];    // too big for an AP stack; one CPU runs this test at a time
             uint32_t seq_len = rh_materialize(pat, site, stride, seg_start, seg_end, seq, period);
             if (seq_len == 0) {
                 iter++;
