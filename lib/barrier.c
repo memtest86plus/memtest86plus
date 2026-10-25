@@ -34,6 +34,7 @@ void barrier_reset(barrier_t *barrier, int num_threads)
     }
 }
 
+// A completed wait is a full memory barrier for all participants.
 void barrier_spin_wait(barrier_t *barrier)
 {
     if (barrier == NULL || barrier->num_threads < 2) {
@@ -44,7 +45,8 @@ void barrier_spin_wait(barrier_t *barrier)
     waiting_flags[my_cpu].flag = true;
     if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
         volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
-        while (*i_am_blocked) {
+        // Newer loads must not see data older than the peers' writes.
+        while (__atomic_load_n(i_am_blocked, __ATOMIC_ACQUIRE)) {
 #if defined(__x86_64) || defined(__i386__)
             __builtin_ia32_pause();
 #elif defined (__loongarch_lp64)
@@ -102,7 +104,7 @@ void barrier_halt_wait(barrier_t *barrier)
         "0:           \n"
         : /* no outputs */
         : "m" (barrier->count)
-        : /* no clobbers */
+        : "memory"
         : end
     );
 #elif defined(__loongarch_lp64)
@@ -126,7 +128,7 @@ void barrier_halt_wait(barrier_t *barrier)
     // so SEV before WFE still wakes immediately, avoiding missed wakeups.
     if (__sync_sub_and_fetch(&barrier->count, 1) != 0) {
         volatile bool *i_am_blocked = &waiting_flags[my_cpu].flag;
-        while (*i_am_blocked) {
+        while (__atomic_load_n(i_am_blocked, __ATOMIC_ACQUIRE)) {
             __asm__ __volatile__ ("wfe" ::: "memory");
         }
         goto end;
