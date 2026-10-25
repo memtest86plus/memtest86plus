@@ -496,6 +496,10 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
                         break;
                     }
                     if (smp_narrow_to_proximity_domain(orig_start, orig_end, &proximity_domain_idx, &new_start, &new_end)) {
+                        // No enabled CPU in that domain would test it: give it to the BSP's domain.
+                        if (used_cpus_in_proximity_domain[proximity_domain_idx] == 0) {
+                            proximity_domain_idx = smp_get_proximity_domain_idx(0);
+                        }
                         // Create a new entry in the virtual memory map.
                         num_mapped_pages += (new_end - new_start) >> PAGE_SHIFT;
                         vm_map[vm_map_size].pm_base_addr = new_start >> PAGE_SHIFT;
