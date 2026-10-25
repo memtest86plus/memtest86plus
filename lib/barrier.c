@@ -120,7 +120,7 @@ void barrier_halt_wait(barrier_t *barrier)
         "0:\n\t" \
         : /* no outputs */
         : "r" (&(barrier->count))
-        : "$t0", "t1", "$t2"
+        : "$t0", "t1", "$t2", "memory"
         : end
     );
 #elif defined(__aarch64__)
