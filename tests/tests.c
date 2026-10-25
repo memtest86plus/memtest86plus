@@ -137,15 +137,10 @@ int run_test(int my_cpu, int test, int stage, int iterations)
                 first_word = (uintptr_t *)0x500;
             }
 
-#if defined(__aarch64__)
-            // RAM starts well above physical address 0, so never move the
-            // start below the first mapped RAM page.
+            // Never move the start below the first mapped RAM page.
             if (first_word > vm_map[0].start) {
                 vm_map[0].start = first_word;
             }
-#else
-            vm_map[0].start = first_word;
-#endif
         }
 
         /* Update display of memory segments being tested */
