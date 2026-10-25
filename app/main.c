@@ -512,8 +512,9 @@ static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
                             break;
                         }
                     } else {
-                        // Could not match with proximity domain, fall back to default behaviour. This shouldn't happen !
-                        vm_map[vm_map_size].proximity_domain_idx = 0;
+                        // Map only the uncovered rest, owned by the BSP's domain.
+                        seg_start = orig_start >> PAGE_SHIFT;
+                        vm_map[vm_map_size].proximity_domain_idx = smp_get_proximity_domain_idx(0);
                         goto non_numa_vm_map_entry;
                     }
                 }
