@@ -88,7 +88,9 @@ static const char *exception_class_name(uint64_t esr)
 
 void interrupt(struct trap_regs *trap_regs)
 {
-    spin_lock(error_mutex);
+    // Don't wait for the error mutex: it may be held by a stopped CPU, or by
+    // this very CPU if the interrupt was taken inside the error reporting path.
+    spin_trylock(error_mutex);
 
     clear_message_area();
 
