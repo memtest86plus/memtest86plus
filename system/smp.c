@@ -1078,10 +1078,10 @@ void map_the_numa_memory_range(uint8_t highest_bit)
         node_nu = (pm_map[i].start >> (node_offset - PAGE_SHIFT)) & 0xF;
         if (node_nu != 0) {
             pm_map[i].start &= ~((uint64_t)0xF << (node_offset - PAGE_SHIFT));
-            pm_map[i].start |= node_nu << (highest_bit - PAGE_SHIFT);
+            pm_map[i].start |= (uint64_t)node_nu << (highest_bit - PAGE_SHIFT);
 
             pm_map[i].end &= ~((uint64_t)0xF << (node_offset - PAGE_SHIFT));
-            pm_map[i].end |= node_nu << (highest_bit - PAGE_SHIFT);
+            pm_map[i].end |= (uint64_t)node_nu << (highest_bit - PAGE_SHIFT);
         }
     }
 
@@ -1093,9 +1093,9 @@ void map_the_numa_memory_range(uint8_t highest_bit)
             node_nu = (memory_affinity_ranges[i].start >> node_offset) & 0xF;
             if (node_nu != 0) {
                 memory_affinity_ranges[i].start &= ~((uint64_t)0xF << node_offset);
-                memory_affinity_ranges[i].start |= node_nu << highest_bit;
+                memory_affinity_ranges[i].start |= (uint64_t)node_nu << highest_bit;
                 memory_affinity_ranges[i].end   &= ~((uint64_t)0xF << node_offset);
-                memory_affinity_ranges[i].end   |= node_nu << highest_bit;
+                memory_affinity_ranges[i].end   |= (uint64_t)node_nu << highest_bit;
             }
         }
     }
