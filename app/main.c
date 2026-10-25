@@ -254,11 +254,11 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
         uintptr_t try_start = pm_map[i].start << PAGE_SHIFT;
         uintptr_t try_limit = pm_map[i].end   << PAGE_SHIFT;
         if (try_start < lower_limit) try_start = lower_limit;
+        if (try_start >= upper_limit) break;
+        // The whole image, stacks included, must stay below the limit: the other copy tests the memory above it.
+        if (program_size > upper_limit - try_start) continue;
         uintptr_t try_end   = try_start + program_size;
         if (try_end > try_limit) continue;
-
-        if (try_start >= upper_limit) break;
-        if (try_end   <  lower_limit) continue;
 
         *load_addr = try_start;
         return true;
