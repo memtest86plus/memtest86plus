@@ -754,6 +754,12 @@ static bool find_numa_nodes_in_srat(void)
     // Pass 1: parse memory affinity entries and allocate proximity domains for each of them, while validating input a little bit.
     while (tab_entry_ptr < srat_table_end) {
         srat_entry_header_t *entry_header = (srat_entry_header_t *)tab_entry_ptr;
+        // A truncated entry would make us read past the end of the table.
+        if (tab_entry_ptr + sizeof(srat_entry_header_t) > srat_table_end
+         || entry_header->length < sizeof(srat_entry_header_t)
+         || tab_entry_ptr + entry_header->length > srat_table_end) {
+            return false;
+        }
         if (entry_header->type == SRAT_PROCESSOR_APIC_AFFINITY) {
             if (entry_header->length != sizeof(srat_processor_lapic_affinity_entry_t)) {
                 return false;
@@ -764,7 +770,8 @@ static bool find_numa_nodes_in_srat(void)
                 return false;
             }
             srat_memory_affinity_entry_t *entry = (srat_memory_affinity_entry_t *)tab_entry_ptr;
-            if (entry->flags & SRAT_MAF_ENABLED) {
+            // A zero-length entry owns no memory: ignore it like a disabled one.
+            if ((entry->flags & SRAT_MAF_ENABLED) && entry->address_length != 0) {
                 uint32_t proximity_domain = entry->proximity_domain;
                 uint64_t start = entry->base_address;
                 uint64_t end = entry->base_address + entry->address_length;
