@@ -134,6 +134,9 @@ test_context_t test_contexts[VMEM_MAX_CONTEXTS] = { 0 };
 // Per-context barriers, allocated from the pinned synchronization arena.
 static barrier_t *context_barrier = NULL;
 
+// A mutex serializing input service and UI rendering by the context masters.
+spinlock_t  *ui_mutex = NULL;
+
 int         pass_num = 0;
 int         test_num = 0;
 
@@ -567,9 +570,9 @@ static void global_init(void)
     context_barrier = smp_alloc_barriers(VMEM_MAX_CONTEXTS, 1);
 
     error_mutex   = smp_alloc_mutex();
+    ui_mutex      = smp_alloc_mutex();
 
-    if (start_barrier == NULL || run_barrier == NULL
-        || context_barrier == NULL || error_mutex == NULL) {
+    if (start_barrier == NULL || run_barrier == NULL || context_barrier == NULL || error_mutex == NULL || ui_mutex == NULL) {
         // The pinned synchronization arena is exhausted; do not run without
         // synchronization objects.
         display_notice("Insufficient pinned memory for synchronization objects. Rebooting...");

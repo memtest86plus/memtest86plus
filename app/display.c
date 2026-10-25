@@ -80,7 +80,7 @@ static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 
 // The once-per-second UI ownership context. Reset to context 0 at every wave
 // binding; the owner may hand over to a still-running context when its team
-// exhausts its windows (see numa_do_tick()).
+// exhausts its windows (see do_tick_numa()).
 static int ui_owner_context = 0;
 
 void display_reset_ui_owner(void)
@@ -453,7 +453,8 @@ void display_test_stage_field(void)
 // NUMA_PAR Testing line. Shows the active/total execution context (job)
 // count and the aggregate pages tested in this stage, so the line keeps
 // advancing while any team still works and clearly shows a tail wait when
-// some jobs have finished.
+// some jobs have finished. Writes are serialized under ui_mutex; a
+// contended master simply skips this window's update.
 void display_test_addresses_numa(void)
 {
     unsigned int jobs = num_bound_execution_contexts;
@@ -470,10 +471,14 @@ void display_test_addresses_numa(void)
     if (tested > num_pages_to_test) {
         tested = num_pages_to_test;
     }
+    if (!spin_trylock(ui_mutex)) {
+        return;
+    }
     int print_end = printf(4, 39, "%i/%i jobs [%kB/%kB]", (uintptr_t)(jobs - done),
                            (uintptr_t)jobs, tested << 2, num_pages_to_test << 2);
     clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 1);
     display_test_stage_field();
+    spin_unlock(ui_mutex);
 }
 
 void display_error_count(void)
@@ -642,14 +647,216 @@ void scroll(void)
     }
 }
 
-void do_tick(int my_cpu)
+// Advances the once-per-second timing state and returns true when the
+// once-per-second updates should run this tick. Lock-free, so the canary
+// and ECC checks keep running even when the UI try-lock fails.
+static bool tick_new_second(int *act_sec)
+{
+    if (clks_per_msec > 0) {
+        uint64_t current_time = get_tsc();
+        int secs = (current_time - run_start_time) / (1000 * (uint64_t)clks_per_msec);
+        *act_sec = secs;   // full elapsed seconds: minutes/hours derive from it
+    }
+    if (*act_sec != prev_sec) {
+        prev_sec = *act_sec;
+        timed_update_done = false;
+    }
+    return !timed_update_done;
+}
+
+// Run-time and spinner updates; caller holds ui_mutex.
+static void ui_spinner_and_runtime(int act_sec)
+{
+    if (clks_per_msec > 0) {
+        int mins = act_sec / 60;
+        int hours = mins / 60; mins %= 60;
+        display_run_time(hours, mins, act_sec % 60);
+    }
+
+    bool update_spinner = true;
+    if (clks_per_msec > 0) {
+        uint64_t current_time = get_tsc();
+        if (current_time >= next_spin_time) {
+            next_spin_time = current_time + SPINNER_PERIOD * clks_per_msec;
+        } else {
+            update_spinner = false;
+        }
+    }
+    if (update_spinner) {
+        spin_idx = (spin_idx + 1) % NUM_SPIN_STATES;
+        display_spinner(spin_state[spin_idx]);
+    }
+}
+
+// Temperature and TTY updates; caller holds ui_mutex.
+static void ui_temperature_and_tty(int act_sec)
+{
+    display_temperature();
+    if (enable_tty && act_sec % tty_update_period == 0) {
+        tty_partial_redraw();
+    }
+}
+
+// The pure-display part of the once-per-second checks; caller holds
+// ui_mutex.
+static void ui_error_banner(void)
+{
+    // Display FAIL banner if (new) errors detected
+    if (err_banner_redraw && !big_status_displayed && error_count > 1) {
+        display_big_status(false);
+    }
+}
+
+// Once-per-second updates that may enter error or trace paths (error_mutex,
+// whose order is error -> ui); callers must not hold ui_mutex.
+static void ui_errors_and_hw(void)
+{
+    // A corrupted stack canary means a CPU overran its stack slot and may
+    // have corrupted the thread-local barrier flags below it (see boot.h).
+    static int last_overflow_cpu = -1;
+    int overflow_cpu = stack_canary_check();
+    if (overflow_cpu >= 0 && overflow_cpu != last_overflow_cpu) {
+        last_overflow_cpu = overflow_cpu;
+        do_trace(overflow_cpu, "CPU stack overflow detected - test results are unreliable");
+    }
+
+    // Check ECC Errors
+    memctrl_poll_ecc();
+
+    timed_update_done = true;
+}
+
+// Runs the once-per-second timed UI and hardware/error updates, for paths
+// that own the screen without a context barrier (e.g. the NUMA_PAR
+// global-once bit-fade delay on CPU 0).
+void update_timed_ui(void)
 {
     int act_sec = 0;
-    bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
-    if (use_spin_wait) {
+    bool once_per_second = tick_new_second(&act_sec);
+    // Mirror do_tick_numa(): try-lock so an interrupt handler that holds the
+    // UI lock never stalls the fade, and keep the error/hw helpers (which
+    // may take error_mutex, order error -> ui) outside the UI lock.
+    if (spin_trylock(ui_mutex)) {
+        ui_spinner_and_runtime(act_sec);
+        if (once_per_second) {
+            ui_temperature_and_tty(act_sec);
+            ui_error_banner();
+        }
+        spin_unlock(ui_mutex);
+    }
+    if (once_per_second) {
+        ui_errors_and_hw();
+    }
+}
+
+// True when this context owns the once-per-second UI. Ownership starts at
+// context 0 and is taken over by the first still-running context when the
+// current owner's team has exhausted its windows, so the spinner, run time,
+// temperature and input stay alive while the slowest team finishes its tail.
+static bool ui_owner_is(int context)
+{
+    int owner = __atomic_load_n(&ui_owner_context, __ATOMIC_ACQUIRE);
+    if (owner == context) {
+        return true;
+    }
+    if (!__atomic_load_n(&test_contexts[owner].windows_exhausted, __ATOMIC_ACQUIRE)) {
+        return false;
+    }
+    int expected = owner;
+    return __atomic_compare_exchange_n(&ui_owner_context, &expected, context,
+                                       false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+}
+
+// NUMA_PAR tick service: the context master accounts the team's work and
+// renders progress under ui_mutex (try-lock), without ever queuing behind
+// another context master. The current UI owner services input, outside the
+// lock, so a menu session never stalls another context; ownership moves to a
+// still-running context when the previous owner's team finishes. The context
+// barrier publishes the master's writes; there is no trailing UI barrier.
+static void do_tick_numa(int my_cpu)
+{
+    test_context_t *ctx = test_context();
+    int context = test_context_index();
+
+    if (my_cpu == ctx->master_cpu_num) {
+        // The master counts one team tick per do_tick(), independent of the
+        // team size: the dummy calibration measures the same per-context
+        // work units, and the whole-map ratio scales them to the run.
+        __sync_fetch_and_add(&test_work_done, 1);
+
+        // The UI owner polls the keyboard and may enter the blocking
+        // configuration menu. The call is deliberately outside ui_mutex:
+        // holding the lock across a menu session would stall common_err() on
+        // every other context. A UI-requested bail is still published to all
+        // contexts.
+        if (ui_owner_is(context)) {
+            check_input();
+            if (bail) {
+                // The UI asked to stop: publish a cross-context cancellation
+                // request so every team converges on the same exit path.
+                test_publish_cancel_request();
+            }
+        }
+
+        if (spin_trylock(ui_mutex)) {
+            uint64_t done = __atomic_load_n(&test_work_done, __ATOMIC_ACQUIRE);
+            render_aggregate_progress(done - test_work_done_base, test_work_expected, done, pass_work_expected);
+            spin_unlock(ui_mutex);
+        }
+
+        // The UI owner advances the once-per-second timing state (single
+        // writer) and services the canary/ECC checks, the error display and
+        // the serial log. These may enter error or trace paths, so never
+        // call them while holding ui_mutex.
+        if (ui_owner_is(context)) {
+            int act_sec = 0;
+            bool once_per_second = tick_new_second(&act_sec);
+
+            if (spin_trylock(ui_mutex)) {
+                ui_spinner_and_runtime(act_sec);
+                if (once_per_second) {
+                    ui_temperature_and_tty(act_sec);
+                    ui_error_banner();
+                }
+                spin_unlock(ui_mutex);
+            }
+            if (once_per_second) {
+                ui_errors_and_hw();
+            }
+            error_update();
+        }
+
+        if (__atomic_load_n(&global_cancel_requested, __ATOMIC_ACQUIRE)) {
+            test_request_cancel(context);
+        }
+    }
+
+    if (power_save < POWER_SAVE_HIGH) {
         barrier_spin_wait(test_run_barrier());
     } else {
         barrier_halt_wait(test_run_barrier());
+    }
+}
+
+// Handles the once-per-tick progress display: renders the legacy
+// percentage/bar display through the test_run_barrier() protocol, so the
+// legacy path is unchanged. In NUMA_PAR the aggregate display is owned by
+// the context masters; do_tick_numa() below renders progress without ever
+// queuing behind another context master, and the current UI owner services
+// input so a menu session never stalls another context.
+void do_tick(int my_cpu)
+{
+    if (numa_run_active) {
+        do_tick_numa(my_cpu);
+        return;
+    }
+
+    int act_sec = 0;
+    bool use_spin_wait = (power_save < POWER_SAVE_HIGH);
+    if (use_spin_wait) {
+        barrier_spin_wait(run_barrier);
+    } else {
+        barrier_halt_wait(run_barrier);
     }
 
     if (master_cpu == my_cpu) {
@@ -657,9 +864,9 @@ void do_tick(int my_cpu)
         error_update();
     }
     if (use_spin_wait) {
-        barrier_spin_wait(test_run_barrier());
+        barrier_spin_wait(run_barrier);
     } else {
-        barrier_halt_wait(test_run_barrier());
+        barrier_halt_wait(run_barrier);
     }
 
     // Only the master CPU does the update.
@@ -679,7 +886,8 @@ void do_tick(int my_cpu)
             pct = 100;
         }
     }
-    display_test_progress(pct);
+    display_test_percentage(pct);
+    display_test_bar((BAR_LENGTH * pct) / 100);
 
     pct = 0;
     if (ticks_per_pass[pass_type] > 0) {
@@ -688,8 +896,8 @@ void do_tick(int my_cpu)
             pct = 100;
         }
     }
-    display_pass_progress(pct);
-
+    display_pass_percentage(pct);
+    display_pass_bar((BAR_LENGTH * pct) / 100);
     bool update_spinner = true;
     if (clks_per_msec > 0) {
         uint64_t current_time = get_tsc();
@@ -761,10 +969,15 @@ void do_trace(int my_cpu, const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
+    // The trace writes the screen, so serialize it against the other
+    // context masters' UI work: error_mutex then ui_mutex (the plan's lock
+    // order). No caller of do_trace holds ui_mutex.
     spin_lock(error_mutex);
+    spin_lock(ui_mutex);
     scroll();
-    printi(scroll_message_row, 0, my_cpu, 2, false, false);
-    vprintf(scroll_message_row, 4, fmt, args);
+    printi(scroll_message_row, 0, my_cpu, 4, false, false);
+    vprintf(scroll_message_row, 6, fmt, args);
+    spin_unlock(ui_mutex);
     spin_unlock(error_mutex);
     va_end(args);
 }

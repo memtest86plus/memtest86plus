@@ -575,6 +575,7 @@ static void run_global_stage_once(void)
         if (VMEM_MAX_CONTEXTS > 1) {
             render_aggregate_progress(test_work_done - test_work_done_base, test_work_expected, test_work_done, pass_work_expected);
         }
+        update_timed_ui();
         sleep_secs--;
         sleep(1);
     }
