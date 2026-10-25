@@ -817,9 +817,8 @@ static bool find_numa_nodes_in_srat(void)
             if (entry_header->length != sizeof(srat_processor_lx2apic_affinity_entry_t)) {
                 return false;
             }
-        } else {
-            return false;
         }
+        // Skip other subtables (GICC, GIC ITS, Generic Initiator/Port...), like Linux does.
         tab_entry_ptr += entry_header->length;
     }
 
