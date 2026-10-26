@@ -946,7 +946,7 @@ static void cpu_selection_menu(void)
             break;
           case '6':
             exclude_ecores = !exclude_ecores;
-            prints(POP_R+8, POP_LI+6, exclude_ecores ? "Exclude" : "Include");
+            prints(POP_R+8, POP_LI+6, exclude_ecores ? "Include" : "Exclude");
             break;
           case '7':
             if (smt_siblings_present) {
