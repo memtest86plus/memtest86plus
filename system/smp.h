@@ -31,7 +31,7 @@
 /**
  * The maximum number of NUMA proximity domains.
  */
-#define MAX_PROXIMITY_DOMAINS       MAX_APIC_IDS
+#define MAX_PROXIMITY_DOMAINS       32
 
 /**
  * The current state of a CPU core.
