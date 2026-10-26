@@ -91,6 +91,8 @@ static uintptr_t        high_load_addr;
 
 static barrier_t        *start_barrier = NULL;
 
+static bool             park_cpu[MAX_CPUS];     // started only to follow the barriers
+
 static bool             start_run  = false;
 static bool             start_pass = false;
 static bool             start_test = false;
@@ -444,8 +446,8 @@ static void ap_enumerate(int my_cpu)
         hybrid_core_type[my_cpu] = get_ap_hybrid_type();
     }
 
-    // Excluded E-cores keep following the barriers and relocations, but don't test.
-    if (hybrid_core_type[my_cpu] == CORE_ECORE && exclude_ecores) {
+    // Excluded E-cores and SMT threads keep following the barriers and relocations, but don't test.
+    if (park_cpu[my_cpu] || (hybrid_core_type[my_cpu] == CORE_ECORE && exclude_ecores)) {
         cpu_state[my_cpu] = CPU_STATE_DISABLED;
     } else {
         cpu_state[my_cpu] = CPU_STATE_RUNNING;
@@ -685,12 +687,21 @@ void main(void)
         if (my_cpu == 0) {
             global_init();
             init_state = 1;
-            if (enable_trace && num_enabled_cpus > 1) {
+            // Start the excluded SMT threads too, so they set CR4.MCE (a broadcast MCE shuts down threads without it).
+            int num_started_cpus = num_enabled_cpus;
+            for (int i = 1; i < num_available_cpus; i++) {
+                if (exclude_smtcores && cpu_state[i] == CPU_STATE_DISABLED && smp_is_smt_sibling(i)) {
+                    cpu_state[i] = CPU_STATE_ENABLED;
+                    park_cpu[i] = true;
+                    num_started_cpus++;
+                }
+            }
+            if (enable_trace && num_started_cpus > 1) {
                 set_scroll_lock(false);
                 trace(0, "starting other CPUs");
             }
-            // All started CPUs, including the excluded E-cores that only follow the barriers.
-            barrier_reset(start_barrier, num_enabled_cpus);
+            // All started CPUs, including the excluded E-cores and SMT threads that only follow the barriers.
+            barrier_reset(start_barrier, num_started_cpus);
             int failed = smp_start(cpu_state);
             if (failed) {
                 const char *message = "Failed to start CPU core %i. Press any key to reboot...";
@@ -698,7 +709,7 @@ void main(void)
                 while (get_key() == 0) { }
                 reboot();
             }
-            if (enable_trace && num_enabled_cpus > 1) {
+            if (enable_trace && num_started_cpus > 1) {
                 trace(0, "all other CPUs started");
                 set_scroll_lock(true);
             }
