@@ -37,6 +37,8 @@
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */
 
+#define EFI_BOOT_OFFSET	0x1e0		/* Offset of efi_boot (the PE/COFF entry point) in the x86 startup code */
+
 #define SETUP_SECS	7		/* Size of the 16-bit setup code in sectors */
 
 #define BOOT_SEG	0x07c0		/* Segment address for the 16-bit boot code */

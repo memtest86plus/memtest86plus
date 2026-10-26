@@ -19,7 +19,7 @@
 // and calls kernel entry point at 0x10000.
 //
 // 2) To support loading from the UEFI, it provides the MS-DOS & PE/COFF headers.
-// The PE/COFF headers point to offset 0x10000 + 0x1E0 where efi_boot from
+// The PE/COFF headers point to offset 0x10000 + EFI_BOOT_OFFSET where efi_boot from
 // startup32.S / startup64.S that handles EFI handover and the rest of booting.
 //
 // 3) When using an intermediate bootloader, it provides the first few bytes of
@@ -836,7 +836,7 @@ optional_header:
 	.long	_virt_init_size			# SizeOfInitializedData
 	.long	0				# SizeOfUninitializedData
 
-	.long	_virt_text_start + 0x1e0	# AddressOfEntryPoint
+	.long	_virt_text_start + EFI_BOOT_OFFSET	# AddressOfEntryPoint
 
 	.long	_virt_text_start		# BaseOfCode
 #ifndef __x86_64__

@@ -104,7 +104,7 @@ startup32:
 
 # The EFI PE32+ boot entry point.
 
-	.org	0x1e0
+	.org	EFI_BOOT_OFFSET
 	.globl	efi_boot
 efi_boot:
 	movq	%rcx, %rdi		# the EFI image handle
@@ -275,6 +275,16 @@ flush:	movw	$KERNEL_DS, %ax
 	movq	%rax, (%rsp)
 	ldmxcsr (%rsp)
 
+	# Enable machine checks if supported (INIT clears CR4.MCE, and an MCE then shuts down the CPU).
+
+	movl	$1, %eax
+	cpuid
+	testl	$(1 << 7), %edx		# Check bit 7 (MCE)
+	jz	2f
+	movq	%cr4, %rax
+	orl	$(1 << 6), %eax		# Set bit 6 (MCE)
+	movq	%rax, %cr4
+2:
 	# Enable AVX if supported. CPUID.1:ECX.OSXSAVE (bit 27) only mirrors
 	# CR4.OSXSAVE, which is not set yet, so test XSAVE (bit 26) and AVX
 	# (bit 28) instead.

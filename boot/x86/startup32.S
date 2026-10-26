@@ -186,10 +186,43 @@ init_idt_descr:
 
 	finit
 
+	# Enable machine checks if supported (INIT clears CR4.MCE, and an MCE then shuts down the CPU).
+
+	pushl	%ebx			# ebx is overwritten by cpuid
+	movl	$1, %eax
+	cpuid
+	popl	%ebx			# restore ebx
+	andl	$((1 << 14) | (1 << 7)), %edx	# Check bits 14 (MCA) and 7 (MCE), as P5-style MCE is often miswired
+	cmpl	$((1 << 14) | (1 << 7)), %edx
+	jne	2f
+	movl	%cr4, %eax
+	orl	$(1 << 6), %eax		# Set bit 6 (MCE)
+	movl	%eax, %cr4
+2:
 	# Call the dynamic linker to fix up the addresses in the GOT.
 
 	call	reloc
 
+	jmp	init_paging		# continue after efi_boot
+
+# The EFI PE32 boot entry point.
+
+	.org	EFI_BOOT_OFFSET
+	.globl	efi_boot
+efi_boot:
+	popl	%eax			# the return address (discard)
+	popl	%ecx			# the EFI image handle
+	popl	%edx			# the EFI system table pointer
+
+	pushl	$0			# the boot params pointer (0 = not yet allocated)
+	pushl	%edx			# the EFI system table pointer
+	pushl	%ecx			# the EFI image handle
+
+	call	efi_handover		# never returns
+
+# Set up paging and run the application (placed after efi_boot to free room before it).
+
+init_paging:
 	# Disable paging (needed during restart). Also disable write protect
 	# (in case set by EFI boot).
 
@@ -248,21 +281,6 @@ init_idt_descr:
 0:	pushl	$0	# error code
 	pushl	$257	# vector
 	jmp	int_handler32
-
-# The EFI PE32 boot entry point.
-
-	.org	0x1e0
-	.globl	efi_boot
-efi_boot:
-	popl	%eax			# the return address (discard)
-	popl	%ecx			# the EFI image handle
-	popl	%edx			# the EFI system table pointer
-
-	pushl	$0			# the boot params pointer (0 = not yet allocated)
-	pushl	%edx			# the EFI system table pointer
-	pushl	%ecx			# the EFI image handle
-
-	call	efi_handover		# never returns
 
 # Initialise the 64-bit IDT.
 
@@ -568,7 +586,9 @@ int_handler32:
 	pushl	%ebp		# save the state of ebp
 	leal	24(%esp), %ebp	# save the state of esp before the interrupt
 	pushl	%ebp
-	leal	int_handler@GOTOFF(%ebx), %ebp
+	call	0f		# get the int_handler address PC-relative, as ebx may not hold the GOT pointer
+0:	popl	%ebp
+	addl	$(int_handler - 0b), %ebp
 	movw	$KERNEL_CS, -2(%esp)
 	movl	%ebp, -6(%esp)
 	lcall	*-6(%esp)
