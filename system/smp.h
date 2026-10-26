@@ -77,6 +77,12 @@ void smp_send_nmi(int cpu_num);
 int smp_my_cpu_num(void);
 
 /**
+ * Returns true if the CPU core whose ordinal number is cpu_num is a secondary
+ * SMT thread. Always false for the BSP.
+ */
+bool smp_is_smt_sibling(int cpu_num);
+
+/**
  * Return the index of the proximity domain corresponding to the current CPU number.
  * 1 in NUMA-unaware mode, >= 1 otherwise.
  */

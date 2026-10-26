@@ -157,6 +157,7 @@ typedef struct {
     int     is_hybrid;
     int     ecore_count;
     int     pcore_count;
+    int     smt_shift;      // Number of low APIC ID bits holding the SMT thread ID
 } cpuid_topology_t;
 
 typedef struct {

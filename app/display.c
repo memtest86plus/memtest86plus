@@ -262,18 +262,18 @@ void display_cpu_topology(void)
     // If topology failed, assume topology according to APIC
     if (cpuid_info.topology.core_count <= 0) {
 
-        cpuid_info.topology.core_count = num_enabled_cpus;
-        cpuid_info.topology.thread_count = num_enabled_cpus;
+        cpuid_info.topology.core_count = num_available_cpus;
+        cpuid_info.topology.thread_count = num_available_cpus;
 
-        if(cpuid_info.flags.htt && num_enabled_cpus >= 2 && num_enabled_cpus % 2 == 0) {
+        if(cpuid_info.flags.htt && num_available_cpus >= 2 && num_available_cpus % 2 == 0) {
             cpuid_info.topology.core_count /= 2;
         }
     }
 
     // Compute number of sockets according to individual CPU core count
-    if (num_enabled_cpus > cpuid_info.topology.thread_count &&
-        num_enabled_cpus % cpuid_info.topology.thread_count == 0) {
-        num_cpu_sockets  = num_enabled_cpus / cpuid_info.topology.thread_count;
+    if (num_available_cpus > cpuid_info.topology.thread_count &&
+        num_available_cpus % cpuid_info.topology.thread_count == 0) {
+        num_cpu_sockets  = num_available_cpus / cpuid_info.topology.thread_count;
     }
 
     // Display P/E-Core count for Hybrid CPUs.

@@ -91,6 +91,8 @@ static uintptr_t        high_load_addr;
 
 static barrier_t        *start_barrier = NULL;
 
+static int              last_enabled_cpu = 0;
+
 static bool             start_run  = false;
 static bool             start_pass = false;
 static bool             start_test = false;
@@ -361,6 +363,7 @@ static void global_init(void)
                 chunk_index[i] = num_enabled_cpus;
             }
             num_enabled_cpus++;
+            last_enabled_cpu = i;
         }
     }
     display_cpu_topology();
@@ -377,7 +380,8 @@ static void global_init(void)
         post_display_init();
     }
 
-    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
+    // Stack slots are indexed by CPU number, and the barriers touch the slot of every available CPU.
+    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_available_cpus - 1) * AP_STACK_SIZE;
 
     bool load_addr_ok = set_load_addr(& low_load_addr, program_size,         0x1000,  LOW_LOAD_LIMIT)
                      && set_load_addr(&high_load_addr, program_size, LOW_LOAD_LIMIT, HIGH_LOAD_LIMIT);
@@ -447,7 +451,7 @@ static void ap_enumerate(int my_cpu)
         //TODO : hlt AP?
     }
 
-    if (my_cpu == num_enabled_cpus - 1) {
+    if (my_cpu == last_enabled_cpu) {
         display_cpu_topology();
     }
 }

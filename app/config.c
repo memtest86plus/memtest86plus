@@ -72,6 +72,8 @@
 
 static uint16_t popup_save_buffer[POP_W * POP_H];
 
+static bool     smt_siblings_present = false;
+
 //------------------------------------------------------------------------------
 // Public Variables
 //------------------------------------------------------------------------------
@@ -89,6 +91,7 @@ cpu_state_t     cpu_state[MAX_CPUS];
 
 core_type_t     hybrid_core_type[MAX_CPUS];
 bool            exclude_ecores     = true;
+bool            exclude_smtcores   = true;
 
 bool            smp_enabled        = true;
 
@@ -356,6 +359,8 @@ static void parse_option(const char *option, const char *params)
         enable_sm = false;
     } else if (strncmp(option, "nosmp", 6) == 0) {
         smp_enabled = false;
+    } else if (strncmp(option, "smt", 4) == 0) {
+        exclude_smtcores = false;
     } else if (strncmp(option, "nospdcrc", 9) == 0) {
         enable_spd_crc = false;
     } else if (strncmp(option, "numa", 5) == 0) {
@@ -819,12 +824,25 @@ static void error_mode_menu(void)
     clear_screen_region(POP_REGION);
 }
 
+// Enables or disables the SMT sibling threads according to exclude_smtcores. Returns false if there are none.
+static bool apply_smt_exclusion(void)
+{
+    bool found = false;
+    for (int i = 1; i < num_available_cpus; i++) {
+        if (smp_is_smt_sibling(i)) {
+            cpu_state[i] = exclude_smtcores ? CPU_STATE_DISABLED : CPU_STATE_ENABLED;
+            found = true;
+        }
+    }
+    return found;
+}
+
 static bool set_all_cpus(cpu_state_t state, int display_offset)
 {
     clear_popup_row(POP_R+16);
     for (int i = 1; i < num_available_cpus; i++) {
         cpu_state[i] = state;
-        display_enabled(POP_R+12, i - display_offset, state == CPU_STATE_ENABLED);
+        display_enabled(POP_R+13, i - display_offset, state == CPU_STATE_ENABLED);
     }
     return true;
 }
@@ -839,7 +857,7 @@ static bool add_or_remove_cpu(bool add, int display_offset)
         return false;
     }
     cpu_state[n] = add ? CPU_STATE_ENABLED : CPU_STATE_DISABLED;
-    display_enabled(POP_R+12, n - display_offset, add);
+    display_enabled(POP_R+13, n - display_offset, add);
     clear_popup_row(POP_R+16);
     return true;
 }
@@ -860,7 +878,7 @@ static bool add_cpu_range(int display_offset)
     }
     for (int i = n1; i <= n2; i++) {
         cpu_state[i] = CPU_STATE_ENABLED;
-        display_enabled(POP_R+12, i - display_offset, true);
+        display_enabled(POP_R+13, i - display_offset, true);
     }
     clear_popup_row(POP_R+16);
     return true;
@@ -868,13 +886,13 @@ static bool add_cpu_range(int display_offset)
 
 static void display_cpu_selection(int display_offset)
 {
-    clear_screen_region(POP_R+11, POP_C, POP_LAST_R, POP_LAST_C);
-    display_selection_header(POP_R+10, num_available_cpus - 1, display_offset);
+    clear_screen_region(POP_R+12, POP_C, POP_LAST_R, POP_LAST_C);
+    display_selection_header(POP_R+11, num_available_cpus - 1, display_offset);
     if (display_offset == 0) {
-        printc(POP_R+12, POP_LM, 'B');
+        printc(POP_R+13, POP_LM, 'B');
     }
     for (int i = 1; i < num_available_cpus; i++) {
-        display_enabled(POP_R+12, i - display_offset, cpu_state[i] == CPU_STATE_ENABLED);
+        display_enabled(POP_R+13, i - display_offset, cpu_state[i] == CPU_STATE_ENABLED);
     }
 }
 
@@ -896,7 +914,14 @@ static void cpu_selection_menu(void)
             prints(POP_R+8, POP_LI, "<F6>  Exclude E-Cores");
         }
     }
-    prints(POP_R+9, POP_LI, "<F10> Exit menu");
+    if (smt_siblings_present) {
+        if (exclude_smtcores) {
+            prints(POP_R+9, POP_LI, "<F7>  Include SMT threads");
+        } else {
+            prints(POP_R+9, POP_LI, "<F7>  Exclude SMT threads");
+        }
+    }
+    prints(POP_R+10, POP_LI, "<F10> Exit menu");
 
     display_cpu_selection(display_offset);
 
@@ -922,6 +947,15 @@ static void cpu_selection_menu(void)
           case '6':
             exclude_ecores = !exclude_ecores;
             prints(POP_R+8, POP_LI+6, exclude_ecores ? "Exclude" : "Include");
+            break;
+          case '7':
+            if (smt_siblings_present) {
+                exclude_smtcores = !exclude_smtcores;
+                apply_smt_exclusion();
+                display_cpu_selection(display_offset);
+                prints(POP_R+9, POP_LI+6, exclude_smtcores ? "Include" : "Exclude");
+                changed = true;
+            }
             break;
           case 'u':
             if (display_offset >= SEL_W) {
@@ -1145,6 +1179,8 @@ void config_menu(bool initial)
 
 void initial_config(void)
 {
+    smt_siblings_present = apply_smt_exclusion();
+
     display_initial_notice();
 
     if (num_available_cpus < 2) {

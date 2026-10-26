@@ -257,6 +257,7 @@ void cpuid_init(void)
     cpuid_info.topology.is_hybrid    =  0;
     cpuid_info.topology.ecore_count  = -1;
     cpuid_info.topology.pcore_count  = -1;
+    cpuid_info.topology.smt_shift    =  0;
 }
 
 core_type_t get_ap_hybrid_type(void)

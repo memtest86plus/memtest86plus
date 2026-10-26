@@ -33,6 +33,7 @@ void cpuid_init(void)
     cpuid_info.topology.is_hybrid    =  0;
     cpuid_info.topology.ecore_count  = -1;
     cpuid_info.topology.pcore_count  = -1;
+    cpuid_info.topology.smt_shift    =  0;
 
     // Get the brand ID.
     cpuid_info.brand_id.raw[0] = (uint32_t)(__iocsrrd_w(0x10));

@@ -1313,6 +1313,13 @@ int smp_my_cpu_num(void)
 #endif
 }
 
+bool smp_is_smt_sibling(int cpu_num)
+{
+    cpu_apic_id_t smt_mask = ((cpu_apic_id_t)1 << cpuid_info.topology.smt_shift) - 1;
+
+    return cpu_num > 0 && cpu_num < num_available_cpus && (cpu_num_to_apic_id[cpu_num] & smt_mask) != 0;
+}
+
 uint32_t smp_get_proximity_domain_idx(int cpu_num)
 {
     return num_available_cpus > 1 ? cpu_num_to_proximity_domain_idx[cpu_num] : 0;
