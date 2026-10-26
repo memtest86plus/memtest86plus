@@ -452,26 +452,6 @@ static void ap_enumerate(int my_cpu)
     }
 }
 
-// Called once all APs have enumerated: counts the core types and reassigns the test chunks.
-static void bsp_enumerate(void)
-{
-    hybrid_core_type[0] = get_ap_hybrid_type();
-
-    cpuid_info.topology.pcore_count = 0;
-    cpuid_info.topology.ecore_count = 0;
-    for (int i = 0; i < num_available_cpus; i++) {
-        if (hybrid_core_type[i] == CORE_PCORE) {
-            cpuid_info.topology.pcore_count++;
-        } else if (hybrid_core_type[i] == CORE_ECORE) {
-            cpuid_info.topology.ecore_count++;
-        }
-    }
-
-    assign_test_cpus(CPU_STATE_RUNNING);
-
-    display_cpu_topology();
-}
-
 static void setup_vm_map(uintptr_t win_start, uintptr_t win_end)
 {
     vm_map_size = 0;
@@ -722,8 +702,20 @@ void main(void)
                 trace(0, "all other CPUs started");
                 set_scroll_lock(true);
             }
+            // All APs have enumerated: count the core types and reassign the test chunks.
             if (cpuid_info.topology.is_hybrid) {
-                bsp_enumerate();
+                hybrid_core_type[0] = get_ap_hybrid_type();
+                cpuid_info.topology.pcore_count = 0;
+                cpuid_info.topology.ecore_count = 0;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if (hybrid_core_type[i] == CORE_PCORE) {
+                        cpuid_info.topology.pcore_count++;
+                    } else if (hybrid_core_type[i] == CORE_ECORE) {
+                        cpuid_info.topology.ecore_count++;
+                    }
+                }
+                assign_test_cpus(CPU_STATE_RUNNING);
+                display_cpu_topology();
             }
             init_state = 2;
         } else {

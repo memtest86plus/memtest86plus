@@ -852,12 +852,10 @@ find_proximity_domain:
                     }
                 }
 
-                if (found2 == -1) {
-                    // We've found an affinity entry whose APIC ID we don't know about.
-                    return false;
+                // Skip the CPUs we don't use (eg: > MAX_CPUS).
+                if (found2 != -1) {
+                    cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
                 }
-
-                cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
             }
         }
         else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
@@ -1199,7 +1197,9 @@ void smp_init(bool smp_enable)
         if (find_numa_nodes_in_srat()) {
             check_if_needs_to_map();
         } else {
-            // Do nothing.
+            // Discard a partial parse, so that NUMA gets disabled.
+            num_proximity_domains = 0;
+            num_memory_affinity_ranges = 0;
         }
     }
 

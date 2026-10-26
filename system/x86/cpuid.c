@@ -174,7 +174,8 @@ void cpuid_init(void)
                 }
             }
             cpuid_info.topology.core_count = cpuid_info.topology.thread_count / cpuid_info.topology.thread_per_core ;
-            cpuid_info.topology.smt_shift  = (cpuid_info.topology.thread_per_core > 1);
+            // Pre-Zen reports cores per compute unit here, which aren't SMT threads.
+            cpuid_info.topology.smt_shift  = (cpuid_info.topology.thread_per_core > 1 && cpuid_info.version.extendedFamily >= 8);
         }
         break;
        case 'C':
