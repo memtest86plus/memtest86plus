@@ -98,6 +98,13 @@ startup64:
 	msr	daifset, #0xF
 	mov	x19, x0			// our CPU number
 
+	// Turn the MMU off before replacing TCR: the firmware's live tables may use another
+	// layout (e.g. LPA2). Under VHE this hits SCTLR_EL2, which also holds TCR/TTBR0 below
+	mrs	x0, sctlr_el1
+	bic	x0, x0, #1		// SCTLR.M
+	msr	sctlr_el1, x0
+	isb
+
 	// Enable FP/SIMD at EL1 and EL0 (the compiler may use SIMD registers).
 	mov	x0, #(3 << 20)		// CPACR_EL1.FPEN
 	msr	cpacr_el1, x0
@@ -125,10 +132,8 @@ startup64:
 	cmp	x0, #0x8
 	b.eq	el2_entry
 
-	// Entered at EL1. The MMU may be on (BSP, firmware page tables) or
-	// off (AP). Switch to our page tables and make sure the MMU and
-	// caches are enabled. Both mappings identity-map this code, so the
-	// transition is safe
+	// Entered at EL1, MMU now off. Enable it with our identity-mapped
+	// page tables, along with the caches
 	isb
 	tlbi	vmalle1
 	dsb	nsh
@@ -142,19 +147,16 @@ el2_entry:
 	// Initialise the EL2 registers that affect EL1, then drop to EL1
 	// with the MMU and caches already enabled.
 
-	// If the firmware runs EL2 with VHE (HCR_EL2.E2H set), the EL2
-	// system register layouts differ and clearing E2H redefines the
-	// active translation regime, so turn the EL2 MMU off first (this
-	// code runs from an identity mapping, so that is safe)
+	// If the firmware runs EL2 with VHE (HCR_EL2.E2H set), startup64's
+	// *_el1 writes went to the EL2 registers (EL2 MMU now off), so clear
+	// E2H and redo them
 	mrs	x0, hcr_el2
 	tbz	x0, #34, 1f		// HCR_EL2.E2H
-	mrs	x0, sctlr_el2
-	bic	x0, x0, #1		// clear SCTLR_EL2.M
-	msr	sctlr_el2, x0
-	isb
 	mov_q	x0, HCR_VALUE		// clears E2H
 	msr	hcr_el2, x0
 	isb
+	mov	x0, x19
+	b	startup64
 1:
 	mrs	x0, midr_el1
 	msr	vpidr_el2, x0
