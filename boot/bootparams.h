@@ -94,7 +94,9 @@ typedef struct {
     screen_info_t   screen_info;
     uint8_t         unused1[0x070 - 0x040];
     uint64_t        acpi_rsdp_addr;
-    uint8_t         unused2[0x1c0 - 0x078];
+    uint8_t         unused2a[0x0c8 - 0x078];
+    uint32_t        ext_cmd_line_ptr;
+    uint8_t         unused2b[0x1c0 - 0x0cc];
     efi_info_t      efi_info;
     uint8_t         unused3[0x1e8 - 0x1e0];
     uint8_t         e820_entries;
@@ -108,5 +110,18 @@ typedef struct {
     e820_entry_t    e820_map[E820_MAP_SIZE];
     uint8_t         unused8[0xeec - 0xd00];
 } __attribute__((packed)) boot_params_t;
+
+/**
+ * Returns the address of the boot command line.
+ */
+static inline uintptr_t get_cmd_line_ptr(const boot_params_t *boot_params)
+{
+#if defined(__aarch64__)
+    // Only set by efi_setup(), which may place the boot params above 4GB.
+    return boot_params->cmd_line_ptr | (uintptr_t)boot_params->ext_cmd_line_ptr << 32;
+#else
+    return boot_params->cmd_line_ptr;
+#endif
+}
 
 #endif /* BOOTPARAMS_H */

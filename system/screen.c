@@ -296,7 +296,7 @@ void screen_init(void)
 {
     const boot_params_t *boot_params = (boot_params_t *)boot_params_addr;
 
-    parse_cmd_line(boot_params->cmd_line_ptr, boot_params->cmd_line_size);
+    parse_cmd_line(get_cmd_line_ptr(boot_params), boot_params->cmd_line_size);
 
     const screen_info_t *screen_info = &boot_params->screen_info;
 
