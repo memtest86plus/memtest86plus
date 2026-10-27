@@ -852,12 +852,10 @@ find_proximity_domain:
                     }
                 }
 
-                if (found2 == -1) {
-                    // We've found an affinity entry whose APIC ID we don't know about.
-                    return false;
+                // Skip the CPUs we don't use (eg: > MAX_CPUS).
+                if (found2 != -1) {
+                    cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
                 }
-
-                cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
             }
         }
         else if (entry_header->type == SRAT_PROCESSOR_X2APIC_AFFINITY) {
@@ -1199,7 +1197,9 @@ void smp_init(bool smp_enable)
         if (find_numa_nodes_in_srat()) {
             check_if_needs_to_map();
         } else {
-            // Do nothing.
+            // Discard a partial parse, so that NUMA gets disabled.
+            num_proximity_domains = 0;
+            num_memory_affinity_ranges = 0;
         }
     }
 
@@ -1250,11 +1250,11 @@ int smp_start(cpu_state_t cpu_state[MAX_CPUS])
 #if SEQUENTIAL_AP_START
         int timeout = 10*1000*10;
         while (timeout > 0) {
-            if (cpu_state[cpu_num] == CPU_STATE_RUNNING) break;
+            if (cpu_state[cpu_num] != CPU_STATE_ENABLED) break;
             usleep(100);
             timeout--;
         }
-        if (cpu_state[cpu_num] != CPU_STATE_RUNNING) {
+        if (cpu_state[cpu_num] == CPU_STATE_ENABLED) {
             return cpu_num;
         }
 #endif
@@ -1311,6 +1311,13 @@ int smp_my_cpu_num(void)
     }
     return 0;
 #endif
+}
+
+bool smp_is_smt_sibling(int cpu_num)
+{
+    cpu_apic_id_t smt_mask = ((cpu_apic_id_t)1 << cpuid_info.topology.smt_shift) - 1;
+
+    return cpu_num > 0 && cpu_num < num_available_cpus && (cpu_num_to_apic_id[cpu_num] & smt_mask) != 0;
 }
 
 uint32_t smp_get_proximity_domain_idx(int cpu_num)

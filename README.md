@@ -187,6 +187,8 @@ recognised:
 
   * nosmp
     * disables ACPI table parsing and the use of multiple CPU cores
+  * smt
+    * includes SMT (Hyper-Threading) sibling threads, which are excluded by default
   * nobench
     * disables the integrated memory benchmark
   * nobigstatus

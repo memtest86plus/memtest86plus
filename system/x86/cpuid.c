@@ -142,6 +142,7 @@ void cpuid_init(void)
     cpuid_info.topology.is_hybrid       =  0;
     cpuid_info.topology.ecore_count     = -1;
     cpuid_info.topology.pcore_count     = -1;
+    cpuid_info.topology.smt_shift       =  0;
 
     // Set correct HTT flag according to AP-485
     if (cpuid_info.max_cpuid >= 1 && cpuid_info.flags.htt) {
@@ -173,6 +174,8 @@ void cpuid_init(void)
                 }
             }
             cpuid_info.topology.core_count = cpuid_info.topology.thread_count / cpuid_info.topology.thread_per_core ;
+            // Pre-Zen reports cores per compute unit here, which aren't SMT threads.
+            cpuid_info.topology.smt_shift  = (cpuid_info.topology.thread_per_core > 1 && cpuid_info.version.extendedFamily >= 8);
         }
         break;
        case 'C':
@@ -202,6 +205,7 @@ void cpuid_init(void)
                 switch((reg[2] >> 8) & 0xFF) {
                     case 1: // SMT
                         cpuid_info.topology.thread_per_core  = reg[1] & 0xFF;
+                        cpuid_info.topology.smt_shift        = reg[0] & 0x1F;
                         break;
                     case 2: // Cores
                         cpuid_info.topology.thread_count = reg[1] & 0xFFFF;
@@ -222,6 +226,7 @@ void cpuid_init(void)
             if (cpuid_info.flags.htt){
                 if (((cpuid_info.proc_info.raw >> 16) & 0xFF) > (uint32_t)cpuid_info.topology.core_count) {
                     cpuid_info.topology.thread_count *= 2;
+                    cpuid_info.topology.smt_shift = 1;
                 } else {
                     cpuid_info.flags.htt = !cpuid_info.flags.htt;
                 }
@@ -230,6 +235,7 @@ void cpuid_init(void)
             if(cpuid_info.flags.htt){
                 cpuid_info.topology.core_count = 1;
                 cpuid_info.topology.thread_count = 2;
+                cpuid_info.topology.smt_shift = 1;
             }
         }
         break;

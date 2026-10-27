@@ -50,6 +50,7 @@ extern cpu_state_t  cpu_state[MAX_CPUS];
 
 extern core_type_t  hybrid_core_type[MAX_CPUS];
 extern bool         exclude_ecores;
+extern bool         exclude_smtcores;
 
 extern bool         smp_enabled;
 

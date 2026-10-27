@@ -269,6 +269,26 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
     return false;
 }
 
+// Assigns a test chunk to each CPU in the given state, and counts them in num_enabled_cpus.
+static void assign_test_cpus(cpu_state_t state)
+{
+    for (int i = 0; i < MAX_PROXIMITY_DOMAINS; i++) {
+        used_cpus_in_proximity_domain[i] = 0;
+    }
+    num_enabled_cpus = 0;
+    for (int i = 0; i < num_available_cpus; i++) {
+        if (cpu_state[i] == state) {
+            if (enable_numa) {
+                uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
+                chunk_index[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
+            } else {
+                chunk_index[i] = num_enabled_cpus;
+            }
+            num_enabled_cpus++;
+        }
+    }
+}
+
 static void global_init(void)
 {
     // Set once initialisation is complete; the early relocation below
@@ -351,18 +371,7 @@ static void global_init(void)
         num_available_cpus = 1;
     }
 
-    num_enabled_cpus = 0;
-    for (int i = 0; i < num_available_cpus; i++) {
-        if (cpu_state[i] == CPU_STATE_ENABLED) {
-            if (enable_numa) {
-                uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
-                chunk_index[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
-            } else {
-                chunk_index[i] = num_enabled_cpus;
-            }
-            num_enabled_cpus++;
-        }
-    }
+    assign_test_cpus(CPU_STATE_ENABLED);
     display_cpu_topology();
 
     master_cpu = 0;
@@ -377,7 +386,8 @@ static void global_init(void)
         post_display_init();
     }
 
-    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_enabled_cpus - 1) * AP_STACK_SIZE;
+    // Stack slots are indexed by CPU number, and the barriers touch the slot of every available CPU.
+    size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_available_cpus - 1) * AP_STACK_SIZE;
 
     bool load_addr_ok = set_load_addr(& low_load_addr, program_size,         0x1000,  LOW_LOAD_LIMIT)
                      && set_load_addr(&high_load_addr, program_size, LOW_LOAD_LIMIT, HIGH_LOAD_LIMIT);
@@ -430,25 +440,15 @@ static void global_init(void)
 
 static void ap_enumerate(int my_cpu)
 {
-    if (!cpuid_info.topology.is_hybrid) {
-        return;
+    if (cpuid_info.topology.is_hybrid) {
+        hybrid_core_type[my_cpu] = get_ap_hybrid_type();
     }
 
-    hybrid_core_type[my_cpu] = get_ap_hybrid_type();
-
-    if (hybrid_core_type[my_cpu] == CORE_PCORE) {
-        cpuid_info.topology.pcore_count++;
-    } else if (hybrid_core_type[my_cpu] == CORE_ECORE) {
-        cpuid_info.topology.ecore_count++;
-    }
-
+    // Excluded E-cores keep following the barriers and relocations, but don't test.
     if (hybrid_core_type[my_cpu] == CORE_ECORE && exclude_ecores) {
         cpu_state[my_cpu] = CPU_STATE_DISABLED;
-        //TODO : hlt AP?
-    }
-
-    if (my_cpu == num_enabled_cpus - 1) {
-        display_cpu_topology();
+    } else {
+        cpu_state[my_cpu] = CPU_STATE_RUNNING;
     }
 }
 
@@ -542,7 +542,7 @@ static void test_all_windows(int my_cpu)
     if (!dummy_run) {
         if (cpu_mode == PAR && test_list[test_num].cpu_mode == PAR) {
             parallel_test = true;
-            i_am_active = true;
+            i_am_active = (cpu_state[my_cpu] != CPU_STATE_DISABLED);
         }
     }
     if (i_am_master) {
@@ -689,6 +689,7 @@ void main(void)
                 set_scroll_lock(false);
                 trace(0, "starting other CPUs");
             }
+            // All started CPUs, including the excluded E-cores that only follow the barriers.
             barrier_reset(start_barrier, num_enabled_cpus);
             int failed = smp_start(cpu_state);
             if (failed) {
@@ -701,10 +702,24 @@ void main(void)
                 trace(0, "all other CPUs started");
                 set_scroll_lock(true);
             }
+            // All APs have enumerated: count the core types and reassign the test chunks.
+            if (cpuid_info.topology.is_hybrid) {
+                hybrid_core_type[0] = get_ap_hybrid_type();
+                cpuid_info.topology.pcore_count = 0;
+                cpuid_info.topology.ecore_count = 0;
+                for (int i = 0; i < num_available_cpus; i++) {
+                    if (hybrid_core_type[i] == CORE_PCORE) {
+                        cpuid_info.topology.pcore_count++;
+                    } else if (hybrid_core_type[i] == CORE_ECORE) {
+                        cpuid_info.topology.ecore_count++;
+                    }
+                }
+                assign_test_cpus(CPU_STATE_RUNNING);
+                display_cpu_topology();
+            }
             init_state = 2;
         } else {
             trace(my_cpu, "AP started");
-            cpu_state[my_cpu] = CPU_STATE_RUNNING;
             ap_enumerate(my_cpu);
             while (init_state < 2) {
                 usleep(100);

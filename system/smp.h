@@ -31,7 +31,7 @@
 /**
  * The maximum number of NUMA proximity domains.
  */
-#define MAX_PROXIMITY_DOMAINS       MAX_APIC_IDS
+#define MAX_PROXIMITY_DOMAINS       32
 
 /**
  * The current state of a CPU core.
@@ -75,6 +75,12 @@ void smp_send_nmi(int cpu_num);
  * Returns the ordinal number of the calling CPU core.
  */
 int smp_my_cpu_num(void);
+
+/**
+ * Returns true if the CPU core whose ordinal number is cpu_num is a secondary
+ * SMT thread. Always false for the BSP.
+ */
+bool smp_is_smt_sibling(int cpu_num);
 
 /**
  * Return the index of the proximity domain corresponding to the current CPU number.
