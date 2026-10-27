@@ -21,6 +21,7 @@
 #define SKL_MMR_TIMING_CAS      0x4070
 #define SKL_MMR_MAD_CHAN0       0x500C
 #define SKL_MMR_MAD_CHAN1       0x5010
+#define SKL_MMR_SA_PERF_STATUS  0x5918
 #define SKL_MMR_DRAM_CLOCK      0x5E00
 
 #define SKL_MMR_WINDOW_RANGE    (1UL << 15)
@@ -52,13 +53,13 @@ void get_imc_config_intel_skl(void)
 
     uintptr_t mchbar_addr = map_region(mmio_reg, SKL_MMR_WINDOW_RANGE, false);
 
-    // Get DRAM Ratio
-    ptr = (uintptr_t*)(mchbar_addr + SKL_MMR_DRAM_CLOCK);
-    reg0 = *ptr & 0xF;
+    // Get DRAM Ratio (QCLK_RATIO, bit 7 = 100 MHz reference instead of 133 MHz)
+    ptr = (uintptr_t*)(mchbar_addr + SKL_MMR_SA_PERF_STATUS);
+    reg0 = *ptr & 0xFF;
 
-    if (reg0 < 3) return;
+    if ((reg0 & 0x7F) < 3) return;
 
-    dram_ratio = reg0 * (133.34f / 100.0f);
+    dram_ratio = (reg0 & 0x80) ? (reg0 & 0x7F) : (reg0 & 0x7F) * (133.34f / 100.0f);
 
     // Get CPU Ratio
     rdmsr(MSR_IA32_PLATFORM_INFO, reg0, reg1);
