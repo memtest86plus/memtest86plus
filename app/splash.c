@@ -57,6 +57,9 @@ static void draw_centred_text(int y, uint32_t colour, const char *str)
 void splash_start(void)
 {
     // Early debug output and the "no USB keyboards" countdown must be displayed
+#if defined(USB_DEBUG_HOLD)
+    return;
+#endif
     if (enable_trace || (usb_init_options & USB_DEBUG) || keyboard_types == KT_USB || !screen_hold(&fb)) {
         return;
     }
