@@ -31,7 +31,6 @@ SYS_OBJS = system/acpi.o \
            system/ehci.o \
            system/fat32.o \
            system/font.o \
-           system/gfx.o \
            system/heap.o \
            system/hwquirks.o \
            system/keyboard.o \
@@ -89,8 +88,6 @@ APP_OBJS = app/badram.o \
            app/error.o \
            app/main.o \
            app/reports.o \
-           app/splash.o \
-           app/splash_logo.o \
            app/loongarch/interrupt.o
 
 OBJS = boot/startup.o boot/efisetup.o $(SYS_OBJS) $(IMC_OBJS) $(LIB_OBJS) $(TST_OBJS) $(APP_OBJS)

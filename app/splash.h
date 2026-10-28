@@ -11,6 +11,8 @@
  * Copyright (C) 2026 Sam Demeulemeester.
  */
 
+#if defined(SPLASH_SCREEN)
+
 /**
  * Shows the splash screen if in native graphics mode.
  */
@@ -30,5 +32,14 @@ void splash_notice(const char *message);
  * Removes the splash screen and restores the text display (no effect if not shown).
  */
 void splash_end(void);
+
+#else
+
+static inline void splash_start(void) {}
+static inline void splash_status(const char *message) { (void)message; }
+static inline void splash_notice(const char *message) { (void)message; }
+static inline void splash_end(void) {}
+
+#endif
 
 #endif // SPLASH_H

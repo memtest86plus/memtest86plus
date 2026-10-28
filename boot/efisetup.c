@@ -482,7 +482,7 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     bool use_current_mode = (pref_h_resolution == 0) && (pref_v_resolution == 0);
 
-#if defined(__x86_64__)
+#if defined(SPLASH_SCREEN)
     bool use_native_mode = splash && !rotate && (pref_h_resolution == UINT32_MAX) && (pref_v_resolution == UINT32_MAX);
 #else
     bool use_native_mode = false;
@@ -555,19 +555,10 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         return EFI_NOT_FOUND;
     }
 
-    efi_phys_addr_t  lfb_base = efi_table_attr(mode, frame_buffer_base);
-
     si->orig_video_isVGA = VIDEO_TYPE_EFI;
 
     si->lfb_width  = best_info.h_resolution;
     si->lfb_height = best_info.v_resolution;
-    si->lfb_base   = lfb_base;
-#if (ARCH_BITS == 64)
-    if (lfb_base >> 32) {
-        si->capabilities |= LFB_CAPABILITY_64BIT_BASE;
-        si->ext_lfb_base = lfb_base >> 32;
-    }
-#endif
 
     switch (best_info.pixel_format) {
       case PIXEL_RGB_RESERVED_8BIT_PER_COLOR:
@@ -630,9 +621,6 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     si->lfb_size = si->lfb_linelength * si->lfb_height;
 
     if (debug) {
-        print_string("FB base   : ");
-        print_hex((uintptr_t)lfb_base);
-        print_string("\n");
         print_string("FB size   : ");
         print_dec(si->lfb_width);
         print_string(" x ");
@@ -665,7 +653,20 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
         }
     }
 
+    // Read after SetMode, which may move the framebuffer.
+    efi_phys_addr_t  lfb_base = efi_table_attr(mode, frame_buffer_base);
+    si->lfb_base = lfb_base;
+#if (ARCH_BITS == 64)
+    if (lfb_base >> 32) {
+        si->capabilities |= LFB_CAPABILITY_64BIT_BASE;
+        si->ext_lfb_base = lfb_base >> 32;
+    }
+#endif
+
     if (debug) {
+        print_string("FB base   : ");
+        print_hex((uintptr_t)lfb_base);
+        print_string("\n");
         test_frame_buffer(si);
         print_string("Press any key to continue...\n");
         wait_for_key();
