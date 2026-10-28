@@ -295,6 +295,18 @@ flush:	movw	$KERNEL_DS, %ax
 
 no_avx:
 
+	# Set PAT entry 7 (PAT+PCD+PWT) to write-combining, for the frame buffer.
+
+	movl	$1, %eax
+	cpuid
+	btl	$16, %edx		# Check bit 16 (PAT)
+	jnc	0f
+	movl	$0x277, %ecx		# IA32_PAT
+	rdmsr
+	andl	$0x00ffffff, %edx
+	orl	$0x01000000, %edx
+	wrmsr
+0:
 	# Call the dynamic linker to fix up the addresses in the GOT.
 
 	call	reloc

@@ -71,6 +71,15 @@ extern bool paging_incomplete;
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 
 /**
+ * Makes an already mapped region write-combining, where supported (used for
+ * the frame buffer).
+ *
+ * \param virt_addr         - the virtual byte address of the region.
+ * \param size              - the region size in bytes.
+ */
+void set_write_combining(uintptr_t virt_addr, size_t size);
+
+/**
  * Prepares the mapping for 1..VMEM_MAX_CONTEXTS execution contexts, before AP startup (on x86-64,
  * a pinned Page Directory Table per extra context). Returns false on failure: one context only.
  */

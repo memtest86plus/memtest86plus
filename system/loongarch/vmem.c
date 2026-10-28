@@ -76,6 +76,10 @@ bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __a
     return true;
 }
 
+void set_write_combining(uintptr_t virt_addr __attribute__((unused)), size_t size __attribute__((unused)))
+{
+}
+
 void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
     // Undo the NUMA node compaction (smp.c check_if_needs_to_map()).

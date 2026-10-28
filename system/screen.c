@@ -376,6 +376,7 @@ void screen_init(void)
 
         // The above clipping should guarantee the mapping never fails.
         lfb_base = map_region(lfb_base, lfb_height * lfb_stride, false);
+        set_write_combining(lfb_base, lfb_height * lfb_stride);
 
         if ((screen_info->capabilities & LFB_CAPABILITY_MT_NATIVE) && lfb_bytes_per_pixel == 4 && !lfb_rotate) {
             native_fb.base      = lfb_base;
