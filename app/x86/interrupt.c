@@ -18,6 +18,7 @@
 
 #include "error.h"
 #include "display.h"
+#include "splash.h"
 
 #include "interrupt.h"
 
@@ -207,6 +208,8 @@ ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
     // Never released: holding the UI lock keeps NUMA teams off the dump.
     spin_trylock(error_mutex);
     spin_trylock(ui_mutex);
+
+    splash_end();
 
     clear_message_area();
 
