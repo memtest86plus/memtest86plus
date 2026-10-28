@@ -67,8 +67,8 @@ void get_imc_config_intel_skl(void)
 
     if (!cpu_ratio) return;
 
-    // Compute DRAM Frequency
-    imc.freq = ((clks_per_msec / 1000) / cpu_ratio) * dram_ratio * 2;
+    // Compute DRAM Frequency (QCLK ratio already gives the data rate)
+    imc.freq = ((clks_per_msec / 1000) / cpu_ratio) * dram_ratio;
 
     if (imc.freq < 150 || imc.freq > 8000) {
         imc.freq = 0;
