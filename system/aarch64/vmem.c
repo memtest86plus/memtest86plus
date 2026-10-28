@@ -347,6 +347,10 @@ bool map_window(uintptr_t start_page __attribute__((unused)))
     return true;
 }
 
+void set_write_combining(uintptr_t virt_addr __attribute__((unused)), size_t size __attribute__((unused)))
+{
+}
+
 void *first_word_mapping(uintptr_t page)
 {
     return (void *)(page << PAGE_SHIFT);

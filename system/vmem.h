@@ -57,6 +57,15 @@ extern bool paging_incomplete;
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 
 /**
+ * Makes an already mapped region write-combining, where supported (used for
+ * the frame buffer).
+ *
+ * \param virt_addr         - the virtual byte address of the region.
+ * \param size              - the region size in bytes.
+ */
+void set_write_combining(uintptr_t virt_addr, size_t size);
+
+/**
  * Maps a \ref VM_WINDOW_SIZE region of physical memory into the upper 2GB of
  * virtual memory. The physical memory region must be aligned on a \ref
  * VM_WINDOW_SIZE boundary. The virtual address will be similarly aligned.

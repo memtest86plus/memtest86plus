@@ -114,6 +114,24 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
     return VM_REGION_START + first_virt_page * VM_PAGE_SIZE + base_addr % VM_PAGE_SIZE;
 }
 
+void set_write_combining(uintptr_t virt_addr, size_t size)
+{
+#ifdef __x86_64__
+    if (virt_addr == 0 || !cpuid_info.flags.pat) return;
+
+    // Select PAT entry 7 (PAT+PCD+PWT), which the startup code sets to write-combining.
+    uint64_t *pd[4] = { pd0, pd1, pd2, pd3 };
+    uintptr_t end = virt_addr + size;
+    for (uintptr_t addr = virt_addr & ~(uintptr_t)(VM_PAGE_SIZE - 1); addr < end; addr += VM_PAGE_SIZE) {
+        pd[addr >> 30][(addr >> VM_PAGE_SHIFT) % 512] |= (1 << 12) | (1 << 4) | (1 << 3);
+    }
+    load_pdbr();
+#else
+    (void)virt_addr;
+    (void)size;
+#endif
+}
+
 bool map_window(uintptr_t start_page)
 {
     uintptr_t window = start_page >> (30 - PAGE_SHIFT);
