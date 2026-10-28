@@ -315,6 +315,8 @@ static void (*put_char)(int, int, uint8_t, uint8_t) = vga_put_char;
 
 static void (*held_put_char)(int, int, uint8_t, uint8_t) = vga_put_char;
 
+static bool screen_held = false;
+
 static void put_value(int row, int col, uint16_t value)
 {
     put_char(row, col, value % 256, value / 256);
@@ -451,17 +453,20 @@ void screen_init(void)
 
 bool screen_hold(screen_fb_t *fb)
 {
-    if (native_fb.base == 0) {
+    if (native_fb.base == 0 || screen_held) {
         return false;
     }
     *fb = native_fb;
     held_put_char = put_char;
     put_char = hold_put_char;
+    screen_held = true;
     return true;
 }
 
 void screen_release(void)
 {
+    if (!screen_held) return;
+    screen_held = false;
     put_char = held_put_char;
 
     uint32_t *line = (uint32_t *)native_fb.base;
