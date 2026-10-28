@@ -436,38 +436,6 @@ static efi_graphics_output_t *find_gop(efi_handle_t *handles, size_t handles_siz
     return first_gop;
 }
 
-static uint32_t find_native_mode(efi_graphics_output_t *gop, efi_gop_mode_info_t *best_info)
-{
-    efi_gop_mode_t *mode = efi_table_attr(gop, mode);
-
-    uint32_t best_mode = UINT32_MAX;
-    uint32_t best_area = 0;
-    for (uint32_t mode_num = 0; mode_num < mode->max_mode; mode_num++) {
-        efi_gop_mode_info_t *info;
-        uintn_t              info_size;
-        efi_status_t status = efi_call_proto(gop, query_mode, mode_num, &info_size, &info);
-        if (status != EFI_SUCCESS) {
-            continue;
-        }
-        bool is_32bpp = (info->pixel_format == PIXEL_RGB_RESERVED_8BIT_PER_COLOR)
-                     || (info->pixel_format == PIXEL_BGR_RESERVED_8BIT_PER_COLOR);
-
-        bool h_res_ok = (info->h_resolution >= MIN_H_RESOLUTION) && (info->h_resolution <= MAX_NATIVE_H_RESOLUTION);
-        bool v_res_ok = (info->v_resolution >= MIN_V_RESOLUTION) && (info->v_resolution <= MAX_NATIVE_V_RESOLUTION);
-
-        // Prefer the current mode, usually the panel's native resolution.
-        uint32_t area = (mode_num == mode->mode) ? UINT32_MAX : info->h_resolution * info->v_resolution;
-
-        if (is_32bpp && h_res_ok && v_res_ok && (area > best_area)) {
-            best_mode = mode_num;
-            best_area = area;
-            *best_info = *info;
-        }
-        efi_call_bs(free_pool, info);
-    }
-    return best_mode;
-}
-
 static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *handles, size_t handles_size)
 {
     efi_status_t status;
@@ -507,16 +475,12 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
     best_info.h_resolution = UINT32_MAX;
     best_info.v_resolution = UINT32_MAX;
 
+    efi_gop_mode_info_t native_info;
+    uint32_t native_mode = UINT32_MAX;
+    uint32_t native_area = 0;
+
     uint32_t best_mode = UINT32_MAX;
-    if (use_native_mode) {
-        best_mode = find_native_mode(gop, &best_info);
-    }
-    if (best_mode != UINT32_MAX) {
-        si->capabilities |= LFB_CAPABILITY_MT_NATIVE;
-        if (debug) {
-            print_string("Native mode selected\n");
-        }
-    } else if (use_current_mode) {
+    if (use_current_mode) {
         best_mode = mode->mode;
         best_info = *mode->info;
     } else {
@@ -526,6 +490,21 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
             status = efi_call_proto(gop, query_mode, mode_num, &info_size, &info);
             if (status != EFI_SUCCESS) {
                 continue;
+            }
+            if (use_native_mode) {
+                bool is_32bpp = (info->pixel_format == PIXEL_RGB_RESERVED_8BIT_PER_COLOR)
+                             || (info->pixel_format == PIXEL_BGR_RESERVED_8BIT_PER_COLOR);
+                bool h_res_ok = (info->h_resolution >= MIN_H_RESOLUTION)
+                             && (info->h_resolution <= MAX_NATIVE_H_RESOLUTION);
+                bool v_res_ok = (info->v_resolution >= MIN_V_RESOLUTION)
+                             && (info->v_resolution <= MAX_NATIVE_V_RESOLUTION);
+                // Prefer the current mode, usually the panel's native resolution.
+                uint32_t area = (mode_num == mode->mode) ? UINT32_MAX : info->h_resolution * info->v_resolution;
+                if (is_32bpp && h_res_ok && v_res_ok && (area > native_area)) {
+                    native_mode = mode_num;
+                    native_area = area;
+                    native_info = *info;
+                }
             }
             if ((info->h_resolution == pref_h_resolution) && (info->v_resolution == pref_v_resolution)) {
                 best_mode = mode_num;
@@ -548,6 +527,14 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
                 }
             }
             efi_call_bs(free_pool, info);
+        }
+    }
+    if (native_mode != UINT32_MAX) {
+        best_mode = native_mode;
+        best_info = native_info;
+        si->capabilities |= LFB_CAPABILITY_MT_NATIVE;
+        if (debug) {
+            print_string("Native mode selected\n");
         }
     }
     if (best_mode == UINT32_MAX) {
