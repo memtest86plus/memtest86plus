@@ -59,6 +59,14 @@ struct tstruct_header {
     uint16_t handle;
 } __attribute__((packed));
 
+struct bios_info {
+    struct tstruct_header header;
+    uint8_t  vendor;
+    uint8_t  version;
+    uint16_t start_segment;
+    uint8_t  release_date; // Remaining fields unused.
+} __attribute__((packed));
+
 struct system_info {
     struct tstruct_header header;
     uint8_t  manufacturer;
@@ -205,6 +213,12 @@ void get_smbios_board_info(const char **manufacturer, const char **product);
  * Sets output pointers to NULL if unavailable.
  */
 void get_smbios_serial_info(const char **system_serial, const char **baseboard_serial);
+
+/**
+ * Retrieve the BIOS (type 0) version and release date strings,
+ * snapshotted at boot. Sets output pointers to NULL if unavailable.
+ */
+void get_smbios_bios_info(const char **version, const char **date);
 
 /**
  * Print DMI

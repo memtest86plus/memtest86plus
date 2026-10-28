@@ -25,6 +25,7 @@ static const efi_guid_t SMBIOS2_GUID = { 0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16
 // Some firmware (e.g. QEMU virt, ARM laptops) only publishes the 64-bit SMBIOS v3 entry point.
 static const efi_guid_t SMBIOS3_GUID = { 0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} };
 
+struct bios_info *dmi_bios_info;
 struct system_info *dmi_system_info;
 struct baseboard_info *dmi_baseboard_info;
 struct mem_dev *dmi_memory_device;  // no static initialiser: reloc() would rebase it (see reloc64.c)
@@ -48,6 +49,8 @@ static bool dmi_board_info_valid = false;
 // the board info above.
 static char dmi_system_serial[DMI_STRING_MAX];
 static char dmi_board_serial[DMI_STRING_MAX];
+static char dmi_bios_version[DMI_STRING_MAX];
+static char dmi_bios_date[16];
 
 static bool copy_dmi_string(char *dst, size_t dst_size, struct tstruct_header *header, uint8_t string_idx);
 
@@ -162,8 +165,12 @@ static int parse_dmi(uint16_t numstructs)
             break;
         }
 
+        // Type 0 - BIOS Information
+        if (header->type == 0 && header->length > offsetof(struct bios_info, release_date)) {
+            dmi_bios_info = (struct bios_info *) dmi;
+        }
         // Type 1 - System Information
-        if (header->type == 1 && header->length > offsetof(struct system_info, wut)) {
+        else if (header->type == 1 && header->length > offsetof(struct system_info, wut)) {
             // Multiple type 1 structs are not allowed by the standard. Still, effectively pick up the last one.
             dmi_system_info = (struct system_info *) dmi;
         }
@@ -199,6 +206,7 @@ static int parse_dmi(uint16_t numstructs)
         dmi += header->length;
 
         if (dmi >= table_start + table_length) {
+            dmi_bios_info = NULL;
             dmi_system_info = NULL;
             dmi_baseboard_info = NULL;
             dmi_cpu_info = NULL;
@@ -215,6 +223,7 @@ static int parse_dmi(uint16_t numstructs)
         dmi += 2;
 
         if ((dmi > table_start + table_length) || (++tstruct_count > numstructs)) {
+            dmi_bios_info = NULL;
             dmi_system_info = NULL;
             dmi_baseboard_info = NULL;
             dmi_cpu_info = NULL;
@@ -277,9 +286,15 @@ static void override_cpu_model(void)
 }
 #endif
 
-// Snapshot the serial numbers before the memory tests overwrite the table.
-static void capture_serial_numbers(void)
+// Snapshot the serial numbers and BIOS info before the memory tests overwrite the table.
+static void capture_dmi_strings(void)
 {
+    if (dmi_bios_info != NULL) {
+        copy_dmi_string(dmi_bios_version, sizeof(dmi_bios_version),
+                        &dmi_bios_info->header, dmi_bios_info->version);
+        copy_dmi_string(dmi_bios_date, sizeof(dmi_bios_date),
+                        &dmi_bios_info->header, dmi_bios_info->release_date);
+    }
     if (dmi_system_info != NULL) {
         copy_dmi_string(dmi_system_serial, sizeof(dmi_system_serial),
                         &dmi_system_info->header, dmi_system_info->serialnumber);
@@ -372,7 +387,7 @@ int smbios_init(void)
     int result = parse_dmi(numstructs);
 
     if (result == 0) {
-        capture_serial_numbers();
+        capture_dmi_strings();
     }
 
 #if defined(__aarch64__)
@@ -399,6 +414,12 @@ void get_smbios_serial_info(const char **system_serial, const char **baseboard_s
 {
     *system_serial = dmi_system_serial[0] != '\0' ? dmi_system_serial : NULL;
     *baseboard_serial = dmi_board_serial[0] != '\0' ? dmi_board_serial : NULL;
+}
+
+void get_smbios_bios_info(const char **version, const char **date)
+{
+    *version = dmi_bios_version[0] != '\0' ? dmi_bios_version : NULL;
+    *date = dmi_bios_date[0] != '\0' ? dmi_bios_date : NULL;
 }
 
 void print_smbios_startup_info(void)

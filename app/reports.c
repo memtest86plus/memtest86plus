@@ -211,6 +211,12 @@ static int format_results(char *buf, int bufsize)
         pos = buf_printf(pos, "Motherboard: %s %s\r\n", board_mfg, board_prod);
     }
 
+    const char *bios_version, *bios_date;
+    get_smbios_bios_info(&bios_version, &bios_date);
+    if (bios_version) {
+        pos = buf_printf(pos, bios_date ? "BIOS: %s (%s)\r\n" : "BIOS: %s\r\n", bios_version, bios_date);
+    }
+
     const char *system_serial, *baseboard_serial;
     get_smbios_serial_info(&system_serial, &baseboard_serial);
     if (system_serial) {
