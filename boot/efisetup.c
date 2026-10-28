@@ -455,7 +455,8 @@ static uint32_t find_native_mode(efi_graphics_output_t *gop, efi_gop_mode_info_t
         bool h_res_ok = (info->h_resolution >= MIN_H_RESOLUTION) && (info->h_resolution <= MAX_NATIVE_H_RESOLUTION);
         bool v_res_ok = (info->v_resolution >= MIN_V_RESOLUTION) && (info->v_resolution <= MAX_NATIVE_V_RESOLUTION);
 
-        uint32_t area = info->h_resolution * info->v_resolution;
+        // Prefer the current mode, usually the panel's native resolution.
+        uint32_t area = (mode_num == mode->mode) ? UINT32_MAX : info->h_resolution * info->v_resolution;
 
         if (is_32bpp && h_res_ok && v_res_ok && (area > best_area)) {
             best_mode = mode_num;
@@ -652,6 +653,12 @@ static efi_status_t set_screen_info_from_gop(screen_info_t *si, efi_handle_t *ha
 
     if (!use_current_mode) {
         status = efi_call_proto(gop, set_mode, best_mode);
+        if (status != EFI_SUCCESS && (si->capabilities & LFB_CAPABILITY_MT_NATIVE)) {
+            // Retry with the default mode selection.
+            si->capabilities &= ~LFB_CAPABILITY_MT_NATIVE;
+            splash = false;
+            return set_screen_info_from_gop(si, handles, handles_size);
+        }
         if (status != EFI_SUCCESS) {
             print_string("Set GOP mode failed\n");
             return status;
