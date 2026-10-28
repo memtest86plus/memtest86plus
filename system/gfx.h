@@ -17,8 +17,10 @@
 #include "screen.h"
 
 /**
- * An image compressed as a PackBits RLE stream of pixel bytes, each holding a
+ * An image compressed as a run-length encoded stream of pixel bytes, each holding a
  * colour index (bits 7:4, 0 = transparent) and a 4-bit alpha value (bits 3:0).
+ * Each run starts with a header byte h: if bit 7 is set, the next byte is repeated
+ * (h & 0x7f) + 1 times, otherwise (h & 0x7f) + 1 literal bytes follow (not PackBits).
  */
 typedef struct {
     int             width;
@@ -33,12 +35,7 @@ typedef struct {
 void gfx_init(const screen_fb_t *fb);
 
 /**
- * Sets the background to a vertical gradient between the specified colours.
- */
-void gfx_set_background(uint32_t top_colour, uint32_t bottom_colour);
-
-/**
- * Repaints the specified rectangle with the background.
+ * Clears the specified rectangle to black.
  */
 void gfx_clear_rect(int x, int y, int width, int height);
 
@@ -49,7 +46,7 @@ void gfx_clear_rect(int x, int y, int width, int height);
 void gfx_draw_text(int x, int y, int scale, uint32_t colour, const char *str);
 
 /**
- * Draws the image at (x,y) (top left), blended over the background, 
+ * Draws the image at (x,y) (top left), blended over black,
  * and at half size if shrink is true.
  */
 void gfx_draw_image(int x, int y, const gfx_image_t *image, bool shrink);

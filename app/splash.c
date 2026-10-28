@@ -15,22 +15,20 @@
 #include "config.h"
 #include "build_version.h"
 
+#include "splash_logo.h"
+
 #include "splash.h"
 
 //------------------------------------------------------------------------------
 // Constants
 //------------------------------------------------------------------------------
 
-#define BG_TOP_COLOUR       0x000000
-#define BG_BOTTOM_COLOUR    0x000000
 #define VERSION_COLOUR      0x8f8f8f
 #define STATUS_COLOUR       0xbfbfbf
 
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
-
-extern const gfx_image_t splash_logo_white;
 
 static bool         active = false;
 
@@ -66,9 +64,8 @@ void splash_start(void)
 
     active = true;
 
+    // The framebuffer is still black from screen_init().
     gfx_init(&fb);
-    gfx_set_background(BG_TOP_COLOUR, BG_BOTTOM_COLOUR);
-    gfx_clear_rect(0, 0, fb.width, fb.height);
 
     bool shrink = fb.width < 1024;
     int logo_width  = shrink ? splash_logo_white.width  / 2 : splash_logo_white.width;
@@ -76,7 +73,7 @@ void splash_start(void)
     int logo_y = (fb.height * 2) / 5 - logo_height / 2;
     gfx_draw_image((fb.width - logo_width) / 2, logo_y, &splash_logo_white, shrink);
 
-    text_scale = fb.width >= 1280 ? 2 : 1; // > or >= ?
+    text_scale = fb.width >= 1280 ? 2 : 1;
     status_row = (fb.height * 3) / 4;
     notice_row = (fb.height * 7) / 8;
 
