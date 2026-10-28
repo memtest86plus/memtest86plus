@@ -2,7 +2,7 @@
 //
 // Converts a PNG into a gfx_image_t C source file (check system/gfx.h).
 // Each pixel is mapped to the nearest palette colour plus a 4-bit alpha, then
-// the pixel bytes are PackBits RLE compressed. Self-contained.
+// the pixel bytes are run-length encoded (format in system/gfx.h). Self-contained.
 //
 // Usage: mklogo input.png output.c symbol [--colours RRGGBB,RRGGBB,...] [--preview preview.png]
 //               [--background TOPRGB,BOTTOMRGB]
@@ -721,7 +721,7 @@ static void classify(const uint8_t *rgba, size_t count, const rgb_t *colours, in
     }
 }
 
-static size_t packbits(const uint8_t *values, size_t n, uint8_t *out)
+static size_t rle_encode(const uint8_t *values, size_t n, uint8_t *out)
 {
     size_t len = 0, i = 0;
     while (i < n) {
@@ -750,7 +750,7 @@ static size_t packbits(const uint8_t *values, size_t n, uint8_t *out)
     return len;
 }
 
-static bool unpackbits_matches(const uint8_t *data, size_t len, const uint8_t *values, size_t count)
+static bool rle_matches(const uint8_t *data, size_t len, const uint8_t *values, size_t count)
 {
     size_t i = 0, n = 0;
     while (n < count) {
@@ -996,9 +996,9 @@ int main(int argc, char *argv[])
     free(rgba);
 
     uint8_t *data = xmalloc(count * 2 + 2);
-    size_t len = packbits(values, count, data);
-    if (!unpackbits_matches(data, len, values, count)) {
-        die("internal error: PackBits round trip failed");
+    size_t len = rle_encode(values, count, data);
+    if (!rle_matches(data, len, values, count)) {
+        die("internal error: RLE round trip failed");
     }
 
     if (preview_path != NULL) {

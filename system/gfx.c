@@ -32,9 +32,6 @@ typedef struct {
 
 static screen_fb_t fb;
 
-static uint32_t bg_top;
-static uint32_t bg_bottom;
-
 static uint8_t image_row[2][MAX_IMAGE_WIDTH];
 
 //------------------------------------------------------------------------------
@@ -55,30 +52,16 @@ static void put_pixel(int x, int y, uint32_t pixel)
     ((uint32_t *)fb.base)[y * fb.stride + x] = pixel;
 }
 
-static uint32_t background(int y)
-{
-    int span = fb.height > 1 ? fb.height - 1 : 1;
-    uint32_t colour = 0;
-    for (int shift = 0; shift < 24; shift += 8) {
-        int top    = (bg_top    >> shift) & 0xff;
-        int bottom = (bg_bottom >> shift) & 0xff;
-        colour |= (uint32_t)(top + (bottom - top) * y / span) << shift;
-    }
-    return colour;
-}
-
-static uint32_t image_colour(const gfx_image_t *image, uint8_t value, uint32_t bg)
+static uint32_t image_colour(const gfx_image_t *image, uint8_t value)
 {
     int index = value >> 4;
     int alpha = value & 0xf;
-    if (index == 0 || index > 3) return bg;
+    if (index == 0 || index > 3) return 0;
 
     uint32_t fg = image->colours[index];
     uint32_t colour = 0;
     for (int shift = 0; shift < 24; shift += 8) {
-        int f = (fg >> shift) & 0xff;
-        int b = (bg >> shift) & 0xff;
-        colour |= (uint32_t)(b + (f - b) * alpha / 15) << shift;
+        colour |= (((fg >> shift) & 0xff) * alpha / 15) << shift;
     }
     return colour;
 }
@@ -87,7 +70,8 @@ static uint32_t average4(uint32_t c0, uint32_t c1, uint32_t c2, uint32_t c3)
 {
     uint32_t colour = 0;
     for (int shift = 0; shift < 24; shift += 8) {
-        uint32_t sum = ((c0 >> shift) & 0xff) + ((c1 >> shift) & 0xff) + ((c2 >> shift) & 0xff) + ((c3 >> shift) & 0xff);
+        uint32_t sum = ((c0 >> shift) & 0xff) + ((c1 >> shift) & 0xff)
+                     + ((c2 >> shift) & 0xff) + ((c3 >> shift) & 0xff);
         colour |= (sum / 4) << shift;
     }
     return colour;
@@ -116,12 +100,6 @@ void gfx_init(const screen_fb_t *info)
     fb = *info;
 }
 
-void gfx_set_background(uint32_t top_colour, uint32_t bottom_colour)
-{
-    bg_top    = top_colour;
-    bg_bottom = bottom_colour;
-}
-
 void gfx_clear_rect(int x, int y, int width, int height)
 {
     if (x < 0) { width  += x; x = 0; }
@@ -130,10 +108,9 @@ void gfx_clear_rect(int x, int y, int width, int height)
     if (y + height > fb.height) height = fb.height - y;
 
     for (int row = y; row < y + height; row++) {
-        uint32_t pixel = pack(background(row));
         uint32_t *line = (uint32_t *)fb.base + row * fb.stride;
         for (int col = x; col < x + width; col++) {
-            line[col] = pixel;
+            line[col] = 0;
         }
     }
 }
@@ -167,17 +144,16 @@ void gfx_draw_image(int x, int y, const gfx_image_t *image, bool shrink)
             }
         }
         int py = y + row / step;
-        uint32_t bg = background(py);
         for (int col = 0; col + step <= image->width; col += step) {
             uint32_t colour;
             if (shrink) {
-                colour = average4(image_colour(image, image_row[0][col],     bg),
-                                  image_colour(image, image_row[0][col + 1], bg),
-                                  image_colour(image, image_row[1][col],     bg),
-                                  image_colour(image, image_row[1][col + 1], bg));
+                colour = average4(image_colour(image, image_row[0][col]),
+                                  image_colour(image, image_row[0][col + 1]),
+                                  image_colour(image, image_row[1][col]),
+                                  image_colour(image, image_row[1][col + 1]));
             } else {
                 if ((image_row[0][col] >> 4) == 0) continue;
-                colour = image_colour(image, image_row[0][col], bg);
+                colour = image_colour(image, image_row[0][col]);
             }
             put_pixel(x + col / step, py, pack(colour));
         }
