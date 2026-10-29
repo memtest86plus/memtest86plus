@@ -39,7 +39,7 @@
  * same time. 16 contexts cover any realistic 1-2 node machine in a single
  * wave while keeping the per-context page-table/map footprint bounded; more
  * CPU-backed NUMA domains are processed in successive waves. i586 builds
- * use a single context. The value must be visible to startup assembly.
+ * use a single context.
  */
 #if defined(__i386__)
 #define	VMEM_MAX_CONTEXTS	1
@@ -97,7 +97,7 @@ extern uint64_t	pdp[];
 
 extern uint64_t	pd0[];
 extern uint64_t	pd1[];
-extern uint64_t	win_pd[];
+extern uint64_t	pd2[];
 extern uint64_t	pd3[];
 
 extern uintptr_t boot_params_addr;

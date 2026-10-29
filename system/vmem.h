@@ -13,10 +13,9 @@
  * and use the upper 2GB for mapping the remaining physical memory as
  * required.
  *
- * On x86-64, every execution context tests through its own 2MB-page window,
- * whose table is a private Page Directory Table selected by a PDP entry in
- * the shared table set: context 0 maps its windows at 2GB, any further
- * contexts at 4GB and above, in 1GB steps. A CPU must only ever dereference
+ * On x86-64, every execution context tests through its own 2MB-page window:
+ * context 0 maps its windows at 2GB, any further contexts at 4GB and above,
+ * in 1GB steps, through Page Directory Tables in pinned heap pages. A CPU must only ever dereference
  * the test window of the execution context it is bound to, so no context
  * ever walks stale translations published by another.
  *
@@ -80,18 +79,8 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 /**
  * Prepares the architecture's physical-memory mapping model for the given
  * number of execution contexts, which must be 1..VMEM_MAX_CONTEXTS.
- * On x86-64 this initializes every per-context PML4/PDP/PD2 root; on
- * AArch64 and LoongArch64 it validates the shared identity/direct mapping.
- * Returns false (leaving a single context usable) on failure or an
- * unsupported context count. Call before AP startup.
- */
-bool vmem_prepare_execution_contexts(int num_contexts);
-
-/**
- * Prepares the architecture's physical-memory mapping model for the given
- * number of execution contexts, which must be 1..VMEM_MAX_CONTEXTS.
- * On x86-64 this initialises the single shared paging root and makes every
- * context's test window reachable through its own PDP entry; on AArch64 and
+ * On x86-64 this allocates a pinned heap page per extra context for its
+ * window Page Directory Table and links it into the PDP; on AArch64 and
  * LoongArch64 it validates the shared identity/direct mapping.
  * Returns false (leaving a single context usable) on failure or an
  * unsupported context count. Call before AP startup.

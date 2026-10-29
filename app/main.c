@@ -659,13 +659,9 @@ static void global_init(void)
         numa_mode = NUMA_ON;
     }
 
-    // Prepare the architecture mapping model for up to VMEM_MAX_CONTEXTS
-    // execution contexts before the APs start. On x86-64 this initializes
-    // the shared paging root and every context's test window mapping;
-    // i586 keeps a single context.
-    if (VMEM_MAX_CONTEXTS > 1
-        && !vmem_prepare_execution_contexts(VMEM_MAX_CONTEXTS)
-        && numa_mode == NUMA_PAR) {
+    // One execution context per proximity domain at most; x86-64 pins a window PD for each extra one.
+    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR
+        && !vmem_prepare_execution_contexts(MIN(VMEM_MAX_CONTEXTS, num_proximity_domains))) {
         numa_mode = NUMA_ON;
     }
 

@@ -17,6 +17,7 @@
 #include "assert.h"
 
 #include "cpuid.h"
+#include "heap.h"
 #include "spinlock.h"
 
 #include "vmem.h"
@@ -31,9 +32,8 @@
 // physical memory window we are currently testing, and the following 512MB to
 // map the screen frame buffer, ACPI tables, and any hardware devices we need
 // to access that are not in the permanently mapped regions. Every execution
-// context beyond the first tests through its own 1GB window, located at 4GB
-// and above, mapped by a C-code-inserted PDP entry pointing at a private
-// Page Directory Table.
+// context beyond the first tests through its own 1GB window at 4GB and above,
+// whose Page Directory Table is a pinned heap page.
 
 #define MAX_REGION_PAGES    256     // VM pages
 
@@ -58,7 +58,11 @@ static int      num_contexts = 1;
 
 static uintptr_t    mapped_window[VMEM_MAX_CONTEXTS] = { 2 };
 
-// Serialises PD2 reconstruction within a context. Initialized before AP
+// The window PDs of contexts 1..n. Being outside the image, their physical
+// addresses in pdp[] remain valid in every relocated copy.
+static uint64_t     *context_pd[VMEM_MAX_CONTEXTS];
+
+// Serialises window PD reconstruction within a context. Initialized before AP
 // startup: after relocation the copied BSS is not re-zeroed, so an explicit
 // init is required.
 static spinlock_t   window_mutex[VMEM_MAX_CONTEXTS] = { 0 };
@@ -96,27 +100,10 @@ static void load_pdbr(void)
 #endif
 }
 
-// Builds the shared x86-64 paging root: the PML4 and PDP base entries, plus
-// one PDP entry per additional test window slot, each pointing at a private
-// Page Directory Table. The slots' mapped_window[] bookkeeping is not touched
-// here: the initial pool content (physical 2GB) matches the initial
-// bookkeeping, and later map_window() calls rebuild only the slots in use.
-#ifdef __x86_64__
-static void init_page_tables(void)
+static uint64_t *window_pd(int context_id)
 {
-    pml4[0] = (uintptr_t)pdp + 0x3;
-    pdp[0] = (uintptr_t)pd0 + 0x3;
-    pdp[1] = (uintptr_t)pd1 + 0x3;
-    pdp[2] = (uintptr_t)win_pd + 0x3;
-    pdp[3] = (uintptr_t)pd3 + 0x3;
-    // Test window slots 1..n: context k maps its windows at 4GB and above.
-    // Unused entries stay zeroed, so an accidental access faults instead of
-    // silently aliasing another context's window.
-    for (int context_id = 1; context_id < num_contexts; context_id++) {
-        pdp[context_id + 3] = (uintptr_t)(win_pd + context_id * 512) + 0x3;
-    }
+    return context_id == 0 ? pd2 : context_pd[context_id];
 }
-#endif
 
 //------------------------------------------------------------------------------
 // Public Functions
@@ -133,22 +120,29 @@ bool vmem_prepare_execution_contexts(int requested_contexts)
     return true;
 #else
     if (requested_contexts < 1 || requested_contexts > VMEM_MAX_CONTEXTS) {
-        num_contexts = 1;
         return false;
     }
-
-    num_contexts = requested_contexts;
-    init_page_tables();
-
-    // First boot: every test window still carries the initial physical 2GB
-    // mappings from the image, so the bookkeeping must agree with them.
-    for (int context_id = 0; context_id < num_contexts; context_id++) {
-        mapped_window[context_id] = 2;
+    if (requested_contexts > 1) {
+        // The heap may lie above the identity-mapped 2GB: map_region() keeps the PDs writable.
+        size_t size = (requested_contexts - 1) * PAGE_SIZE;
+        uintptr_t mark = heap_mark(HEAP_TYPE_HM_1);
+        uintptr_t pd_addr = heap_alloc(HEAP_TYPE_HM_1, size, PAGE_SIZE);
+        uintptr_t pd_virt = (pd_addr != 0) ? map_region(pd_addr, size, false) : 0;
+        if (pd_virt == 0) {
+            heap_rewind(HEAP_TYPE_HM_1, mark);
+            return false;
+        }
+        for (int context_id = 1; context_id < requested_contexts; context_id++) {
+            context_pd[context_id] = (uint64_t *)(pd_virt + (context_id - 1) * PAGE_SIZE);
+            // Not present until map_window(), so a stray access faults.
+            for (int i = 0; i < 512; i++) {
+                context_pd[context_id][i] = 0;
+            }
+            pdp[context_id + 3] = pd_addr + (context_id - 1) * PAGE_SIZE + 0x3;
+        }
+        load_pdbr();
     }
-
-    // Every CPU shares this paging root; the startup code loads it and
-    // each CPU reloads it again after every relocation.
-    load_pdbr();
+    num_contexts = requested_contexts;
     return true;
 #endif
 }
@@ -214,10 +208,15 @@ bool map_window(int context_id, uintptr_t start_page)
         return false;
     }
 
+    if (context_id >= num_contexts) {
+        // No window PD was prepared for this context.
+        return false;
+    }
+
     spin_lock(&window_mutex[context_id]);
     if (mapped_window[context_id] != window) {
         // Compute the page table entries for this context's test window.
-        uint64_t *context_win_pd = win_pd + context_id * 512;
+        uint64_t *context_win_pd = window_pd(context_id);
         for (int i = 0; i < 512; i++) {
             context_win_pd[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + 0x83;
         }
