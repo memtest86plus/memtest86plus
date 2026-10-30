@@ -41,9 +41,10 @@
 #define SPIN_SIZE (1 << 27)  // in testwords
 
 /**
- * A macro to perform test bailout when requested.
+ * A macro to perform test bailout when requested. In NUMA_PAR the whole team
+ * reads the same decision, published by the context barrier.
  */
-#define BAILOUT if (bail) return ticks
+#define BAILOUT if (test_stop_requested()) return ticks
 
 /**
  * A macro to skip the current range without disturbing waits on barriers and creating a deadlock.
@@ -91,6 +92,12 @@ static inline testword_t prsg(testword_t state)
  * chunk_align.
  */
 void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segment, size_t chunk_align);
+
+/**
+ * Returns the offset translating a virtual address of the current map into its physical address.
+ * On 32-bit builds, returns the VM window number, to be added into the LSBs of the address.
+ */
+testword_t phys_addr_offset(void);
 
 /**
  * Flushes the CPU caches. If SMP is enabled, synchronises the threads before

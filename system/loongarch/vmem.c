@@ -9,6 +9,7 @@
 #include "boot.h"
 
 #include "cpuid.h"
+#include "smp.h"
 
 #include "vmem.h"
 
@@ -64,12 +65,21 @@ uintptr_t map_region(uintptr_t base_addr, size_t size __attribute__((unused)), b
     }
 }
 
-bool map_window(uintptr_t start_page __attribute__((unused)))
+bool vmem_prepare_execution_contexts(int num_contexts)
+{
+    // One shared direct mapping: only the NUMA address transform could alias two contexts.
+    if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
+        return false;
+    }
+    return smp_numa_transform_valid();
+}
+
+bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
 {
     return true;
 }
 
-void *first_word_mapping(uintptr_t page)
+void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
     void *result;
 
@@ -87,12 +97,12 @@ void *first_word_mapping(uintptr_t page)
     return result;
 }
 
-void *last_word_mapping(uintptr_t page, size_t word_size)
+void *last_word_mapping(uintptr_t page, size_t word_size, int context_id)
 {
-    return (uint8_t *)first_word_mapping(page) + (PAGE_SIZE - word_size);
+    return (uint8_t *)first_word_mapping(page, context_id) + (PAGE_SIZE - word_size);
 }
 
-uintptr_t page_of(void *addr)
+uintptr_t page_of(void *addr, int context_id __attribute__((unused)))
 {
     uintptr_t page = (uintptr_t)addr >> PAGE_SHIFT;
     return page;

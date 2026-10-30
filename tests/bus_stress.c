@@ -122,9 +122,10 @@ static void burst_interleave(testword_t *pw, size_t nw, vec_state_t *stw,
 // previous iteration; sweep 2 fills H2 and verifies the H1 data just written.
 static int do_sweep(int my_cpu, int iteration, bool second, size_t burst_blocks, size_t sleep_period)
 {
+    int context = test_context_index();
     int ticks = 0;
 
-    for (int j = 0; j < vm_map_size; j++) {
+    for (int j = 0; j < vm_map_size[context]; j++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, j, VEC_BYTES);
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test
@@ -204,7 +205,7 @@ int test_bus_stress(int my_cpu, int iteration)
     size_t burst_blocks = (size_t)8 << (iteration % 3);
     size_t sleep_period = (iteration & 1) ? BUS_ON_BYTES / (2 * burst_blocks * VEC_BYTES) : 0;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master(my_cpu)) {
         display_test_pattern_value(bus_seed(iteration, 0, 0));
     }
 

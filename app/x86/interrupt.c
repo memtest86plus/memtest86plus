@@ -204,7 +204,9 @@ ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
 
     // Don't wait for the error mutex: it may be held by a stopped CPU, or by
     // this very CPU if the interrupt was taken inside the error reporting path.
+    // Never released: holding the UI lock keeps NUMA_PAR teams off the dump.
     spin_trylock(error_mutex);
+    spin_trylock(ui_mutex);
 
     clear_message_area();
 

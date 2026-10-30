@@ -29,7 +29,7 @@
 #define MAX_APIC_IDS                512
 
 /**
- * The maximum number of NUMA proximity domains.
+ * The maximum number of NUMA proximity domains; larger topologies disable NUMA.
  */
 #define MAX_PROXIMITY_DOMAINS       32
 
@@ -53,6 +53,11 @@ extern int num_available_cpus;
  * may increase after calling smp_init().
  */
 extern int num_proximity_domains;
+
+/**
+ * Set if the SRAT has too many proximity domains or memory ranges; NUMA is then disabled.
+ */
+extern bool smp_topology_too_large;
 
 /**
  * Initialises the SMP state and detects the number of available CPU cores.
@@ -105,14 +110,30 @@ static inline uint16_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_doma
  */
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end);
 
+/**
+ * Returns true if the given proximity domain owns at least one SRAT memory range.
+ */
+bool smp_domain_has_memory(uint32_t domain_idx);
+
+/**
+ * Returns the number of the domain's SRAT range pieces in the page range (one vm_map segment each).
+ */
+uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page);
+
+/**
+ * Checks that the active LoongArch64 NUMA address transform round-trips and keeps ownership
+ * distinct. Always true on the other architectures.
+ */
+bool smp_numa_transform_valid(void);
+
 //int count_cpus_for_proximity_domain_corresponding_to_range(uintptr_t start, uintptr_t end, uint32_t proximity_domain_idx);
 
 //void get_memory_affinity_entry(int idx, uint32_t * proximity_domain_idx, uint64_t * start, uint64_t * end);
 
 /**
- * Allocates and initialises a barrier object in pinned memory.
+ * Allocates and initialises an array of barrier objects in pinned memory.
  */
-barrier_t *smp_alloc_barrier(int num_threads);
+barrier_t *smp_alloc_barriers(int num_barriers, int num_threads);
 
 /**
  * Allocates and initialises a spinlock object in pinned memory.

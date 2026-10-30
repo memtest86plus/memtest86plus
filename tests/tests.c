@@ -82,9 +82,9 @@ int ticks_per_test[NUM_PASS_TYPES][NUM_TEST_PATTERNS];
             trace(my_cpu, "Run barrier wait begin at %s line %i", __FILE__, __LINE__); \
         } \
         if (power_save < POWER_SAVE_HIGH) { \
-            barrier_spin_wait(run_barrier); \
+            barrier_spin_wait(test_run_barrier()); \
         } else { \
-            barrier_halt_wait(run_barrier); \
+            barrier_halt_wait(test_run_barrier()); \
         } \
         if (TRACE_BARRIERS) { \
             trace(my_cpu, "Run barrier wait end at %s line %i", __FILE__, __LINE__); \
@@ -121,31 +121,48 @@ void test_list_init(void)
     desc[i] = '\0';
 }
 
+// In window 0, raises the first segment's start to the lower limit. Never lowers it: the map would
+// then expand into memory owned by another context.
+static void clamp_low_prefix(int context)
+{
+    // Legacy runs (also after a NUMA_PAR fallback) track the window in window_num.
+    bool window_zero = numa_run_active ? (test_context()->window_index == 0)
+                                       : (window_num == 0);
+    if (!window_zero) {
+        return;
+    }
+    uintptr_t *first_word = first_word_mapping(pm_limit_lower, context);
+
+    // For USB_WORKAROUND.
+    if (first_word < (uintptr_t *)0x500) {
+        first_word = (uintptr_t *)0x500;
+    }
+
+    // Never move the start below the first mapped RAM page.
+    if (first_word > vm_map[context][0].start) {
+        vm_map[context][0].start = first_word;
+    }
+}
+
 int run_test(int my_cpu, int test, int stage, int iterations)
 {
+    int context = test_context_index();
     // (Re)arm the canary guarding against this CPU overrunning its stack.
     // Needed on every call: relocation invalidates the stack area.
     stack_canary_arm(my_cpu);
 
-    if (my_cpu == master_cpu) {
-        if (window_num == 0) {
-            // First window, so we need to test all selected lower memory.
-            uintptr_t *first_word = first_word_mapping(pm_limit_lower);
-
-            // For USB_WORKAROUND.
-            if (first_word < (uintptr_t *)0x500) {
-                first_word = (uintptr_t *)0x500;
-            }
-
-            // Never move the start below the first mapped RAM page.
-            if (first_word > vm_map[0].start) {
-                vm_map[0].start = first_word;
-            }
+    if (numa_run_active) {
+        // Each context master clamps its own map and updates the Testing line.
+        if (my_cpu == test_context()->master_cpu_num) {
+            clamp_low_prefix(context);
+            display_test_addresses_numa();
         }
+    } else if (my_cpu == master_cpu) {
+        clamp_low_prefix(context);
 
         /* Update display of memory segments being tested */
-        uintptr_t pb = page_of(vm_map[0].start);
-        uintptr_t pe = page_of(vm_map[vm_map_size - 1].end) + 1;
+        uintptr_t pb = page_of(vm_map[context][0].start, context);
+        uintptr_t pe = page_of(vm_map[context][vm_map_size[context] - 1].end, context) + 1;
         display_test_addresses(pb << 2, pe << 2, num_pages_to_test << 2);
     }
     BARRIER;
@@ -297,7 +314,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
 
         // Bit fade test: four fill/fade/check rounds - solid zeros, solid ones, then an
         // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
-      case 10:
+      case TEST_BIT_FADE:
         ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
         break;

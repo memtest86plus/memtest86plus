@@ -266,6 +266,17 @@ recognised:
       For example: `testlist=0,1` would only run tests 0 and 1.
   * ecc
     * Enable ECC polling
+  * numa=*mode*
+    * *mode* is one of
+      * off
+        * disables NUMA placement
+      * on
+        * enables NUMA-aware placement
+      * par
+        * NUMA parallel: per-domain execution teams (needs more than one
+          execution context and at least two selected CPU-backed memory
+          domains)
+    * `numa` alone behaves like `numa=on`; `nonuma` like `numa=off`
 
 ## Keyboard Selection
 
