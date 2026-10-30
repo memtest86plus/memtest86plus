@@ -130,21 +130,9 @@ int test_own_addr1(int my_cpu)
 
 int test_own_addr2(int my_cpu, int stage)
 {
-    int context = test_context_index();
     int ticks = 0;
 
-    testword_t offset;
-
-    // Calculate the offset (in pages) between the virtual address and the physical address.
-    offset = (vm_map[context][0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
-    offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
-#if (ARCH_BITS == 64)
-    // Convert to a byte address offset. This will translate the virtual address into a physical address.
-    offset *= PAGE_SIZE;
-#else
-    // Convert to a VM window offset. This will get added into the LSBs of the virtual address.
-    offset /= VM_WINDOW_SIZE;
-#endif
+    testword_t offset = phys_addr_offset();
 
     switch (stage) {
       case 0:

@@ -99,6 +99,13 @@ static inline testword_t prsg(testword_t state)
 void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segment, size_t chunk_align);
 
 /**
+ * Returns the offset that translates a virtual address in the current memory
+ * map into its physical byte address. On 32-bit builds, returns the VM window
+ * number, to be added into the LSBs of the virtual address.
+ */
+testword_t phys_addr_offset(void);
+
+/**
  * Flushes the CPU caches. If SMP is enabled, synchronises the threads before
  * and after issuing the cache flush instruction.
  */

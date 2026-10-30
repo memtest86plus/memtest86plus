@@ -17,6 +17,7 @@
 
 #include "cache.h"
 #include "smp.h"
+#include "vmem.h"
 
 #include "barrier.h"
 
@@ -105,6 +106,19 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
             }
         }
     }
+}
+
+testword_t phys_addr_offset(void)
+{
+    int context = test_context_index();
+#if (ARCH_BITS == 64)
+    // All segments of the current window share one virtual-to-physical offset.
+    return ((testword_t)vm_map[context][0].pm_base_addr << PAGE_SHIFT) - (uintptr_t)vm_map[context][0].start;
+#else
+    testword_t offset = (vm_map[context][0].pm_base_addr / VM_WINDOW_SIZE) * VM_WINDOW_SIZE;
+    offset = (offset >= VM_PINNED_SIZE) ? offset - VM_PINNED_SIZE : 0;
+    return offset / VM_WINDOW_SIZE;
+#endif
 }
 
 void flush_caches(int my_cpu)
