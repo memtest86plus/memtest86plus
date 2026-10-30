@@ -267,7 +267,17 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
                 window_page_bounds(ctx->window_index, &ctx->window_start, &ctx->window_end);
             } else {
                 ctx->window_start = ctx->window_end;
-                ctx->window_end  += VM_WINDOW_SIZE;
+                // Skip address space holes spanning whole windows.
+                for (int i = 0; i < pm_map_size; i++) {
+                    if (pm_map[i].end > ctx->window_start) {
+                        uintptr_t seg_window = pm_map[i].start & ~(VM_WINDOW_SIZE - 1);
+                        if (seg_window > ctx->window_start) {
+                            ctx->window_start = seg_window;
+                        }
+                        break;
+                    }
+                }
+                ctx->window_end   = ctx->window_start + VM_WINDOW_SIZE;
             }
             if (ctx->window_start >= pm_map[pm_map_size - 1].end) {
                 // The window enumeration is exhausted. The sticky flag is
