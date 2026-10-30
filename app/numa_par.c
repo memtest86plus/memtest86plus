@@ -50,10 +50,10 @@ static uint64_t scale_work(uint64_t cal, uint64_t units, uint64_t denom)
 }
 
 // The expected aggregate work for the whole test: one dummy calibration per
-// test, minus the global-once fade stages (measured once per resident sweep),
-// scaled by the test's whole-map work ratio, plus those fade stages for every
-// selected sweep. The test percentage is therefore whole-test progress and
-// the bar is monotonic over all stages and sweeps, matching the legacy UI.
+// test, minus the global-once fade stages, scaled by the test's whole-map
+// work ratio, plus those fade stages. The test percentage is therefore
+// whole-test progress and the bar is monotonic over all stages, matching the
+// legacy UI.
 static uint64_t test_expected_work(int test)
 {
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
@@ -67,19 +67,12 @@ static uint64_t test_expected_work(int test)
         }
     }
     // The global-once stages are accounted one work unit per elapsed second
-    // on CPU 0, independent of the memory partition; the dummy calibration
-    // measures them once, while the run may execute two resident sweeps.
+    // on CPU 0, independent of the memory partition.
     uint64_t memory_cal = cal > fade_cal ? cal - fade_cal : 0;
     int work_class = test_list[test].work_class;
     uint64_t expected = scale_work(memory_cal, work_units[work_class],
                                    work_denom[work_class]);
-
-    uint64_t sweeps = 1;
-    if (test_first_sweep(test) == TEST_SWEEP_LOW
-        && selected_map_has_windows_1_plus()) {
-        sweeps = 2;
-    }
-    return expected + fade_cal * sweeps;
+    return expected + fade_cal;
 }
 
 // The expected aggregate work for the whole pass: the sum over every
@@ -158,7 +151,7 @@ static void bind_execution_wave(int wave, bool parallel_test)
             test_contexts[context].master_cpu_num = -1;
             test_contexts[context].team_cpu_count = 0;
             test_contexts[context].active_cpu_count = 0;
-            test_contexts[context].window_index = (test_memory_sweep == TEST_SWEEP_HIGH) ? 1 : 0;
+            test_contexts[context].window_index = (test_list[test_num].stages > 1) ? 1 : 0;
             test_contexts[context].window_start = 0;
             test_contexts[context].window_end = 0;
             __atomic_store_n(&test_contexts[context].windows_exhausted, false, __ATOMIC_RELAXED);
@@ -425,22 +418,11 @@ typedef enum {
 
 static test_scheduler_phase_t scheduler_phase;
 
-// Decides whether window 0 will be tested in this stage/wave. In NUMA_PAR
-// single-stage tests visit window 0 whenever the selected map has memory
-// below LOW_LOAD_LIMIT; multi-stage tests visit it only in the low sweep.
-// A wave whose contexts map nothing there skips the empty window.
+// Decides whether window 0 will be tested in this stage/wave. As in the legacy
+// loop, multi-stage tests skip it: relocating between their stages would overwrite it.
 static bool wave_has_window_zero(void)
 {
-    if (test_memory_sweep != TEST_SWEEP_ALL) {
-        return test_memory_sweep == TEST_SWEEP_LOW;
-    }
-    // The real run and the prospective-NUMA_PAR dummy calibration use the
-    // same map-based decision, so the dummy measures the same window set
-    // the scheduler will test.
-    if (VMEM_MAX_CONTEXTS > 1 && (numa_run_active || (dummy_run && numa_par_runs()))) {
-        return selected_map_has_window_zero();
-    }
-    return true;
+    return test_list[test_num].stages == 1 && selected_map_has_window_zero();
 }
 
 // Runs a test-specific global-once stage on CPU 0. The bit-fade fade delay
@@ -647,8 +629,7 @@ static void test_all_windows_numa(int my_cpu)
             run_owned_window_zero(my_cpu, iterations);
             LONG_BARRIER;
             if (my_cpu == 0) {
-                scheduler_phase = test_memory_sweep != TEST_SWEEP_LOW
-                                ? WAVE_WINDOWS_1_PLUS : WAVE_FINISH;
+                scheduler_phase = WAVE_WINDOWS_1_PLUS;
             }
             SHORT_BARRIER;
             continue;

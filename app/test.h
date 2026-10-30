@@ -77,8 +77,7 @@ extern uint16_t test_team_chunk_index[MAX_CPUS];
 /**
  * Aggregate work counters used for NUMA_PAR progress display: each context
  * master adds one team tick to test_work_done per do_tick(), and
- * test_work_expected is computed for the complete test (all stages and
- * resident sweeps).
+ * test_work_expected is computed for the complete test (all stages).
  */
 extern uint64_t test_work_done;
 extern uint64_t test_work_expected;

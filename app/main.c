@@ -218,8 +218,8 @@ uint64_t    test_pages_done = 0;
 // The whole-test progress anchor and expected work: the test percentage is
 // (test_work_done - test_work_done_base) / test_work_expected, while the pass
 // percentage is test_work_done / pass_work_expected. Written by CPU 0 at the
-// test boundary, so the test bar covers all stages and both resident-memory
-// sweeps monotonically, matching the legacy UI.
+// test boundary, so the test bar covers all stages monotonically, matching
+// the legacy UI.
 uint64_t    test_work_done_base = 0;
 uint64_t    pass_work_expected = 0;
 
@@ -257,33 +257,16 @@ static bool numa_window_step(int my_cpu, int context, int iterations);
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-// Multi-stage NUMA_PAR tests finish all stages below LOW_LOAD_LIMIT while
-// resident high, then all stages above it while resident low. Relocating
-// between a fill and its check would overwrite patterns in both load areas.
-typedef enum {
-    TEST_SWEEP_ALL,
-    TEST_SWEEP_LOW,
-    TEST_SWEEP_HIGH,
-    NUM_TEST_SWEEPS
-} test_memory_sweep_t;
-
-static test_memory_sweep_t test_memory_sweep = TEST_SWEEP_ALL;
-
-static test_memory_sweep_t test_first_sweep(int test);
-static bool test_next_sweep(int test);
-static bool selected_map_has_windows_1_plus(void);
-
 // The bit-fade test: four rounds of fill/fade/check stages. The fade delay
-// runs once on CPU 0 per resident-memory sweep, between its all-wave fill
-// and check stages; every memory-touching stage visits every wave.
+// runs once on CPU 0, between its all-wave fill and check stages; every
+// memory-touching stage visits every wave.
 //
 // In NUMA_PAR the fill/check stages run one execution context per
 // CPU-backed memory domain, concurrently: on a 2-socket machine with one
 // memory domain per socket, the test therefore works on two blocks (e.g.
-// 2 x 64 GB) at once, and the single global fade covers both. The test is
-// multi-stage, so it also runs the two resident sweeps (LOW: window 0, 4 MiB
-// on x86; HIGH: windows 1+, the bulk), each with its own per-round fade; the
-// Testing line only shows the primary context's block.
+// 2 x 64 GB) at once, and the single global fade covers both. Like every
+// multi-stage test, it skips window 0; the Testing line only shows the
+// primary context's block.
 static bool test_stage_is_global_once(int test, int stage)
 {
     return test == 10 && (stage % 3) == 1;
@@ -401,8 +384,7 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
         uintptr_t try_limit = pm_map[i].end   << PAGE_SHIFT;
         if (try_start < lower_limit) try_start = lower_limit;
         if (try_start >= upper_limit) break;
-        // Each resident sweep tests the other side of this boundary, so
-        // the entire image, including stacks and TLS, must stay within it.
+        // The whole image, stacks included, must stay below the limit: the other copy tests the memory above it.
         if (program_size > upper_limit - try_start) continue;
         uintptr_t try_end   = try_start + program_size;
         if (try_end > try_limit) continue;
@@ -842,42 +824,7 @@ static bool selected_map_has_window_zero(void)
     return false;
 }
 
-static bool selected_map_has_windows_1_plus(void)
-{
-    uintptr_t low_limit = LOW_LOAD_LIMIT >> PAGE_SHIFT;
-    uintptr_t lower = pm_limit_lower > low_limit ? pm_limit_lower : low_limit;
-    for (int i = 0; i < pm_map_size; i++) {
-        uintptr_t s = pm_map[i].start > lower ? pm_map[i].start : lower;
-        uintptr_t e = MIN(pm_map[i].end, pm_limit_upper);
-        if (s < e) {
-            return true;
-        }
-    }
-    return false;
-}
-
 #include "numa_par.c"
-
-
-static test_memory_sweep_t test_first_sweep(int test)
-{
-    // The dummy calibration measures the whole selected map once per test;
-    // the real run distributes that same map over its resident sweeps.
-    if (!dummy_run && numa_par_runs() && test_list[test].stages > 1) {
-        return selected_map_has_window_zero() ? TEST_SWEEP_LOW : TEST_SWEEP_HIGH;
-    }
-    return TEST_SWEEP_ALL;
-}
-
-static bool test_next_sweep(int test)
-{
-    if (test_list[test].stages > 1 && test_memory_sweep == TEST_SWEEP_LOW
-        && selected_map_has_windows_1_plus()) {
-        test_memory_sweep = TEST_SWEEP_HIGH;
-        return true;
-    }
-    return false;
-}
 
 void test_publish_cancel_request(void)
 {
@@ -940,13 +887,9 @@ static void test_all_windows(int my_cpu)
         }
 
         if (i_am_master) {
-            if (window_num == 0 && test_list[test_num].stages > 1
-                && !(dummy_run && numa_par_runs())) {
+            if (window_num == 0 && test_list[test_num].stages > 1) {
                 // A multi-stage test runs through all the windows at each stage.
-                // Relocation may disrupt the test. The NUMA_PAR dummy
-                // calibration is the exception: it measures the whole selected
-                // map once, including window 0, so its per-test calibration
-                // matches the low+high work the scheduler will execute.
+                // Relocation may disrupt the test.
                 window_num = 1;
             }
             if (window_num == 0 && pm_limit_lower >= LOW_LOAD_LIMIT) {
@@ -1230,7 +1173,6 @@ void main(void)
             if (start_test) {
                 trace(my_cpu, "start test %i", test_num);
                 test_stage = 0;
-                test_memory_sweep = test_first_sweep(test_num);
                 rerun_test = true;
                 if (dummy_run) {
                     ticks_per_test[pass_num][test_num] = 0;
@@ -1243,8 +1185,7 @@ void main(void)
                         // Whole-test progress: anchor the cumulative counter
                         // and publish the complete test's expected work
                         // before its first stage starts. Never recomputed
-                        // for later stages (including the upper sweep) or on
-                        // relocation re-entry.
+                        // for later stages or on relocation re-entry.
                         test_work_done_base = __atomic_load_n(&test_work_done, __ATOMIC_RELAXED);
                         test_work_expected = test_expected_work(test_num);
                     }
@@ -1282,11 +1223,6 @@ void main(void)
                 }
                 if (!dummy_run && test_list[test_num].enabled && test_list[test_num].stages > 1) {
                     display_test_stage(test_stage + 1, test_list[test_num].stages);
-                }
-                if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-                    test_contexts[0].window_index = (test_memory_sweep == TEST_SWEEP_HIGH) ? 1 : 0;
-                    test_contexts[0].window_start = 0;
-                    test_contexts[0].window_end   = 0;
                 }
             }
             start_run  = false;
@@ -1337,13 +1273,6 @@ void main(void)
                 continue;
             }
             test_stage = 0;
-
-            if (test_next_sweep(test_num)) {
-                // Keep the same test/calibration totals, but start every
-                // stage of the upper sweep after one relocation to low.
-                rerun_test = true;
-                continue;
-            }
 
             if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
                 switch (cpu_mode) {
