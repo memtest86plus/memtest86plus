@@ -33,6 +33,16 @@ void memctrl_init(void)
     }
 
     switch(imc.family) {
+
+      case IMC_K8:
+        get_imc_config_amd_0fh();
+        break;
+      case IMC_K10:
+        get_imc_config_amd_10h();
+        break;
+      case IMC_K15:
+        get_imc_config_amd_15h();
+        break;
       case IMC_K17:
       case IMC_K19_VRM:
       case IMC_K19_CZN:
@@ -42,16 +52,32 @@ void memctrl_init(void)
       case IMC_K1A_GRG:
         get_imc_config_amd_zen();
         break;
+      case IMC_NHM:
+      case IMC_NHM_E:
+      case IMC_WMR:
+        get_imc_config_intel_nhm();
+        break;
       case IMC_SNB:
       case IMC_IVB:
         get_imc_config_intel_snb();
         break;
+      case IMC_SNB_E:
+      case IMC_IVB_E:
+        get_imc_config_intel_snb_ep();
+        break;
       case IMC_HSW:
         get_imc_config_intel_hsw();
+        break;
+      case IMC_HSW_E:
+      case IMC_BDW_E:
+        get_imc_config_intel_hsw_ep();
         break;
       case IMC_SKL:
       case IMC_KBL:
         get_imc_config_intel_skl();
+        break;
+      case IMC_SKL_SP:
+        get_imc_config_intel_skx();
         break;
       case IMC_RKL:
         get_imc_config_intel_icl();
@@ -70,9 +96,10 @@ void memctrl_init(void)
     }
 
     // Consistency check
-    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRCD == 0) {
+    // FIXME this check kills handling for the IMCs which do not read timings. What to do ?
+    /*if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRAS == 0) {
         imc.freq = 0;
-    }
+    }*/
 }
 
 void memctrl_poll_ecc(void)
