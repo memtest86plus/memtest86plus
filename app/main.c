@@ -258,7 +258,7 @@ static bool numa_window_step(int my_cpu, int context, int iterations);
 // primary context's block.
 static bool test_stage_is_global_once(int test, int stage)
 {
-    return test == 10 && (stage % 3) == 1;
+    return test == TEST_BIT_FADE && (stage % 3) == 1;
 }
 
 

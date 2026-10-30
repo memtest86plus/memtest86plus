@@ -320,7 +320,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
 
         // Bit fade test: four fill/fade/check rounds - solid zeros, solid ones, then an
         // address-seeded random pattern and its complement. `iterations` = fade seconds per round.
-      case 10:
+      case TEST_BIT_FADE:
         ticks += test_bit_fade(my_cpu, stage, iterations);
         BAILOUT;
         break;

@@ -16,6 +16,8 @@
 
 #define NUM_TEST_PATTERNS   12
 
+#define TEST_BIT_FADE       10  // index in test_list[]
+
 typedef struct {
     bool            enabled;
     uint8_t         cpu_mode;
