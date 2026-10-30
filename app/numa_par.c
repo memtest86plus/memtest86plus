@@ -232,8 +232,8 @@ static void run_global_stage_once(void)
     }
     // No context is bound here, so there are no context barriers to enter;
     // service input, publish per-second progress, run the timed UI/ECC
-    // checks and update the stage description directly. Only CPU 0 runs
-    // this, so no UI lock is needed.
+    // checks, the error display and the serial log tick, like do_tick().
+    // Only CPU 0 runs this, so no UI lock is needed.
     display_test_stage_description("fade over %i seconds", sleep_secs);
     while (sleep_secs > 0) {
         check_input();
@@ -243,6 +243,7 @@ static void run_global_stage_once(void)
         }
         display_progress_tick();
         update_timed_ui();
+        error_update();
         sleep_secs--;
         sleep(1);
     }
