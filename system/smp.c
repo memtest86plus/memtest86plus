@@ -985,9 +985,9 @@ static int find_numa_nodes_in_srat(void)
                     return 0;
                 }
 
-                // Reject a second affinity entry for the same CPU: duplicate or
-                // conflicting affinities both make the mapping ambiguous.
-                if (cpu_num_to_domain_assigned[found2]) {
+                // Accept a duplicate affinity entry, reject a conflicting one.
+                if (cpu_num_to_domain_assigned[found2]
+                 && cpu_num_to_proximity_domain_idx[found2] != (uint32_t)found1) {
                     return 0;
                 }
                 cpu_num_to_domain_assigned[found2] = true;
@@ -1023,10 +1023,10 @@ find_proximity_domain:
 
                 // Skip the CPUs we don't use (eg: > MAX_CPUS).
                 if (found2 != -1) {
-                    // Reject a second affinity entry for the same CPU:
-                    // duplicate or conflicting affinities both make the
-                    // mapping ambiguous.
-                    if (cpu_num_to_domain_assigned[found2]) {
+                    // Accept a duplicate affinity entry (firmware may list a
+                    // CPU as both xAPIC and x2APIC), reject a conflicting one.
+                    if (cpu_num_to_domain_assigned[found2]
+                     && cpu_num_to_proximity_domain_idx[found2] != (uint32_t)found1) {
                         return 0;
                     }
                     cpu_num_to_domain_assigned[found2] = true;
