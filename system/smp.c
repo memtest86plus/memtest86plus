@@ -601,10 +601,8 @@ static bool find_cpus_in_floating_mp_struct(void)
 }
 #endif
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__loongarch_lp64)
 // Firmware may list the same core twice (e.g. as both a local APIC and an
-// x2APIC entry on x86, or with a duplicated core ID on LoongArch). Reject
-// duplicates so the SRAT affinity mapping stays unambiguous.
+// x2APIC entry). Skip it rather than starting the same core twice.
 static bool apic_id_already_listed(cpu_apic_id_t apic_id, int found_cpus)
 {
     int count = found_cpus < MAX_CPUS ? found_cpus : MAX_CPUS;
@@ -616,7 +614,6 @@ static bool apic_id_already_listed(cpu_apic_id_t apic_id, int found_cpus)
     }
     return false;
 }
-#endif
 
 static bool find_cpus_in_madt(void)
 {
@@ -699,11 +696,7 @@ static bool find_cpus_in_madt(void)
         if (entry_header->type == MADT_CORE_PIC) {
             madt_processor_entry_t *entry = (madt_processor_entry_t *)tab_entry_ptr;
             if (entry->flags & (MADT_PF_ENABLED|MADT_PF_ONLINE_CAPABLE)) {
-                // Reject duplicate core IDs: the SRAT affinity mapping would
-                // be ambiguous.
                 if (apic_id_already_listed(entry->core_id, found_cpus)) {
-                    // Skip the duplicate: aborting here would silently drop
-                    // every later CPU from the enumeration.
                     tab_entry_ptr += entry_header->length;
                     continue;
                 }
@@ -728,18 +721,9 @@ static bool find_cpus_in_madt(void)
             if (entry->flags & (MADT_GICC_ENABLED|MADT_GICC_ONLINE_CAPABLE)) {
                 uint64_t mpidr = entry->mpidr & MPIDR_AFFINITY_MASK;
                 uint32_t uid = entry->acpi_processor_uid;
-                // Reject duplicate Processor UIDs: SRAT type 3 resolves CPUs
-                // by UID, so a duplicated UID would make the mapping ambiguous.
-                bool uid_already_listed = false;
-                for (int i = 0; i < num_available_cpus; i++) {
-                    if (cpu_num_to_uid_assigned[i] && cpu_num_to_acpi_uid[i] == uid) {
-                        uid_already_listed = true;
-                        break;
-                    }
-                }
-                if (uid_already_listed) {
-                    // Skip the duplicate: aborting the walk here would
-                    // silently drop every later CPU from the enumeration.
+                // Skip a core listed twice; slot 0 is the BSP, known before the walk.
+                if (mpidr == bsp_mpidr ? cpu_num_to_uid_assigned[0]
+                                       : apic_id_already_listed(mpidr, num_available_cpus)) {
                     tab_entry_ptr += entry_header->length;
                     continue;
                 }
@@ -975,23 +959,24 @@ static int find_numa_nodes_in_srat(void)
                 int found2 = -1;
                 for (int i = 0; i < num_available_cpus; i++) {
                     if (cpu_num_to_uid_assigned[i] && cpu_num_to_acpi_uid[i] == apic_id) {
+                        if (found2 != -1) {
+                            // Two cores share this UID: the affinity is ambiguous.
+                            return 0;
+                        }
                         found2 = i;
-                        break;
                     }
                 }
 
-                if (found2 == -1) {
-                    // We've found an affinity entry whose CPU we don't know about.
-                    return 0;
+                // Skip the CPUs we don't use (eg: > MAX_CPUS, or disabled in the MADT).
+                if (found2 != -1) {
+                    // Accept a duplicate affinity entry, reject a conflicting one.
+                    if (cpu_num_to_domain_assigned[found2]
+                     && cpu_num_to_proximity_domain_idx[found2] != (uint32_t)found1) {
+                        return 0;
+                    }
+                    cpu_num_to_domain_assigned[found2] = true;
+                    cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
                 }
-
-                // Accept a duplicate affinity entry, reject a conflicting one.
-                if (cpu_num_to_domain_assigned[found2]
-                 && cpu_num_to_proximity_domain_idx[found2] != (uint32_t)found1) {
-                    return 0;
-                }
-                cpu_num_to_domain_assigned[found2] = true;
-                cpu_num_to_proximity_domain_idx[found2] = (uint32_t)found1;
             }
         }
 #else
