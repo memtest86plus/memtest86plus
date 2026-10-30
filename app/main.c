@@ -208,20 +208,9 @@ unsigned int num_bound_execution_contexts = 1;
 // at least two selected CPU-backed memory domains).
 bool        numa_run_active = false;
 
-// Aggregate progress counters; test_work_done and test_pages_done are
-// atomic-access-only. test_pages_done is the pages tested in the current
-// stage by all contexts, used by the NUMA_PAR Testing line.
-uint64_t    test_work_done = 0;
-uint64_t    test_work_expected = 0;
+// The pages tested in the current stage by all contexts, used by the NUMA_PAR
+// Testing line; atomic access only.
 uint64_t    test_pages_done = 0;
-
-// The whole-test progress anchor and expected work: the test percentage is
-// (test_work_done - test_work_done_base) / test_work_expected, while the pass
-// percentage is test_work_done / pass_work_expected. Written by CPU 0 at the
-// test boundary, so the test bar covers all stages monotonically, matching
-// the legacy UI.
-uint64_t    test_work_done_base = 0;
-uint64_t    pass_work_expected = 0;
 
 // Cross-context cancellation request; atomic-access-only, 0 or 1.
 uint32_t    global_cancel_requested = 0;
@@ -760,7 +749,7 @@ non_numa_vm_map_entry:
 // (on aarch64 LOW_LOAD_LIMIT may be above VM_WINDOW_SIZE, so the end is
 // rounded up to avoid rechecking the region containing the low copy);
 // the following windows step by VM_WINDOW_SIZE. Every window is at most
-// one tick block, which the work accounting relies on.
+// one tick block.
 static void window_page_bounds(uint64_t window_index, uintptr_t *win_start, uintptr_t *win_end)
 {
     uintptr_t low_limit = LOW_LOAD_LIMIT >> PAGE_SHIFT;
@@ -1147,22 +1136,13 @@ void main(void)
                 for (int cpu = 0; cpu < num_available_cpus; cpu++) {
                     run_cpu_selected[cpu] = (cpu_state[cpu] != CPU_STATE_DISABLED);
                 }
-                if (VMEM_MAX_CONTEXTS > 1) {
+                if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR) {
                     build_numa_domain_list();
-                    build_work_ratios();
                 }
             }
             if (start_pass) {
                 test_num = 0;
                 start_test = true;
-                // The NUMA_PAR pass counters are pass-cumulative: done never
-                // resets within a pass and the expected total covers the
-                // whole pass, so both percentages are monotonic.
-                __atomic_store_n(&test_work_done, 0, __ATOMIC_RELAXED);
-                test_work_done_base = 0;
-                if (VMEM_MAX_CONTEXTS > 1) {
-                    pass_work_expected = pass_expected_work();
-                }
                 if (dummy_run) {
                     ticks_per_pass[pass_num] = 0;
                 } else {
@@ -1176,19 +1156,9 @@ void main(void)
                 rerun_test = true;
                 if (dummy_run) {
                     ticks_per_test[pass_num][test_num] = 0;
-                } else {
-                    if (test_list[test_num].enabled) {
-                        display_start_test();
-                        serial_log_event(SLOG_TEST_START);
-                    }
-                    if (VMEM_MAX_CONTEXTS > 1 && test_list[test_num].enabled) {
-                        // Whole-test progress: anchor the cumulative counter
-                        // and publish the complete test's expected work
-                        // before its first stage starts. Never recomputed
-                        // for later stages or on relocation re-entry.
-                        test_work_done_base = __atomic_load_n(&test_work_done, __ATOMIC_RELAXED);
-                        test_work_expected = test_expected_work(test_num);
-                    }
+                } else if (test_list[test_num].enabled) {
+                    display_start_test();
+                    serial_log_event(SLOG_TEST_START);
                 }
                 bail = false;
             }

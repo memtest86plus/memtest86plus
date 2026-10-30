@@ -296,18 +296,16 @@ void display_reset_ui_owner(void);
 void update_timed_ui(void);
 
 /**
- * Renders NUMA_PAR aggregate progress from the shared work counters: the
- * test fields use the current stage, the pass fields the cumulative bases.
+ * The test and pass progress ticks (ticks_per_test and ticks_per_pass are the
+ * final values). In NUMA_PAR every context master adds its team's ticks.
  */
-void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_done, uint64_t pass_expected);
+extern int test_ticks;
+extern int pass_ticks;
 
 /**
- * Renders one progress percentage and advances the matching bar, owning the
- * bar state in this translation unit.
+ * Counts one test and pass progress tick and renders both bars.
  */
-void display_test_progress(int pct);
-
-void display_pass_progress(int pct);
+void display_progress_tick(void);
 
 /**
  * Sets the stage shown in the right-aligned "Stg xx/yy" field of the

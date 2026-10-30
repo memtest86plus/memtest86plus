@@ -654,17 +654,12 @@ void serial_log_tick(void)
     next_log_time = now + SERIAL_LOG_INTERVAL * 1000 * (uint64_t)clks_per_msec;
 
     // Same progress calculation as do_tick(), from our own tick counters.
-    // In NUMA_PAR the shared aggregate work counters replace the tick counts.
+    // In NUMA_PAR, from the display counters all context masters add to.
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-        // The test percentage is whole-test progress from the per-test
-        // calibration scaled by the selected map's work ratio; the pass
-        // percentage uses the pass-cumulative bases. The jobs field reports
-        // how many execution contexts have exhausted their windows, so a
-        // serial log reader can tell whether the remaining time is a tail
-        // wait.
-        uint64_t done = __atomic_load_n(&test_work_done, __ATOMIC_ACQUIRE);
+        // The jobs field reports how many execution contexts have exhausted
+        // their windows, so a reader can tell whether the rest is a tail wait.
         unsigned int jobs = num_bound_execution_contexts;
         unsigned int done_jobs = 0;
         for (unsigned int c = 0; c < jobs; c++) {
@@ -673,9 +668,8 @@ void serial_log_tick(void)
             }
         }
         slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i jobs=%u/%u errors=%u",
-             pass_num, slog_pct(done, pass_work_expected),
-             test_num, slog_pct(done - test_work_done_base,
-                                test_work_expected),
+             pass_num, slog_pct(pass_ticks, ticks_per_pass[pass_type]),
+             test_num, slog_pct(test_ticks, ticks_per_test[pass_type][test_num]),
              (uintptr_t)done_jobs, (uintptr_t)jobs, (uintptr_t)error_count);
         return;
     }

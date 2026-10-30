@@ -10,107 +10,10 @@
 #endif
 
 
-// The whole-map work ratio for each work class: the dummy calibration
-// measures one team tick per whole-map work unit (a physical segment for
-// segment-fixed tests, a nonempty window for window-fixed tests), while a
-// NUMA_PAR run executes each owner's piece once. work_units counts those
-// owner work units over the selected map and work_denom the dummy's units.
-// The ratios are built by build_work_ratios() after the domain list, so the
-// expected work of every test is one per-test calibration scaled by its
-// class ratio.
-static uint64_t work_units[TEST_WORK_CLASSES];
-static uint64_t work_denom[TEST_WORK_CLASSES];
-
-// The tick-block accounting only applies where NUMA_PAR can run; on i586
-// (32-bit testwords) the equality would not hold.
-#if VMEM_MAX_CONTEXTS > 1
-_Static_assert((VM_WINDOW_SIZE << PAGE_SHIFT) == (uintptr_t)SPIN_SIZE * sizeof(testword_t),
-               "tick block must span at least a whole window");
-#endif
-
 // The relocation-resumable phase machine state: current_wave and
 // num_execution_waves are copied by the relocation and read back on re-entry.
 static unsigned int current_wave = 0;
 static unsigned int num_execution_waves = 1;
-
-// Scales the per-test memory calibration by the whole-map work ratio. The
-// raw product can exceed 64 bits (2^31 ticks x 64 owner pieces per segment),
-// so split the division: units/denom and units%denom keep both terms below
-// 2^56. The 128-bit division helper is not linkable in this freestanding
-// build. The remainder term keeps the scaling exact when the dummy
-// calibration is not a multiple of the physical segment/window count.
-static uint64_t scale_work(uint64_t cal, uint64_t units, uint64_t denom)
-{
-    if (denom == 0) {
-        return 0;
-    }
-    uint64_t q = units / denom;
-    uint64_t r = units % denom;
-    return cal * q + (cal * r) / denom;
-}
-
-// The expected aggregate work for the whole test: one dummy calibration per
-// test, minus the global-once fade stages, scaled by the test's whole-map
-// work ratio, plus those fade stages. The test percentage is therefore
-// whole-test progress and the bar is monotonic over all stages, matching the
-// legacy UI.
-static uint64_t test_expected_work(int test)
-{
-    pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
-    uint64_t cal = (uint64_t)ticks_per_test[pass_type][test];
-
-    uint64_t fade_cal = 0;
-    for (int stage = 0; stage < test_list[test].stages; stage++) {
-        if (test_stage_is_global_once(test, stage)) {
-            fade_cal += (uint64_t)test_list[test].iterations
-                      / (pass_num == 0 ? 3 : 1);
-        }
-    }
-    // The global-once stages are accounted one work unit per elapsed second
-    // on CPU 0, independent of the memory partition.
-    uint64_t memory_cal = cal > fade_cal ? cal - fade_cal : 0;
-    int work_class = test_list[test].work_class;
-    uint64_t expected = scale_work(memory_cal, work_units[work_class],
-                                   work_denom[work_class]);
-    return expected + fade_cal;
-}
-
-// The expected aggregate work for the whole pass: the sum over every
-// enabled test, so the pass percentage is whole-pass progress.
-static uint64_t pass_expected_work(void)
-{
-    uint64_t expected = 0;
-    for (int test = 0; test < NUM_TEST_PATTERNS; test++) {
-        if (test_list[test].enabled) {
-            expected += test_expected_work(test);
-        }
-    }
-    return expected;
-}
-
-// Renders NUMA_PAR aggregate progress from the shared work counters: the
-// test fields use the current test's whole-test counters, the pass fields
-// the pass-cumulative bases.
-void render_aggregate_progress(uint64_t done, uint64_t expected, uint64_t pass_done, uint64_t pass_expected)
-{
-    int pct = 0;
-    if (expected > 0) {
-        pct = (int)((done * 100) / expected);
-        if (pct > 100) {
-            pct = 100;
-        }
-    }
-    display_test_progress(pct);
-
-    pct = 0;
-    if (pass_expected > 0) {
-        pct = (int)((pass_done * 100) / pass_expected);
-        if (pct > 100) {
-            pct = 100;
-        }
-    }
-    display_pass_progress(pct);
-}
 
 // True when the current run executes (or, during the dummy calibration,
 // will execute) the NUMA_PAR scheduler: NUMA_PAR is selected, the mapping
@@ -180,10 +83,9 @@ static void bind_execution_wave(int wave, bool parallel_test)
         }
 
         // The wave ownership table: every domain's memory is owned by
-        // exactly one context in exactly one wave. setup_vm_map() and the
-        // work statistics both consult memory_owner_context[], so each
-        // piece is mapped, tested and accounted exactly once per stage,
-        // and no two teams ever alias the same physical range.
+        // exactly one context in exactly one wave. setup_vm_map() consults
+        // memory_owner_context[], so each piece is mapped and tested exactly
+        // once per stage, and no two teams ever alias the same physical range.
         int bsp_context = domain_to_context[bsp_proximity_domain];
         for (int domain = 0; domain < num_proximity_domains; domain++) {
             if (domain_to_context[domain] != CONTEXT_NONE) {
@@ -304,85 +206,6 @@ static void build_numa_domain_list(void)
     // (see the end of this file for the NUMA_PAR scheduler machinery)
 }
 
-// Computes the whole-map work ratios over the actually tested map (pm_map
-// intersected with the selected range, split by the scheduler's windows).
-// The dummy calibration runs the legacy map once over the same window set
-// and therefore measures work_denom units per test (a physical segment for
-// segment-fixed tests, a nonempty window for window-fixed tests). A
-// NUMA_PAR run splits every physical segment by proximity domain: each
-// piece is one team tick for segment-fixed tests, while window-fixed tests
-// tick once per nonempty owner/window pair. Memory-only domains are owned
-// by the BSP context, like setup_vm_map() assigns them.
-static void build_work_ratios(void)
-{
-    memset(work_units, 0, sizeof(work_units));
-    memset(work_denom, 0, sizeof(work_denom));
-    bool owner_in_window[MAX_PROXIMITY_DOMAINS] = { false };
-
-    for (uint64_t window_index = 0; ; window_index++) {
-        uintptr_t win_start, win_end;
-        window_page_bounds(window_index, &win_start, &win_end);
-
-        // Reduce the window to the selected range, like setup_vm_map().
-        // The unclipped end still drives the termination check below, so
-        // the iteration always covers the whole map.
-        uintptr_t clipped_end = win_end;
-        if (win_start < pm_limit_lower) {
-            win_start = pm_limit_lower;
-        }
-        if (win_end > pm_limit_upper) {
-            clipped_end = pm_limit_upper;
-        }
-
-        if (win_start < clipped_end) {
-            bool window_has_memory = false;
-            for (int seg = 0; seg < pm_map_size; seg++) {
-                uintptr_t s = pm_map[seg].start;
-                uintptr_t e = pm_map[seg].end;
-                if (s <= win_start) {
-                    s = win_start;
-                }
-                if (e >= clipped_end) {
-                    e = clipped_end;
-                }
-                if (s < e) {
-                    work_denom[TEST_WORK_SEGMENT_FIXED]++;
-                    for (int d = 0; d < num_proximity_domains; d++) {
-                        uint32_t pieces =
-                            smp_domain_memory_pieces_in_range(d, s, e);
-                        if (pieces == 0) {
-                            continue;
-                        }
-                        window_has_memory = true;
-                        // Attribute to the execution owner: a memory-only
-                        // domain belongs to the BSP context in wave 0.
-                        int owner = (enabled_cpus_in_proximity_domain[d] > 0)
-                                  ? d : (int)bsp_proximity_domain;
-                        work_units[TEST_WORK_SEGMENT_FIXED] += pieces;
-                        owner_in_window[owner] = true;
-                    }
-                }
-            }
-            if (window_has_memory) {
-                work_denom[TEST_WORK_WINDOW_FIXED]++;
-            }
-        }
-
-        // Window-fixed tests tick once per nonempty owner/window pair, so
-        // each owner is marked at most once per window, even when several
-        // of its owned domains overlap there.
-        for (int d = 0; d < num_proximity_domains; d++) {
-            if (owner_in_window[d]) {
-                work_units[TEST_WORK_WINDOW_FIXED]++;
-                owner_in_window[d] = false;
-            }
-        }
-        if (win_end >= pm_map[pm_map_size - 1].end) {
-            break;
-        }
-    }
-}
-
 //------------------------------------------------------------------------------
 // NUMA_PAR scheduler.
 //
@@ -438,9 +261,7 @@ static int run_global_stage_once(void)
     }
     int ticks = 0;
     if (dummy_run) {
-        // The dummy calibration measures the delay without sleeping: the
-        // expected-work accounting for the global-once stage is the
-        // measured seconds.
+        // The dummy calibration measures the delay without sleeping.
         return sleep_secs;
     }
     // No context is bound here, so there are no context barriers to enter;
@@ -454,10 +275,7 @@ static int run_global_stage_once(void)
             // Stop the delay early; the run boundary handles the request.
             break;
         }
-        __sync_fetch_and_add(&test_work_done, 1);
-        if (VMEM_MAX_CONTEXTS > 1) {
-            render_aggregate_progress(test_work_done - test_work_done_base, test_work_expected, test_work_done, pass_work_expected);
-        }
+        display_progress_tick();
         update_timed_ui();
         ticks++;
         sleep_secs--;
@@ -599,8 +417,7 @@ static void test_all_windows_numa(int my_cpu)
                 int ticks = run_global_stage_once();
                 if (dummy_run) {
                     // The dummy calibration measures the fade delay without
-                    // sleeping: the expected-work accounting for the
-                    // global-once stage is the measured seconds.
+                    // sleeping.
                     ticks_per_test[pass_num][test_num] += ticks;
                 }
                 scheduler_phase = WAVE_DONE;

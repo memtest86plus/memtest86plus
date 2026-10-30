@@ -64,8 +64,8 @@ static bool scroll_wait = false;
 
 static int spin_idx = 0;        // current spinner position
 
-static int pass_ticks = 0;      // current value (ticks_per_pass is final value)
-static int test_ticks = 0;      // current value (ticks_per_test is final value)
+int pass_ticks = 0;             // current value (ticks_per_pass is final value)
+int test_ticks = 0;             // current value (ticks_per_test is final value)
 
 int pass_bar_length = 0; // currently displayed length
 int test_bar_length = 0; // currently displayed length
@@ -414,18 +414,37 @@ void display_start_test(void)
 #endif
 }
 
-// Renders one progress percentage and advances the matching bar. The bar
-// state stays private to this translation unit.
-void display_test_progress(int pct)
+static int progress_pct(int ticks, int total)
 {
-    display_test_percentage(pct);
-    display_test_bar((BAR_LENGTH * pct) / 100);
+    int pct = (total > 0) ? 100 * ticks / total : 0;
+    return (pct > 100) ? 100 : pct;
 }
 
-void display_pass_progress(int pct)
+// Renders the test and pass progress from the tick counters.
+static void render_progress(void)
 {
+    pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
+
+    int pct = progress_pct(test_ticks, ticks_per_test[pass_type][test_num]);
+    display_test_percentage(pct);
+    display_test_bar((BAR_LENGTH * pct) / 100);
+
+    pct = progress_pct(pass_ticks, ticks_per_pass[pass_type]);
     display_pass_percentage(pct);
     display_pass_bar((BAR_LENGTH * pct) / 100);
+}
+
+// NUMA_PAR context masters count concurrently.
+static void count_progress_tick(void)
+{
+    __sync_fetch_and_add(&test_ticks, 1);
+    __sync_fetch_and_add(&pass_ticks, 1);
+}
+
+void display_progress_tick(void)
+{
+    count_progress_tick();
+    render_progress();
 }
 
 // The stage currently shown in the Testing line's right-aligned field.
@@ -781,10 +800,9 @@ static void do_tick_numa(int my_cpu)
     int context = test_context_index();
 
     if (my_cpu == ctx->master_cpu_num) {
-        // The master counts one team tick per do_tick(), independent of the
-        // team size: the dummy calibration measures the same per-context
-        // work units, and the whole-map ratio scales them to the run.
-        __sync_fetch_and_add(&test_work_done, 1);
+        // One tick per team, like the legacy master: the contexts' ticks add
+        // up to the dummy calibration over the whole map.
+        count_progress_tick();
 
         // The UI owner polls the keyboard and may enter the blocking
         // configuration menu. The call is deliberately outside ui_mutex:
@@ -801,8 +819,7 @@ static void do_tick_numa(int my_cpu)
         }
 
         if (spin_trylock(ui_mutex)) {
-            uint64_t done = __atomic_load_n(&test_work_done, __ATOMIC_ACQUIRE);
-            render_aggregate_progress(done - test_work_done_base, test_work_expected, done, pass_work_expected);
+            render_progress();
             spin_unlock(ui_mutex);
         }
 
@@ -876,30 +893,7 @@ void do_tick(int my_cpu)
         return;
     }
 
-    test_ticks++;
-    pass_ticks++;
-
-    pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
-
-    int pct = 0;
-    if (ticks_per_test[pass_type][test_num] > 0) {
-        pct = 100 * test_ticks / ticks_per_test[pass_type][test_num];
-        if (pct > 100) {
-            pct = 100;
-        }
-    }
-    display_test_percentage(pct);
-    display_test_bar((BAR_LENGTH * pct) / 100);
-
-    pct = 0;
-    if (ticks_per_pass[pass_type] > 0) {
-        pct = 100 * pass_ticks / ticks_per_pass[pass_type];
-        if (pct > 100) {
-            pct = 100;
-        }
-    }
-    display_pass_percentage(pct);
-    display_pass_bar((BAR_LENGTH * pct) / 100);
+    display_progress_tick();
     bool update_spinner = true;
     if (clks_per_msec > 0) {
         uint64_t current_time = get_tsc();
