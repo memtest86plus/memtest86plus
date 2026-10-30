@@ -55,10 +55,8 @@ typedef enum {
         printf(1, 25 - offset, "%i/%i%cC", actual_cpu_temp, max_cpu_temp, 0xF8); \
     }
 
-#if TESTWORD_WIDTH < 64
 #define display_cpu_addr_mode(str) \
     prints(4, 75, str)
-#endif
 
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))
@@ -169,34 +167,32 @@ typedef enum {
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        int print_end = printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
-        clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 1); \
-        display_test_stage_field(); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        int print_end = printf(4, 39, __VA_ARGS__); \
-        clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 1); \
-        display_test_stage_field(); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        printf(4, 39, __VA_ARGS__); \
     }
 
 #define display_test_pattern_name(str) \
     { \
-        int print_end = prints(5, 39, str); \
-        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
+        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
+        prints(5, 39, str); \
     }
 
 #define display_test_pattern_value(pattern) \
     { \
-        int print_end = printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
-        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
+        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
+        printf(5, 39, "0x%0*x", TESTWORD_DIGITS, pattern); \
     }
 
 #define display_test_pattern_values(pattern, offset) \
     { \
-        int print_end = printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
-        clear_screen_region(5, print_end, 5, SCREEN_WIDTH - 1); \
+        clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1); \
+        printf(5, 39, "0x%0*x - %i", TESTWORD_DIGITS, pattern, offset); \
     }
 
 #define display_run_time(hours, mins, secs) \
@@ -306,18 +302,6 @@ extern int pass_ticks;
  * Counts one test and pass progress tick and renders both bars.
  */
 void display_progress_tick(void);
-
-/**
- * Sets the stage shown in the right-aligned "Stg xx/yy" field of the
- * Testing line, and redraws the field. Called once per stage start.
- */
-void display_test_stage(int stage, int stages);
-
-/**
- * Redraws the stage field after a Testing-line value update; a no-op when
- * the current test has a single stage.
- */
-void display_test_stage_field(void);
 
 /**
  * NUMA_PAR Testing line: draws the current window and cumulative progress of

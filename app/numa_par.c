@@ -30,130 +30,106 @@ static bool numa_par_runs(void)
 // chunk indexes. Runs only between two global barriers.
 static void bind_execution_wave(int wave, bool parallel_test)
 {
-    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-        // CPUs not taking part in this stage won't re-arm their stack
-        // canaries, and the coming relocations will invalidate them.
-        stack_canary_disarm_all();
-
-        memset(domain_to_context, CONTEXT_NONE, sizeof(domain_to_context));
-        memset(cpu_is_test_participant, 0, sizeof(cpu_is_test_participant));
-
-        unsigned int first = wave * VMEM_MAX_CONTEXTS;
-        unsigned int limit = MIN(first + VMEM_MAX_CONTEXTS, num_cpu_memory_domains);
-        unsigned int num_contexts_in_wave = 0;
-
-        for (unsigned int i = first; i < limit; i++) {
-            uint32_t domain = cpu_memory_domains[i];
-            int context = num_contexts_in_wave++;
-            domain_to_context[domain] = context;
-
-            // The preceding global barrier guarantees the prior user of this
-            // reusable context is quiescent. Status is an atomic object and
-            // is not reset with a raw struct memset.
-            test_contexts[context].proximity_domain_idx = domain;
-            test_contexts[context].master_cpu_num = -1;
-            test_contexts[context].team_cpu_count = 0;
-            test_contexts[context].active_cpu_count = 0;
-            test_contexts[context].window_index = (test_list[test_num].stages > 1) ? 1 : 0;
-            test_contexts[context].window_start = 0;
-            test_contexts[context].window_end = 0;
-            __atomic_store_n(&test_contexts[context].windows_exhausted, false, __ATOMIC_RELAXED);
-            __atomic_store_n(&test_contexts[context].status, CONTEXT_OK, __ATOMIC_RELAXED);
-        }
-
-        for (int cpu = 0; cpu < num_available_cpus; cpu++) {
-            uint32_t domain = smp_get_proximity_domain_idx(cpu);
-            int context = domain_to_context[domain];
-            bool in_team = cpu_is_global_participant[cpu] && run_cpu_selected[cpu] && context != CONTEXT_NONE;
-            if (in_team) {
-                cpu_execution_context[cpu] = context;
-                if (test_contexts[context].team_cpu_count == 0) {
-                    test_contexts[context].master_cpu_num = cpu;
-                }
-                test_team_chunk_index[cpu] = test_contexts[context].team_cpu_count++;
-                // In a parallel test every team CPU enters the test-internal
-                // barrier; a sequential test only the context master does.
-                cpu_is_test_participant[cpu] = parallel_test || cpu == test_contexts[context].master_cpu_num;
-            } else {
-                // Parked CPUs (later waves, CPU-only domains, disabled CPUs)
-                // use context 0 only for identity-mapped control flow; they
-                // never join context 0's test barrier.
-                cpu_execution_context[cpu] = 0;
-            }
-        }
-
-        // The wave ownership table: every domain's memory is owned by
-        // exactly one context in exactly one wave. setup_vm_map() consults
-        // memory_owner_context[], so each piece is mapped and tested exactly
-        // once per stage, and no two teams ever alias the same physical range.
-        int bsp_context = domain_to_context[bsp_proximity_domain];
-        for (int domain = 0; domain < num_proximity_domains; domain++) {
-            if (domain_to_context[domain] != CONTEXT_NONE) {
-                memory_owner_context[domain] = domain_to_context[domain];
-            } else if (   wave == 0
-                       && enabled_cpus_in_proximity_domain[domain] == 0
-                       && smp_domain_has_memory(domain)) {
-                memory_owner_context[domain] = bsp_context;
-            } else {
-                memory_owner_context[domain] = CONTEXT_NONE;
-            }
-        }
-
-        // CPU 0 is the only reset owner, and every other CPU is still held
-        // at the pre-publication global rendezvous.
-        assert(!dummy_run);   // calibration never binds NUMA_PAR waves
-        for (int context = 0; context < (int)num_contexts_in_wave; context++) {
-            test_context_t *ctx = &test_contexts[context];
-            assert(ctx->team_cpu_count > 0);
-            assert(ctx->master_cpu_num >= 0);
-            ctx->active_cpu_count = parallel_test ? ctx->team_cpu_count : 1;
-            barrier_reset(&context_barrier[context], ctx->active_cpu_count);
-        }
-
-        num_bound_execution_contexts = num_contexts_in_wave;
-        display_reset_ui_owner();
-
-        // Wave-boundary invariant checks (debug-time validation); every
-        // active context barrier was quiescent before barrier_reset().
-        assert(num_contexts_in_wave >= 1 && num_contexts_in_wave <= VMEM_MAX_CONTEXTS);
-        for (int context = 0; context < (int)num_contexts_in_wave; context++) {
-            assert(test_contexts[context].master_cpu_num >= 0);
-            assert(test_contexts[context].team_cpu_count > 0);
-            assert(   test_contexts[context].active_cpu_count >= 1
-                   && test_contexts[context].active_cpu_count <= test_contexts[context].team_cpu_count);
-        }
-
-        // The Using: field would otherwise stay blank in NUMA_PAR; fill it
-        // like the legacy path does (IMC/SPD mode keeps its own display).
-        if (display_mode == DISPLAY_MODE_NA) {
-            display_all_active();
-        }
-
-        // Emit the lifecycle boundary once the binding and context count are
-        // final, so concurrent multi-wave serial logs stay unambiguous.
-        serial_log_wave_bind(current_wave, num_contexts_in_wave);
-
-        return;
-    }
-
-    // Legacy modes: publish the active CPU count and reconfigure the legacy
-    // run_barrier with it.
+    // CPUs not taking part in this stage won't re-arm their stack
+    // canaries, and the coming relocations will invalidate them.
     stack_canary_disarm_all();
 
-    test_contexts[0].active_cpu_count = 1;
-    if (!dummy_run) {
-        if (parallel_test) {
-            test_contexts[0].active_cpu_count = num_enabled_cpus;
-            if(display_mode == DISPLAY_MODE_NA) {
-                display_all_active();
+    memset(domain_to_context, CONTEXT_NONE, sizeof(domain_to_context));
+    memset(cpu_is_test_participant, 0, sizeof(cpu_is_test_participant));
+
+    unsigned int first = wave * VMEM_MAX_CONTEXTS;
+    unsigned int limit = MIN(first + VMEM_MAX_CONTEXTS, num_cpu_memory_domains);
+    unsigned int num_contexts_in_wave = 0;
+
+    for (unsigned int i = first; i < limit; i++) {
+        uint32_t domain = cpu_memory_domains[i];
+        int context = num_contexts_in_wave++;
+        domain_to_context[domain] = context;
+
+        // The preceding global barrier guarantees the prior user of this
+        // reusable context is quiescent. Status is an atomic object and
+        // is not reset with a raw struct memset.
+        test_contexts[context].proximity_domain_idx = domain;
+        test_contexts[context].master_cpu_num = -1;
+        test_contexts[context].team_cpu_count = 0;
+        test_contexts[context].active_cpu_count = 0;
+        test_contexts[context].window_index = (test_list[test_num].stages > 1) ? 1 : 0;
+        test_contexts[context].window_start = 0;
+        test_contexts[context].window_end = 0;
+        __atomic_store_n(&test_contexts[context].windows_exhausted, false, __ATOMIC_RELAXED);
+        __atomic_store_n(&test_contexts[context].status, CONTEXT_OK, __ATOMIC_RELAXED);
+    }
+
+    for (int cpu = 0; cpu < num_available_cpus; cpu++) {
+        uint32_t domain = smp_get_proximity_domain_idx(cpu);
+        int context = domain_to_context[domain];
+        bool in_team = cpu_is_global_participant[cpu] && run_cpu_selected[cpu] && context != CONTEXT_NONE;
+        if (in_team) {
+            cpu_execution_context[cpu] = context;
+            if (test_contexts[context].team_cpu_count == 0) {
+                test_contexts[context].master_cpu_num = cpu;
             }
+            test_team_chunk_index[cpu] = test_contexts[context].team_cpu_count++;
+            // In a parallel test every team CPU enters the test-internal
+            // barrier; a sequential test only the context master does.
+            cpu_is_test_participant[cpu] = parallel_test || cpu == test_contexts[context].master_cpu_num;
         } else {
-            if (display_mode == 0) {
-                display_active_cpu(smp_my_cpu_num());
-            }
+            // Parked CPUs (later waves, CPU-only domains, disabled CPUs)
+            // use context 0 only for identity-mapped control flow; they
+            // never join context 0's test barrier.
+            cpu_execution_context[cpu] = 0;
         }
     }
-    barrier_reset(run_barrier, test_contexts[0].active_cpu_count);
+
+    // The wave ownership table: every domain's memory is owned by
+    // exactly one context in exactly one wave. setup_vm_map() consults
+    // memory_owner_context[], so each piece is mapped and tested exactly
+    // once per stage, and no two teams ever alias the same physical range.
+    int bsp_context = domain_to_context[bsp_proximity_domain];
+    for (int domain = 0; domain < num_proximity_domains; domain++) {
+        if (domain_to_context[domain] != CONTEXT_NONE) {
+            memory_owner_context[domain] = domain_to_context[domain];
+        } else if (   wave == 0
+                   && enabled_cpus_in_proximity_domain[domain] == 0
+                   && smp_domain_has_memory(domain)) {
+            memory_owner_context[domain] = bsp_context;
+        } else {
+            memory_owner_context[domain] = CONTEXT_NONE;
+        }
+    }
+
+    // CPU 0 is the only reset owner, and every other CPU is still held
+    // at the pre-publication global rendezvous.
+    for (int context = 0; context < (int)num_contexts_in_wave; context++) {
+        test_context_t *ctx = &test_contexts[context];
+        assert(ctx->team_cpu_count > 0);
+        assert(ctx->master_cpu_num >= 0);
+        ctx->active_cpu_count = parallel_test ? ctx->team_cpu_count : 1;
+        barrier_reset(&context_barrier[context], ctx->active_cpu_count);
+    }
+
+    num_bound_execution_contexts = num_contexts_in_wave;
+    display_reset_ui_owner();
+
+    // Wave-boundary invariant checks (debug-time validation); every
+    // active context barrier was quiescent before barrier_reset().
+    assert(num_contexts_in_wave >= 1 && num_contexts_in_wave <= VMEM_MAX_CONTEXTS);
+    for (int context = 0; context < (int)num_contexts_in_wave; context++) {
+        assert(test_contexts[context].master_cpu_num >= 0);
+        assert(test_contexts[context].team_cpu_count > 0);
+        assert(   test_contexts[context].active_cpu_count >= 1
+               && test_contexts[context].active_cpu_count <= test_contexts[context].team_cpu_count);
+    }
+
+    // The Using: field would otherwise stay blank in NUMA_PAR; fill it
+    // like the legacy path does (IMC/SPD mode keeps its own display).
+    if (display_mode == DISPLAY_MODE_NA) {
+        display_all_active();
+    }
+
+    // Emit the lifecycle boundary once the binding and context count are
+    // final, so concurrent multi-wave serial logs stay unambiguous.
+    serial_log_wave_bind(current_wave, num_contexts_in_wave);
 }
 
 // Materializes the domain metadata after the CPU selection snapshot has been
@@ -252,17 +228,12 @@ static bool wave_has_window_zero(void)
 // sleeps through the test's configured fade interval; the other global
 // participants wait at the surrounding global barriers, so no per-context
 // barrier or test helper may be used here.
-static int run_global_stage_once(void)
+static void run_global_stage_once(void)
 {
     int sleep_secs = test_list[test_num].iterations;
     if (pass_num == 0) {
         // Reduced fast pass, matching the window stages.
         sleep_secs /= 3;
-    }
-    int ticks = 0;
-    if (dummy_run) {
-        // The dummy calibration measures the delay without sleeping.
-        return sleep_secs;
     }
     // No context is bound here, so there are no context barriers to enter;
     // service input, publish per-second progress, run the timed UI/ECC
@@ -277,11 +248,9 @@ static int run_global_stage_once(void)
         }
         display_progress_tick();
         update_timed_ui();
-        ticks++;
         sleep_secs--;
         sleep(1);
     }
-    return ticks;
 }
 
 // NUMA_PAR: one window iteration of the calling CPU's context. The context
@@ -414,12 +383,7 @@ static void test_all_windows_numa(int my_cpu)
             // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
-                int ticks = run_global_stage_once();
-                if (dummy_run) {
-                    // The dummy calibration measures the fade delay without
-                    // sleeping.
-                    ticks_per_test[pass_num][test_num] += ticks;
-                }
+                run_global_stage_once();
                 scheduler_phase = WAVE_DONE;
             }
             LONG_BARRIER;
@@ -440,7 +404,7 @@ static void test_all_windows_numa(int my_cpu)
             // through the context status and promoted at the wave boundary:
             // the stage aborts there, and the run boundary falls back to
             // legacy placement.
-            if (!dummy_run && (uintptr_t)&_start != high_load_addr) {
+            if ((uintptr_t)&_start != high_load_addr) {
                 relocate_all_and_resume(high_load_addr, my_cpu);
             }
             run_owned_window_zero(my_cpu, iterations);
@@ -453,7 +417,7 @@ static void test_all_windows_numa(int my_cpu)
           }
 
           case WAVE_WINDOWS_1_PLUS:
-            if (!dummy_run && (uintptr_t)&_start != low_load_addr) {
+            if ((uintptr_t)&_start != low_load_addr) {
                 relocate_all_and_resume(low_load_addr, my_cpu);
             }
             run_owned_windows_1_plus(my_cpu, iterations);

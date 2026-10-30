@@ -560,14 +560,6 @@ static void global_init(void)
     error_mutex   = smp_alloc_mutex();
     ui_mutex      = smp_alloc_mutex();
 
-    if (start_barrier == NULL || run_barrier == NULL || context_barrier == NULL || error_mutex == NULL || ui_mutex == NULL) {
-        // The pinned synchronization arena is exhausted; do not run without
-        // synchronization objects.
-        display_notice("Insufficient pinned memory for synchronization objects. Rebooting...");
-        while (get_key() == 0) { }
-        reboot();
-    }
-
     start_run = true;
     dummy_run = true;
     restart = false;
@@ -1178,21 +1170,14 @@ void main(void)
                         trace(0, "NUMA_PAR unavailable with current selection; using legacy mode");
                     }
                 }
-                current_wave = 0;
-                if (VMEM_MAX_CONTEXTS <= 1 || !numa_run_active) {
-                    num_execution_waves = 1;   // set from the domains otherwise
-                }
-                scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-                    // A new stage of the same test starts: only the
-                    // cancellation request and the failure latch are reset,
-                    // the whole-test progress anchor is kept.
+                    // A new stage starts: reset the scheduler, the cancellation
+                    // request, the page count and the failure latch.
+                    current_wave = 0;
+                    scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
                     __atomic_store_n(&test_pages_done, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;
-                }
-                if (!dummy_run && test_list[test_num].enabled && test_list[test_num].stages > 1) {
-                    display_test_stage(test_stage + 1, test_list[test_num].stages);
                 }
             }
             start_run  = false;
@@ -1202,7 +1187,7 @@ void main(void)
         }
         SHORT_BARRIER;
         if (test_list[test_num].enabled) {
-            if (numa_run_active) {
+            if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
                 test_all_windows_numa(my_cpu);
             } else {
                 test_all_windows(my_cpu);
