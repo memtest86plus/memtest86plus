@@ -470,19 +470,18 @@ static void global_init(void)
     if (VMEM_MAX_CONTEXTS > 1 && num_proximity_domains == 0) {
         numa_mode = NUMA_OFF;
     }
-    if (VMEM_MAX_CONTEXTS > 1 && smp_topology_too_large) {
-        trace(0, "WARNING: SRAT declares more than %i proximity domains; NUMA disabled", MAX_PROXIMITY_DOMAINS);
-    }
+    // NUMA_PAR needs independent CPU-backed memory teams; fall back to
+    // legacy NUMA-aware placement (reported once the trace area exists).
+    bool numa_par_fallback = false;
     if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && (VMEM_MAX_CONTEXTS <= 1 || num_proximity_domains < 2)) {
-        // NUMA_PAR needs independent CPU-backed memory teams; fall back to
-        // legacy NUMA-aware placement with a clear message.
-        trace(0, "NUMA_PAR unavailable (need 2+ memory domains); using NUMA_ON");
+        numa_par_fallback = true;
         numa_mode = NUMA_ON;
     }
 
     // One execution context per proximity domain at most; x86-64 pins a window PD for each extra one.
     if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR
         && !vmem_prepare_execution_contexts(MIN(VMEM_MAX_CONTEXTS, num_proximity_domains))) {
+        numa_par_fallback = true;
         numa_mode = NUMA_ON;
     }
 
@@ -543,6 +542,13 @@ static void global_init(void)
         trace(0, "ACPI FADT found at %0*x", 2*sizeof(uintptr_t), acpi_config.fadt_addr);
         trace(0, "ACPI SRAT found at %0*x", 2*sizeof(uintptr_t), acpi_config.srat_addr);
         //trace(0, "ACPI SLIT found at %0*x", 2*sizeof(uintptr_t), acpi_config.slit_addr);
+    }
+    if (VMEM_MAX_CONTEXTS > 1 && smp_topology_too_large) {
+        trace(0, "WARNING: SRAT exceeds %i domains or %i memory ranges; NUMA disabled",
+              MAX_PROXIMITY_DOMAINS, 2 * MAX_PROXIMITY_DOMAINS);
+    }
+    if (numa_par_fallback) {
+        trace(0, "NUMA_PAR unavailable; using NUMA_ON");
     }
 
     if (!load_addr_ok) {
