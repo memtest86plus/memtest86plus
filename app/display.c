@@ -780,13 +780,14 @@ static void do_tick_numa(int my_cpu)
         // up to the dummy calibration over the whole map.
         count_progress_tick();
 
-        // The UI owner polls the keyboard and may enter the blocking
-        // configuration menu. The call is deliberately outside ui_mutex:
-        // holding the lock across a menu session would stall common_err() on
-        // every other context. A UI-requested bail is still published to all
-        // contexts.
+        // The UI owner polls the keyboard and may enter the blocking menu. Both
+        // locks keep the other teams' errors and drawing off the popup meanwhile.
         if (ui_owner_is(context)) {
+            spin_lock(error_mutex);
+            spin_lock(ui_mutex);
             check_input();
+            spin_unlock(ui_mutex);
+            spin_unlock(error_mutex);
             if (bail) {
                 // The UI asked to stop: publish a cross-context cancellation
                 // request so every team converges on the same exit path.
