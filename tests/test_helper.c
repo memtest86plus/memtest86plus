@@ -116,7 +116,9 @@ void flush_caches(int my_cpu)
         } else {
             barrier_halt_wait(test_run_barrier());
         }
-        if (my_cpu == master_cpu) {
+        // In NUMA_PAR every team flushes its own socket's caches.
+        int flush_cpu = numa_run_active ? test_context()->master_cpu_num : master_cpu;
+        if (my_cpu == flush_cpu) {
             cache_flush();
         }
         if (use_spin_wait) {
