@@ -1104,6 +1104,10 @@ void main(void)
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
                     current_wave = 0;
                     scheduler_phase = test_stage_is_global_once(test_num, test_stage) ? GLOBAL_STAGE_ONCE : WAVE_BIND;
+                    if (bail) {
+                        // The test was skipped: run none of its remaining stages, like the legacy loop.
+                        scheduler_phase = WAVE_DONE;
+                    }
                     __atomic_store_n(&global_cancel_requested, 0, __ATOMIC_RELAXED);
                     __atomic_store_n(&test_pages_done, 0, __ATOMIC_RELAXED);
                     numa_stage_failure = false;

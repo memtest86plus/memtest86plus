@@ -163,7 +163,7 @@ typedef struct {
     int         window_index;
     uintptr_t   window_start;
     uintptr_t   window_end;
-    bool        windows_exhausted;   // sticky per binding, published by the context barrier
+    bool        windows_exhausted;   // the context is done (sticky per binding)
     int         status;
 } test_context_t;
 

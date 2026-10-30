@@ -243,7 +243,11 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
     barrier_spin_wait(test_run_barrier());
 
     if (stop) {
-        // The whole team read the same state, so it exits together.
+        // The whole team read the same state, so it exits together. Marking the context done
+        // lets another context take over the UI (see ui_owner_is()).
+        if (my_cpu == ctx->master_cpu_num) {
+            __atomic_store_n(&ctx->windows_exhausted, true, __ATOMIC_RELEASE);
+        }
         return false;
     }
     if (windows_exhausted) {
@@ -265,6 +269,9 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
     barrier_spin_wait(test_run_barrier());
 
     if (load_test_status(context) != CONTEXT_OK) {
+        if (my_cpu == ctx->master_cpu_num) {
+            __atomic_store_n(&ctx->windows_exhausted, true, __ATOMIC_RELEASE);
+        }
         return false;
     }
     run_test(my_cpu, test_num, test_stage, iterations);

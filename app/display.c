@@ -737,8 +737,8 @@ void update_timed_ui(void)
     }
 }
 
-// True when this context owns the once-per-second UI. When the owner's team runs out of windows,
-// a still-running context takes over, so the UI stays alive during the tail.
+// True when this context owns the once-per-second UI. When the owner's team is done, a
+// still-running context takes over, so the UI stays alive during the tail.
 static bool ui_owner_is(int context)
 {
     int owner = __atomic_load_n(&ui_owner_context, __ATOMIC_ACQUIRE);

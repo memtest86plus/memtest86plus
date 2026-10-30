@@ -287,7 +287,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         if (new_address) {
             // Only the master CPU may poll the keyboard: polling from other
             // CPUs would race the master's polling.
-            if (smp_my_cpu_num() == test_context()->master_cpu_num) {
+            if (smp_my_cpu_num() == (numa_run_active ? test_context()->master_cpu_num : master_cpu)) {
                 check_input();
             }
             scroll();
