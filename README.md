@@ -266,7 +266,7 @@ recognised:
       For example: `testlist=0,1` would only run tests 0 and 1.
   * ecc
     * Enable ECC polling
-  * numa=*mode*[,*policy*,*N*]
+  * numa=*mode*
     * *mode* is one of
       * off
         * disables NUMA placement
@@ -277,19 +277,6 @@ recognised:
           execution context and at least two selected CPU-backed memory
           domains)
     * `numa` alone behaves like `numa=on`; `nonuma` like `numa=off`
-    * the optional *policy*,*N* suffix selects at most *N* cores per
-      proximity domain
-      * ordinal
-        * the first *N* selected logical CPUs of each domain
-      * topology
-        * *N* physical cores per domain, one per core group
-          (CCD/CCX/die/cluster) where possible; without usable topology
-          data (or on hybrid CPUs, whose per-core-type SMT shifts cannot
-          be represented by a single decomposition) it silently degrades
-          to the ordinal picking
-    * `,0` selects every core (no subset); a malformed suffix is ignored
-    * the subset is re-derived at every run boundary for `par`, but fixed
-      at boot for `on` (which uses boot-time chunk ordinals)
 
 ## Keyboard Selection
 
