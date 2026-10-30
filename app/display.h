@@ -284,7 +284,7 @@ void check_input(void);
 void display_reset_ui_owner(void);
 
 /**
- * Runs the once-per-second UI and error updates outside a context barrier (the bit-fade delay).
+ * Runs the once-per-second UI and error updates (NUMA_PAR UI owner, bit-fade delay).
  */
 void update_timed_ui(void);
 

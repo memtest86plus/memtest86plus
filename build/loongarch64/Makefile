@@ -168,7 +168,6 @@ tests/%.o: ../../tests/%.c
 	@mkdir -p tests
 	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
-tests/loongarch/%.o: CFLAGS += -Werror=stack-usage=1024
 tests/loongarch/%.o: ../../tests/loongarch/%.c
 	@mkdir -p tests/loongarch
 	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS)  -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)

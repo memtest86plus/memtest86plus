@@ -360,9 +360,6 @@ static uint64_t next_log_time  = 0;
 static bool     log_running    = false;
 static bool     log_error_seen = false;
 
-static int      log_test_ticks = 0;
-static int      log_pass_ticks = 0;
-
 // Start a log line with the "MTLOG ts=<sec>.<decisec> ev=<event>" prefix.
 static char *slog_begin(const char *event)
 {
@@ -595,7 +592,6 @@ void serial_log_event(slog_event_t event)
 
     switch (event) {
       case SLOG_PASS_START:
-        log_pass_ticks = 0;
         slog("pass_start", " pass=%i", pass_num);
         break;
       case SLOG_PASS_END:
@@ -610,7 +606,6 @@ void serial_log_event(slog_event_t event)
         break;
       case SLOG_TEST_START: {
         log_error_seen = false;
-        log_test_ticks = 0;
         const char *text;
         int len = test_desc_text(test_num, &text);
         char name[40];
@@ -642,15 +637,11 @@ void serial_log_tick(void)
 {
     if (!log_running || clks_per_msec == 0) return;
 
-    log_test_ticks++;
-    log_pass_ticks++;
-
     uint64_t now = get_tsc();
     if (now < next_log_time) return;
     next_log_time = now + SERIAL_LOG_INTERVAL * 1000 * (uint64_t)clks_per_msec;
 
-    // Same progress calculation as do_tick(), from our own tick counters.
-    // In NUMA_PAR, from the display counters all context masters add to.
+    // The screen's progress, from the display's tick counters.
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -664,8 +655,8 @@ void serial_log_tick(void)
     }
 
     slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
-         pass_num, slog_pct(log_pass_ticks, ticks_per_pass[pass_type]),
-         test_num, slog_pct(log_test_ticks, ticks_per_test[pass_type][test_num]),
+         pass_num, slog_pct(pass_ticks, ticks_per_pass[pass_type]),
+         test_num, slog_pct(test_ticks, ticks_per_test[pass_type][test_num]),
          (uintptr_t)error_count);
 }
 

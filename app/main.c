@@ -169,7 +169,7 @@ static bool cpu_is_global_participant[MAX_CPUS];
 static bool run_cpu_selected[MAX_CPUS];
 
 // CPUs entering the test barriers in this wave: the whole team, or the master for a sequential test.
-bool        cpu_is_test_participant[MAX_CPUS];
+static bool cpu_is_test_participant[MAX_CPUS];
 
 // Each CPU's context in this wave; parked CPUs use context 0.
 static uint8_t cpu_execution_context[MAX_CPUS];
@@ -225,8 +225,6 @@ uint32_t    global_cancel_requested = 0;
     } else { \
         barrier_spin_wait(start_barrier); \
     }
-
-static bool numa_window_step(int my_cpu, int context, int iterations);
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

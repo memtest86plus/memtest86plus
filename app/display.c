@@ -718,12 +718,12 @@ static void ui_errors_and_hw(void)
     timed_update_done = true;
 }
 
-// The once-per-second updates outside a context barrier (the bit-fade delay on CPU 0).
+// The once-per-second updates of the NUMA_PAR UI owner and of the bit-fade delay on CPU 0.
 void update_timed_ui(void)
 {
     int act_sec = 0;
     bool once_per_second = tick_new_second(&act_sec);
-    // Like do_tick_numa(): try-lock, and the error helpers outside the UI lock.
+    // Try-lock, and the error helpers (which may take error_mutex) outside the UI lock.
     if (spin_trylock(ui_mutex)) {
         ui_spinner_and_runtime(act_sec);
         if (once_per_second) {
@@ -783,22 +783,8 @@ static void do_tick_numa(int my_cpu)
             spin_unlock(ui_mutex);
         }
 
-        // The error helpers may take error_mutex: never under ui_mutex.
         if (ui_owner_is(context)) {
-            int act_sec = 0;
-            bool once_per_second = tick_new_second(&act_sec);
-
-            if (spin_trylock(ui_mutex)) {
-                ui_spinner_and_runtime(act_sec);
-                if (once_per_second) {
-                    ui_temperature_and_tty(act_sec);
-                    ui_error_banner();
-                }
-                spin_unlock(ui_mutex);
-            }
-            if (once_per_second) {
-                ui_errors_and_hw();
-            }
+            update_timed_ui();
             error_update();
         }
 

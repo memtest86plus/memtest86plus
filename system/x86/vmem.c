@@ -107,12 +107,8 @@ static uint64_t *window_pd(int context_id)
 bool vmem_prepare_execution_contexts(int requested_contexts)
 {
 #ifndef __x86_64__
-    if (requested_contexts != 1) {
-        return false;
-    }
-    num_contexts = 1;
-    load_pdbr();
-    return true;
+    (void)requested_contexts;   // never called: its caller needs VMEM_MAX_CONTEXTS > 1
+    return false;
 #else
     if (requested_contexts < 1 || requested_contexts > VMEM_MAX_CONTEXTS) {
         return false;
