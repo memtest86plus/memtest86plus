@@ -279,21 +279,17 @@ void restore_big_status(void);
 void check_input(void);
 
 /**
- * Resets the once-per-second UI ownership to context 0. Called by the
- * scheduler at each wave binding.
+ * Resets the UI ownership to context 0, at each wave binding.
  */
 void display_reset_ui_owner(void);
 
 /**
- * Runs the once-per-second timed UI and hardware/error updates, for paths
- * that own the screen without a context barrier (e.g. the NUMA_PAR
- * global-once bit-fade delay on CPU 0).
+ * Runs the once-per-second UI and error updates outside a context barrier (the bit-fade delay).
  */
 void update_timed_ui(void);
 
 /**
- * The test and pass progress ticks (ticks_per_test and ticks_per_pass are the
- * final values). In NUMA_PAR every context master adds its team's ticks.
+ * The test and pass progress ticks (ticks_per_test and ticks_per_pass are the final values).
  */
 extern int test_ticks;
 extern int pass_ticks;
@@ -304,10 +300,7 @@ extern int pass_ticks;
 void display_progress_tick(void);
 
 /**
- * NUMA_PAR Testing line: draws the current window and cumulative progress of
- * the laggard execution context (the one with the least fraction of its
- * non-empty windows done), plus the active job count. Only the laggard's
- * master actually draws.
+ * NUMA_PAR Testing line: the active/total job count and the pages tested in this stage.
  */
 void display_test_addresses_numa(void);
 

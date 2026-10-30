@@ -45,8 +45,7 @@ void serial_log_event(slog_event_t event);
 void serial_log_wave_bind(int wave, unsigned int num_contexts);
 
 /**
- * Emits the terminal status of a NUMA_PAR context at a wave boundary, with
- * its wave and domain identity while the binding is still valid.
+ * Emits the terminal status of a NUMA_PAR context at a wave boundary.
  */
 void serial_log_context_end(int wave, int context, int domain, int status);
 

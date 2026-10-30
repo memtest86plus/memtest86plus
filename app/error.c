@@ -154,11 +154,8 @@ static bool update_error_info(testword_t page, testword_t offset, uintptr_t addr
 
 static void common_err(error_type_t type, uintptr_t addr, testword_t good, testword_t bad, bool use_for_badram)
 {
-    // Lock order: error_mutex then ui_mutex, so concurrent context masters
-    // never interleave error rendering, and no caller enters this path with
-    // ui_mutex held (the NUMA_PAR tick path services UI and error reporting
-    // separately). The ISR trylocks both, so a fault inside this path can
-    // still reach the reboot prompt without deadlocking.
+    // Lock order: error_mutex, then ui_mutex. The ISR trylocks both, so a fault in here still
+    // reaches the reboot prompt.
     spin_lock(error_mutex);
     spin_lock(ui_mutex);
 
@@ -174,8 +171,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     testword_t xor = good ^ bad;
 
     bool new_stats = false;
-    // Translate immediately, while the detecting context's mapping epoch is
-    // still stable; deferred code must not consult a later mapped_window.
+    // Translate now, with the detecting context's current mapping.
     int context = test_context_index();
     testword_t page   = page_of((void *)addr, context);
     testword_t offset = addr & (PAGE_SIZE - 1);
@@ -401,13 +397,10 @@ void parity_error(void)
 void error_update(void)
 {
     if (error_count > 0 || error_count_cecc > 0) {
-        // The mode-change trigger may enter common_err(), whose lock order
-        // is error_mutex -> ui_mutex, so it must run without ui_mutex held.
+        // common_err() takes error_mutex then ui_mutex: not under ui_mutex.
         if (error_mode != last_error_mode) {
             common_err(NEW_MODE, 0, 0, 0, false);
         }
-        // The pure rendering below is serialized against the other context
-        // masters' UI work.
         spin_lock(ui_mutex);
         if (error_mode == ERROR_MODE_SUMMARY && test_list[test_num].errors > 0) {
             display_pinned_message(1 + test_num, 69, "%c%i",
@@ -432,8 +425,7 @@ void error_update(void)
         spin_unlock(ui_mutex);
     }
 
-    // common_err() logs under error_mutex: keep a NUMA_PAR team's error line
-    // from interleaving with this tick in the shared serial log buffer.
+    // Keep error lines from interleaving with this tick in the serial log.
     spin_lock(error_mutex);
     serial_log_tick();
     spin_unlock(error_mutex);

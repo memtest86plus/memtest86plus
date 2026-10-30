@@ -7,17 +7,13 @@
  * Provides functions to handle physical memory page mapping into virtual
  * memory.
  *
- * The startup code sets up one set of paging tables shared by every CPU. It
- * gives us a 4GB virtual address space, initially identity mapped to the
- * first 4GB of physical memory. We leave the lower 2GB permanently mapped,
- * and use the upper 2GB for mapping the remaining physical memory as
- * required.
+ * The startup code sets up the paging tables to give us a 4GB virtual address
+ * space, initially identity mapped to the first 4GB of physical memory. We
+ * leave the lower 2GB permanently mapped, and use the upper 2GB for mapping
+ * the remaining physical memory as required.
  *
- * On x86-64, every execution context tests through its own 2MB-page window:
- * context 0 maps its windows at 2GB, any further contexts at 4GB and above,
- * in 1GB steps, through Page Directory Tables in pinned heap pages. A CPU must only ever dereference
- * the test window of the execution context it is bound to, so no context
- * ever walks stale translations published by another.
+ * The paging tables are shared by every CPU, so on x86-64 each execution context tests through its
+ * own window: context 0 at 2GB, the others at 4GB and above, in 1GB steps.
  *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
@@ -42,9 +38,7 @@
 #define VM_WINDOW_SIZE  PAGE_C(1,GB)
 
 /**
- * Returns the virtual byte address of the base of the test window of the
- * given execution context. Context 0 keeps the original 2GB window, so all
- * modes other than NUMA_PAR behave exactly as before.
+ * Returns the virtual base address of the given execution context's test window.
  */
 static inline uintptr_t vmem_window_base(int context_id)
 {
@@ -77,13 +71,8 @@ extern bool paging_incomplete;
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 
 /**
- * Prepares the architecture's physical-memory mapping model for the given
- * number of execution contexts, which must be 1..VMEM_MAX_CONTEXTS.
- * On x86-64 this allocates a pinned heap page per extra context for its
- * window Page Directory Table and links it into the PDP; on AArch64 and
- * LoongArch64 it validates the shared identity/direct mapping.
- * Returns false (leaving a single context usable) on failure or an
- * unsupported context count. Call before AP startup.
+ * Prepares the mapping for 1..VMEM_MAX_CONTEXTS execution contexts, before AP startup (on x86-64,
+ * a pinned Page Directory Table per extra context). Returns false on failure: one context only.
  */
 bool vmem_prepare_execution_contexts(int num_contexts);
 
@@ -105,9 +94,7 @@ bool map_window(int context_id, uintptr_t start_page);
 /**
  * Returns a virtual memory pointer to the first word of the specified physical
  * memory page. Physical memory pages above \ref VM_PINNED_SIZE must have been
- * mapped by a call to map_window() prior to calling this function. The alias
- * address chosen for pages of the currently mapped window is taken from the
- * given execution context's test window.
+ * mapped by a call to map_window() prior to calling this function.
  *
  * \param page              - the physical page number.
  * \param context_id        - the execution context whose test window is used.
@@ -120,9 +107,7 @@ void *first_word_mapping(uintptr_t page, int context_id);
 /**
  * Returns a virtual memory pointer to the last word of the specified physical
  * memory page. Physical memory pages above \ref VM_PINNED_SIZE must have been
- * mapped by a call to map_window() prior to calling this function. The alias
- * address chosen for pages of the currently mapped window is taken from the
- * given execution context's test window.
+ * mapped by a call to map_window() prior to calling this function.
  *
  * \param page              - the physical page number.
  * \param word_size         - the size of a word in bytes.
@@ -135,11 +120,9 @@ void *last_word_mapping(uintptr_t page, size_t word_size, int context_id);
 
 /**
  * Returns the page number of the physical memory page containing the specified
- * virtual memory address, translated through the given execution context's
- * current window mapping. The specified address must either be permanently
- * mapped or lie within the given context's test window, and the physical
- * window must have been mapped by a call to map_window() prior to calling
- * this function.
+ * virtual memory address. The specified address must either be permanently
+ * mapped or mapped by a call to map_window() for the given context prior to
+ * calling this function.
  *
  * \param addr              - the virtual memory address.
  * \param context_id        - the execution context whose mapping is used.

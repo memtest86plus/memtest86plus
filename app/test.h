@@ -46,8 +46,7 @@ extern int master_cpu;
 extern int window_num;
 
 /**
- * A barrier used when running tests. Only the scheduler/control code may use
- * it directly; test implementations use test_run_barrier().
+ * A barrier used when running tests. The tests use test_run_barrier().
  */
 extern barrier_t *run_barrier;
 
@@ -62,15 +61,12 @@ extern spinlock_t *error_mutex;
 extern spinlock_t *ui_mutex;
 
 /**
- * True while a NUMA_PAR run is active (real run, at least two selected
- * CPU-backed memory domains). Legacy modes and the BSP-only dummy run are
- * always false.
+ * True while a NUMA_PAR run is active; false in legacy modes and the dummy run.
  */
 extern bool numa_run_active;
 
 /**
- * The dense per-CPU chunk index within the current context team, rebuilt at
- * every wave binding.
+ * The per-CPU chunk index within its context team, rebuilt at every wave binding.
  */
 extern uint16_t test_team_chunk_index[MAX_CPUS];
 
@@ -85,22 +81,17 @@ extern uint64_t test_pages_done;
 extern uint32_t global_cancel_requested;
 
 /**
- * Returns true when the calling context has been asked to stop (NUMA_PAR
- * cancellation published through the context barrier). False in legacy modes,
- * which use the plain `bail` flag.
+ * Returns true when the calling context has been asked to stop (`bail` in legacy modes).
  */
 bool test_stop_requested(void);
 
 /**
- * Publishes a cross-context cancellation request (release store) from a
- * context master after the UI requested a bail; every context converges on
- * the same exit path at its next safe point.
+ * Publishes a cross-context cancellation request after the UI requested a bail.
  */
 void test_publish_cancel_request(void);
 
 /**
- * Requests a stop of the given execution context; the first terminal reason
- * wins.
+ * Requests a stop of the given execution context; the first terminal reason wins.
  */
 void test_request_cancel(int context);
 
@@ -148,25 +139,21 @@ typedef struct {
 } vm_map_t;
 
 /**
- * The list of memory segments currently mapped into virtual memory for each
- * execution context.
+ * The list of memory segments currently mapped into virtual memory, per context.
  */
 extern vm_map_t vm_map[VMEM_MAX_CONTEXTS][MAX_MEM_SEGMENTS];
 /**
- * The number of memory segments currently mapped into virtual memory for each
- * execution context.
+ * The number of memory segments currently mapped into virtual memory, per context.
  */
 extern int vm_map_size[VMEM_MAX_CONTEXTS];
 
 /**
- * The number of pages currently mapped into virtual memory for each execution
- * context.
+ * The number of pages currently mapped into virtual memory, per context.
  */
 extern size_t num_mapped_pages[VMEM_MAX_CONTEXTS];
 
 /**
- * The mutable per-execution-context state needed by the test scheduler and
- * test implementations. Context 0 is the legacy-mode context.
+ * The state of an execution context. Context 0 is the legacy-mode context.
  */
 typedef struct {
     uint32_t    proximity_domain_idx;
@@ -181,8 +168,7 @@ typedef struct {
 } test_context_t;
 
 /**
- * The number of execution contexts bound in the current wave (the active
- * NUMA_PAR job count). 1 in legacy modes and during the dummy run.
+ * The number of execution contexts bound in the current wave; 1 in legacy modes and the dummy run.
  */
 extern unsigned int num_bound_execution_contexts;
 
@@ -192,8 +178,7 @@ extern unsigned int num_bound_execution_contexts;
 extern test_context_t test_contexts[VMEM_MAX_CONTEXTS];
 
 /**
- * Returns the execution context of the calling CPU. In legacy modes and
- * during the BSP-only dummy run this is always context 0.
+ * Returns the calling CPU's execution context (context 0 in legacy modes and the dummy run).
  */
 test_context_t *test_context(void);
 
@@ -203,23 +188,18 @@ test_context_t *test_context(void);
 int test_context_index(void);
 
 /**
- * Returns the execution context currently bound to the given CPU, clamped
- * to 0 for unbound or invalid ordinals.
+ * Returns the execution context bound to the given CPU, or 0 when unbound.
  */
 int execution_context_for_cpu(int cpu);
 
 /**
- * Returns the barrier to use for test-internal waits from the calling CPU:
- * the current context barrier in active NUMA_PAR, the legacy run_barrier
- * otherwise.
+ * Returns the calling CPU's test barrier: its context barrier in NUMA_PAR, else run_barrier.
  */
 barrier_t *test_run_barrier(void);
 
 /**
- * True when the given CPU is the primary context master of the current wave,
- * the only context master allowed to update the test-specific display fields
- * without ui_mutex. A negative CPU (the dummy calibration) is never the
- * primary master, so the dummy performs no display updates.
+ * True when the CPU is the master of context 0, the only one updating the test display fields
+ * without ui_mutex. Never true for the dummy run (negative CPU).
  */
 static inline bool test_is_primary_context_master(int my_cpu)
 {

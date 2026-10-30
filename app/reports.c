@@ -625,16 +625,12 @@ void serial_log_event(slog_event_t event)
     }
 }
 
-// Emits the wave-binding event so the machine-parseable serial log stays
-// unambiguous with concurrent contexts. Called by CPU 0 at WAVE_BIND.
 void serial_log_wave_bind(int wave, unsigned int num_contexts)
 {
     if (!log_running) return;
     slog("wave_bind", " wave=%i contexts=%u", wave, num_contexts);
 }
 
-// Emits the terminal status of a context at a wave boundary, with its wave
-// and domain identity while the binding is still valid.
 void serial_log_context_end(int wave, int context, int domain, int status)
 {
     if (!log_running) return;

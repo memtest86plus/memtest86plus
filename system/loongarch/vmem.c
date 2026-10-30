@@ -67,9 +67,7 @@ uintptr_t map_region(uintptr_t base_addr, size_t size __attribute__((unused)), b
 
 bool vmem_prepare_execution_contexts(int num_contexts)
 {
-    // LoongArch64 uses DMW/direct addressing with one shared mapping
-    // configuration; there is no per-context translation root. NUMA_PAR is
-    // only safe when the NUMA address transform cannot alias two teams.
+    // One shared direct mapping: only the NUMA address transform could alias two contexts.
     if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
         return false;
     }
@@ -83,7 +81,6 @@ bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __a
 
 void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
-    // The direct mapping does not depend on the calling context's test window.
     void *result;
 
     if (map_numa_memory_range == true) {

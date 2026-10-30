@@ -33,9 +33,8 @@
 #define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
 /*
- * The number of execution contexts that may run memory-test teams at the
- * same time: 8 covers a 2-socket SNC4/NPS4 machine in one wave, more domains
- * run in successive waves. i586 uses one context.
+ * Execution contexts testing at once (8 covers a 2-socket SNC4/NPS4 machine);
+ * more domains run in successive waves.
  */
 #if defined(__i386__)
 #define	VMEM_MAX_CONTEXTS	1

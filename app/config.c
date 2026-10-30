@@ -363,7 +363,7 @@ static void parse_option(const char *option, const char *params)
         exclude_smtcores = false;
     } else if (strncmp(option, "nospdcrc", 9) == 0) {
         enable_spd_crc = false;
-    } else if (strncmp(option, "numa", 4) == 0 && option[4] == '\0') {
+    } else if (strncmp(option, "numa", 5) == 0) {
         if (strncmp(params, "off", 4) == 0) {
             numa_mode = NUMA_OFF;
         } else if (strncmp(params, "on", 3) == 0 || params[0] == '\0') {
@@ -371,11 +371,10 @@ static void parse_option(const char *option, const char *params)
         } else if (VMEM_MAX_CONTEXTS > 1 && strncmp(params, "par", 4) == 0) {
             numa_mode = NUMA_PAR;
         } else {
-            // An unrecognised mode resets NUMA to off, rather than silently
-            // enabling it (e.g. a typo such as "numa=oon").
+            // An unknown mode (e.g. a typo) turns NUMA off.
             numa_mode = NUMA_OFF;
         }
-    } else if (strncmp(option, "nonuma", 6) == 0 && option[6] == '\0') {
+    } else if (strncmp(option, "nonuma", 7) == 0) {
         numa_mode = NUMA_OFF;
     } else if (strncmp(option, "powersave", 10) == 0) {
         if (strncmp(params, "off", 4) == 0) {

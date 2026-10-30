@@ -81,10 +81,8 @@ static const rh_pattern_t rh_static_patterns[] = {
 };
 #define RH_NUM_STATIC ((int)(sizeof(rh_static_patterns) / sizeof(rh_static_patterns[0])))
 
-// Per-execution-context materialised aggressor sequence. Kept off the stack:
-// under NUMA_PAR an AP (2 KiB stack) runs this test, and test_rowhammer()'s
-// frame plus the do_tick()/UI chain overflows it. Contexts are disjoint and
-// rowhammer is a ONE-mode test, so one slot per context is safe.
+// Per-context aggressor sequence, kept off the small AP stacks. Rowhammer is a ONE-mode test, so
+// one slot per context is enough.
 static void *rh_seq[VMEM_MAX_CONTEXTS][RH_MAX_PERIOD];
 
 //------------------------------------------------------------------------------
@@ -568,9 +566,7 @@ int test_rowhammer(int my_cpu, int time_budget_secs)
             rh_check(site, stride, vic_off, n_vic, vword, seg_start, seg_end);
 
             iter++;
-        // Poll the stop decision atomically (the context status in NUMA_PAR,
-        // the bail flag in legacy modes) to shorten stop latency; the team
-        // still converges through the context barrier at the next do_tick().
+        // Polled here too, to shorten the stop latency.
         } while (!test_stop_requested() && slice_cyc != 0
                  && (get_tsc() - site_start) < slice_cyc);
 

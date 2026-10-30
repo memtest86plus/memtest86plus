@@ -29,9 +29,7 @@
 #define MAX_APIC_IDS                512
 
 /**
- * The maximum number of NUMA proximity domains. Independent of MAX_APIC_IDS:
- * it bounds immutable/discovery-side SRAT topology data, not CPU ordinals.
- * Larger topologies fall back cleanly to topology-agnostic mode.
+ * The maximum number of NUMA proximity domains; larger topologies disable NUMA.
  */
 #define MAX_PROXIMITY_DOMAINS       32
 
@@ -57,8 +55,7 @@ extern int num_available_cpus;
 extern int num_proximity_domains;
 
 /**
- * Set if the SRAT declares more distinct proximity domains than
- * MAX_PROXIMITY_DOMAINS; NUMA placement is disabled entirely in that case.
+ * Set if the SRAT has too many proximity domains or memory ranges; NUMA is then disabled.
  */
 extern bool smp_topology_too_large;
 
@@ -114,22 +111,18 @@ static inline uint16_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_doma
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end);
 
 /**
- * Returns true if the given proximity-domain index owns at least one
- * accepted SRAT memory range.
+ * Returns true if the given proximity domain owns at least one SRAT memory range.
  */
 bool smp_domain_has_memory(uint32_t domain_idx);
 
 /**
- * Returns the number of the given domain's SRAT range pieces intersecting
- * the given page range; each intersection is one vm_map segment.
+ * Returns the number of the domain's SRAT range pieces in the page range (one vm_map segment each).
  */
 uint32_t smp_domain_memory_pieces_in_range(uint32_t domain_idx, uintptr_t start_page, uintptr_t end_page);
 
 /**
- * Validates the active LoongArch64 NUMA address transform for parallel teams:
- * canonical spans must round-trip to physical addresses and retain distinct
- * ownership. Identity fallback is valid. Called after SRAT normalization and
- * pinned allocations; always true on architectures without the transform.
+ * Checks that the active LoongArch64 NUMA address transform round-trips and keeps ownership
+ * distinct. Always true on the other architectures.
  */
 bool smp_numa_transform_valid(void);
 

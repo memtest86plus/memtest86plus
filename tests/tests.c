@@ -121,16 +121,11 @@ void test_list_init(void)
     desc[i] = '\0';
 }
 
-// Clamps the low-prefix context's first segment to the global lower limit
-// (and the USB guard below 0x500) in window 0. Only the context owning the
-// low prefix may do this; a context whose owned range starts higher must
-// keep its start, or its map would expand into another team's range and the
-// same physical memory would be tested twice, concurrently.
+// In window 0, raises the first segment's start to the lower limit. Never lowers it: the map would
+// then expand into memory owned by another context.
 static void clamp_low_prefix(int context)
 {
-    // The legacy path keeps its window state in the plain globals; only the
-    // NUMA_PAR path maintains the per-context field. Mixing them would skip
-    // the clamp after a NUMA_PAR run falls back to legacy placement.
+    // Legacy runs (also after a NUMA_PAR fallback) track the window in window_num.
     bool window_zero = numa_run_active ? (test_context()->window_index == 0)
                                        : (window_num == 0);
     if (!window_zero) {
@@ -143,6 +138,7 @@ static void clamp_low_prefix(int context)
         first_word = (uintptr_t *)0x500;
     }
 
+    // Never move the start below the first mapped RAM page.
     if (first_word > vm_map[context][0].start) {
         vm_map[context][0].start = first_word;
     }
@@ -156,9 +152,7 @@ int run_test(int my_cpu, int test, int stage, int iterations)
     stack_canary_arm(my_cpu);
 
     if (numa_run_active) {
-        // Each context master clamps its own low prefix and the laggard's
-        // master updates the aggregate Testing line (the helper draws only
-        // when the calling context is the laggard).
+        // Each context master clamps its own map and updates the Testing line.
         if (my_cpu == test_context()->master_cpu_num) {
             clamp_low_prefix(context);
             display_test_addresses_numa();

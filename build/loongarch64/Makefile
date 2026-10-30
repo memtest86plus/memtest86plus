@@ -5,16 +5,13 @@ ifeq ($(shell uname -m),loongarch64)
   LD = ld
   OBJCOPY = objcopy
 else
-  # Pick the first available cross compiler: unversioned Debian name, Debian
-  # versioned name (gcc-16 packages), or the Yongbao/CI name.
+  # The first available cross compiler: Debian, Debian gcc-16, or Yongbao/CI.
   CC = $(firstword $(shell \
       command -v loongarch64-linux-gnu-gcc  >/dev/null 2>&1 && echo loongarch64-linux-gnu-gcc; \
       command -v loongarch64-linux-gnu-gcc-16 >/dev/null 2>&1 && echo loongarch64-linux-gnu-gcc-16; \
       command -v loongarch64-unknown-linux-gnu-gcc >/dev/null 2>&1 && echo loongarch64-unknown-linux-gnu-gcc; \
       echo loongarch64-linux-gnu-gcc))
-  # Derive the binutils tools from the chosen compiler's prefix, so the
-  # Debian (linux-gnu) and Yongbao (unknown-linux-gnu) toolchains always
-  # match the compiler.
+  # Binutils matching the compiler's prefix.
   LD = $(if $(findstring unknown-linux-gnu,$(CC)),loongarch64-unknown-linux-gnu-ld,loongarch64-linux-gnu-ld)
   OBJCOPY = $(if $(findstring unknown-linux-gnu,$(CC)),loongarch64-unknown-linux-gnu-objcopy,loongarch64-linux-gnu-objcopy)
 endif

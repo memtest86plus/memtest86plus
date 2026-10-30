@@ -1,32 +1,24 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2026 Lionel Debroux.
 //
-// NUMA_PAR scheduler support, textually included into app/main.c (see the
-// #include "numa_par.c" site there): its functions and state are static to
-// that translation unit and it must not be compiled standalone.
+// NUMA_PAR scheduler, #included by app/main.c: not compiled standalone.
 
-// The relocation-resumable phase machine state: current_wave and
-// num_execution_waves are copied by the relocation and read back on re-entry.
+// Scheduler state, copied by the relocation and read back on re-entry.
 static unsigned int current_wave = 0;
 static unsigned int num_execution_waves = 1;
 
-// True when the current run executes (or, during the dummy calibration,
-// will execute) the NUMA_PAR scheduler: NUMA_PAR is selected, the mapping
-// model was validated (vmem_prepare_execution_contexts() before AP startup
-// downgraded NUMA_PAR on failure), the CPU sequencing mode is parallel, and
-// enough selected CPU-backed memory domains exist to form independent teams.
+// True when this run uses the NUMA_PAR scheduler: NUMA_PAR mode (validated before AP startup),
+// parallel CPU mode, and at least two CPU-backed memory domains.
 static bool numa_par_runs(void)
 {
     return VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && cpu_mode == PAR && num_cpu_memory_domains >= 2;
 }
 
-// Master/CPU0-only: binds the current wave's CPU-backed domains to distinct
-// execution contexts, configures their barriers, and publishes the dense
-// chunk indexes. Runs only between two global barriers.
+// CPU 0 only, between two global barriers: binds the wave's CPU-backed domains to execution
+// contexts and sets up their teams and barriers.
 static void bind_execution_wave(int wave, bool parallel_test)
 {
-    // CPUs not taking part in this stage won't re-arm their stack
-    // canaries, and the coming relocations will invalidate them.
+    // Idle CPUs won't re-arm their stack canaries, and the coming relocations invalidate them.
     stack_canary_disarm_all();
 
     memset(domain_to_context, CONTEXT_NONE, sizeof(domain_to_context));
@@ -41,9 +33,7 @@ static void bind_execution_wave(int wave, bool parallel_test)
         int context = num_contexts_in_wave++;
         domain_to_context[domain] = context;
 
-        // The preceding global barrier guarantees the prior user of this
-        // reusable context is quiescent. Status is an atomic object and
-        // is not reset with a raw struct memset.
+        // The previous user is quiescent since the global barrier. Not memset: it holds atomics.
         test_contexts[context].proximity_domain_idx = domain;
         test_contexts[context].master_cpu_num = -1;
         test_contexts[context].team_cpu_count = 0;
@@ -65,21 +55,17 @@ static void bind_execution_wave(int wave, bool parallel_test)
                 test_contexts[context].master_cpu_num = cpu;
             }
             test_team_chunk_index[cpu] = test_contexts[context].team_cpu_count++;
-            // In a parallel test every team CPU enters the test-internal
-            // barrier; a sequential test only the context master does.
+            // A parallel test runs the whole team, a sequential one the master only.
             cpu_is_test_participant[cpu] = parallel_test || cpu == test_contexts[context].master_cpu_num;
         } else {
-            // Parked CPUs (later waves, CPU-only domains, disabled CPUs)
-            // use context 0 only for identity-mapped control flow; they
-            // never join context 0's test barrier.
+            // Parked CPUs (later waves, CPU-only domains, disabled CPUs) use context 0's mapping
+            // but never join its test barrier.
             cpu_execution_context[cpu] = 0;
         }
     }
 
-    // The wave ownership table: every domain's memory is owned by
-    // exactly one context in exactly one wave. setup_vm_map() consults
-    // memory_owner_context[], so each piece is mapped and tested exactly
-    // once per stage, and no two teams ever alias the same physical range.
+    // Each domain's memory is owned by one context in one wave (see setup_vm_map()), so it is
+    // tested once per stage. Memory-only domains go to the BSP context in wave 0.
     int bsp_context = domain_to_context[bsp_proximity_domain];
     for (int domain = 0; domain < num_proximity_domains; domain++) {
         if (domain_to_context[domain] != CONTEXT_NONE) {
@@ -93,8 +79,6 @@ static void bind_execution_wave(int wave, bool parallel_test)
         }
     }
 
-    // CPU 0 is the only reset owner, and every other CPU is still held
-    // at the pre-publication global rendezvous.
     for (int context = 0; context < (int)num_contexts_in_wave; context++) {
         test_context_t *ctx = &test_contexts[context];
         assert(ctx->team_cpu_count > 0);
@@ -106,8 +90,7 @@ static void bind_execution_wave(int wave, bool parallel_test)
     num_bound_execution_contexts = num_contexts_in_wave;
     display_reset_ui_owner();
 
-    // Wave-boundary invariant checks (debug-time validation); every
-    // active context barrier was quiescent before barrier_reset().
+    // Wave invariants.
     assert(num_contexts_in_wave >= 1 && num_contexts_in_wave <= VMEM_MAX_CONTEXTS);
     for (int context = 0; context < (int)num_contexts_in_wave; context++) {
         assert(test_contexts[context].master_cpu_num >= 0);
@@ -116,19 +99,15 @@ static void bind_execution_wave(int wave, bool parallel_test)
                && test_contexts[context].active_cpu_count <= test_contexts[context].team_cpu_count);
     }
 
-    // The Using: field would otherwise stay blank in NUMA_PAR; fill it
-    // like the legacy path does (IMC/SPD mode keeps its own display).
+    // Fill the Using: field like the legacy path (IMC/SPD mode keeps its own display).
     if (display_mode == DISPLAY_MODE_NA) {
         display_all_active();
     }
 
-    // Emit the lifecycle boundary once the binding and context count are
-    // final, so concurrent multi-wave serial logs stay unambiguous.
     serial_log_wave_bind(current_wave, num_contexts_in_wave);
 }
 
-// Materializes the domain metadata after the CPU selection snapshot has been
-// published at a run boundary. Produces cpu_memory_domains[] (BSP first),
+// At a run boundary, from the CPU selection: builds cpu_memory_domains[] (BSP domain first),
 // num_cpu_memory_domains and num_execution_waves.
 static void build_numa_domain_list(void)
 {
@@ -142,21 +121,16 @@ static void build_numa_domain_list(void)
         enabled_cpus_in_proximity_domain[domain]++;
     }
 
-    // Build the ordered list of domains that need an execution team, BSP
-    // first: the BSP domain heads the list and owns context 0 in wave 0.
-    // The BSP itself cannot be disabled, so the BSP domain always has at
-    // least one enabled CPU. A memory-only domain (no enabled CPU) is
-    // deliberately omitted here: its memory is owned by the BSP context in
-    // wave 0. A CPU-only domain (no memory) is parked entirely.
+    // Domains needing a team, the BSP domain first (context 0 of wave 0). Memory-only domains
+    // are owned by the BSP context in wave 0; CPU-only domains are parked.
     bsp_proximity_domain = smp_get_proximity_domain_idx(0);
     num_cpu_memory_domains = 0;
 
-    // If any orphaned memory domain exists, the BSP domain is included in
-    // wave 0 even when the BSP domain itself reports no local memory,
-    // otherwise there would be no live BSP context to own those ranges.
+    // The BSP domain is listed even without memory when it must own memory-only domains.
     bool have_orphan_memory = false;
     for (int domain = 0; domain < num_proximity_domains; domain++) {
-        if (domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain) && enabled_cpus_in_proximity_domain[domain] == 0) {
+        if (   domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain)
+            && enabled_cpus_in_proximity_domain[domain] == 0) {
             have_orphan_memory = true;
             break;
         }
@@ -166,39 +140,26 @@ static void build_numa_domain_list(void)
     }
 
     for (int domain = 0; domain < num_proximity_domains; domain++) {
-        // Orphaned memory domains are covered by the BSP context in wave 0
-        // and must not get their own execution context.
-        if (domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain) && enabled_cpus_in_proximity_domain[domain] != 0) {
+        if (   domain != (int)bsp_proximity_domain && smp_domain_has_memory(domain)
+            && enabled_cpus_in_proximity_domain[domain] != 0) {
             cpu_memory_domains[num_cpu_memory_domains++] = domain;
         }
     }
 
     num_execution_waves = (num_cpu_memory_domains + VMEM_MAX_CONTEXTS - 1) / VMEM_MAX_CONTEXTS;
-    // (see the end of this file for the NUMA_PAR scheduler machinery)
 }
 
 //------------------------------------------------------------------------------
 // NUMA_PAR scheduler.
 //
-// The scheduler is a relocation-resumable state machine: run_at() never
-// returns, so after every relocation main() calls test_all_windows_numa()
-// again, which resumes from the copied scheduler_phase/current_wave
-// globals. Each logical test stage starts one state-machine sequence (wave
-// 0..N-1 per stage); NUMA_PAR binds execution contexts to CPU-backed
-// proximity domains at WAVE_BIND. The plain memory-testing window loop
-// (test_all_windows() in main.c) is not used while a NUMA_PAR run is
-// active.
-//
-// Every reconfiguration (barrier_reset, context rebind, status reset,
-// relocation) happens only between the LONG/SHORT_BARRIER pairs that bracket
-// each phase, so no running barrier generation or context wait is ever
-// reconfigured concurrently: the barriers are the quiescence protocol.
+// A relocation-resumable state machine: run_at() never returns, so after a relocation main()
+// re-enters test_all_windows_numa(), which resumes from scheduler_phase and current_wave.
+// Each stage runs waves 0..N-1. Contexts and barriers are only reconfigured between the
+// LONG/SHORT_BARRIER pairs bracketing each phase.
 //------------------------------------------------------------------------------
 
-// Stage-global fatal-failure latch, promoted by CPU 0 at every wave
-// boundary before the contexts are rebound for the next wave, so a failure
-// in an early wave is never erased by a later rebind. Cleared at stage
-// start; read after the stage ends to fall back to legacy mode.
+// Fatal context failures, latched by CPU 0 at each wave end before the next rebind. Read after
+// the stage to fall back to legacy mode.
 static bool numa_stage_failure = false;
 
 typedef enum {
@@ -212,16 +173,13 @@ typedef enum {
 
 static test_scheduler_phase_t scheduler_phase;
 
-// Decides whether window 0 will be tested in this stage/wave. As in the legacy
-// loop, multi-stage tests skip it: relocating between their stages would overwrite it.
+// As in the legacy loop, multi-stage tests skip window 0: relocating between stages would overwrite it.
 static bool wave_has_window_zero(void)
 {
     return test_list[test_num].stages == 1 && selected_map_has_window_zero();
 }
 
-// Runs a test-specific global-once stage on CPU 0. The bit-fade fade delay
-// sleeps through the test's configured fade interval; the other global
-// participants wait at the surrounding global barriers, so no per-context
+// CPU 0 only: the bit-fade delay. The other CPUs wait at the global barriers, so no context
 // barrier or test helper may be used here.
 static void run_global_stage_once(void)
 {
@@ -230,15 +188,12 @@ static void run_global_stage_once(void)
         // Reduced fast pass, matching the window stages.
         sleep_secs /= 3;
     }
-    // No context is bound here, so there are no context barriers to enter;
-    // service input, publish per-second progress, run the timed UI/ECC
-    // checks, the error display and the serial log tick, like do_tick().
-    // Only CPU 0 runs this, so no UI lock is needed.
+    // Does do_tick()'s work each second. Only CPU 0 runs, so no UI lock is needed.
     display_test_stage_description("fade over %i seconds", sleep_secs);
     while (sleep_secs > 0) {
         check_input();
         if (restart || bail) {
-            // Stop the delay early; the run boundary handles the request.
+            // Stop early; the run boundary handles the request.
             break;
         }
         display_progress_tick();
@@ -249,11 +204,8 @@ static void run_global_stage_once(void)
     }
 }
 
-// NUMA_PAR: one window iteration of the calling CPU's context. The context
-// master computes the window and the map; the context barrier publishes
-// them. Returns false when the context must stop (terminal status); every
-// participant rendezvouses at the barrier before exiting, so a terminal
-// status never strands a team.
+// One window iteration of the calling CPU's context: the master computes the window and map,
+// the context barrier publishes them. Returns false when the whole team must stop.
 static bool numa_window_step(int my_cpu, int context, int iterations)
 {
     test_context_t *ctx = &test_contexts[context];
@@ -280,11 +232,8 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
                 ctx->window_end   = ctx->window_start + VM_WINDOW_SIZE;
             }
             if (ctx->window_start >= pm_map[pm_map_size - 1].end) {
-                // The window enumeration is exhausted. The sticky flag is
-                // published by the context barrier below and never rewritten
-                // during this binding, so every participant reads the same
-                // end-of-enumeration decision (a per-window value would race
-                // the master's next write).
+                // Sticky for this binding: a per-window flag would race the master's next write
+                // before every peer has read it.
                 __atomic_store_n(&ctx->windows_exhausted, true, __ATOMIC_RELEASE);
             }
             setup_vm_map(context, ctx->window_start, ctx->window_end);
@@ -292,31 +241,25 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
     }
     barrier_spin_wait(test_run_barrier());
 
-    // Finish reading this publication before a faster peer can enter
-    // map_window and publish a failure for the next phase. Otherwise a
-    // delayed CPU could leave here while that peer waits at the map barrier.
+    // Read the publication before a faster peer can publish a map_window() failure: a delayed
+    // CPU could otherwise exit while that peer waits at the map barrier.
     stop = stop || load_test_status(context) != CONTEXT_OK;
     bool windows_exhausted = __atomic_load_n(&ctx->windows_exhausted, __ATOMIC_ACQUIRE);
     bool window_empty = (num_mapped_pages[context] == 0);
     barrier_spin_wait(test_run_barrier());
 
     if (stop) {
-        // Every team member evaluates the same published state after the
-        // same barrier generation, so the whole context exits together; a
-        // lone early exit would strand the others in the next tick barrier.
+        // The whole team read the same state, so it exits together.
         return false;
     }
     if (windows_exhausted) {
-        // No more windows for this context.
         return false;
     }
     if (window_empty) {
-        // No memory to test in this window.
         if (my_cpu == ctx->master_cpu_num) {
             ctx->window_index++;
         }
-        // Keep the empty-window path at a common step boundary before any
-        // CPU starts the next iteration.
+        // Keep the team in step before the next iteration.
         barrier_spin_wait(test_run_barrier());
         return true;
     }
@@ -332,34 +275,27 @@ static bool numa_window_step(int my_cpu, int context, int iterations)
     }
     run_test(my_cpu, test_num, test_stage, iterations);
 
-    // The last test tick only synchronises the memory accesses before it.
-    // Peers may still read vm_map or vm_map_size while leaving their test
-    // loops, so wait for every run_test call to return before the master
-    // publishes the next window's map.
+    // Peers may still read vm_map while leaving run_test(): wait for all of them before the
+    // master publishes the next window's map.
     barrier_spin_wait(test_run_barrier());
 
     if (my_cpu == ctx->master_cpu_num) {
-        // Aggregate pages tested, for the Testing line's progress field.
+        // For the Testing line's progress field.
         __sync_fetch_and_add(&test_pages_done, num_mapped_pages[context]);
         ctx->window_index++;
     }
     return true;
 }
 
-// Window 0 covers [0, LOW_LOAD_LIMIT). The master computes the window and
-// the map; the publication barrier makes them visible before test access.
+// Window 0 covers [0, LOW_LOAD_LIMIT). Parked CPUs wait only at the phase-end global barrier.
 static void run_owned_window_zero(int my_cpu, int iterations)
 {
-    // The context master computes window 0 and its map; the context
-    // barrier publishes them. Parked CPUs wait only at the phase-end
-    // global barrier.
     if (cpu_is_test_participant[my_cpu]) {
         numa_window_step(my_cpu, execution_context_for_cpu(my_cpu), iterations);
     }
 }
 
-// Windows 1 and above, in ascending order, until the context has enumerated
-// its owned memory.
+// Windows 1 and above, until the context's memory is exhausted.
 static void run_owned_windows_1_plus(int my_cpu, int iterations)
 {
     if (!cpu_is_test_participant[my_cpu]) {
@@ -369,9 +305,8 @@ static void run_owned_windows_1_plus(int my_cpu, int iterations)
     while (numa_window_step(my_cpu, context, iterations)) { }
 }
 
-// Loops through the memory windows for the current stage, one execution
-// context per CPU-backed proximity domain (waves per VMEM_MAX_CONTEXTS).
-// Invoked by main() only while a NUMA_PAR run is active.
+// NUMA_PAR counterpart of test_all_windows(): runs the current stage with one context per
+// CPU-backed domain, in waves of VMEM_MAX_CONTEXTS.
 static void test_all_windows_numa(int my_cpu)
 {
     int iterations = test_list[test_num].iterations;
@@ -383,10 +318,6 @@ static void test_all_windows_numa(int my_cpu)
     for (;;) {
         switch (scheduler_phase) {
           case GLOBAL_STAGE_ONCE:
-            // A test-specific global-once stage (e.g. the bit-fade delay)
-            // runs once on CPU 0 between memory-touching phases; the other
-            // global participants wait at the surrounding barriers. No
-            // context is bound and no context barrier is entered here.
             LONG_BARRIER;
             if (my_cpu == 0) {
                 run_global_stage_once();
@@ -406,10 +337,7 @@ static void test_all_windows_numa(int my_cpu)
             continue;
 
           case WAVE_WINDOW_0: {
-            // A window-0 map failure (the PAE limit was reached) is recorded
-            // through the context status and promoted at the wave boundary:
-            // the stage aborts there, and the run boundary falls back to
-            // legacy placement.
+            // A map failure is latched at WAVE_FINISH; the run then falls back to legacy placement.
             if ((uintptr_t)&_start != high_load_addr) {
                 relocate_all_and_resume(high_load_addr, my_cpu);
             }
@@ -437,18 +365,17 @@ static void test_all_windows_numa(int my_cpu)
           case WAVE_FINISH:
             LONG_BARRIER;
             if (my_cpu == 0) {
-                // Promote any fatal context status to the stage-global
-                // failure latch before the next wave rebinds these contexts,
-                // and report every terminal status with its wave/domain
-                // identity while it is still available.
+                // Latch fatal statuses and log terminal ones before the next wave rebinds the contexts.
                 for (int context = 0; context < (int)num_bound_execution_contexts;
                      context++) {
                     int status = load_test_status(context);
-                    if (status == CONTEXT_MAP_FAILED || status == CONTEXT_MAP_OVERFLOW || status == CONTEXT_TOPOLOGY_FAILED) {
+                    if (   status == CONTEXT_MAP_FAILED || status == CONTEXT_MAP_OVERFLOW
+                        || status == CONTEXT_TOPOLOGY_FAILED) {
                         numa_stage_failure = true;
                     }
                     if (status != CONTEXT_OK) {
-                        serial_log_context_end(current_wave, context, test_contexts[context].proximity_domain_idx, status);
+                        serial_log_context_end(current_wave, context, test_contexts[context].proximity_domain_idx,
+                                               status);
                     }
                 }
                 if (++current_wave < num_execution_waves) {

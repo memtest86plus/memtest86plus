@@ -26,14 +26,12 @@
 // Constants
 //------------------------------------------------------------------------------
 
-// The startup code builds a single set of paging tables, shared by every CPU,
-// giving 4GB of virtual address space with 2MB pages, initially identity
-// mapped to the first 4GB of physical memory. We use the third GB to map the
-// physical memory window we are currently testing, and the following 512MB to
-// map the screen frame buffer, ACPI tables, and any hardware devices we need
-// to access that are not in the permanently mapped regions. Every execution
-// context beyond the first tests through its own 1GB window at 4GB and above,
-// whose Page Directory Table is a pinned heap page.
+// The startup code sets up the paging tables to give us 4GB of virtual address
+// space, using 2MB pages, initially identity mapped to the first 4GB of physical
+// memory. We use the third GB to map the physical memory window we are currently
+// testing, and the following 512MB to map the screen frame buffer, ACPI tables,
+// and any hardware devices we need to access that are not in the permanently
+// mapped regions. Execution contexts 1 and above use their own windows at 4GB and above.
 
 #define MAX_REGION_PAGES    256     // VM pages
 
@@ -62,9 +60,7 @@ static uintptr_t    mapped_window[VMEM_MAX_CONTEXTS] = { 2 };
 // addresses in pdp[] remain valid in every relocated copy.
 static uint64_t     *context_pd[VMEM_MAX_CONTEXTS];
 
-// Serialises window PD reconstruction within a context. Initialized before AP
-// startup: after relocation the copied BSS is not re-zeroed, so an explicit
-// init is required.
+// Serialises window PD rebuilds within a context.
 static spinlock_t   window_mutex[VMEM_MAX_CONTEXTS] = { 0 };
 
 //------------------------------------------------------------------------------
@@ -83,7 +79,6 @@ static void load_pdbr(void)
         : "rax", "memory"
     );
 #else
-    // Preserve the current i586 PAE/non-long-mode CR3 path exactly.
     void *page_table;
     if (cpuid_info.flags.lm == 1) {
         page_table = pml4;
@@ -188,8 +183,7 @@ bool map_window(int context_id, uintptr_t start_page)
     if (window < 2) {
         // The region is below the test window, so it is already mapped.
 #ifdef __x86_64__
-        // The paging root is shared, but reload it anyway to flush the
-        // calling CPU's stale translations.
+        // Still flush this CPU's stale translations.
         load_pdbr();
 #endif
         return true;
@@ -215,15 +209,14 @@ bool map_window(int context_id, uintptr_t start_page)
 
     spin_lock(&window_mutex[context_id]);
     if (mapped_window[context_id] != window) {
-        // Compute the page table entries for this context's test window.
+        // Compute the page table entries.
         uint64_t *context_win_pd = window_pd(context_id);
         for (int i = 0; i < 512; i++) {
             context_win_pd[i] = ((uint64_t)window << 30) + (i << VM_PAGE_SHIFT) + 0x83;
         }
         mapped_window[context_id] = window;
     }
-    // Every CPU must reload its own PDBR to flush any remnants of the old
-    // mapping, even when another CPU rebuilt the window's table.
+    // Every CPU reloads its PDBR, even when another CPU rebuilt the window's table.
     load_pdbr();
     spin_unlock(&window_mutex[context_id]);
     return true;

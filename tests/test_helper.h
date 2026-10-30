@@ -41,13 +41,8 @@
 #define SPIN_SIZE (1 << 27)  // in testwords
 
 /**
- * A macro to perform test bailout when requested. In NUMA_PAR the stop
- * decision is published through the context barrier at the last safe point;
- * in legacy modes the plain `bail` flag is used. The equalize invariant
- * keeps every team member at the same do_tick generation, and the barrier's
- * release/acquire fences publish the context status, so every member
- * evaluates the same decision after the same generation and none is
- * stranded in a tick barrier by an early single exit.
+ * A macro to perform test bailout when requested. In NUMA_PAR the whole team
+ * reads the same decision, published by the context barrier.
  */
 #define BAILOUT if (test_stop_requested()) return ticks
 
@@ -99,9 +94,8 @@ static inline testword_t prsg(testword_t state)
 void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segment, size_t chunk_align);
 
 /**
- * Returns the offset that translates a virtual address in the current memory
- * map into its physical byte address. On 32-bit builds, returns the VM window
- * number, to be added into the LSBs of the virtual address.
+ * Returns the offset translating a virtual address of the current map into its physical address.
+ * On 32-bit builds, returns the VM window number, to be added into the LSBs of the address.
  */
 testword_t phys_addr_offset(void);
 

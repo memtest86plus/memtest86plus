@@ -36,12 +36,8 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         my_cpu = 0;
     }
 
-    // NUMA_PAR: the per-context map already contains only memory owned by
-    // this team, so there is no per-segment proximity-domain rejection; the
-    // dense per-context chunk index splits each segment evenly. The chunks
-    // are contiguous, complete and non-overlapping; the last chunk absorbs
-    // the remainder and is never empty, so every mapped block is tested
-    // exactly once.
+    // NUMA_PAR: the context's map only holds its own memory. Split each segment evenly over the
+    // team, the last chunk taking the remainder.
     if (numa_run_active) {
         int context = test_context_index();
         test_context_t *ctx = &test_contexts[context];
@@ -68,8 +64,7 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         *start = vm_map[context][segment].start;
         *end   = vm_map[context][segment].end;
     } else {
-        // Legacy NUMA_ON chunking only; a requested-but-inactive NUMA_PAR
-        // uses the topology-agnostic path below.
+        // NUMA_ON only: an inactive NUMA_PAR uses the plain path below.
         if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
             uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(my_cpu);
 
