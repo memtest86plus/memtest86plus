@@ -378,8 +378,6 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
         uintptr_t try_end   = try_start + program_size;
         if (try_end > try_limit) continue;
 
-        if (try_end   <  lower_limit) continue;
-
         *load_addr = try_start;
         return true;
     }
@@ -1198,7 +1196,6 @@ void main(void)
             continue;
         }
 
-        check_input();
         if (VMEM_MAX_CONTEXTS > 1 && numa_run_active && numa_stage_failure) {
             // Topology or map construction failure: fall back to legacy
             // placement and restart the run, never silently omit memory.

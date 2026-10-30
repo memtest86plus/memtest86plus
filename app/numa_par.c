@@ -5,11 +5,6 @@
 // #include "numa_par.c" site there): its functions and state are static to
 // that translation unit and it must not be compiled standalone.
 
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-
 // The relocation-resumable phase machine state: current_wave and
 // num_execution_waves are copied by the relocation and read back on re-entry.
 static unsigned int current_wave = 0;

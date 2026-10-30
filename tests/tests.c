@@ -167,11 +167,9 @@ int run_test(int my_cpu, int test, int stage, int iterations)
         clamp_low_prefix(context);
 
         /* Update display of memory segments being tested */
-        if (test_is_primary_context_master(my_cpu)) {
-            uintptr_t pb = page_of(vm_map[context][0].start, context);
-            uintptr_t pe = page_of(vm_map[context][vm_map_size[context] - 1].end, context) + 1;
-            display_test_addresses(pb << 2, pe << 2, num_pages_to_test << 2);
-        }
+        uintptr_t pb = page_of(vm_map[context][0].start, context);
+        uintptr_t pe = page_of(vm_map[context][vm_map_size[context] - 1].end, context) + 1;
+        display_test_addresses(pb << 2, pe << 2, num_pages_to_test << 2);
     }
     BARRIER;
 

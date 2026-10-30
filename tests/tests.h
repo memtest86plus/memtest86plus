@@ -16,9 +16,6 @@
 
 #define NUM_TEST_PATTERNS   12
 
-// The largest number of stages any test pattern uses (bit-fade: 12).
-#define MAX_TEST_STAGES     12
-
 typedef struct {
     bool            enabled;
     uint8_t         cpu_mode;
