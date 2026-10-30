@@ -138,13 +138,7 @@
 
 #define HEAP_BASE_ADDR              (smp_heap_page << PAGE_SHIFT)
 
-// The pinned synchronization arena is two pages: the first page holds the
-// AP trampoline on x86, the rest is carved up for barrier objects, mutexes
-// and future synchronization state. Both pages are excluded from pm_map
-// testing by the heap allocator.
-
-#define SYNC_ARENA_PAGES            2
-#define SYNC_ARENA_LIMIT            (HEAP_BASE_ADDR + SYNC_ARENA_PAGES * PAGE_SIZE)
+#define SYNC_ARENA_LIMIT            (HEAP_BASE_ADDR + PAGE_SIZE)
 
 #define AP_TRAMPOLINE_PAGE          (smp_heap_page)
 
@@ -1720,9 +1714,9 @@ void smp_init(bool smp_enable)
 #endif
 
 
-    // Allocate two pages of low memory for the AP trampoline and sync
-    // objects. These need to remain pinned in place during relocation.
-    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, SYNC_ARENA_PAGES * PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
+    // Allocate a page of low memory for AP trampoline and sync objects.
+    // These need to remain pinned in place during relocation.
+    smp_heap_page = heap_alloc(HEAP_TYPE_LM_1, PAGE_SIZE, PAGE_SIZE) >> PAGE_SHIFT;
 
 #if defined(__i386__) || defined(__x86_64__)
     alloc_addr = HEAP_BASE_ADDR + (ap_trampoline_end - ap_trampoline);
