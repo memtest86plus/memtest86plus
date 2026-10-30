@@ -658,19 +658,12 @@ void serial_log_tick(void)
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
     if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-        // The jobs field reports how many execution contexts have exhausted
-        // their windows, so a reader can tell whether the rest is a tail wait.
-        unsigned int jobs = num_bound_execution_contexts;
-        unsigned int done_jobs = 0;
-        for (unsigned int c = 0; c < jobs; c++) {
-            if (__atomic_load_n(&test_contexts[c].windows_exhausted, __ATOMIC_ACQUIRE)) {
-                done_jobs++;
-            }
-        }
+        // jobs= is active/total, like the screen's Testing line.
         slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i jobs=%u/%u errors=%u",
              pass_num, slog_pct(pass_ticks, ticks_per_pass[pass_type]),
              test_num, slog_pct(test_ticks, ticks_per_test[pass_type][test_num]),
-             (uintptr_t)done_jobs, (uintptr_t)jobs, (uintptr_t)error_count);
+             (uintptr_t)numa_active_jobs(), (uintptr_t)num_bound_execution_contexts,
+             (uintptr_t)error_count);
         return;
     }
 

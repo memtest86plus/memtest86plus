@@ -311,6 +311,11 @@ void display_progress_tick(void);
  */
 void display_test_addresses_numa(void);
 
+/**
+ * NUMA_PAR: the number of bound execution contexts still testing windows.
+ */
+unsigned int numa_active_jobs(void);
+
 void set_scroll_lock(bool enabled);
 
 void toggle_scroll_lock(void);

@@ -432,5 +432,9 @@ void error_update(void)
         spin_unlock(ui_mutex);
     }
 
+    // common_err() logs under error_mutex: keep a NUMA_PAR team's error line
+    // from interleaving with this tick in the shared serial log buffer.
+    spin_lock(error_mutex);
     serial_log_tick();
+    spin_unlock(error_mutex);
 }

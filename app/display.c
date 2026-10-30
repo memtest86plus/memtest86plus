@@ -446,6 +446,17 @@ void display_progress_tick(void)
     render_progress();
 }
 
+unsigned int numa_active_jobs(void)
+{
+    unsigned int active = 0;
+    for (unsigned int c = 0; c < num_bound_execution_contexts; c++) {
+        if (!__atomic_load_n(&test_contexts[c].windows_exhausted, __ATOMIC_ACQUIRE)) {
+            active++;
+        }
+    }
+    return active;
+}
+
 // NUMA_PAR Testing line. Shows the active/total execution context (job)
 // count and the aggregate pages tested in this stage, so the line keeps
 // advancing while any team still works and clearly shows a tail wait when
@@ -457,12 +468,6 @@ void display_test_addresses_numa(void)
     if (jobs == 0) {
         return;
     }
-    unsigned int done = 0;
-    for (unsigned int c = 0; c < jobs; c++) {
-        if (__atomic_load_n(&test_contexts[c].windows_exhausted, __ATOMIC_ACQUIRE)) {
-            done++;
-        }
-    }
     uint64_t tested = __atomic_load_n(&test_pages_done, __ATOMIC_ACQUIRE);
     if (tested > num_pages_to_test) {
         tested = num_pages_to_test;
@@ -470,7 +475,7 @@ void display_test_addresses_numa(void)
     if (!spin_trylock(ui_mutex)) {
         return;
     }
-    int print_end = printf(4, 39, "%i/%i jobs [%kB/%kB]", (uintptr_t)(jobs - done),
+    int print_end = printf(4, 39, "%i/%i jobs [%kB/%kB]", (uintptr_t)numa_active_jobs(),
                            (uintptr_t)jobs, tested << 2, num_pages_to_test << 2);
     clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 6);
     spin_unlock(ui_mutex);
