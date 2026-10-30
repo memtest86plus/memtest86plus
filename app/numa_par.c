@@ -13,11 +13,11 @@ static unsigned int num_execution_waves = 1;
 // True when the current run executes (or, during the dummy calibration,
 // will execute) the NUMA_PAR scheduler: NUMA_PAR is selected, the mapping
 // model was validated (vmem_prepare_execution_contexts() before AP startup
-// downgraded NUMA_PAR on failure), and enough selected CPU-backed memory
-// domains exist to form independent teams.
+// downgraded NUMA_PAR on failure), the CPU sequencing mode is parallel, and
+// enough selected CPU-backed memory domains exist to form independent teams.
 static bool numa_par_runs(void)
 {
-    return VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && num_cpu_memory_domains >= 2;
+    return VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && cpu_mode == PAR && num_cpu_memory_domains >= 2;
 }
 
 // Master/CPU0-only: binds the current wave's CPU-backed domains to distinct

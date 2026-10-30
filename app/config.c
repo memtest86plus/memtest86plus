@@ -717,11 +717,6 @@ static void address_range_menu(void)
 
 static void set_cpu_mode(cpu_mode_t mode)
 {
-    if (mode != PAR && VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR) {
-        // Selecting a legacy sequencing mode suspends NUMA_PAR; legacy NUMA
-        // placement may still apply. Selecting Parallel (PAR) keeps it.
-        numa_mode = NUMA_ON;
-    }
     printc(POP_R+3+cpu_mode, POP_LM, ' ');
     cpu_mode = mode;
     printc(POP_R+3+cpu_mode, POP_LM, '*');
