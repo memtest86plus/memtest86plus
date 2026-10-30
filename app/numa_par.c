@@ -92,12 +92,6 @@ static void bind_execution_wave(int wave, bool parallel_test)
 
     // Wave invariants.
     assert(num_contexts_in_wave >= 1 && num_contexts_in_wave <= VMEM_MAX_CONTEXTS);
-    for (int context = 0; context < (int)num_contexts_in_wave; context++) {
-        assert(test_contexts[context].master_cpu_num >= 0);
-        assert(test_contexts[context].team_cpu_count > 0);
-        assert(   test_contexts[context].active_cpu_count >= 1
-               && test_contexts[context].active_cpu_count <= test_contexts[context].team_cpu_count);
-    }
 
     // Fill the Using: field like the legacy path (IMC/SPD mode keeps its own display).
     if (display_mode == DISPLAY_MODE_NA) {

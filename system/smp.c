@@ -860,10 +860,6 @@ static int find_numa_nodes_in_srat(void)
                     // We've found a wraparound, that's not good.
                     return 0;
                 }
-                if (start == end) {
-                    tab_entry_ptr += entry_header->length;
-                    continue;
-                }
                 if ((start & ((1ULL << PAGE_SHIFT) - 1)) != 0
                  || (end   & ((1ULL << PAGE_SHIFT) - 1)) != 0) {
                     // Two domains would test the unaligned boundary page concurrently.

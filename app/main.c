@@ -444,7 +444,7 @@ static void global_init(void)
     }
     // NUMA_PAR needs two domains or more, else fall back to NUMA_ON (traced below).
     bool numa_par_fallback = false;
-    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && (VMEM_MAX_CONTEXTS <= 1 || num_proximity_domains < 2)) {
+    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && num_proximity_domains < 2) {
         numa_par_fallback = true;
         numa_mode = NUMA_ON;
     }
@@ -893,8 +893,7 @@ static void test_all_windows(int my_cpu)
 
         if (dummy_run) {
             if (i_am_master) {
-                int ticks = run_test(-1, test_num, test_stage, iterations);
-                ticks_per_test[pass_num][test_num] += ticks;
+                ticks_per_test[pass_num][test_num] += run_test(-1, test_num, test_stage, iterations);
             }
         } else {
             if (!map_window(0, vm_map[0][0].pm_base_addr)) {
