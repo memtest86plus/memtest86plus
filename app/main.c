@@ -148,7 +148,7 @@ bool        bail    = false;
 uintptr_t   test_addr[MAX_CPUS];
 
 //------------------------------------------------------------------------------
-// NUMA_PAR scheduling state
+// NUMA scheduling state
 //------------------------------------------------------------------------------
 
 // Context statuses: the first terminal one sticks until CPU 0 rebinds the context.
@@ -193,7 +193,7 @@ static unsigned int bsp_proximity_domain = 0;
 // In .data, not BSS: it clamps execution_context_for_cpu() to context 0 before BSS is cleared.
 unsigned int num_bound_execution_contexts = 1;
 
-// True while a NUMA_PAR run is active (see numa_par_runs()).
+// True while a NUMA run is active (see numa_par_runs()).
 bool        numa_run_active = false;
 
 // Pages tested in this stage by all contexts, for the Testing line; atomic access only.
@@ -362,21 +362,11 @@ static bool set_load_addr(uintptr_t *load_addr, size_t program_size, uintptr_t l
 // Assigns a test chunk to each CPU in the given state, and counts them in num_enabled_cpus.
 static void assign_test_cpus(cpu_state_t state)
 {
-    for (int i = 0; i < MAX_PROXIMITY_DOMAINS; i++) {
-        used_cpus_in_proximity_domain[i] = 0;
-    }
+    // NUMA runs assign their own team chunk indexes at wave binding.
     num_enabled_cpus = 0;
     for (int i = 0; i < num_available_cpus; i++) {
         if (cpu_state[i] == state) {
-            // Per-domain chunk indexes for NUMA_ON only. NUMA_PAR assigns its own at wave binding,
-            // and its legacy fallback is topology-agnostic.
-            if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
-                uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(i);
-                chunk_index[i] = smp_alloc_cpu_in_proximity_domain(proximity_domain_idx);
-            } else {
-                chunk_index[i] = num_enabled_cpus;
-            }
-            num_enabled_cpus++;
+            chunk_index[i] = num_enabled_cpus++;
         }
     }
 }
@@ -436,22 +426,14 @@ static void global_init(void)
 
     smp_init(smp_enabled);
 
-    // Force disable the NUMA code paths when no proximity domain was found.
-    if (VMEM_MAX_CONTEXTS > 1 && num_proximity_domains == 0) {
-        numa_mode = NUMA_OFF;
-    }
-    // NUMA_PAR needs two domains or more, else fall back to NUMA_ON (traced below).
-    bool numa_par_fallback = false;
-    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && num_proximity_domains < 2) {
-        numa_par_fallback = true;
-        numa_mode = NUMA_ON;
-    }
-
-    // One execution context per proximity domain at most; x86-64 pins a window PD for each extra one.
-    if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR
-        && !vmem_prepare_execution_contexts(MIN(VMEM_MAX_CONTEXTS, num_proximity_domains))) {
-        numa_par_fallback = true;
-        numa_mode = NUMA_ON;
+    // NUMA needs two proximity domains or more, and one execution context per domain at most (x86-64
+    // pins a window PD for each extra one). Otherwise test without NUMA, traced below if SRAT has domains.
+    bool numa_fallback = false;
+    if (VMEM_MAX_CONTEXTS > 1 && enable_numa
+        && (num_proximity_domains < 2
+            || !vmem_prepare_execution_contexts(MIN(VMEM_MAX_CONTEXTS, num_proximity_domains)))) {
+        numa_fallback = num_proximity_domains > 0;
+        enable_numa = false;
     }
 
     // At this point we have started reserving physical pages in the memory
@@ -516,8 +498,8 @@ static void global_init(void)
         trace(0, "WARNING: SRAT exceeds %i domains or %i memory ranges; NUMA disabled",
               MAX_PROXIMITY_DOMAINS, 2 * MAX_PROXIMITY_DOMAINS);
     }
-    if (numa_par_fallback) {
-        trace(0, "NUMA_PAR unavailable; using NUMA_ON");
+    if (numa_fallback) {
+        trace(0, "NUMA unavailable; testing without NUMA");
     }
 
     if (!load_addr_ok) {
@@ -604,7 +586,7 @@ static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
             uint64_t new_end;
 
             if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
-                // NUMA_PAR: split by proximity domain, keep the spans owned by this context.
+                // NUMA: split by proximity domain, keep the spans owned by this context.
                 orig_start = (uint64_t)seg_start << PAGE_SHIFT;
                 orig_end = (uint64_t)seg_end << PAGE_SHIFT;
 
@@ -633,7 +615,6 @@ static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
                         vm_map[context][vm_map_size[context]].pm_base_addr = new_start >> PAGE_SHIFT;
                         vm_map[context][vm_map_size[context]].start        = first_word_mapping(new_start >> PAGE_SHIFT, context);
                         vm_map[context][vm_map_size[context]].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t), context);
-                        vm_map[context][vm_map_size[context]].proximity_domain_idx = proximity_domain_idx;
                         vm_map_size[context]++;
                         if (new_start != orig_start || new_end != orig_end) {
                             // Proceed to the next part of the range.
@@ -649,44 +630,7 @@ static void setup_vm_map(int context, uintptr_t win_start, uintptr_t win_end)
                         break;
                     }
                 }
-            } else if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
-                // NUMA_ON: split by proximity domain. An inactive NUMA_PAR uses the plain path below.
-                orig_start = (uint64_t)seg_start << PAGE_SHIFT;
-                orig_end = (uint64_t)seg_end << PAGE_SHIFT;
-
-                while (1) {
-                    if (vm_map_size[context] >= MAX_MEM_SEGMENTS) {
-                        break;
-                    }
-                    if (smp_narrow_to_proximity_domain(orig_start, orig_end, &proximity_domain_idx, &new_start, &new_end)) {
-                        // No enabled CPU in that domain would test it: give it to the BSP's domain.
-                        if (used_cpus_in_proximity_domain[proximity_domain_idx] == 0) {
-                            proximity_domain_idx = smp_get_proximity_domain_idx(0);
-                        }
-                        // Create a new entry in the virtual memory map.
-                        num_mapped_pages[context] += (new_end - new_start) >> PAGE_SHIFT;
-                        vm_map[context][vm_map_size[context]].pm_base_addr = new_start >> PAGE_SHIFT;
-                        vm_map[context][vm_map_size[context]].start        = first_word_mapping(new_start >> PAGE_SHIFT, context);
-                        vm_map[context][vm_map_size[context]].end          = last_word_mapping((new_end >> PAGE_SHIFT) - 1, sizeof(testword_t), context);
-                        vm_map[context][vm_map_size[context]].proximity_domain_idx = proximity_domain_idx;
-                        vm_map_size[context]++;
-                        if (new_start != orig_start || new_end != orig_end) {
-                            // Proceed to the next part of the range.
-                            orig_start = new_end; // No shift here, we already have a physical address.
-                            orig_end = (uint64_t)seg_end << PAGE_SHIFT;
-                        } else {
-                            // We're done with this range.
-                            break;
-                        }
-                    } else {
-                        // Map only the uncovered rest, owned by the BSP's domain.
-                        seg_start = orig_start >> PAGE_SHIFT;
-                        vm_map[context][vm_map_size[context]].proximity_domain_idx = smp_get_proximity_domain_idx(0);
-                        goto non_numa_vm_map_entry;
-                    }
-                }
             } else {
-non_numa_vm_map_entry:
                 num_mapped_pages[context] += seg_end - seg_start;
                 vm_map[context][vm_map_size[context]].pm_base_addr = seg_start;
                 vm_map[context][vm_map_size[context]].start        = first_word_mapping(seg_start, context);
@@ -758,7 +702,7 @@ static bool selected_map_has_window_zero(void)
     return false;
 }
 
-// The NUMA_PAR scheduler: part of this file, split out for readability.
+// The NUMA scheduler: part of this file, split out for readability.
 #include "numa_par.c"
 
 void test_publish_cancel_request(void)
@@ -918,7 +862,7 @@ static void select_next_master(void)
 // Public Functions
 //------------------------------------------------------------------------------
 
-// Execution-context accessors: legacy modes and the dummy run always use context 0.
+// Execution-context accessors: legacy mode and the dummy run always use context 0.
 
 test_context_t *test_context(void)
 {
@@ -963,7 +907,7 @@ barrier_t *test_run_barrier(void)
     return run_barrier;
 }
 
-// Legacy modes use the UI bail flag. NUMA_PAR uses the context status, published by the context
+// Legacy mode uses the UI bail flag. NUMA uses the context status, published by the context
 // barrier, so the whole team takes the same exit.
 bool test_stop_requested(void)
 {
@@ -1057,11 +1001,11 @@ void main(void)
                     error_init();
                     serial_log_run_start();
                 }
-                // Snapshot the CPU selection for this run and build the NUMA_PAR domain list.
+                // Snapshot the CPU selection for this run and build the NUMA domain list.
                 for (int cpu = 0; cpu < num_available_cpus; cpu++) {
                     run_cpu_selected[cpu] = (cpu_state[cpu] != CPU_STATE_DISABLED);
                 }
-                if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR) {
+                if (VMEM_MAX_CONTEXTS > 1 && enable_numa) {
                     build_numa_domain_list();
                 }
             }
@@ -1093,10 +1037,10 @@ void main(void)
                 window_end   = 0;
                 // Start the scheduler for this stage (not on relocation re-entry, which resumes it).
                 numa_run_active = !dummy_run && VMEM_MAX_CONTEXTS > 1 && numa_par_runs();
-                if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && !numa_run_active) {
-                    // The legacy fallback is topology-agnostic, so no memory is omitted.
+                if (VMEM_MAX_CONTEXTS > 1 && enable_numa && !numa_run_active) {
+                    // The non-NUMA fallback is topology-agnostic, so no memory is omitted.
                     if (test_num == 0 && test_stage == 0) {
-                        trace(0, "NUMA_PAR unavailable with current selection; using legacy mode");
+                        trace(0, "NUMA unavailable with current CPU mode or selection; testing without NUMA");
                     }
                 }
                 if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
@@ -1130,9 +1074,9 @@ void main(void)
         }
 
         if (VMEM_MAX_CONTEXTS > 1 && numa_run_active && numa_stage_failure) {
-            // Topology or map failure: restart in NUMA_OFF mode rather than omit memory; the failed
+            // Topology or map failure: restart without NUMA rather than omit memory; the failed
             // topology must not be trusted again.
-            numa_mode = NUMA_OFF;
+            enable_numa = false;
             restart = true;
         }
 
@@ -1179,7 +1123,7 @@ void main(void)
                     break;
                 }
             }
-            // NUMA_PAR has no master rotation: each context keeps its master.
+            // NUMA has no master rotation: each context keeps its master.
         }
 
         if (dummy_run) {

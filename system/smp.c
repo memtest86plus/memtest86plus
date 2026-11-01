@@ -394,7 +394,6 @@ static memory_affinity_t memory_affinity_ranges[2 * MAX_PROXIMITY_DOMAINS];
 static uint32_t          proximity_domains[MAX_PROXIMITY_DOMAINS];
 #endif
 
-uint16_t                  used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
 static uintptr_t         smp_heap_page = 0;
 
@@ -1336,10 +1335,6 @@ void smp_init(bool smp_enable)
         memory_affinity_ranges[i].end = 0;
     }
 #endif
-
-    for (int i = 0; i < (int)(ARRAY_SIZE(used_cpus_in_proximity_domain)); i++) {
-        used_cpus_in_proximity_domain[i] = 0;
-    }
 
     num_available_cpus = 1;
 #if VMEM_MAX_CONTEXTS > 1

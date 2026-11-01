@@ -22,14 +22,9 @@
 /**
  * A mapping from a CPU core number to the index number of the memory chunk
  * it operates on when performing a memory test in parallel across all the
- * enabled cores (in the current proximity domain, when NUMA awareness is
- * enabled).
+ * enabled cores (without NUMA).
  */
 extern uint16_t chunk_index[MAX_CPUS];
-/**
- * An array where the count of used CPUs in the current proximity domain.
- */
-extern uint16_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
 
 /*
  * The number of CPU cores being used for the current test. This is always
@@ -42,7 +37,7 @@ extern int num_active_cpus;
  */
 extern int master_cpu;
 
-/* Legacy window number (context 0); NUMA_PAR uses test_context() fields. */
+/* Legacy window number (context 0); NUMA uses test_context() fields. */
 extern int window_num;
 
 /**
@@ -61,7 +56,7 @@ extern spinlock_t *error_mutex;
 extern spinlock_t *ui_mutex;
 
 /**
- * True while a NUMA_PAR run is active; false in legacy modes and the dummy run.
+ * True while a NUMA run is active; false in legacy mode and the dummy run.
  */
 extern bool numa_run_active;
 
@@ -71,7 +66,7 @@ extern bool numa_run_active;
 extern uint16_t test_team_chunk_index[MAX_CPUS];
 
 /**
- * Aggregate pages tested in the current NUMA_PAR stage, by all contexts.
+ * Aggregate pages tested in the current NUMA stage, by all contexts.
  */
 extern uint64_t test_pages_done;
 
@@ -81,7 +76,7 @@ extern uint64_t test_pages_done;
 extern uint32_t global_cancel_requested;
 
 /**
- * Returns true when the calling context has been asked to stop (`bail` in legacy modes).
+ * Returns true when the calling context has been asked to stop (`bail` in legacy mode).
  */
 bool test_stop_requested(void);
 
@@ -135,7 +130,6 @@ typedef struct {
     uintptr_t   pm_base_addr;
     testword_t  *start;
     testword_t  *end;
-    uint32_t    proximity_domain_idx;
 } vm_map_t;
 
 /**
@@ -168,7 +162,7 @@ typedef struct {
 } test_context_t;
 
 /**
- * The number of execution contexts bound in the current wave; 1 in legacy modes and the dummy run.
+ * The number of execution contexts bound in the current wave; 1 in legacy mode and the dummy run.
  */
 extern unsigned int num_bound_execution_contexts;
 
@@ -178,7 +172,7 @@ extern unsigned int num_bound_execution_contexts;
 extern test_context_t test_contexts[VMEM_MAX_CONTEXTS];
 
 /**
- * Returns the calling CPU's execution context (context 0 in legacy modes and the dummy run).
+ * Returns the calling CPU's execution context (context 0 in legacy mode and the dummy run).
  */
 test_context_t *test_context(void);
 
@@ -193,7 +187,7 @@ int test_context_index(void);
 int execution_context_for_cpu(int cpu);
 
 /**
- * Returns the calling CPU's test barrier: its context barrier in NUMA_PAR, else run_barrier.
+ * Returns the calling CPU's test barrier: its context barrier in NUMA, else run_barrier.
  */
 barrier_t *test_run_barrier(void);
 

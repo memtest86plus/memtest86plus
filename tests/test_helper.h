@@ -41,7 +41,7 @@
 #define SPIN_SIZE (1 << 27)  // in testwords
 
 /**
- * A macro to perform test bailout when requested. In NUMA_PAR the whole team
+ * A macro to perform test bailout when requested. In NUMA the whole team
  * reads the same decision, published by the context barrier.
  */
 #define BAILOUT if (test_stop_requested()) return ticks

@@ -94,18 +94,6 @@ bool smp_is_smt_sibling(int cpu_num);
 uint32_t smp_get_proximity_domain_idx(int cpu_num);
 
 /**
- * "Allocates" a CPU ID in the given proximity domain, for filling in NUMA-aware chunk index.
- * Returns the nth CPU ID found so far in the proximity domain.
- */
-static inline uint16_t smp_alloc_cpu_in_proximity_domain(uint32_t proximity_domain_idx)
-{
-    extern uint16_t used_cpus_in_proximity_domain[MAX_PROXIMITY_DOMAINS];
-    uint16_t chunk_index = used_cpus_in_proximity_domain[proximity_domain_idx];
-    used_cpus_in_proximity_domain[proximity_domain_idx]++;
-    return chunk_index;
-}
-
-/**
  * Computes the first span, limited to a single proximity domain, of the given memory range.
  */
 int smp_narrow_to_proximity_domain(uint64_t start, uint64_t end, uint32_t * proximity_domain_idx, uint64_t * new_start, uint64_t * new_end);

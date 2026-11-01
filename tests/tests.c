@@ -125,7 +125,7 @@ void test_list_init(void)
 // then expand into memory owned by another context.
 static void clamp_low_prefix(int context)
 {
-    // Legacy runs (also after a NUMA_PAR fallback) track the window in window_num.
+    // Legacy runs (also after a NUMA fallback) track the window in window_num.
     bool window_zero = numa_run_active ? (test_context()->window_index == 0)
                                        : (window_num == 0);
     if (!window_zero) {

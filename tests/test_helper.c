@@ -36,7 +36,7 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         my_cpu = 0;
     }
 
-    // NUMA_PAR: the context's map only holds its own memory. Split each segment evenly over the
+    // NUMA: the context's map only holds its own memory. Split each segment evenly over the
     // team, the last chunk taking the remainder.
     if (numa_run_active) {
         int context = test_context_index();
@@ -64,41 +64,16 @@ void calculate_chunk(testword_t **start, testword_t **end, int my_cpu, int segme
         *start = vm_map[context][segment].start;
         *end   = vm_map[context][segment].end;
     } else {
-        // NUMA_ON only: an inactive NUMA_PAR uses the plain path below.
-        if (VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_ON) {
-            uint32_t proximity_domain_idx = smp_get_proximity_domain_idx(my_cpu);
+        uintptr_t segment_size = (vm_map[context][segment].end - vm_map[context][segment].start + 1) * sizeof(testword_t);
+        uintptr_t chunk_size   = round_down(segment_size / num_active_cpus, chunk_align);
 
-            // Is this CPU in the same proximity domain as the current segment ?
-            if (proximity_domain_idx == vm_map[context][segment].proximity_domain_idx) {
-                uintptr_t segment_size = (vm_map[context][segment].end - vm_map[context][segment].start + 1) * sizeof(testword_t);
-                uintptr_t chunk_size   = round_down(segment_size / used_cpus_in_proximity_domain[proximity_domain_idx], chunk_align);
+        // Calculate chunk boundaries.
+        *start = (testword_t *)((uintptr_t)vm_map[context][segment].start + chunk_size * chunk_index[my_cpu]);
+        *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
 
-                // Calculate chunk boundaries.
-                *start = (testword_t *)((uintptr_t)vm_map[context][segment].start + chunk_size * chunk_index[my_cpu]);
-                *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
-
-                // The last CPU also takes the rounding remainder.
-                if (*end > vm_map[context][segment].end
-                 || chunk_index[my_cpu] == used_cpus_in_proximity_domain[proximity_domain_idx] - 1) {
-                    *end = vm_map[context][segment].end;
-                }
-            } else {
-                // Nope.
-                *start = (testword_t *)1;
-                *end = (testword_t *)0;
-            }
-        } else {
-            uintptr_t segment_size = (vm_map[context][segment].end - vm_map[context][segment].start + 1) * sizeof(testword_t);
-            uintptr_t chunk_size   = round_down(segment_size / num_active_cpus, chunk_align);
-
-            // Calculate chunk boundaries.
-            *start = (testword_t *)((uintptr_t)vm_map[context][segment].start + chunk_size * chunk_index[my_cpu]);
-            *end   = (testword_t *)((uintptr_t)(*start) + chunk_size) - 1;
-
-            // The last CPU also takes the rounding remainder.
-            if (*end > vm_map[context][segment].end || chunk_index[my_cpu] == num_active_cpus - 1) {
-                *end = vm_map[context][segment].end;
-            }
+        // The last CPU also takes the rounding remainder.
+        if (*end > vm_map[context][segment].end || chunk_index[my_cpu] == num_active_cpus - 1) {
+            *end = vm_map[context][segment].end;
         }
     }
 }
@@ -125,7 +100,7 @@ void flush_caches(int my_cpu)
         } else {
             barrier_halt_wait(test_run_barrier());
         }
-        // In NUMA_PAR every team flushes its own socket's caches.
+        // In NUMA every team flushes its own socket's caches.
         int flush_cpu = numa_run_active ? test_context()->master_cpu_num : master_cpu;
         if (my_cpu == flush_cpu) {
             cache_flush();

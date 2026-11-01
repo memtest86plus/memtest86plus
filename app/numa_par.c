@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2026 Lionel Debroux.
 //
-// NUMA_PAR scheduler, #included by app/main.c: not compiled standalone.
+// NUMA scheduler, #included by app/main.c: not compiled standalone.
 
 // Scheduler state, copied by the relocation and read back on re-entry.
 static unsigned int current_wave = 0;
 static unsigned int num_execution_waves = 1;
 
-// True when this run uses the NUMA_PAR scheduler: NUMA_PAR mode (validated before AP startup),
+// True when this run uses the NUMA scheduler: NUMA mode (validated before AP startup),
 // parallel CPU mode, and at least two CPU-backed memory domains.
 static bool numa_par_runs(void)
 {
-    return VMEM_MAX_CONTEXTS > 1 && numa_mode == NUMA_PAR && cpu_mode == PAR && num_cpu_memory_domains >= 2;
+    return VMEM_MAX_CONTEXTS > 1 && enable_numa && cpu_mode == PAR && num_cpu_memory_domains >= 2;
 }
 
 // CPU 0 only, between two global barriers: binds the wave's CPU-backed domains to execution
@@ -144,7 +144,7 @@ static void build_numa_domain_list(void)
 }
 
 //------------------------------------------------------------------------------
-// NUMA_PAR scheduler.
+// NUMA scheduler.
 //
 // A relocation-resumable state machine: run_at() never returns, so after a relocation main()
 // re-enters test_all_windows_numa(), which resumes from scheduler_phase and current_wave.
@@ -306,7 +306,7 @@ static void run_owned_windows_1_plus(int my_cpu, int iterations)
     while (numa_window_step(my_cpu, context, iterations)) { }
 }
 
-// NUMA_PAR counterpart of test_all_windows(): runs the current stage with one context per
+// NUMA counterpart of test_all_windows(): runs the current stage with one context per
 // CPU-backed domain, in waves of VMEM_MAX_CONTEXTS.
 static void test_all_windows_numa(int my_cpu)
 {

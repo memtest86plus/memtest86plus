@@ -431,7 +431,7 @@ static void render_progress(void)
     display_pass_bar((BAR_LENGTH * pct) / 100);
 }
 
-// NUMA_PAR context masters count concurrently.
+// NUMA context masters count concurrently.
 static void count_progress_tick(void)
 {
     __sync_fetch_and_add(&test_ticks, 1);
@@ -455,7 +455,7 @@ unsigned int numa_active_jobs(void)
     return active;
 }
 
-// NUMA_PAR Testing line: active/total jobs and the pages tested in this stage. A master finding
+// NUMA Testing line: active/total jobs and the pages tested in this stage. A master finding
 // ui_mutex taken skips the update.
 void display_test_addresses_numa(void)
 {
@@ -625,7 +625,7 @@ void scroll(void)
         scroll_message_row++;
     } else {
         // Only the master CPU may poll the keyboard, so the scroll-lock
-        // single-step wait is only available to it (to context 0's master in NUMA_PAR).
+        // single-step wait is only available to it (to context 0's master in NUMA).
         if (test_is_primary_context_master(smp_my_cpu_num())) {
             if (scroll_lock) {
                 display_footer_message("<Enter> Single step     ");
@@ -718,7 +718,7 @@ static void ui_errors_and_hw(void)
     timed_update_done = true;
 }
 
-// The once-per-second updates of the NUMA_PAR UI owner and of the bit-fade delay on CPU 0.
+// The once-per-second updates of the NUMA UI owner and of the bit-fade delay on CPU 0.
 void update_timed_ui(void)
 {
     int act_sec = 0;
@@ -753,7 +753,7 @@ static bool ui_owner_is(int context)
                                        false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
 }
 
-// NUMA_PAR tick: the context master counts the team's tick and renders progress (try-lock, never
+// NUMA tick: the context master counts the team's tick and renders progress (try-lock, never
 // waiting for another master). The UI owner also services input and the once-per-second updates.
 static void do_tick_numa(int my_cpu)
 {
@@ -800,7 +800,7 @@ static void do_tick_numa(int my_cpu)
     }
 }
 
-// Handles the once-per-tick progress display (do_tick_numa() in NUMA_PAR).
+// Handles the once-per-tick progress display (do_tick_numa() in NUMA).
 void do_tick(int my_cpu)
 {
     if (numa_run_active) {

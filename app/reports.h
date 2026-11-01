@@ -40,12 +40,12 @@ typedef enum { SLOG_PASS_START, SLOG_PASS_END, SLOG_TEST_START, SLOG_TEST_END } 
 void serial_log_event(slog_event_t event);
 
 /**
- * Emits the NUMA_PAR wave-binding event. Called by CPU 0 at WAVE_BIND.
+ * Emits the NUMA wave-binding event. Called by CPU 0 at WAVE_BIND.
  */
 void serial_log_wave_bind(int wave, unsigned int num_contexts);
 
 /**
- * Emits the terminal status of a NUMA_PAR context at a wave boundary.
+ * Emits the terminal status of a NUMA context at a wave boundary.
  */
 void serial_log_context_end(int wave, int context, int domain, int status);
 

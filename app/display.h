@@ -284,7 +284,7 @@ void check_input(void);
 void display_reset_ui_owner(void);
 
 /**
- * Runs the once-per-second UI and error updates (NUMA_PAR UI owner, bit-fade delay).
+ * Runs the once-per-second UI and error updates (NUMA UI owner, bit-fade delay).
  */
 void update_timed_ui(void);
 
@@ -300,12 +300,12 @@ extern int pass_ticks;
 void display_progress_tick(void);
 
 /**
- * NUMA_PAR Testing line: the active/total job count and the pages tested in this stage.
+ * NUMA Testing line: the active/total job count and the pages tested in this stage.
  */
 void display_test_addresses_numa(void);
 
 /**
- * NUMA_PAR: the number of bound execution contexts still testing windows.
+ * NUMA: the number of bound execution contexts still testing windows.
  */
 unsigned int numa_active_jobs(void);
 
