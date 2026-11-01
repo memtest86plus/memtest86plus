@@ -1,9 +1,9 @@
 # Default to the cross toolchain when not building on a LoongArch64 host.
 # Overridable from the command line (make CC=... LD=... OBJCOPY=...).
 ifeq ($(shell uname -m),loongarch64)
-  CC = gcc
-  LD = ld
-  OBJCOPY = objcopy
+  CC ?= gcc
+  LD ?= ld
+  OBJCOPY ?= objcopy
 else
   # The first available cross compiler: Debian, Debian gcc-16, or Yongbao/CI.
   CC = $(firstword $(shell \
