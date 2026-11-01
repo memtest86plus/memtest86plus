@@ -413,8 +413,7 @@ int     num_available_cpus = 1;  // There is always at least one CPU, the BSP
 int     num_memory_affinity_ranges = 0;
 int     num_proximity_domains = 0;
 #endif
-bool    map_numa_memory_range = false;
-uint8_t highest_map_bit = 0;
+uint8_t highest_map_bit = 0;   // LoongArch64 NUMA node compaction, 0 when inactive
 
 // Set when the SRAT has too many domains or memory ranges; NUMA is then disabled.
 #if VMEM_MAX_CONTEXTS > 1
@@ -1028,7 +1027,7 @@ static bool sort_and_validate_memory_affinity_ranges(void)
         bool same_mapping_span = true;
 #if defined(__loongarch_lp64)
         // Adjacent canonical nodes may be physically noncontiguous: keep them apart.
-        if (map_numa_memory_range) {
+        if (highest_map_bit != 0) {
             same_mapping_span = (cur->start >> highest_map_bit) == (prev->start >> highest_map_bit);
         }
 #endif
@@ -1231,120 +1230,14 @@ static bool start_cpu(int cpu_num)
 #endif
 
 #if defined(__loongarch_lp64)
-#if VMEM_MAX_CONTEXTS > 1
-// The node bits of the LoongArch64 node-in-address encoding.
-#define NUMA_NODE_OFFSET 44
-
-// Moves the four-bit node field from from_bit to to_bit, keeping the offset within the node.
-// Spans are half-open, so an end at the next node boundary still belongs to the start's node.
-static bool numa_transform_span(uint64_t start, uint64_t end, unsigned int from_bit, unsigned int to_bit,
-                                uint64_t *new_start, uint64_t *new_end)
+// Bits needed by the in-node offsets of [start, end); NUMA_NODE_OFFSET + 1 (too wide) when the span
+// crosses a node boundary or uses address bits above the node field.
+static unsigned int numa_local_bits(uint64_t start, uint64_t end)
 {
-    if (from_bit < PAGE_SHIFT || from_bit > NUMA_NODE_OFFSET
-     || to_bit < PAGE_SHIFT || to_bit > NUMA_NODE_OFFSET
-     || start >= end || (start >> from_bit) != ((end - 1) >> from_bit)) {
-        return false;
+    if ((start >> NUMA_NODE_OFFSET) != ((end - 1) >> NUMA_NODE_OFFSET) || ((end - 1) >> (NUMA_NODE_OFFSET + 4)) != 0) {
+        return NUMA_NODE_OFFSET + 1;
     }
-    uint64_t node = (start >> from_bit) & 0xF;
-    uint64_t local_start = start & ~(0xFULL << from_bit);
-    uint64_t length = end - start;
-    uint64_t local_limit = 1ULL << to_bit;
-    if (local_start >= local_limit || length > local_limit - local_start) {
-        return false;
-    }
-    *new_start = local_start | (node << to_bit);
-    *new_end = *new_start + length;
-    return true;
-}
-
-// Gives the canonical form of a physical span (or of an already canonical one when transformed)
-// and checks that the round trip reproduces it.
-static bool numa_canonical_span(uint64_t start, uint64_t end, unsigned int highest_bit, bool transformed,
-                                uint64_t *canonical_start, uint64_t *canonical_end)
-{
-    uint64_t original_start, original_end;
-    if (transformed) {
-        return numa_transform_span(start, end, highest_bit, NUMA_NODE_OFFSET, &original_start, &original_end)
-            && numa_transform_span(original_start, original_end, NUMA_NODE_OFFSET, highest_bit, canonical_start, canonical_end)
-            && *canonical_start == start && *canonical_end == end;
-    }
-    return numa_transform_span(start, end, NUMA_NODE_OFFSET, highest_bit, canonical_start, canonical_end)
-        && numa_transform_span(*canonical_start, *canonical_end, highest_bit, NUMA_NODE_OFFSET, &original_start, &original_end)
-        && original_start == start && original_end == end;
-}
-
-static bool numa_transform_ranges_valid(unsigned int highest_bit, bool transformed)
-{
-    uint64_t previous_end = 0;
-    for (int i = 0; i < pm_map_size; i++) {
-        // Pinned allocations may leave a segment empty.
-        if (pm_map[i].start == pm_map[i].end) {
-            continue;
-        }
-        if (pm_map[i].start > (UINT64_MAX >> PAGE_SHIFT) || pm_map[i].end > (UINT64_MAX >> PAGE_SHIFT)) {
-            return false;
-        }
-        uint64_t start, end;
-        if (!numa_canonical_span((uint64_t)pm_map[i].start << PAGE_SHIFT, (uint64_t)pm_map[i].end << PAGE_SHIFT,
-                                 highest_bit, transformed, &start, &end)
-         || start < previous_end) {
-            return false;
-        }
-        previous_end = end;
-    }
-    for (int i = 0; i < num_memory_affinity_ranges; i++) {
-        uint64_t start, end;
-        if (!numa_canonical_span(memory_affinity_ranges[i].start, memory_affinity_ranges[i].end,
-                                 highest_bit, transformed, &start, &end)) {
-            return false;
-        }
-        for (int j = 0; j < i; j++) {
-            // Same-domain overlaps are merged by SRAT normalization.
-            if (memory_affinity_ranges[i].proximity_domain_idx == memory_affinity_ranges[j].proximity_domain_idx) {
-                continue;
-            }
-            uint64_t j_start, j_end;
-            if (!numa_canonical_span(memory_affinity_ranges[j].start, memory_affinity_ranges[j].end,
-                                     highest_bit, transformed, &j_start, &j_end)
-             || (j_start < end && j_end > start)) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-// Validates first, so a failure leaves the physical map intact. All domains are transformed: SRAT
-// domain ordinals are unrelated to the node field of the addresses.
-static bool map_the_numa_memory_range(unsigned int highest_bit)
-{
-    if (!numa_transform_ranges_valid(highest_bit, false)) {
-        return false;
-    }
-    for (int i = 0; i < pm_map_size; i++) {
-        if (pm_map[i].start == pm_map[i].end) {
-            continue;
-        }
-        uint64_t start, end;
-        numa_canonical_span((uint64_t)pm_map[i].start << PAGE_SHIFT, (uint64_t)pm_map[i].end << PAGE_SHIFT,
-                            highest_bit, false, &start, &end);
-        pm_map[i].start = start >> PAGE_SHIFT;
-        pm_map[i].end = end >> PAGE_SHIFT;
-    }
-    for (int i = 0; i < num_memory_affinity_ranges; i++) {
-        uint64_t start, end;
-        numa_canonical_span(memory_affinity_ranges[i].start, memory_affinity_ranges[i].end,
-                            highest_bit, false, &start, &end);
-        memory_affinity_ranges[i].start = start;
-        memory_affinity_ranges[i].end = end;
-    }
-    // The transform preserves the map order, so heap_init()'s saved segment indexes stay valid.
-    return true;
-}
-
-static unsigned int numa_local_address_bits(uint64_t end)
-{
-    uint64_t last = (end - 1) & ~(0xFULL << NUMA_NODE_OFFSET);
+    uint64_t last = (end - 1) & ((1ULL << NUMA_NODE_OFFSET) - 1);
     unsigned int bits = 0;
     while (last != 0) {
         bits++;
@@ -1353,53 +1246,53 @@ static unsigned int numa_local_address_bits(uint64_t end)
     return bits;
 }
 
+// Moves the node field of [*start, *end) from NUMA_NODE_OFFSET down to bit 'bits'.
+static void numa_compact_span(uint64_t *start, uint64_t *end, unsigned int bits)
+{
+    uint64_t length = *end - *start;
+    *start = ((*start >> NUMA_NODE_OFFSET) << bits) | (*start & ((1ULL << NUMA_NODE_OFFSET) - 1));
+    *end = *start + length;
+}
+
+// Compacts every node (SRAT domain ordinals are unrelated to the node field) down to the widest
+// in-node offset. This keeps the map order and can't alias, so heap_init()'s segment indexes stay valid.
 void check_if_needs_to_map(void)
 {
-    if (map_numa_memory_range) {
-        return;
-    }
-    highest_map_bit = 0;
     if (num_proximity_domains == 0 || num_memory_affinity_ranges == 0) {
         return;
     }
     // Keep nonzero nodes above the pinned identity region (program, heap, relocation targets).
-    unsigned int bits = numa_local_address_bits((uint64_t)VM_PINNED_SIZE << PAGE_SHIFT);
-    if (bits < PAGE_SHIFT) bits = PAGE_SHIFT;
+    unsigned int bits = numa_local_bits(0, (uint64_t)VM_PINNED_SIZE << PAGE_SHIFT);
     for (int i = 0; i < num_memory_affinity_ranges; i++) {
-        if (memory_affinity_ranges[i].start >= memory_affinity_ranges[i].end) {
-            return;
-        }
-        unsigned int local_bits = numa_local_address_bits(memory_affinity_ranges[i].end);
+        unsigned int local_bits = numa_local_bits(memory_affinity_ranges[i].start, memory_affinity_ranges[i].end);
         if (local_bits > bits) bits = local_bits;
     }
     for (int i = 0; i < pm_map_size; i++) {
-        if (pm_map[i].start == pm_map[i].end) {
-            continue;
+        if (pm_map[i].start != pm_map[i].end) {
+            unsigned int local_bits = numa_local_bits((uint64_t)pm_map[i].start << PAGE_SHIFT,
+                                                      (uint64_t)pm_map[i].end << PAGE_SHIFT);
+            if (local_bits > bits) bits = local_bits;
         }
-        if (pm_map[i].start > pm_map[i].end || pm_map[i].end > (UINT64_MAX >> PAGE_SHIFT)) {
-            return;
+    }
+    if (bits > NUMA_NODE_OFFSET) {
+        return;
+    }
+    for (int i = 0; i < pm_map_size; i++) {
+        if (pm_map[i].start != pm_map[i].end) {
+            uint64_t start = (uint64_t)pm_map[i].start << PAGE_SHIFT, end = (uint64_t)pm_map[i].end << PAGE_SHIFT;
+            numa_compact_span(&start, &end, bits);
+            pm_map[i].start = start >> PAGE_SHIFT;
+            pm_map[i].end = end >> PAGE_SHIFT;
         }
-        unsigned int local_bits = numa_local_address_bits((uint64_t)pm_map[i].end << PAGE_SHIFT);
-        if (local_bits > bits) bits = local_bits;
     }
-    // Wider offsets can't be compacted without reordering the map (and the heap's indexes): keep identity.
-    if (bits <= NUMA_NODE_OFFSET && map_the_numa_memory_range(bits)) {
-        highest_map_bit = bits;
-        map_numa_memory_range = true;
+    for (int i = 0; i < num_memory_affinity_ranges; i++) {
+        uint64_t start = memory_affinity_ranges[i].start, end = memory_affinity_ranges[i].end;
+        numa_compact_span(&start, &end, bits);
+        memory_affinity_ranges[i].start = start;
+        memory_affinity_ranges[i].end = end;
     }
+    highest_map_bit = bits;
 }
-#endif
-
-bool smp_numa_transform_valid(void)
-{
-#if VMEM_MAX_CONTEXTS > 1
-    // After SRAT normalization and pinned allocations: re-check the active transform's round trip.
-    return !map_numa_memory_range || numa_transform_ranges_valid(highest_map_bit, true);
-#else
-    return true;
-#endif
-}
-
 #else
 void check_if_needs_to_map(void)
 {
@@ -1407,11 +1300,6 @@ void check_if_needs_to_map(void)
     // It is an empty function if not LoongArch64.
     //
     return;
-}
-
-bool smp_numa_transform_valid(void)
-{
-    return true;
 }
 #endif
 

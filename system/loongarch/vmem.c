@@ -9,11 +9,11 @@
 #include "boot.h"
 
 #include "cpuid.h"
+#include "registers.h"
 #include "smp.h"
 
 #include "vmem.h"
 
-extern bool map_numa_memory_range;
 extern uint8_t highest_map_bit;
 
 //------------------------------------------------------------------------------
@@ -67,11 +67,8 @@ uintptr_t map_region(uintptr_t base_addr, size_t size __attribute__((unused)), b
 
 bool vmem_prepare_execution_contexts(int num_contexts)
 {
-    // One shared direct mapping: only the NUMA address transform could alias two contexts.
-    if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
-        return false;
-    }
-    return smp_numa_transform_valid();
+    // One shared direct mapping, and the NUMA node compaction can't alias: nothing to prepare.
+    return num_contexts >= 1 && num_contexts <= VMEM_MAX_CONTEXTS;
 }
 
 bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
@@ -81,20 +78,12 @@ bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __a
 
 void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
-    void *result;
-
-    if (map_numa_memory_range == true) {
-        if ((page >> (highest_map_bit - PAGE_SHIFT)) & 0xF) {
-            uintptr_t alias = (((uintptr_t)(page >> (highest_map_bit - PAGE_SHIFT)) & 0xF) << 32) ;
-            alias |= page & ~(0xFULL << (highest_map_bit - PAGE_SHIFT));
-            result = (void *)(alias << PAGE_SHIFT);
-        } else {
-            result = (void *)(page << PAGE_SHIFT);
-        }
-    } else {
-        result = (void *)(page << PAGE_SHIFT);
+    // Undo the NUMA node compaction (smp.c check_if_needs_to_map()).
+    if (highest_map_bit != 0) {
+        unsigned int shift = highest_map_bit - PAGE_SHIFT;
+        page = ((page >> shift) << (NUMA_NODE_OFFSET - PAGE_SHIFT)) | (page & ((1UL << shift) - 1));
     }
-    return result;
+    return (void *)(page << PAGE_SHIFT);
 }
 
 void *last_word_mapping(uintptr_t page, size_t word_size, int context_id)
