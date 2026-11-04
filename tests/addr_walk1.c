@@ -30,7 +30,9 @@ int test_addr_walk1(int my_cpu)
     int ticks = 0;
 
     // There isn't a meaningful address for this test.
-    test_addr[my_cpu] = 0;
+    if (my_cpu >= 0) {
+        test_addr[my_cpu] = 0;
+    }
 
     testword_t invert = 0;
     for (int i = 0; i < 2; i++) {

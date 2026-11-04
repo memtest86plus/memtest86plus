@@ -121,6 +121,7 @@ int test_own_addr1(int my_cpu)
     int ticks = 0;
 
     ticks += pattern_fill(my_cpu, 0);
+    BAILOUT;
     ticks += pattern_check(my_cpu, 0);
 
     return ticks;

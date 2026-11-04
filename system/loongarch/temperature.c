@@ -48,7 +48,7 @@ int get_cpu_temp(void)
     }
 }
 
-int get_ram_temp(uint8_t slot)
+int get_ram_temp(uint8_t slot __attribute__((unused)))
 {
     return TEMP_INVALID;
 }
