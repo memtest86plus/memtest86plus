@@ -393,7 +393,7 @@ void display_start_pass(void)
 void display_start_test(void)
 {
     clear_screen_region(2, 39, 3, SCREEN_WIDTH - 1);    // progress bar, test details
-    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6);    // Avoid erasing paging mode
+    clear_screen_region(4, 39, 4, SCREEN_WIDTH - 7);    // Avoid erasing paging/NUMA mode
     clear_screen_region(5, 39, 5, SCREEN_WIDTH - 1);
     clear_screen_region(3, 36, 3, 37);                  // test number
     display_test_percentage(0);
@@ -472,7 +472,7 @@ void display_test_addresses_numa(void)
     }
     int print_end = printf(4, 39, "%i/%i jobs [%kB/%kB]", (uintptr_t)numa_active_jobs(),
                            (uintptr_t)jobs, tested << 2, num_pages_to_test << 2);
-    clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 6);
+    clear_screen_region(4, print_end, 4, SCREEN_WIDTH - 7);
     spin_unlock(ui_mutex);
 }
 

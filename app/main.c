@@ -1037,6 +1037,9 @@ void main(void)
                 window_end   = 0;
                 // Start the scheduler for this stage (not on relocation re-entry, which resumes it).
                 numa_run_active = !dummy_run && VMEM_MAX_CONTEXTS > 1 && numa_par_runs();
+                if (VMEM_MAX_CONTEXTS > 1 && !dummy_run) {
+                    display_numa_mode(numa_run_active);
+                }
                 if (VMEM_MAX_CONTEXTS > 1 && enable_numa && !numa_run_active) {
                     // The non-NUMA fallback is topology-agnostic, so no memory is omitted.
                     if (test_num == 0 && test_stage == 0) {
