@@ -154,7 +154,10 @@ static bool update_error_info(testword_t page, testword_t offset, uintptr_t addr
 
 static void common_err(error_type_t type, uintptr_t addr, testword_t good, testword_t bad, bool use_for_badram)
 {
+    // Lock order: error_mutex, then ui_mutex. The ISR trylocks both, so a fault in here still
+    // reaches the reboot prompt.
     spin_lock(error_mutex);
+    spin_lock(ui_mutex);
 
     restore_big_status();
 
@@ -168,7 +171,9 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     testword_t xor = good ^ bad;
 
     bool new_stats = false;
-    testword_t page   = page_of((void *)addr);
+    // Translate now, with the detecting context's current mapping.
+    int context = test_context_index();
+    testword_t page   = page_of((void *)addr, context);
     testword_t offset = addr & (PAGE_SIZE - 1);
 
     switch (type) {
@@ -282,7 +287,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         if (new_address) {
             // Only the master CPU may poll the keyboard: polling from other
             // CPUs would race the master's polling.
-            if (smp_my_cpu_num() == master_cpu) {
+            if (smp_my_cpu_num() == (numa_run_active ? test_context()->master_cpu_num : master_cpu)) {
                 check_input();
             }
             scroll();
@@ -328,6 +333,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         error_info.last_xor  = xor;
     }
 
+    spin_unlock(ui_mutex);
     spin_unlock(error_mutex);
 }
 
@@ -391,9 +397,11 @@ void parity_error(void)
 void error_update(void)
 {
     if (error_count > 0 || error_count_cecc > 0) {
+        // common_err() takes error_mutex then ui_mutex: not under ui_mutex.
         if (error_mode != last_error_mode) {
             common_err(NEW_MODE, 0, 0, 0, false);
         }
+        spin_lock(ui_mutex);
         if (error_mode == ERROR_MODE_SUMMARY && test_list[test_num].errors > 0) {
             display_pinned_message(1 + test_num, 69, "%c%i",
                                    test_list[test_num].errors == INT_MAX ? '>' : ' ',
@@ -414,7 +422,11 @@ void error_update(void)
         if (enable_tty) {
             tty_error_redraw();
         }
+        spin_unlock(ui_mutex);
     }
 
+    // Keep error lines from interleaving with this tick in the serial log.
+    spin_lock(error_mutex);
     serial_log_tick();
+    spin_unlock(error_mutex);
 }

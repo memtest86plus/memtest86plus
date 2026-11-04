@@ -12,6 +12,9 @@
  * leave the lower 2GB permanently mapped, and use the upper 2GB for mapping
  * the remaining physical memory as required.
  *
+ * The paging tables are shared by every CPU, so on x86-64 each execution context tests through its
+ * own window: context 0 at 2GB, the others at 4GB and above, in 1GB steps.
+ *
  *//*
  * Copyright (C) 2020-2022 Martin Whitaker.
  */
@@ -33,6 +36,17 @@
  * virtual memory by a call to map_window().
  */
 #define VM_WINDOW_SIZE  PAGE_C(1,GB)
+
+/**
+ * Returns the virtual base address of the given execution context's test window.
+ */
+static inline uintptr_t vmem_window_base(int context_id)
+{
+    if (context_id == 0) {
+        return SIZE_C(2,GB);
+    }
+    return SIZE_C(4,GB) + (context_id - 1) * SIZE_C(1,GB);
+}
 
 /**
  * Set if any range could not be mapped when the page tables were built or
@@ -57,17 +71,25 @@ extern bool paging_incomplete;
 uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup);
 
 /**
- * Maps a \ref VM_WINDOW_SIZE region of physical memory into the upper 2GB of
- * virtual memory. The physical memory region must be aligned on a \ref
- * VM_WINDOW_SIZE boundary. The virtual address will be similarly aligned.
- * The region will remain mapped until the next call to map_window().
+ * Prepares the mapping for 1..VMEM_MAX_CONTEXTS execution contexts, before AP startup (on x86-64,
+ * a pinned Page Directory Table per extra context). Returns false on failure: one context only.
+ */
+bool vmem_prepare_execution_contexts(int num_contexts);
+
+/**
+ * Maps a \ref VM_WINDOW_SIZE region of physical memory into the test window
+ * of the given execution context. The physical memory region must be aligned
+ * on a \ref VM_WINDOW_SIZE boundary. The virtual address will be similarly
+ * aligned. The region will remain mapped until the next call to map_window()
+ * for the same context.
  *
- * \param start_page        - the physical page number of the region.
+ * \param context_id    - the execution context whose test window is used.
+ * \param start_page    - the physical page number of the region.
  *
  * \returns
  * On success, true. On failure, false.
  */
-bool map_window(uintptr_t start_page);
+bool map_window(int context_id, uintptr_t start_page);
 
 /**
  * Returns a virtual memory pointer to the first word of the specified physical
@@ -75,11 +97,12 @@ bool map_window(uintptr_t start_page);
  * mapped by a call to map_window() prior to calling this function.
  *
  * \param page              - the physical page number.
+ * \param context_id        - the execution context whose test window is used.
  *
  * \returns
  * A pointer to the first word of the page.
  */
-void *first_word_mapping(uintptr_t page);
+void *first_word_mapping(uintptr_t page, int context_id);
 
 /**
  * Returns a virtual memory pointer to the last word of the specified physical
@@ -88,22 +111,25 @@ void *first_word_mapping(uintptr_t page);
  *
  * \param page              - the physical page number.
  * \param word_size         - the size of a word in bytes.
+ * \param context_id        - the execution context whose test window is used.
  *
  * \returns
  * A pointer to the last word of the page.
  */
-void *last_word_mapping(uintptr_t page, size_t word_size);
+void *last_word_mapping(uintptr_t page, size_t word_size, int context_id);
 
 /**
  * Returns the page number of the physical memory page containing the specified
  * virtual memory address. The specified address must either be permanently
- * mapped or mapped by a call to map_window() prior to calling this function.
+ * mapped or mapped by a call to map_window() for the given context prior to
+ * calling this function.
  *
  * \param addr              - the virtual memory address.
+ * \param context_id        - the execution context whose mapping is used.
  *
  * \returns
  * The corresponding physical page number.
  */
-uintptr_t page_of(void *addr);
+uintptr_t page_of(void *addr, int context_id);
 
 #endif // VMEM_H
