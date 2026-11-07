@@ -324,18 +324,21 @@ for the unrotated display.
 
 Once booted, Memtest86+ will initialise its display, then pause for a few
 seconds to allow the user to configure its operation. If no key is pressed,
-it will automatically start running all tests using a single CPU core,
-continuing indefinitely until the user reboots or halts the machine.
+it will automatically start running the default tests (all tests except
+tests 1 and 11) with SMP enabled where available and the CPU sequencing
+mode set to parallel, continuing indefinitely until the user reboots or
+halts the machine.
 
 At startup, and when running tests, Memtest86+ responds to the following keys:
 
   * F1
     * enters the configuration menu
   * F2
-    * toggles use of multiple CPU cores (SMP)
+    * toggles use of multiple CPU cores (SMP), at startup only
   * Space
     * toggles scroll lock (stops/starts error message scrolling)
   * Enter
+    * skips the startup pause
     * single message scroll (only when scroll lock enabled)
   * Escape
     * exits the test and reboots the machine
@@ -345,7 +348,7 @@ is full.
 
 The configuration menu allows the user to:
 
-  * select which tests are run (default: all tests)
+  * select which tests are run (default: all tests except tests 1 and 11)
   * limit the address range over which tests are performed (default: all memory)
   * select the CPU sequencing mode (default: parallel)
     * parallel
@@ -364,6 +367,8 @@ The configuration menu allows the user to:
     * Linux memmap
     * bad pages
   * select which of the available CPU cores are used (at startup only)
+    * E-cores (on hybrid CPUs) and SMT (Hyper-Threading) sibling threads are
+      not used for testing by default
     * a maximum of 256 CPU cores can be selected, due to memory and
       display limits
     * the bootstrap processor (BSP) cannot be deselected
@@ -658,9 +663,8 @@ patterns, memmap regions, or bad page regions.
 ### Test 1 : Address test, own address in window
 
 In each memory region in turn, each address is written with its own address
-and then each address is checked for consistency. This test is performed
-sequentially with each available CPU, regardless of the CPU sequencing mode
-selected by the user.
+and then each address is checked for consistency. In parallel mode, this test
+runs on a single CPU core.
 
 ### Test 2 : Address test, own address + window
 
@@ -668,8 +672,8 @@ Across all memory regions, each address is written with its own virtual
 address plus the window number (for 32-bit images) or own physical address
 (for 64-bit images) and then each address is checked for consistency. This
 catches any errors in the high order address bits that would be missed when
-testing each window in turn. This test is performed sequentially with each
-available CPU, regardless of the CPU sequencing mode selected by the user.
+testing each window in turn. In parallel mode, this test runs on a single CPU
+core.
 
 ### Test 3 : Bus stress, read/write turnaround
 
