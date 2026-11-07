@@ -83,6 +83,12 @@ uint16_t pci_config_read16(int bus, int dev, int func, int reg);
 uint32_t pci_config_read32(int bus, int dev, int func, int reg);
 
 /**
+ * Maps one segment-zero PCI function's 4 KB ECAM configuration space using MCFG.
+ * Returns zero if unavailable. Only for startup; accesses must be volatile.
+ */
+uintptr_t pci_config_mmio_addr(int bus, int dev, int func);
+
+/**
  * Writes an 8 bit value to the specified bus+device+function+register address
  * in the PCI configuration address space.
  */

@@ -26,6 +26,7 @@
 
 #include "pci.h"
 #include "unistd.h"
+#include "vmem.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -47,6 +48,15 @@ typedef enum {
     PCI_CONFIG_TYPE_1     = 1,
     PCI_CONFIG_TYPE_2     = 2
 } pci_config_type_t;
+
+typedef struct __attribute__((packed)) {
+    uint64_t base;
+    uint16_t segment;
+    uint8_t  start_bus;
+    uint8_t  end_bus;
+    uint32_t reserved;
+} mcfg_entry_t;
+
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -259,6 +269,31 @@ void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value)
     }
 }
 
+uintptr_t pci_config_mmio_addr(int bus, int dev, int func)
+{
+    if (!acpi_config.mcfg_addr) return 0;
+
+    // MCFG has 8 reserved bytes after the RSDT header.
+    uintptr_t addr = map_region(acpi_config.mcfg_addr, sizeof(rsdt_header_t) + 8, true);
+    if (!addr) return 0;
+    const rsdt_header_t *header = (const rsdt_header_t *)addr;
+    uint32_t length = header->length;
+    if (   length < sizeof(rsdt_header_t) + 8 + sizeof(mcfg_entry_t)
+        || ((length - sizeof(rsdt_header_t) - 8) % sizeof(mcfg_entry_t) != 0)) return 0;
+
+    addr = map_region(acpi_config.mcfg_addr, length, true);
+    if (!addr || acpi_checksum((const void *)addr, length)) return 0;
+
+    const mcfg_entry_t *alloc = (const mcfg_entry_t *)(addr + sizeof(rsdt_header_t) + 8);
+    for (unsigned int i = 0; i < (length - sizeof(rsdt_header_t) - 8) / sizeof(mcfg_entry_t); i++) {
+        if (!alloc[i].base || ((alloc[i].base & 0xFFFFF) != 0) || alloc[i].segment || alloc[i].start_bus > alloc[i].end_bus || bus < alloc[i].start_bus || bus > alloc[i].end_bus) continue;
+        // MCFG bases refer to bus zero, including allocations with a nonzero start bus.
+        uint64_t offset = ((uint64_t)bus << 20) | (dev << 15) | (func << 12);
+        if (alloc[i].base > UINTPTR_MAX - offset - 4095) return 0;
+        return map_region(alloc[i].base + offset, 4096, true);
+    }
+    return 0;
+}
 
 uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size)
 {
