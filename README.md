@@ -266,6 +266,12 @@ recognised:
       For example: `testlist=0,1` would only run tests 0 and 1.
   * ecc
     * Enable ECC polling
+  * nonuma
+    * disables NUMA testing, which is on by default: one CPU team per memory
+      domain, each testing its own memory in parallel. It needs at least two
+      selected CPU-backed memory domains and the parallel CPU mode; otherwise
+      all CPUs share the whole memory as without NUMA. Not on 32-bit x86.
+    * `numa=off` is equivalent; `numa`, `numa=on` and `numa=par` enable it
 
 ## Keyboard Selection
 

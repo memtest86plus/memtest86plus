@@ -58,6 +58,9 @@ typedef enum {
 #define display_cpu_addr_mode(str) \
     prints(4, 75, str)
 
+#define display_numa_mode(active) \
+    prints(4, 74, (active) ? "[NUMA]" : "      ")
+
 #define display_l1_cache_size(size) \
     printf(2, 9, "%6kB", (uintptr_t)(size))
 
@@ -167,13 +170,13 @@ typedef enum {
 
 #define display_test_addresses(pb, pe, total) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 7); \
         printf(4, 39, "%kB - %kB [%kB of %kB]", pb, pe, (pe) - (pb), total); \
     }
 
 #define display_test_stage_description(...) \
     { \
-        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 6); \
+        clear_screen_region(4, 39, 4, SCREEN_WIDTH - 7); \
         printf(4, 39, __VA_ARGS__); \
     }
 
@@ -277,6 +280,37 @@ void display_big_status(bool pass);
 void restore_big_status(void);
 
 void check_input(void);
+
+/**
+ * Resets the UI ownership to context 0, at each wave binding.
+ */
+void display_reset_ui_owner(void);
+
+/**
+ * Runs the once-per-second UI and error updates (NUMA UI owner, bit-fade delay).
+ */
+void update_timed_ui(void);
+
+/**
+ * The test and pass progress ticks (ticks_per_test and ticks_per_pass are the final values).
+ */
+extern int test_ticks;
+extern int pass_ticks;
+
+/**
+ * Counts one test and pass progress tick and renders both bars.
+ */
+void display_progress_tick(void);
+
+/**
+ * NUMA Testing line: the active/total job count and the pages tested in this stage.
+ */
+void display_test_addresses_numa(void);
+
+/**
+ * NUMA: the number of bound execution contexts still testing windows.
+ */
+unsigned int numa_active_jobs(void);
 
 void set_scroll_lock(bool enabled);
 
