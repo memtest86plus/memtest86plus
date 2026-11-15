@@ -89,7 +89,7 @@ static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
 {
     // F2x94[23:20] MemClk. The BKDG lists 100/133/166/200 MHz only; BIOSes also use the other steps.
     static const uint16_t k8_ddr_rates[16] = { 200, 250, 266, 285, 300, 333, 366, 400, 433, 466, 500 };
-    static const uint16_t k8_ddr2_rates[8] = { 400, 533, 667, 800, 0, 0, 0, 0 };
+    static const uint16_t k8_ddr2_rates[8] = { 400, 533, 667, 800, 933, 1066, 0, 0 };
     static const uint16_t k10_rates[2][8]  = {
         { 400, 533, 667, 800, 1066,    0,    0, 0 },   // DDR2
         {   0,   0, 667, 800, 1066, 1333, 1600, 0 },   // DDR3
