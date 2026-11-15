@@ -57,6 +57,7 @@ typedef struct __attribute__((packed)) {
     uint32_t reserved;
 } mcfg_entry_t;
 
+#define MCFG_ENTRIES_OFFSET     (sizeof(rsdt_header_t) + 8)
 
 //------------------------------------------------------------------------------
 // Private Variables
@@ -72,9 +73,37 @@ static struct {
 
 static int num_mmio_allocs = 0;
 
+// First segment 0 ECAM window from the MCFG table, parsed on first use.
+static bool     ecam_parsed    = false;
+static uint64_t ecam_base      = 0;
+static int      ecam_start_bus = 0;
+static int      ecam_end_bus   = -1;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+static void parse_mcfg(void)
+{
+    ecam_parsed = true;
+
+    uintptr_t addr = map_region(acpi_config.mcfg_addr, sizeof(rsdt_header_t), true);
+    if (!addr) return;
+    uint32_t length = ((const rsdt_header_t *)addr)->length;
+    if (length < MCFG_ENTRIES_OFFSET + sizeof(mcfg_entry_t)) return;
+    addr = map_region(acpi_config.mcfg_addr, length, true);
+    if (!addr || acpi_checksum((const void *)addr, length)) return;
+
+    const mcfg_entry_t *entry = (const mcfg_entry_t *)(addr + MCFG_ENTRIES_OFFSET);
+    for (unsigned int i = 0; i < (length - MCFG_ENTRIES_OFFSET) / sizeof(mcfg_entry_t); i++) {
+        if (entry[i].segment == 0 && entry[i].base && entry[i].start_bus <= entry[i].end_bus) {
+            ecam_base      = entry[i].base;
+            ecam_start_bus = entry[i].start_bus;
+            ecam_end_bus   = entry[i].end_bus;
+            return;
+        }
+    }
+}
 
 static bool pci_sanity_check(void)
 {
@@ -269,30 +298,18 @@ void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value)
     }
 }
 
-uintptr_t pci_config_mmio_addr(int bus, int dev, int func)
+uint32_t pci_config_read32_ecam(int bus, int dev, int func, int reg)
 {
-    if (!acpi_config.mcfg_addr) return 0;
+    if (!ecam_parsed && acpi_config.mcfg_addr) parse_mcfg();
+    if (bus < ecam_start_bus || bus > ecam_end_bus) return 0xFFFFFFFF;
 
-    // MCFG has 8 reserved bytes after the RSDT header.
-    uintptr_t addr = map_region(acpi_config.mcfg_addr, sizeof(rsdt_header_t) + 8, true);
-    if (!addr) return 0;
-    const rsdt_header_t *header = (const rsdt_header_t *)addr;
-    uint32_t length = header->length;
-    if (   length < sizeof(rsdt_header_t) + 8 + sizeof(mcfg_entry_t)
-        || ((length - sizeof(rsdt_header_t) - 8) % sizeof(mcfg_entry_t) != 0)) return 0;
-
-    addr = map_region(acpi_config.mcfg_addr, length, true);
-    if (!addr || acpi_checksum((const void *)addr, length)) return 0;
-
-    const mcfg_entry_t *alloc = (const mcfg_entry_t *)(addr + sizeof(rsdt_header_t) + 8);
-    for (unsigned int i = 0; i < (length - sizeof(rsdt_header_t) - 8) / sizeof(mcfg_entry_t); i++) {
-        if (!alloc[i].base || ((alloc[i].base & 0xFFFFF) != 0) || alloc[i].segment || alloc[i].start_bus > alloc[i].end_bus || bus < alloc[i].start_bus || bus > alloc[i].end_bus) continue;
-        // MCFG bases refer to bus zero, including allocations with a nonzero start bus.
-        uint64_t offset = ((uint64_t)bus << 20) | (dev << 15) | (func << 12);
-        if (alloc[i].base > UINTPTR_MAX - offset - 4095) return 0;
-        return map_region(alloc[i].base + offset, 4096, true);
-    }
-    return 0;
+    // The MCFG base refers to bus 0, even when the window starts at a higher bus.
+    uint64_t func_addr = ecam_base + ((uint64_t)bus << 20 | dev << 15 | func << 12);
+    if (func_addr != (uintptr_t)func_addr) return 0xFFFFFFFF;
+    uintptr_t addr = map_region(func_addr, 4096, true);
+    // Reject a bogus window: the ID read through ECAM must match the one read through CF8/CFC.
+    if (!addr || *(volatile uint32_t *)addr != pci_config_read32(bus, dev, func, 0)) return 0xFFFFFFFF;
+    return *(volatile uint32_t *)(addr + (reg & 0xFFC));
 }
 
 uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size)

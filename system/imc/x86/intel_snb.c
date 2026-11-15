@@ -13,7 +13,6 @@
 #include "pci.h"
 #include "tsc.h"
 #include "unistd.h"
-#include "vmem.h"
 
 #include "imc.h"
 
@@ -95,9 +94,8 @@ void get_imc_config_intel_snb_ep(void)
                         if (mtr & (1 << 14)) populated = true;
                     }
                     if (populated) {
-                        uintptr_t addr = pci_config_mmio_addr(bus, timing_dev, timing_func[ch]);
-                        if (!addr || (*(volatile uint32_t *)addr & 0xFFFF) != PCI_VID_INTEL) return;
-                        uint32_t reg = *(volatile uint32_t *)(addr + 0x200);
+                        uint32_t reg = pci_config_read32_ecam(bus, timing_dev, timing_func[ch], 0x200);
+                        if (reg == 0xFFFFFFFF) return;
                         channels++;
                         if (first_dev < 0) {
                             timing = reg;

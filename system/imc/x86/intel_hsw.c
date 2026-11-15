@@ -10,7 +10,6 @@
 #include "memctrl.h"
 #include "msr.h"
 #include "pci.h"
-#include "vmem.h"
 
 #include "imc.h"
 
@@ -60,10 +59,8 @@ void get_imc_config_intel_hsw_ep(void)
                             first_func = ch % 2;
                             // Timings live in the extended configuration space of the
                             // channel thermal-control function.
-                            uintptr_t addr = pci_config_mmio_addr(bus, first_dev, first_func);
-                            if (addr && (*(volatile uint32_t *)addr & 0xFFFF) == PCI_VID_INTEL) {
-                                timing = *(volatile uint32_t *)(addr + 0x200);
-                            }
+                            timing = pci_config_read32_ecam(bus, first_dev, first_func, 0x200);
+                            if (timing == 0xFFFFFFFF) timing = 0;
                         }
                     }
                 }

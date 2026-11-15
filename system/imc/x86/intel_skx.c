@@ -10,7 +10,6 @@
 #include "cpuid.h"
 #include "memctrl.h"
 #include "pci.h"
-#include "vmem.h"
 
 #include "imc.h"
 
@@ -54,9 +53,8 @@ void get_imc_config_intel_skx(void)
         // Timings live in the extended configuration space of the
         // channel thermal-control function.
         // tRCD[4:0], tCL[13:9], tRAS[24:19], tRP[31:27].
-        uintptr_t addr = pci_config_mmio_addr(bus, pmon_dev, pmon_func);
-        if (addr && (*(volatile uint32_t *)addr & 0xFFFF) == PCI_VID_INTEL) {
-            uint32_t timing = *(volatile uint32_t *)(addr + 0x200);
+        uint32_t timing = pci_config_read32_ecam(bus, pmon_dev, pmon_func, 0x200);
+        if (timing != 0xFFFFFFFF) {
             imc.tCL_dec = 0;
             imc.tCL     = (timing >> 9)  & 0x1F;
             imc.tRCD    =  timing        & 0x1F;
