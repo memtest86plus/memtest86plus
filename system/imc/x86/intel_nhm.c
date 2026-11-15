@@ -22,11 +22,10 @@
 #define NHM_MC_DEV              3       // channel ch is device 4 + ch
 #define NHM_MC_CONTROL          0x48    // [10:8] CHANNELx_ACTIVE
 #define NHM_MC_STATUS           0x4C    // [2:0] CHANNELx_DISABLED
-#define NHM_MC_MAX_DOD          0x64    // [1:0] DIMM slots per channel - 1
-#define NHM_MC_DIMM_CLK_RATIO   0x54    // device 3 function 4, [4:0] QCLK ratio: data rate / BCLK
-#define NHM_CH_MRS_VALUE_0_1    0x70    // channel function 0, [6:4] MR0 CAS latency: 001b-111b = CL 5-11
+#define NHM_MC_CLK_RATIO_STATUS 0x50    // device 3 function 4, [4:0] current QCLK ratio: data rate / BCLK
+#define NHM_CH_MRS_VALUE_0_1    0x70    // channel function 0, MR0 CAS latency in A6:A4 (low) and A2 (high)
 #define NHM_CH_BANK_TIMING      0x88    // channel function 0, tRP[3:0], tRAS[8:4], tRCD[12:9]
-#define NHM_CH_DOD              0x48    // channel function 1, one per slot, bit 9: DIMM present
+#define NHM_CH_DOD              0x48    // channel function 1, one per slot (3), bit 9: DIMM present
 
 void get_imc_config_intel_nhm(void)
 {
@@ -44,13 +43,13 @@ void get_imc_config_intel_nhm(void)
 
         uint32_t control = pci_config_read32(bus, NHM_MC_DEV, 0, NHM_MC_CONTROL);
         uint32_t status  = pci_config_read32(bus, NHM_MC_DEV, 0, NHM_MC_STATUS);
-        unsigned int slots = (pci_config_read32(bus, NHM_MC_DEV, 0, NHM_MC_MAX_DOD) & 3) + 1;
         unsigned int channels = 0;
         uint32_t bank = 0, mrs = 0;
         for (int ch = 0; ch < 3; ch++) {
             if (!(control & (1 << (8 + ch))) || (status & (1 << ch))) continue;
+            if (pci_config_read32(bus, 4 + ch, 1, 0) == 0xFFFFFFFF) continue;
             bool populated = false;
-            for (unsigned int slot = 0; slot < slots; slot++) {
+            for (int slot = 0; slot < 3; slot++) {
                 if (pci_config_read32(bus, 4 + ch, 1, NHM_CH_DOD + 4 * slot) & (1 << 9)) populated = true;
             }
             if (!populated) continue;
@@ -65,15 +64,17 @@ void get_imc_config_intel_nhm(void)
         uint32_t low, high;
         rdmsr(MSR_IA32_PLATFORM_INFO, low, high);
         unsigned int cpu_ratio = (low >> 8) & 0xFF;
-        unsigned int dram_ratio = pci_config_read32(bus, NHM_MC_DEV, 4, NHM_MC_DIMM_CLK_RATIO) & 0x1F;
-        if (!cpu_ratio || !clks_per_msec || !((mrs >> 4) & 7)) return;
+        unsigned int dram_ratio = pci_config_read32(bus, NHM_MC_DEV, 4, NHM_MC_CLK_RATIO_STATUS) & 0x1F;
+        // MR0 CL code is A2 (MSB) and A6:A4: codes 1-12 = CL 5-16.
+        unsigned int cl_code = ((mrs >> 4) & 7) | ((mrs & 4) << 1);
+        if (!cpu_ratio || !clks_per_msec || !cl_code) return;
         float freq = (float)clks_per_msec / 1000.0f / cpu_ratio * dram_ratio;
         if (freq < 350.0f || freq > 3000.0f) return;
 
         imc.type    = "DDR3";
         imc.width   = channels * 64;
         imc.tCL_dec = 0;
-        imc.tCL     = 4 + ((mrs >> 4) & 7);
+        imc.tCL     = 4 + cl_code;
         imc.tRCD    = (bank >> 9) & 0xF;
         imc.tRP     = bank & 0xF;
         imc.tRAS    = (bank >> 4) & 0x1F;
