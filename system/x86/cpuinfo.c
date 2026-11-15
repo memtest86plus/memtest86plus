@@ -548,9 +548,6 @@ static void determine_imc(void)
               case 0x1:
                 imc.family = IMC_NHM;         // Core i7 1st Gen 45 nm (Nehalem/Bloomfield)
                 break;
-              case 0x2:
-                imc.family = IMC_NHM;         // Xeon (Nehalem-EX)
-                break;
               case 0x3:
                 imc.family = IMC_IVB_E;       // Core 3rd Gen (Ivy Bridge-E)
                 break;
