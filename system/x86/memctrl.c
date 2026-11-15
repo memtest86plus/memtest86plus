@@ -60,23 +60,19 @@ void memctrl_init(void)
       case IMC_IVB:
         get_imc_config_intel_snb();
         break;
-      case IMC_SNB_E:
-      case IMC_IVB_E:
-        get_imc_config_intel_snb_ep();
-        break;
       case IMC_HSW:
         get_imc_config_intel_hsw();
-        break;
-      case IMC_HSW_E:
-      case IMC_BDW_E:
-        get_imc_config_intel_hsw_ep();
         break;
       case IMC_SKL:
       case IMC_KBL:
         get_imc_config_intel_skl();
         break;
+      case IMC_SNB_E:
+      case IMC_IVB_E:
+      case IMC_HSW_E:
+      case IMC_BDW_E:
       case IMC_SKL_SP:
-        get_imc_config_intel_skx();
+        get_imc_config_intel_ep();
         break;
       case IMC_RKL:
         get_imc_config_intel_icl();
