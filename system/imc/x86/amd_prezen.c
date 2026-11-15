@@ -23,6 +23,7 @@
 #include "imc.h"
 
 #define AMD_NB_DEV          0x18    // node 0 northbridge
+#define AMD_MAX_NODES       8
 #define AMD_F3_NB_CAP       0xE8    // F3xE8[29] MultiNodeCpu
 #define AMD_F1_DCT_SELECT   0x10C   // F1x10C DctCfgSel
 #define AMD_F2_CS_BASE      0x40    // F2x[1,0][5C:40] DRAM CS Base, bit 0 CSEnable
@@ -86,7 +87,8 @@ static const amd_dct_t amd_dcts[] = {
 // Returns the data rate in MT/s from F2x94 (0 = reserved encoding) and sets imc.type.
 static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
 {
-    static const uint16_t k8_ddr_rates[8]  = { 200, 0, 266, 0, 0, 333, 0, 400 };    // F2x94[22:20] MemClk
+    // F2x94[23:20] MemClk. The BKDG lists 100/133/166/200 MHz only; BIOSes also use the other steps.
+    static const uint16_t k8_ddr_rates[16] = { 200, 250, 266, 285, 300, 333, 366, 400, 433, 466, 500 };
     static const uint16_t k8_ddr2_rates[8] = { 400, 533, 667, 800, 0, 0, 0, 0 };
     static const uint16_t k10_rates[2][8]  = {
         { 400, 533, 667, 800, 1066,    0,    0, 0 },   // DDR2
@@ -97,7 +99,7 @@ static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
     switch (layout) {
       case AMD_K8_DDR:
         imc.type = "DDR";
-        return k8_ddr_rates[(cfg >> 20) & 7];
+        return k8_ddr_rates[(cfg >> 20) & 0xF];
       case AMD_K8_DDR2:
         imc.type = "DDR2";
         return k8_ddr2_rates[cfg & 7];
@@ -143,8 +145,10 @@ static bool decode_timing(uint8_t layout, uint32_t cfg, uint32_t t, uint32_t tim
     imc.tCL_dec = 0;
     switch (layout) {
       case AMD_K8_DDR:
-        // Tcl[2:0] 001b=2, 010b=3, 101b=2.5; Trcd[14:12], Trp[26:24], Tras[23:20] in clocks.
+        // Tcl[2:0] 000b=1.5, 001b=2, 010b=3, 101b=2.5; Trcd[14:12], Trp[26:24], Tras[23:20] in clocks.
+        // Values the BKDG reserves (CL 1.5, Trcd/Trp 7, Tras below 5) are in use and shown as programmed.
         switch (t & 7) {
+          case 0: imc.tCL = 1; imc.tCL_dec = 5; break;
           case 1: imc.tCL = 2; break;
           case 2: imc.tCL = 3; break;
           case 5: imc.tCL = 2; imc.tCL_dec = 5; break;
@@ -153,7 +157,7 @@ static bool decode_timing(uint8_t layout, uint32_t cfg, uint32_t t, uint32_t tim
         imc.tRCD = (t >> 12) & 7;
         imc.tRP  = (t >> 24) & 7;
         imc.tRAS = (t >> 20) & 0xF;
-        return imc.tRCD >= 2 && imc.tRCD <= 6 && imc.tRP >= 2 && imc.tRP <= 6 && imc.tRAS >= 5;
+        return imc.tRCD >= 2 && imc.tRP >= 2 && imc.tRAS;
 
       case AMD_K8_DDR2:
         // Tcl[2:0]+1, Trcd[5:4]+3, Trp[9:8]+3, Tras[15:12]+3.
@@ -246,11 +250,12 @@ void get_imc_config_amd_prezen(void)
     }
 
     // The width covers both dies of a dual-node package; the timings come from the first populated DCT.
+    // Node 0 can be empty on multi-socket boards, so packages are scanned until one holds memory.
     bool dual = (row->flags & AMD_DUAL_NODE) && (pci_config_read32(0, AMD_NB_DEV, 3, AMD_F3_NB_CAP) & (1 << 29));
     uint16_t freq = 0;
     int width = 0;
     bool valid = true;
-    for (int dev = AMD_NB_DEV; valid && dev <= AMD_NB_DEV + dual; dev++) {
+    for (int dev = AMD_NB_DEV; valid && dev < AMD_NB_DEV + AMD_MAX_NODES; dev++) {
         if (pci_config_read32(0, dev, 2, 0) != ((uint32_t)row->did << 16 | PCI_VID_AMD)) break;
         bool ganged = row->gang_reg && (pci_config_read32(0, dev, 2, row->gang_reg) & (1 << row->gang_bit));
         uint32_t select = row->sel_mask ? pci_config_read32(0, dev, 1, AMD_F1_DCT_SELECT) : 0;
@@ -288,6 +293,7 @@ void get_imc_config_amd_prezen(void)
         if (row->sel_mask) {
             pci_config_write32(0, dev, 1, AMD_F1_DCT_SELECT, select);
         }
+        if (freq && (!dual || (dev & 1))) break;    // last die of the first package with memory
     }
 
     if (row->flags & AMD_EXT_CFG) {
