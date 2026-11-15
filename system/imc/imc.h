@@ -8,7 +8,7 @@
  */
 
 /* Memory configuration Detection for 64-bit, pr-Zen AMD Family 0Fh to 16h models */
-void get_imc_config_amd_prezen(uint16_t imc_family);
+void get_imc_config_amd_prezen(void);
 
 /* Memory configuration Detection for AMD Zen CPUs */
 void get_imc_config_amd_zen(void);

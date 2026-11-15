@@ -51,18 +51,12 @@
 // Types for the Generic DCT reader shared by the pre-Zen AMD readers.
 
 enum amd_family {
-#if 0
     AMD_FAM_0F_PRENPT = 0,
     AMD_FAM_0F = 1,
-#endif
     AMD_FAM_10 = 2,
-#if 0
     AMD_FAM_11 = 3,
-#endif
-#if 0
     AMD_FAM_12 = 4,
     AMD_FAM_14 = 5,
-#endif
     AMD_FAM_15_00_0F = 6,
     AMD_FAM_15_10_1F = 7,
     AMD_FAM_15_30_3F = 8,
@@ -109,7 +103,6 @@ struct __attribute__((packed)) amd_dct_caps {
 
 static inline __attribute__((always_inline)) uint16_t decode_freq(enum amd_family family, uint32_t config, uint32_t dram_ctrl, bool *is_ddr3)
 {
-#if 0
     if (family == AMD_FAM_0F_PRENPT) {
         // F2x94[22:20] MemClk: 000b=100, 010b=133, 101b=166, 111b=200 MHz; the
         // rate is twice the MEMCLK frequency. Validity is gated by bit 25 MCR
@@ -129,7 +122,6 @@ static inline __attribute__((always_inline)) uint16_t decode_freq(enum amd_famil
         return amd_0fh_rates[config & 0x7];
     }
     else
-#endif
     if (family == AMD_FAM_10) {
         // F2x[1,0]94 MemClkFreq [2:0] rates; the encoding depends on F2x94[8]
         // Ddr3Mode. The rate is twice the MEMCLK frequency.
@@ -141,7 +133,6 @@ static inline __attribute__((always_inline)) uint16_t decode_freq(enum amd_famil
         *is_ddr3 = (config & (1U << 8)) != 0;   // 8: Ddr3Mode
         return amd_10h_rates[*is_ddr3][config & 0x7];
     }
-#if 0
     else if (family == AMD_FAM_11) {
         // Family 11h (Griffin/Caspian mobile, BKDG 41256 Rev 3.00): DDR2
         // only (no Ddr3Mode in F2x94). F2x94[2:0] MemClkFreq is a 3-bit
@@ -154,11 +145,8 @@ static inline __attribute__((always_inline)) uint16_t decode_freq(enum amd_famil
         *is_ddr3 = false;
         return amd_11h_rates[config & 0x7];
     }
-#endif
     else if (
-#if 0
         family == AMD_FAM_12 || family == AMD_FAM_14 ||
-#endif
         family == AMD_FAM_15_00_0F || family == AMD_FAM_15_10_1F || family == AMD_FAM_15_30_3F || family == AMD_FAM_16) {
         *is_ddr3 = true;   // the other Family 12h/14h/15h/16h DCTs are DDR3 only
     }
@@ -196,7 +184,6 @@ static inline __attribute__((always_inline)) uint16_t decode_freq(enum amd_famil
 
 static inline __attribute__((always_inline)) bool decode_timing(enum amd_family family, uint32_t t, uint32_t row_timing, bool ddr3, uint8_t *tCL, uint8_t *tCL_dec, uint8_t *tRCD, uint8_t *tRP, uint8_t *tRAS)
 {
-#if 0
     if (family == AMD_FAM_0F_PRENPT) {
         // Revisions B-E (Post package): DDR1.
         // Register references: BKDG 26094 Rev 3.30: DDR1: F2x88 p.102-104, F2x90 p.106-107, F2x94 p.112-115.
@@ -234,7 +221,6 @@ static inline __attribute__((always_inline)) bool decode_timing(enum amd_family 
         return true;
     }
     else
-#endif
     if (family == AMD_FAM_10) {
         // Register references: BKDG 31116 Rev 3.62 (F2x[1,0]88 p.244-246, F2x[1,0]94
         // p.252-256, F2x110 p.257+, F2x[5C:40], F1x60, F3xE8; Linux amd64_edac.c).
@@ -264,7 +250,6 @@ static inline __attribute__((always_inline)) bool decode_timing(enum amd_family 
         }
         return true;
     }
-#if 0
     else if (family == AMD_FAM_11) {
         // Family 11h (Griffin/Caspian mobile, BKDG 41256 Rev 3.00,
         // F2x[1,0]88): DDR2 only. Tcl [3:0] 0010b=3 .. 0101b=6
@@ -283,8 +268,6 @@ static inline __attribute__((always_inline)) bool decode_timing(enum amd_family 
         *tRAS    = ((t >> 12) & 0xF) + 3;
         return true;
     }
-#endif
-#if 0
     else if (family == AMD_FAM_12 || family == AMD_FAM_14) {
         // Family 12h (Llano, BKDG 41131 Rev 3.02) and Family 14h (Bobcat,
         // BKDG 43170 Rev 3.13). Only Tcl lives in config space, in
@@ -304,7 +287,6 @@ static inline __attribute__((always_inline)) bool decode_timing(enum amd_family 
         *tRAS    = ((row_timing >> 16) & 0x1F) + 15;
         return true;
     }
-#endif
     else if (family == AMD_FAM_15_00_0F || family == AMD_FAM_15_10_1F || family == AMD_FAM_15_30_3F || family == AMD_FAM_15_60_6F || family == AMD_FAM_15_70_7F || family == AMD_FAM_16) {
         // F2x[1,0]200 DRAM Timing Low: Tcl[4:0], Trcd[12:8], Trp[20:16],
         // Tras[29:24] (BKDG 42301 p.510+, 42300 p.398+, 49125 p.419,
@@ -431,7 +413,6 @@ static void get_imc_config_amd_nb_dct(enum amd_family family, const struct amd_d
                 // register number (DctAccessWrite=0 for a read), then read the
                 // data from F2x[1,0]F4 (BKDG 41131 p.291, 43170 p.296).
                 uint32_t row_tmg = 0;
-#if 0
                 if (caps->row_timing_idx) {
                     pci_config_write32(0, dev, 2, AMD_12H_14H_DCT_EXTRA_OFF + off, caps->row_timing_idx);
                     bool done = false;
@@ -444,7 +425,6 @@ static void get_imc_config_amd_nb_dct(enum amd_family family, const struct amd_d
                     }
                     row_tmg = pci_config_read32(0, dev, 2, AMD_12H_14H_DCT_EXTRA_PORT + off);
                 }
-#endif
                 uint8_t tCL, tCL_dec, tRCD, tRP, tRAS;
                 if (   !rate || (freq && (freq != rate || (caps->type_by_ddr3 && ddr3 != is_ddr3)))
                     || !decode_timing(family, reg, row_tmg, is_ddr3, &tCL, &tCL_dec, &tRCD, &tRP, &tRAS)) {
@@ -489,9 +469,8 @@ static void get_imc_config_amd_nb_dct(enum amd_family family, const struct amd_d
 
 // -----------------------------------------------------------------------------
 // High-level entry point.
-void get_imc_config_amd_prezen(uint16_t imc_family)
+void get_imc_config_amd_prezen(void)
 {
-#if 0
     static const struct amd_dct_caps amd_0fh_caps[2] = {
         { // Revisions B-E (DDR1, sockets 940/939/754). F2x90[10] DramEnable
           // only exists from rev C onwards, so the engine must not gate on
@@ -529,7 +508,6 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
             .type           = "DDR2",
         },
     };
-#endif
     static const struct amd_dct_caps amd_10h_caps[1] = {
         {
             .dev_did        = 0x1202,
@@ -551,7 +529,6 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
             .type           = "",
         }
     };
-#if 0
     static const struct amd_dct_caps amd_11h_caps[1] = {
         { // Family 11h models 00h-0Fh (Griffin/Caspian mobile: Turion X2
           // Ultra, Athlon X2; BKDG 41256 Rev 3.00): the Family 10h register
@@ -576,8 +553,6 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
             .type           = "DDR2",
         }
     };
-#endif
-#if 0
     // Both Family 12h and 14h expose their DRAM controllers on function 2 of
     // the device 18h northbridge, with the same device ID 1702h (vendor
     // PCI_VID_AMD; shared between Family 12h and Family 14h, like the
@@ -628,7 +603,6 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
             .type           = "DDR3",
         },
     };
-#endif
     static const struct amd_dct_caps amd_15h_caps[5] = {
         { // Models 00h-0Fh: DCT1 selected by F1x10C[2:0] = 1; dual-die packages
           // flagged by F3xE8[29] MultiNodeCpu (G34r1). DDR3 only.
@@ -779,8 +753,7 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
             .type           = "DDR3",
         },
     };
-#if 0
-    if (imc_family == IMC_K8) {
+    if (imc.family == IMC_K8) {
         // Revision F (Non-Post Package) changed the DCT register layout completely:
         // rev F/G parts have an effective model (model + extendedModel << 4)
         // of 0x40 or above, rev B-E parts (e.g. Opteron 250/270, CPUID
@@ -790,24 +763,19 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
         get_imc_config_amd_nb_dct(model < 0x40 ? AMD_FAM_0F_PRENPT : AMD_FAM_0F, &amd_0fh_caps[model < 0x40 ? 0 : 1]);
     }
     else
-#endif
-    if (imc_family == IMC_K10) {
+    if (imc.family == IMC_K10) {
         get_imc_config_amd_nb_dct(AMD_FAM_10, &amd_10h_caps[0]);
     }
-#if 0
-    else if (imc_family == IMC_K11) {
+    else if (imc.family == IMC_K11) {
         get_imc_config_amd_nb_dct(AMD_FAM_11, &amd_11h_caps[0]);
     }
-#endif
-#if 0
-    else if (imc_family == IMC_K12) {
+    else if (imc.family == IMC_K12) {
         get_imc_config_amd_nb_dct(AMD_FAM_12, &amd_12h_caps[0]);
     }
-    else if (imc_family == IMC_K14) {
+    else if (imc.family == IMC_K14) {
         get_imc_config_amd_nb_dct(AMD_FAM_14, &amd_14h_caps[0]);
     }
-#endif
-    else if (imc_family == IMC_K15) {
+    else if (imc.family == IMC_K15) {
         switch (cpuid_info.version.extendedModel) {
           case 0:
             get_imc_config_amd_nb_dct(AMD_FAM_15_00_0F, &amd_15h_caps[0]);
@@ -828,7 +796,7 @@ void get_imc_config_amd_prezen(uint16_t imc_family)
             break;
         }
     }
-    else if (imc_family == IMC_K16) {
+    else if (imc.family == IMC_K16) {
         // The effective model picks the device IDs: extendedModel 0 = models
         // 00h-0Fh (Kabini), 3 = models 30h-3Fh (Mullins, same die).
         switch (cpuid_info.version.extendedModel) {
