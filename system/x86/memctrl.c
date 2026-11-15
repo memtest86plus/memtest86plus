@@ -95,10 +95,9 @@ void memctrl_init(void)
     }
 
     // Consistency check
-    // FIXME this check kills handling for the IMCs which do not read timings. What to do ?
-    /*if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRAS == 0) {
+    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRAS == 0) {
         imc.freq = 0;
-    }*/
+    }
 }
 
 void memctrl_poll_ecc(void)
