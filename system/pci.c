@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2026 Lionel Debroux.
+// Copyright (C) 2026 Sam Demeulemeester.
 //
 // Derived from memtest86+ pci.c:
 //
@@ -307,7 +309,7 @@ uint32_t pci_config_read32_ecam(int bus, int dev, int func, int reg)
     uint64_t func_addr = ecam_base + ((uint64_t)bus << 20 | dev << 15 | func << 12);
     if (func_addr != (uintptr_t)func_addr) return 0xFFFFFFFF;
     uintptr_t addr = map_region(func_addr, 4096, true);
-    // Reject a bogus window: the ID read through ECAM must match the one read through CF8/CFC.
+    // Reject a bogus window: the ID must match the one read through CF8/CFC.
     if (!addr || *(volatile uint32_t *)addr != pci_config_read32(bus, dev, func, 0)) return 0xFFFFFFFF;
     return *(volatile uint32_t *)(addr + (reg & 0xFFC));
 }

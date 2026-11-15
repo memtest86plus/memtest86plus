@@ -7,13 +7,13 @@
  * Integrated Memory Controler (IMC) Settings Detection Code
  */
 
-/* Memory configuration Detection for 64-bit, pr-Zen AMD Family 0Fh to 16h models */
+/* Memory configuration Detection for 64-bit, pre-Zen AMD Family 0Fh to 16h models */
 void get_imc_config_amd_prezen(void);
 
 /* Memory configuration Detection for AMD Zen CPUs */
 void get_imc_config_amd_zen(void);
 
-/* Memory configuration detection for Nehalem / Westmere-EP */
+/* Memory configuration Detection for Intel Nehalem / Westmere */
 void get_imc_config_intel_nhm(void);
 
 /* Memory configuration Detection for Intel Sandy Bridge */

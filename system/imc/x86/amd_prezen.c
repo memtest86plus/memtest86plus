@@ -1,20 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2026 Lionel Debroux
+// Copyright (C) 2026 Sam Demeulemeester
 //
 // ------------------------
-// Platform-specific code for 64-bit, pre-Zen AMD CPUs:
-// * AMD Family 0Fh CPUs (Athlon 64, Opteron);
-// * AMD Family 10h CPUs (Phenom, Opteron 24xx/61xx);
-// * AMD Family 11h CPUs (Turion X2 Ultra / Athlon X2 mobile, Griffin/Caspian);
-// * AMD Family 12h models 00h-0Fh (Llano A-Series APUs) and Family 14h models 00h-0Fh (Bobcat C-/E-/Z-Series APUs).
-// * AMD Family 15h models:
-//     * Bulldozer 00h-0Fh CPUs (FX Zambezi, Opteron 32xx Zurich / 42xx Valencia / 62xx Interlagos);
-//     * Piledriver 00h-0Fh CPUs (FX Vishera, Opteron 33xx Delhi / 43xx Seoul / 63xx Abu Dhabi);
-//     * 10h-1Fh (Trinity, Richland), 30h-3Fh (Kaveri), 60h-6Fh (Carrizo), 70h-7Fh (Bristol Ridge, Stoney Ridge);
-// * AMD Family 16h models 00h-0Fh (Kabini) and 30h-3Fh (Mullins).
 //
-// Register references: BKDG 26094/32559 (Family 0Fh), 31116 (10h), 41256 (11h), 41131 (12h), 43170 (14h),
-// 42301/42300/49125/50742/55072 (15h), 48751/52740 (16h); Linux drivers/edac/amd64_edac.c.
+// Platform-specific code for pre-Zen AMD CPUs (Family 0Fh to 16h)
+//
+// References: BKDG 26094, 32559 (0Fh), 31116 (10h), 41256 (11h), 41131 (12h), 43170 (14h),
+// 42301, 42300, 49125, 50742, 55072 (15h), 48751, 52740 (16h); Linux amd64_edac.c.
 //
 
 #include <stdbool.h>
@@ -43,7 +36,7 @@
 
 #define AMD_EXTRA_TIMING0   0x40    // DCT extra data "DRAM Timing 0": Trcd, Trp, Tras
 
-// DCT register layout, i.e. how the frequency and the timings are decoded.
+// DCT register layout, which selects the frequency and timing decoding.
 enum {
     AMD_K8_DDR,     // Family 0Fh revisions B-E
     AMD_K8_DDR2,    // Family 0Fh revisions F/G
@@ -90,8 +83,6 @@ static const amd_dct_t amd_dcts[] = {
     { IMC_K16, 0x3, 0x3, 0x1582, 0x000,  0, AMD_K15,      1, 0, 0,  7, AMD_FREQ_CHG | AMD_EXT_CFG                 },
 };
 
-// -----------------------------------------------------------------------------
-
 // Returns the data rate in MT/s from F2x94 (0 = reserved encoding) and sets imc.type.
 static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
 {
@@ -130,7 +121,7 @@ static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
         break;
     }
 
-    // F2x[1,0]94[4:0] MemClkFreq, shared by all Family 12h-16h DCTs; reserved encodings are not filtered.
+    // F2x[1,0]94[4:0] MemClkFreq, common to Family 12h-16h.
     switch (cfg & 0x1F) {
       case 0x02: return 400;    // Kaveri, Carrizo and Bristol Ridge only
       case 0x04: return 667;
@@ -146,7 +137,7 @@ static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
     }
 }
 
-// Decodes the DRAM Timing Low register t (and the Family 12h/14h DRAM Timing 0 word) into imc.
+// Decodes DRAM Timing Low (t) and, on Family 12h/14h, DRAM Timing 0 into imc.
 static bool decode_timing(uint8_t layout, uint32_t cfg, uint32_t t, uint32_t timing0)
 {
     imc.tCL_dec = 0;
@@ -174,7 +165,7 @@ static bool decode_timing(uint8_t layout, uint32_t cfg, uint32_t t, uint32_t tim
 
       case AMD_K10:
       case AMD_K11: {
-        // BKDG 31116 F2x[1,0]88. Tcl[3:0]+4 on DDR3, +1 on DDR2.
+        // Tcl[3:0]: +4 on DDR3, +1 on DDR2.
         bool ddr3 = layout == AMD_K10 && (cfg & (1 << 8));
         imc.tCL = (t & 0xF) + (ddr3 ? 4 : 1);
         if (ddr3 || (layout == AMD_K10 && (cfg & 7) == 4)) {
@@ -221,7 +212,7 @@ static uint16_t read_dct(const amd_dct_t *row, int dev, int off, uint32_t cfg)
         dram_ctrl = pci_config_read32(0, dev, 2, AMD_F2_DRAM_CTRL + off);
     }
     if (row->layout == AMD_K12) {
-        // Indirect read: write the register number, wait for DctAccessDone (bit 31), read the port.
+        // Indirect read through the DCT extra data port; bit 31 is DctAccessDone.
         pci_config_write32(0, dev, 2, AMD_F2_EXTRA_OFF + off, AMD_EXTRA_TIMING0);
         int i = 0;
         while (!(pci_config_read32(0, dev, 2, AMD_F2_EXTRA_OFF + off) & (1U << 31))) {
@@ -235,8 +226,6 @@ static uint16_t read_dct(const amd_dct_t *row, int dev, int off, uint32_t cfg)
     uint16_t freq = decode_freq(row->layout, cfg, dram_ctrl);
     return (freq && decode_timing(row->layout, cfg, t, timing0)) ? freq : 0;
 }
-
-// -----------------------------------------------------------------------------
 
 void get_imc_config_amd_prezen(void)
 {

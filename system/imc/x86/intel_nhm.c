@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2026 Lionel Debroux
+// Copyright (C) 2026 Sam Demeulemeester
 //
 // ------------------------
 //
 // Platform-specific code for Intel Nehalem (NHM) and Westmere (WMR) CPUs
 //
-// Register references: 320835-003, 321322-002; Linux drivers/edac/i7core_edac.c.
+// References: Intel 320835, 321322; Linux i7core_edac.c.
 //
 
 #include <stdbool.h>
@@ -19,7 +20,7 @@
 #include "imc.h"
 
 #define NHM_MC_DEV              3       // channel ch is device 4 + ch
-#define NHM_MC_CONTROL          0x48    // [10:8] CHANNELx_ACTIVE (bit 7 INIT_DONE is write-only)
+#define NHM_MC_CONTROL          0x48    // [10:8] CHANNELx_ACTIVE
 #define NHM_MC_STATUS           0x4C    // [2:0] CHANNELx_DISABLED
 #define NHM_MC_MAX_DOD          0x64    // [1:0] DIMM slots per channel - 1
 #define NHM_MC_DIMM_CLK_RATIO   0x54    // device 3 function 4, [4:0] QCLK ratio: data rate / BCLK

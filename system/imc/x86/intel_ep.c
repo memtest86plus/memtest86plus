@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2026 Lionel Debroux
+// Copyright (C) 2026 Sam Demeulemeester
 //
 // ------------------------
 //
-// Platform-specific code for Intel Xeon EP/SP memory controllers: Sandy Bridge-EP, Ivy Bridge-EP,
-// Haswell-EP, Broadwell-EP and Skylake-SP / Cascade Lake / Cooper Lake.
+// Platform-specific code for Intel Xeon Sandy Bridge-EP to Skylake-SP / Cascade Lake / Cooper Lake
 //
-// Register references: 327043-001, 330784-003, 331051-002; Linux drivers/edac/sb_edac.c,
-// drivers/edac/skx_common.c, arch/x86/events/intel/uncore_snbep.c.
+// References: Intel 327043, 330784, 331051; Linux sb_edac.c, skx_common.c, uncore_snbep.c.
 //
 
 #include <stdbool.h>
@@ -25,7 +24,7 @@
 #define EP_MCMTR            0x7C    // bit 14: DDR4 (Haswell-EP / Broadwell-EP)
 #define EP_DIMMMTR          0x80    // one register per DIMM slot
 
-// Channel PMON function, which also holds the channel timings in extended config space.
+// Channel PMON function, which also holds the timings.
 #define EP_PMON_FIXED_CTR   0xD0    // 48-bit DCLK counter
 #define EP_PMON_FIXED_CTL   0xF0
 #define EP_PMON_BOX_CTL     0xF4
@@ -72,7 +71,7 @@ static const ep_imc_t ep_imcs[] = {
     } },
 };
 
-// Reads the 48-bit fixed DCLK counter, retrying if the high half changes between the two reads.
+// Reads the 48-bit DCLK counter, retrying on a carry between the two halves.
 static bool read_dclk_counter(int bus, int dev, int func, uint64_t *clocks)
 {
     for (int i = 0; i < 3; i++) {
@@ -86,14 +85,14 @@ static bool read_dclk_counter(int bus, int dev, int func, uint64_t *clocks)
     return false;
 }
 
-// Measures the DRAM data rate (MT/s) with the channel fixed DCLK counter over 10 ms; 0 on failure.
+// Measures the data rate (MT/s) over 10 ms with the DCLK counter; 0 on failure.
 static uint16_t measure_freq(int bus, int dev, int func)
 {
     uint32_t ctl = pci_config_read32(bus, dev, func, EP_PMON_FIXED_CTL);
     uint32_t box = pci_config_read32(bus, dev, func, EP_PMON_BOX_CTL);
     if (!clks_per_msec || (box & 3)) return 0;
 
-    // Enable the counter (bit 22) without resetting it. Box control: 0 on SNB-EP, bits 17:16 set on later parts.
+    // Enable the counter (bit 22) without reset; box control is 0 on SNB-EP, bits 17:16 set on later parts.
     pci_config_write32(bus, dev, func, EP_PMON_FIXED_CTL, 1 << 22);
     pci_config_write32(bus, dev, func, EP_PMON_BOX_CTL, imc.family == IMC_SNB_E ? 0 : 3 << 16);
     uint64_t start, end;
@@ -102,7 +101,7 @@ static uint16_t measure_freq(int bus, int dev, int func)
     usleep(10000);
     valid = read_dclk_counter(bus, dev, func, &end) && valid;
     tsc = get_tsc() - tsc;
-    // Restore the controls, without replaying the counter reset bit (19).
+    // Restore the controls, without replaying the counter reset (bit 19).
     pci_config_write32(bus, dev, func, EP_PMON_FIXED_CTL, ctl & ~(1 << 19));
     pci_config_write32(bus, dev, func, EP_PMON_BOX_CTL, box);
 
