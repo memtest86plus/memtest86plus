@@ -320,7 +320,7 @@ uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size
         return 0;
     }
 
-    // Collect the sub-4GB ranges already claimed by our allocations, the MCFG table, PCI BARs,
+    // Collect the sub-4GB ranges already claimed by our allocations, the ECAM window, PCI BARs,
     // and PCI-PCI bridge windows. BAR sizes can't be probed non-destructively, so use the size
     // implied by the address alignment, clamped to [4KB, 64MB].
     uint64_t claimed[MAX_MMIO_CLAIMS][2];
@@ -331,9 +331,10 @@ uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size
         claimed[num_claimed][1] = mmio_allocs[i].base + mmio_allocs[i].size;
         num_claimed++;
     }
-    if (acpi_config.mcfg_addr != 0) {
-        claimed[num_claimed][0] = acpi_config.mcfg_addr;
-        claimed[num_claimed][1] = (uint64_t)acpi_config.mcfg_addr + 0x10000000;
+    if (!ecam_parsed && acpi_config.mcfg_addr) parse_mcfg();
+    if (ecam_end_bus >= ecam_start_bus) {
+        claimed[num_claimed][0] = ecam_base + ((uint64_t)ecam_start_bus << 20);
+        claimed[num_claimed][1] = ecam_base + ((uint64_t)(ecam_end_bus + 1) << 20);
         num_claimed++;
     }
     for (int b = 0; b < PCI_MAX_BUS; b++) {
