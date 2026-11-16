@@ -74,6 +74,7 @@ void memctrl_init(void)
       case IMC_IVB_E:
       case IMC_HSW_E:
       case IMC_BDW_E:
+      case IMC_BDW_DE:
         get_imc_config_intel_ep();
         break;
       case IMC_RKL:
