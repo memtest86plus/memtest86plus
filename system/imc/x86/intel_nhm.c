@@ -4,7 +4,7 @@
 //
 // ------------------------
 //
-// Platform-specific code for Intel Nehalem (NHM) and Westmere (WMR) CPUs
+// Platform-specific code for Intel Nehalem (NHM) and Gulftown / Westmere-EP (WMR_E) CPUs
 //
 // References: Intel 320835, 321322; Linux i7core_edac.c.
 //

@@ -400,7 +400,7 @@ static void determine_imc(void)
           case 0x5:
             switch (cpuid_info.version.extendedModel) {
               case 0x2:
-                imc.family = IMC_NHM;         // Core i3/i5 1st Gen 45 nm (Nehalem/Bloomfield)
+                imc.family = IMC_WMR;         // Core i3/i5 1st Gen 32 nm (Clarkdale/Arrandale)
                 break;
               case 0x3:
                 imc.family = IMC_CLT;
@@ -508,7 +508,7 @@ static void determine_imc(void)
                 enable_temp_cpu = false;
                 break;
               case 0x2:
-                imc.family = IMC_WMR;         // Core i7 1st Gen 32 nm (Westmere)
+                imc.family = IMC_WMR_E;       // Core i7 1st Gen 32 nm (Gulftown/Westmere-EP)
                 break;
               case 0x3:
                 imc.family = IMC_HSW;         // Core 4th Gen (Haswell)
@@ -576,6 +576,9 @@ static void determine_imc(void)
 
           case 0xF:
             switch (cpuid_info.version.extendedModel) {
+              case 0x1:
+                imc.family = IMC_WMR;         // Havendale/Auburndale (unreleased 45 nm)
+                break;
               case 0x3:
                 imc.family = IMC_HSW_E;       // Core 3rd Gen (Haswell-E)
                 break;

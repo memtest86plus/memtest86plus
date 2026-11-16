@@ -13,8 +13,11 @@ void get_imc_config_amd_prezen(void);
 /* Memory configuration Detection for AMD Zen CPUs */
 void get_imc_config_amd_zen(void);
 
-/* Memory configuration Detection for Intel Nehalem / Westmere */
+/* Memory configuration Detection for Intel Nehalem / Westmere-EP */
 void get_imc_config_intel_nhm(void);
+
+/* Memory configuration Detection for Intel Westmere with graphics (Clarkdale / Arrandale / Havendale) */
+void get_imc_config_intel_wmr(void);
 
 /* Memory configuration Detection for Intel Sandy Bridge */
 void get_imc_config_intel_snb(void);

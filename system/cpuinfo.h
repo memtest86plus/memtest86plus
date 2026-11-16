@@ -19,7 +19,7 @@
  */
 
 #define IMC_NHM         0x1000  // Core i7 1st Gen 45 nm (Nehalem/Bloomfield)
-#define IMC_WMR         0x1010  // Core 1st Gen 32 nm (Westmere)
+#define IMC_WMR         0x1010  // Core 1st Gen with graphics (Clarkdale/Arrandale, Havendale/Auburndale)
 #define IMC_SNB         0x1020  // Core 2nd Gen (Sandy Bridge)
 #define IMC_IVB         0x1030  // Core 3rd Gen (Ivy Bridge)
 #define IMC_HSW         0x1040  // Core 4th Gen (Haswell)
@@ -34,6 +34,7 @@
 #define IMC_ARL         0x1130  // Core 15th Gen (Arrow Lake)
 
 #define IMC_NHM_E       0x2010  // Core i7 1st Gen 45 nm (Nehalem-E)
+#define IMC_WMR_E       0x2015  // Core i7 / Xeon 1st Gen 32 nm (Gulftown/Westmere-EP)
 #define IMC_SNB_E       0x2020  // Core 2nd Gen (Sandy Bridge-E)
 #define IMC_IVB_E       0x2030  // Core 3rd Gen (Ivy Bridge-E)
 #define IMC_HSW_E       0x2040  // Core 3rd Gen (Haswell-E)

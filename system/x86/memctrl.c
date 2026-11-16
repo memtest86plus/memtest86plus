@@ -53,8 +53,11 @@ void memctrl_init(void)
         break;
       case IMC_NHM:
       case IMC_NHM_E:
-      case IMC_WMR:
+      case IMC_WMR_E:
         get_imc_config_intel_nhm();
+        break;
+      case IMC_WMR:
+        get_imc_config_intel_wmr();
         break;
       case IMC_SNB:
       case IMC_IVB:
