@@ -132,7 +132,9 @@ void get_imc_config_intel_ep(void)
                 continue;
             }
             for (int slot = 0; slot < ep->slots; slot++) {
-                if (pci_config_read32(bus, ch->mtr_dev, ch->mtr_func, EP_DIMMMTR + 4 * slot) & (1 << ep->pop_bit)) {
+                uint32_t mtr = pci_config_read32(bus, ch->mtr_dev, ch->mtr_func, EP_DIMMMTR + 4 * slot);
+                // A DIMM counts when one of its ranks (count in [13:12]) is not disabled in RANK_DISABLE [19:16].
+                if ((mtr & (1 << ep->pop_bit)) && (~(mtr >> 16) & ((1 << (1 << ((mtr >> 12) & 3))) - 1) & 0xF)) {
                     if (!first) first = ch;
                     channels++;
                     break;
