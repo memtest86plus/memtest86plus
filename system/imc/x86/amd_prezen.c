@@ -94,7 +94,7 @@ static uint16_t decode_freq(uint8_t layout, uint32_t cfg, uint32_t dram_ctrl)
         { 400, 533, 667, 800, 1066,    0,    0, 0 },   // DDR2
         {   0,   0, 667, 800, 1066, 1333, 1600, 0 },   // DDR3
     };
-    static const uint16_t k11_rates[8]     = { 0, 533, 667, 800, 0, 0, 0, 0 };
+    static const uint16_t k11_rates[8]     = { 400, 533, 667, 800, 0, 0, 0, 0 };
 
     switch (layout) {
       case AMD_K8_DDR:
