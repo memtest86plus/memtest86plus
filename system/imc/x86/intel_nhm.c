@@ -25,7 +25,6 @@
 #define NHM_MC_CLK_RATIO_STATUS 0x50    // device 3 function 4, [4:0] current QCLK ratio: data rate / BCLK
 #define NHM_CH_MRS_VALUE_0_1    0x70    // channel function 0, MR0 CAS latency in A6:A4 (low) and A2 (high)
 #define NHM_CH_BANK_TIMING      0x88    // channel function 0, tRP[3:0], tRAS[8:4], tRCD[12:9]
-#define NHM_CH_DOD              0x48    // channel function 1, one per slot (3), bit 9: DIMM present
 
 void get_imc_config_intel_nhm(void)
 {
@@ -45,14 +44,10 @@ void get_imc_config_intel_nhm(void)
         uint32_t status  = pci_config_read32(bus, NHM_MC_DEV, 0, NHM_MC_STATUS);
         unsigned int channels = 0;
         uint32_t bank = 0, mrs = 0;
+        // Active channels are the populated ones; the DOD DIMM-present bits are not always set by the BIOS.
         for (int ch = 0; ch < 3; ch++) {
             if (!(control & (1 << (8 + ch))) || (status & (1 << ch))) continue;
-            if (pci_config_read32(bus, 4 + ch, 1, 0) == 0xFFFFFFFF) continue;
-            bool populated = false;
-            for (int slot = 0; slot < 3; slot++) {
-                if (pci_config_read32(bus, 4 + ch, 1, NHM_CH_DOD + 4 * slot) & (1 << 9)) populated = true;
-            }
-            if (!populated) continue;
+            if (pci_config_read32(bus, 4 + ch, 0, 0) == 0xFFFFFFFF) continue;
             if (!channels++) {
                 bank = pci_config_read32(bus, 4 + ch, 0, NHM_CH_BANK_TIMING);
                 mrs  = pci_config_read32(bus, 4 + ch, 0, NHM_CH_MRS_VALUE_0_1);
@@ -69,7 +64,7 @@ void get_imc_config_intel_nhm(void)
         unsigned int cl_code = ((mrs >> 4) & 7) | ((mrs & 4) << 1);
         if (!cpu_ratio || !clks_per_msec || !cl_code) return;
         float freq = (float)clks_per_msec / 1000.0f / cpu_ratio * dram_ratio;
-        if (freq < 350.0f || freq > 3000.0f) return;
+        if (freq < 350.0f || freq > 4000.0f) return;
 
         imc.type    = "DDR3";
         imc.width   = channels * 64;
