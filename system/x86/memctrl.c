@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2025 Sam Demeulemeester
+// Copyright (C) 2004-2026 Sam Demeulemeester
 //
 // ------------------------
 //
@@ -74,7 +74,6 @@ void memctrl_init(void)
       case IMC_IVB_E:
       case IMC_HSW_E:
       case IMC_BDW_E:
-      case IMC_SKL_SP:
         get_imc_config_intel_ep();
         break;
       case IMC_RKL:
