@@ -1361,7 +1361,10 @@ void smp_init(bool smp_enable)
 
     if (smp_enable) {
 #if defined(__i386__) || defined(__x86_64__)
-        (void)(find_cpus_in_madt() || find_cpus_in_floating_mp_struct());
+        if (!find_cpus_in_madt()) {
+            num_available_cpus = 1;     // drop a partial CPU list
+            (void)find_cpus_in_floating_mp_struct();
+        }
         if (apic != NULL || apic_x2apic) {
             verify_bsp_is_cpu0();
         }
