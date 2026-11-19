@@ -88,7 +88,7 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
           case 'm':
           case 'g':
           case 't':
-            if (n > 0 && n < field_width && buffer[n-1] != 'x') {
+            if (n > 0 && n < field_width && buffer[n-1] != 'x' && !got_suffix) {
                 got_suffix = true;
                 buffer[n] = toupper(c);
             }
@@ -126,7 +126,7 @@ uintptr_t read_value(int row, int col, int field_width, int shift)
         }
     }
 
-    uintptr_t value = 0;
+    uint64_t value = 0;
     for (int i = (base == 16) ? 2 : 0; i < n; i++) {
         value *= base;
         if (buffer[i] >= 'a') {
