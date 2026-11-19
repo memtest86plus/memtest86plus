@@ -162,7 +162,7 @@ void reloc(void)
 
     do_relocations(load_addr, load_offs, dyn_info[DT_REL]->d_un.d_ptr, dyn_info[DT_RELSZ]->d_un.d_val);
 
-    if (dyn_info[DT_PLTREL]->d_un.d_val == DT_REL) {
+    if (dyn_info[DT_PLTREL] != NULL && dyn_info[DT_PLTREL]->d_un.d_val == DT_REL) {
         do_relocations(load_addr, load_offs, dyn_info[DT_JMPREL]->d_un.d_ptr, dyn_info[DT_PLTRELSZ]->d_un.d_val);
     }
 }
