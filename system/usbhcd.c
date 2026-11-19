@@ -282,7 +282,7 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
             if (kbd && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
-                kbd->interval        = endpoint->interval;
+                kbd->interval        = endpoint->interval ? endpoint->interval : 1;
                 kbd = NULL;
 
                 *num_keyboards += 1;
