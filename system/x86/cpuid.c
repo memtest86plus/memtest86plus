@@ -154,7 +154,8 @@ void cpuid_init(void)
 
     switch (cpuid_info.vendor_id.str[0]) {
       case 'A':
-        // AMD Processors
+      case 'H':
+        // AMD / Hygon Processors
         if (cpuid_info.max_xcpuid >= 0x80000008) {
 
             cpuid(0x80000008, 0, &reg[0], &reg[1], &reg[2], &reg[3]);
@@ -179,6 +180,7 @@ void cpuid_init(void)
         }
         break;
        case 'C':
+       case ' ':   // "  Shanghai  " (Zhaoxin)
         // Cyrix / VIA / CentaurHauls / Zhaoxin
         cpuid_info.flags.htt = false;
         break;

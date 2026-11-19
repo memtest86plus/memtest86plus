@@ -83,7 +83,7 @@ void cpu_temp_init(void)
     // CUR_TEMP_RANGE_SEL (bit 19) or CUR_TEMP_TJ_SEL (bits 17:16) == 0b11
     // (BIOS-written register, typical on server parts). Folded into
     // cpu_temp_offset so per-SKU quirks set above still apply.
-    if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
+    if ((cpuid_info.vendor_id.str[0] == 'A' || cpuid_info.vendor_id.str[0] == 'H') && cpuid_info.version.family == 0xF
         && cpuid_info.version.extendedFamily >= 8) {
 
         regl = amd_smn_read(SMN_THM_TCON_CUR_TMP);
@@ -106,8 +106,9 @@ int get_cpu_temp(void)
         return TjMax - Tabs;
     }
 
-    // AMD CPU
-    else if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF) { // Target only K8 & newer
+    // AMD / Hygon CPU
+    else if ((cpuid_info.vendor_id.str[0] == 'A' || cpuid_info.vendor_id.str[0] == 'H')
+          && cpuid_info.version.family == 0xF) { // Target only K8 & newer
 
         if (cpuid_info.version.extendedFamily >= 8) {        // Target Zen µarch and newer. Use SMN to get temperature.
 
@@ -140,7 +141,8 @@ int get_cpu_temp(void)
     }
 
     // VIA/Centaur/Zhaoxin CPU
-    else if (cpuid_info.vendor_id.str[0] == 'C' && cpuid_info.vendor_id.str[1] == 'e'
+    else if (((cpuid_info.vendor_id.str[0] == 'C' && cpuid_info.vendor_id.str[1] == 'e')
+           || cpuid_info.vendor_id.str[0] == ' ')    // "  Shanghai  " (Zhaoxin)
           && (cpuid_info.version.family == 6 || cpuid_info.version.family == 7)) {
 
         uint32_t msr_temp;
