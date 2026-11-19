@@ -671,7 +671,7 @@ static void parse_spd_ddr2(spd_info *spdi, uint8_t slot_idx)
 
     spdi->module_size *= (get_spd(slot_idx, 5) & 7) + 1;
 
-    spdi->hasECC = ((get_spd(slot_idx, 11) >> 1) == 1);
+    spdi->hasECC = ((get_spd(slot_idx, 11) >> 1) & 1);
 
     float tckns, tns;
     uint8_t tbyte;
@@ -812,7 +812,7 @@ static void parse_spd_ddr(spd_info *spdi, uint8_t slot_idx)
 
     spdi->module_size *= get_spd(slot_idx, 5);
 
-    spdi->hasECC = ((get_spd(slot_idx, 11) >> 1) == 1);
+    spdi->hasECC = ((get_spd(slot_idx, 11) >> 1) & 1);
 
     // Module speed
     float tns, tckns;
@@ -963,7 +963,7 @@ static void parse_spd_sdram(spd_info *spdi, uint8_t slot_idx)
         spdi->module_size = 0;
     }
 
-    spdi->hasECC = ((get_spd(slot_idx, 11) >> 1) == 1);
+    spdi->hasECC = ((get_spd(slot_idx, 11) >> 1) & 1);
 
     // Module speed
     float tns, tckns;
