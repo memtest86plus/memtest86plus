@@ -23,9 +23,21 @@ typedef enum {
 } heap_type_t;
 
 /**
+ * Low-memory heap pages kept for allocations made once testing has started.
+ */
+#define HEAP_RUNTIME_PAGES  16
+
+/**
  * Initialises the heaps.
  */
 void heap_init(void);
+
+/**
+ * Moves HEAP_RUNTIME_PAGES out of the memory map if a USB save is possible, none
+ * otherwise. Later low-memory allocations use only those pages and no longer alter
+ * the memory map. Call after the startup allocations, before the first test.
+ */
+void heap_reserve_runtime(void);
 
 /**
  * Allocates a chunk of physical memory in the given heap. The allocated

@@ -444,6 +444,9 @@ static void global_init(void)
 
     keyboard_init();
 
+    // Later allocations must not alter the memory map.
+    heap_reserve_runtime();
+
     display_init();
 
     error_init();
