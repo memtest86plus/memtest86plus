@@ -226,8 +226,12 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 
         sbyte = get_spd(slot_idx, 234);
 
-        // Package ranks per Channel
-        cur_rank *= 1U << ((sbyte >> 3) & 7);
+        // Package ranks per Channel (asymmetrical: even ranks use the first SDRAM, odd ranks the second)
+        uint32_t ranks = ((sbyte >> 3) & 7) + 1;
+        if (sbyte & 0x40) {
+            ranks = (sbyte_adr == 1) ? (ranks + 1) / 2 : ranks / 2;
+        }
+        cur_rank *= ranks;
 
         // Add current rank to total package size
         spdi->module_size += cur_rank;
@@ -355,10 +359,15 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
     spdi->module_size = 1U << (
                                ((get_spd(slot_idx, 4) & 0xF) + 5)   +  // Total SDRAM capacity: (256 Mbits << byte4[3:0] with an oddity for values >= 8) / 1 KB
                                ((get_spd(slot_idx, 13) & 0x7) + 3)  -  // Primary Bus Width: 8 << byte13[2:0]
-                               ((get_spd(slot_idx, 12) & 0x7) + 2)  +  // SDRAM Device Width: 4 << byte12[2:0]
-                               ((get_spd(slot_idx, 12) >> 3) & 0x7) +  // Number of Ranks: byte12[5:3]
-                               ((get_spd(slot_idx, 6) >> 4) & 0x7)     // Die count - 1: byte6[6:4]
+                               ((get_spd(slot_idx, 12) & 0x7) + 2)     // SDRAM Device Width: 4 << byte12[2:0]
                               );
+
+    spdi->module_size *= ((get_spd(slot_idx, 12) >> 3) & 0x7) + 1;    // Number of Package Ranks: byte12[5:3]
+
+    // 3DS (byte6[1:0] = 2): each package rank holds die count (byte6[6:4] + 1) logical ranks
+    if ((get_spd(slot_idx, 6) & 0x3) == 0x2) {
+        spdi->module_size *= ((get_spd(slot_idx, 6) >> 4) & 0x7) + 1;
+    }
 
     spdi->hasECC = (((get_spd(slot_idx, 13) >> 3) & 1) == 1);
 
