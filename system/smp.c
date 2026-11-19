@@ -1163,7 +1163,8 @@ static bool start_cpu(int cpu_num)
 
     bool use_long_delays = true;
     if ((cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.version.family == 6)      // Intel P6 or later
-    ||  (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family >= 15)) {  // AMD Hammer or later
+    ||  (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family >= 15)     // AMD Hammer or later
+    ||  (cpuid_info.vendor_id.str[0] == 'H')) {                                     // Hygon
         use_long_delays = false;
     }
 
