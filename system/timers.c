@@ -29,6 +29,8 @@
 
 #define PIT_TICKS_50mS      59659       // PIT clock is 1.193182MHz
 #define APIC_TICKS_50mS     178977      // APIC clock is 3.579545MHz
+#define PM_TIMER_MASK       0xFFFFFF    // PM timer is 24 or 32 bits wide
+#define PM_TIMER_MAX_LOOPS  1000000
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -53,13 +55,11 @@ static void correct_tsc(void)
         // Generate a dirty delay
         for(volatile uint8_t i=0; i<100u; i++);
 
-        // Make sure counter is incrementing
-        if (inl(acpi_config.pm_addr) > counter) {
+        // Make sure counter is incrementing (modular compare, the counter may wrap)
+        if (((inl(acpi_config.pm_addr) - counter) & PM_TIMER_MASK) != 0) {
 
-            while (1) {
-                if (inl(acpi_config.pm_addr) > (counter + APIC_TICKS_50mS) || loops > 1000000) {
-                    break;
-                }
+            while (((inl(acpi_config.pm_addr) - counter) & PM_TIMER_MASK) <= APIC_TICKS_50mS
+                   && loops <= PM_TIMER_MAX_LOOPS) {
                 loops++;
             }
 
@@ -67,8 +67,8 @@ static void correct_tsc(void)
 
             run_time = end_time - start_time;
 
-            // Make sure we have a credible result
-            if (loops >= 10 && run_time >= 50000) {
+            // Make sure we have a credible result (fall back to PIT if the counter stalled)
+            if (loops >= 10 && loops <= PM_TIMER_MAX_LOOPS && run_time >= 50000) {
                clks_per_msec = run_time / 50;
                return;
             }
