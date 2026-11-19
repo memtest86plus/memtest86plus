@@ -1356,7 +1356,7 @@ void smp_init(bool smp_enable)
 
     // Process SMP Quirks
     if (quirk.type & QUIRK_TYPE_SMP) {
-        // quirk.process();
+        // quirk_process(QUIRK_TYPE_SMP);
         smp_enable = false;
     }
 

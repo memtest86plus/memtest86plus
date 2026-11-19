@@ -48,9 +48,7 @@ int print_spd_startup_info(void)
 
     spd_info curspd;
 
-    if (quirk.type & QUIRK_TYPE_SMBUS) {
-        quirk.process();
-    }
+    quirk_process(QUIRK_TYPE_SMBUS);
 
     if (!setup_smb_controller() || smbusbase == 0) {
         return 0;

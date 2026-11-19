@@ -1180,9 +1180,7 @@ void find_usb_keyboards(bool pause_if_none)
 
     hci_info_t hci_list[MAX_HCI];
 
-    if ((quirk.type & QUIRK_TYPE_USB) && (quirk.process != NULL)) {
-        quirk.process();
-    }
+    quirk_process(QUIRK_TYPE_USB);
 
     int num_hci = find_usb_controllers(hci_list);
 
