@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (C) 2004-2025 Sam Demeulemeester
+// Copyright (C) 2004-2026 Sam Demeulemeester
 //
 // ------------------------
 //
@@ -33,6 +33,15 @@ void memctrl_init(void)
     }
 
     switch(imc.family) {
+      case IMC_K8:
+      case IMC_K10:
+      case IMC_K11:
+      case IMC_K12:
+      case IMC_K14:
+      case IMC_K15:
+      case IMC_K16:
+        get_imc_config_amd_prezen();
+        break;
       case IMC_K17:
       case IMC_K19_VRM:
       case IMC_K19_CZN:
@@ -41,6 +50,14 @@ void memctrl_init(void)
       case IMC_K19_PHX:
       case IMC_K1A_GRG:
         get_imc_config_amd_zen();
+        break;
+      case IMC_NHM:
+      case IMC_NHM_E:
+      case IMC_WMR_E:
+        get_imc_config_intel_nhm();
+        break;
+      case IMC_WMR:
+        get_imc_config_intel_wmr();
         break;
       case IMC_SNB:
       case IMC_IVB:
@@ -52,6 +69,13 @@ void memctrl_init(void)
       case IMC_SKL:
       case IMC_KBL:
         get_imc_config_intel_skl();
+        break;
+      case IMC_SNB_E:
+      case IMC_IVB_E:
+      case IMC_HSW_E:
+      case IMC_BDW_E:
+      case IMC_BDW_DE:
+        get_imc_config_intel_ep();
         break;
       case IMC_RKL:
         get_imc_config_intel_icl();
@@ -70,7 +94,7 @@ void memctrl_init(void)
     }
 
     // Consistency check
-    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRCD == 0) {
+    if (imc.tCL == 0 || imc.tRCD == 0 || imc.tRP == 0 || imc.tRAS == 0) {
         imc.freq = 0;
     }
 }

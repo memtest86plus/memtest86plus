@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (C) 2020-2021 Martin Whitaker.
+// Copyright (C) 2026 Lionel Debroux.
+// Copyright (C) 2026 Sam Demeulemeester.
 //
 // Derived from memtest86+ pci.c:
 //
@@ -26,6 +28,7 @@
 
 #include "pci.h"
 #include "unistd.h"
+#include "vmem.h"
 
 //------------------------------------------------------------------------------
 // Constants
@@ -48,6 +51,16 @@ typedef enum {
     PCI_CONFIG_TYPE_2     = 2
 } pci_config_type_t;
 
+typedef struct __attribute__((packed)) {
+    uint64_t base;
+    uint16_t segment;
+    uint8_t  start_bus;
+    uint8_t  end_bus;
+    uint32_t reserved;
+} mcfg_entry_t;
+
+#define MCFG_ENTRIES_OFFSET     (sizeof(rsdt_header_t) + 8)
+
 //------------------------------------------------------------------------------
 // Private Variables
 //------------------------------------------------------------------------------
@@ -62,9 +75,37 @@ static struct {
 
 static int num_mmio_allocs = 0;
 
+// First segment 0 ECAM window from the MCFG table, parsed on first use.
+static bool     ecam_parsed    = false;
+static uint64_t ecam_base      = 0;
+static int      ecam_start_bus = 0;
+static int      ecam_end_bus   = -1;
+
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
+
+static void parse_mcfg(void)
+{
+    ecam_parsed = true;
+
+    uintptr_t addr = map_region(acpi_config.mcfg_addr, sizeof(rsdt_header_t), true);
+    if (!addr) return;
+    uint32_t length = ((const rsdt_header_t *)addr)->length;
+    if (length < MCFG_ENTRIES_OFFSET + sizeof(mcfg_entry_t)) return;
+    addr = map_region(acpi_config.mcfg_addr, length, true);
+    if (!addr || acpi_checksum((const void *)addr, length)) return;
+
+    const mcfg_entry_t *entry = (const mcfg_entry_t *)(addr + MCFG_ENTRIES_OFFSET);
+    for (unsigned int i = 0; i < (length - MCFG_ENTRIES_OFFSET) / sizeof(mcfg_entry_t); i++) {
+        if (entry[i].segment == 0 && entry[i].base && entry[i].start_bus <= entry[i].end_bus) {
+            ecam_base      = entry[i].base;
+            ecam_start_bus = entry[i].start_bus;
+            ecam_end_bus   = entry[i].end_bus;
+            return;
+        }
+    }
+}
 
 static bool pci_sanity_check(void)
 {
@@ -259,6 +300,19 @@ void pci_config_write32(int bus, int dev, int func, int reg, uint32_t value)
     }
 }
 
+uint32_t pci_config_read32_ecam(int bus, int dev, int func, int reg)
+{
+    if (!ecam_parsed && acpi_config.mcfg_addr) parse_mcfg();
+    if (bus < ecam_start_bus || bus > ecam_end_bus) return 0xFFFFFFFF;
+
+    // The MCFG base refers to bus 0, even when the window starts at a higher bus.
+    uint64_t func_addr = ecam_base + ((uint64_t)bus << 20 | dev << 15 | func << 12);
+    if (func_addr != (uintptr_t)func_addr) return 0xFFFFFFFF;
+    uintptr_t addr = map_region(func_addr, 4096, true);
+    // Reject a bogus window: the ID must match the one read through CF8/CFC.
+    if (!addr || *(volatile uint32_t *)addr != pci_config_read32(bus, dev, func, 0)) return 0xFFFFFFFF;
+    return *(volatile uint32_t *)(addr + (reg & 0xFFC));
+}
 
 uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size)
 {
@@ -266,7 +320,7 @@ uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size
         return 0;
     }
 
-    // Collect the sub-4GB ranges already claimed by our allocations, the MCFG table, PCI BARs,
+    // Collect the sub-4GB ranges already claimed by our allocations, the ECAM window, PCI BARs,
     // and PCI-PCI bridge windows. BAR sizes can't be probed non-destructively, so use the size
     // implied by the address alignment, clamped to [4KB, 64MB].
     uint64_t claimed[MAX_MMIO_CLAIMS][2];
@@ -277,9 +331,10 @@ uintptr_t pci_alloc_mmio(int bus, int dev, int func, int bar_reg, uintptr_t size
         claimed[num_claimed][1] = mmio_allocs[i].base + mmio_allocs[i].size;
         num_claimed++;
     }
-    if (acpi_config.mcfg_addr != 0) {
-        claimed[num_claimed][0] = acpi_config.mcfg_addr;
-        claimed[num_claimed][1] = (uint64_t)acpi_config.mcfg_addr + 0x10000000;
+    if (!ecam_parsed && acpi_config.mcfg_addr) parse_mcfg();
+    if (ecam_end_bus >= ecam_start_bus) {
+        claimed[num_claimed][0] = ecam_base + ((uint64_t)ecam_start_bus << 20);
+        claimed[num_claimed][1] = ecam_base + ((uint64_t)(ecam_end_bus + 1) << 20);
         num_claimed++;
     }
     for (int b = 0; b < PCI_MAX_BUS; b++) {

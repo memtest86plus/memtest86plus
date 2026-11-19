@@ -83,6 +83,12 @@ uint16_t pci_config_read16(int bus, int dev, int func, int reg);
 uint32_t pci_config_read32(int bus, int dev, int func, int reg);
 
 /**
+ * Reads a 32 bit value from the full 4KB configuration space of a segment 0 function,
+ * through the MCFG ECAM window. Returns 0xFFFFFFFF if unavailable. Only for startup.
+ */
+uint32_t pci_config_read32_ecam(int bus, int dev, int func, int reg);
+
+/**
  * Writes an 8 bit value to the specified bus+device+function+register address
  * in the PCI configuration address space.
  */
