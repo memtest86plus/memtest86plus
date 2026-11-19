@@ -505,7 +505,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
         uint8_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF;
-        if (~status & error_mask) {
+        if (!(status & error_mask)) {
             hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
             if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
                 *prev_kbd_rpt = *kbd_rpt;
@@ -517,6 +517,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
         uint16_t dt = kbd_qhd->data_length & EHCI_QTD_DT_MASK;
         build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, dt, kbd_rpt, sizeof(hid_kbd_rpt_t));
 
+        if (status & EHCI_QTD_HALTED) kbd_qhd->status = 0;  // a failed transfer halted the QH
         kbd_qhd->next_qtd_ptr = (uintptr_t)kbd_qtd;
     }
 }

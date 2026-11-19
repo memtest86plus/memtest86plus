@@ -393,7 +393,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
             hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
             uint32_t error_mask = UHCI_TD_STALLED | UHCI_TD_DB_ERR | UHCI_TD_BABBLE | UHCI_TD_NAK_RX | UHCI_TD_CRC_TO | UHCI_TD_BS_ERR;
-            if (~status & error_mask) {
+            if (!(status & error_mask)) {
                 hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
                 if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
                     *prev_kbd_rpt = *kbd_rpt;
