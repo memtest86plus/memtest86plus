@@ -308,11 +308,20 @@ static uint16_t get_uhci_done(workspace_t *ws)
 
 static bool wait_for_uhci_done(workspace_t *ws)
 {
-    // Rely on the controller to timeout if the device doesn't respond.
+    // The controller only detects device errors: a device that NAKs forever needs a timeout.
+    uint16_t io_base = ws->io_base;
     uint16_t status = 0;
+    int timer = 5000 * MILLISEC / 10;
     while (true) {
         status = get_uhci_done(ws);
         if (status != 0) break;
+        if (timer-- == 0) {
+            // Unlink the transfer and clear what it raised meanwhile.
+            write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
+            usleep(2 * MILLISEC);
+            outw(UHCI_USBSTS_INT | UHCI_USBSTS_ERR, UHCI_USBSTS);
+            return false;
+        }
         usleep(10);
     }
 
