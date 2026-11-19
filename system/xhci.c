@@ -150,6 +150,8 @@
 
 #define MILLISEC                        1000    // in microseconds
 
+#define XHCI_MAX_MSD_SLOTS              8       // drive + parent hubs
+
 #define DEVICE_WS_SIZE                  (XHCI_MAX_OP_CONTEXT_SIZE + 2 * sizeof(ep_tr_t))
 
 //------------------------------------------------------------------------------
@@ -372,6 +374,9 @@ typedef struct {
     // State needed to rescan the root ports after initialisation.
     uint8_t             num_ports;
     uint8_t             msd_port;   // 1-based root port owning the found drive, 0 if none
+    bool                msd_scan_active;
+    uint8_t             num_msd_slots;
+    uint8_t             msd_slot_id[XHCI_MAX_MSD_SLOTS];    // slots left enabled by a rescan
     uint8_t             port_type[XHCI_MAX_PORTS];
 } workspace_t  __attribute__ ((aligned (64)));
 
@@ -707,6 +712,10 @@ static int allocate_slot(const usb_hcd_t *hcd)
 
     xhci_trb_t event;
 
+    if (ws->msd_scan_active && ws->num_msd_slots == XHCI_MAX_MSD_SLOTS) {
+        return 0;
+    }
+
     // Record the heap state to allow us to free memory.
     ws->initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
 
@@ -732,6 +741,10 @@ static int allocate_slot(const usb_hcd_t *hcd)
 
     write64_(&ws->device_context_index[slot_id], device_workspace_addr);
 
+    if (ws->msd_scan_active) {
+        ws->msd_slot_id[ws->num_msd_slots++] = slot_id;
+    }
+
     return slot_id;
 
 free_memory:
@@ -739,10 +752,8 @@ free_memory:
     return 0;
 }
 
-static bool release_slot(const usb_hcd_t *hcd, int slot_id)
+static bool disable_slot(workspace_t *ws, int slot_id)
 {
-    workspace_t *ws = (workspace_t *)hcd->ws;
-
     xhci_trb_t event;
 
     enqueue_xhci_command(ws, XHCI_TRB_DISABLE_SLOT | slot_id << 24, 0, 0);
@@ -753,8 +764,40 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
 
     write64_(&ws->device_context_index[slot_id], 0);
 
+    return true;
+}
+
+static bool release_slot(const usb_hcd_t *hcd, int slot_id)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    if (!disable_slot(ws, slot_id)) {
+        return false;
+    }
+
+    for (int i = 0; i < ws->num_msd_slots; i++) {
+        if (ws->msd_slot_id[i] == slot_id) {
+            ws->msd_slot_id[i] = ws->msd_slot_id[--ws->num_msd_slots];
+            break;
+        }
+    }
+
     heap_rewind(HEAP_TYPE_LM_1, ws->initial_heap_mark);
 
+    return true;
+}
+
+// Disables the slots left enabled by a rescan.
+static bool release_msd(const usb_hcd_t *hcd)
+{
+    workspace_t *ws = (workspace_t *)hcd->ws;
+
+    while (ws->num_msd_slots > 0) {
+        if (!disable_slot(ws, ws->msd_slot_id[ws->num_msd_slots - 1])) {
+            return false;
+        }
+        ws->num_msd_slots--;
+    }
     return true;
 }
 
@@ -1140,6 +1183,9 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
     // Record the heap state to allow us to free memory if the scan fails.
     uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
 
+    ws->num_msd_slots   = 0;
+    ws->msd_scan_active = true;
+
     // Construct a hub descriptor for the root hub.
     usb_hub_t root_hub;
     memset(&root_hub, 0, sizeof(root_hub));
@@ -1196,6 +1242,7 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
                                         &num_devices, keyboards, 0, &num_keyboards)) {
             ws->port_type[port_idx] |= PORT_TYPE_IN_USE;
             ws->msd_port = 1 + port_idx;
+            ws->msd_scan_active = false;
             return true;
         }
 
@@ -1203,7 +1250,11 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
         release_slot(hcd, slot_id);
     }
 
-    heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
+    ws->msd_scan_active = false;
+    // Quirky hubs leave child slots enabled.
+    if (release_msd(hcd)) {
+        heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
+    }
     return false;
 }
 
@@ -1225,7 +1276,8 @@ static const hcd_methods_t methods = {
     .configure_bulk_ep   = configure_bulk_ep,
     .bulk_transfer       = bulk_transfer,
     .reset_bulk_ep       = reset_bulk_ep,
-    .scan_for_msd        = scan_for_msd
+    .scan_for_msd        = scan_for_msd,
+    .release_msd         = release_msd
 };
 
 //------------------------------------------------------------------------------
