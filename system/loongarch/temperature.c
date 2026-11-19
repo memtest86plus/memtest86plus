@@ -30,9 +30,7 @@ void cpu_temp_init(void)
     }
 
     // Process temperature-related quirks
-    if (quirk.type & QUIRK_TYPE_TEMP) {
-        quirk.process();
-    }
+    quirk_process(QUIRK_TYPE_TEMP);
 }
 
 int get_cpu_temp(void)

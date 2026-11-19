@@ -296,9 +296,30 @@ static void unhide_asus_smbus(void)
     *ptr &= ~(1u << 3);
 }
 
-// ---------------------
-// -- Public function --
-// ---------------------
+// Several quirks can match one machine: each consumer runs only the handlers of its own type.
+static void add_quirk(quirk_id_t id, uint16_t type, void (*process)(void))
+{
+    quirk.id    = id;
+    quirk.type |= type;
+    if (process != NULL && quirk.num_handlers < QUIRK_MAX_HANDLERS) {
+        quirk.handler[quirk.num_handlers].type    = type;
+        quirk.handler[quirk.num_handlers].process = process;
+        quirk.num_handlers++;
+    }
+}
+
+// ----------------------
+// -- Public functions --
+// ----------------------
+
+void quirk_process(uint16_t type)
+{
+    for (int i = 0; i < quirk.num_handlers; i++) {
+        if (quirk.handler[i].type & type) {
+            quirk.handler[i].process();
+        }
+    }
+}
 
 void quirks_init(void)
 {
@@ -306,7 +327,7 @@ void quirks_init(void)
     quirk.type      = QUIRK_TYPE_NONE;
     quirk.root_vid  = pci_config_read16(0, 0, 0, PCI_VID_REG);
     quirk.root_did  = pci_config_read16(0, 0, 0, PCI_DID_REG);
-    quirk.process   = NULL;
+    quirk.num_handlers = 0;
 
     //  -------------------------------------------------
     //  -- ALi Aladdin IV (M1531) & V (M1541) Quirks  --
@@ -315,9 +336,7 @@ void quirks_init(void)
     // be detected by a proprietary way based on chipset registers
     if (quirk.root_vid == PCI_VID_ALI && (quirk.root_did == 0x1531      // ALi Aladdin IV (M1531)
             || quirk.root_did == 0x1541)) {                              // ALi Aladdin V  (M1541)
-        quirk.id    = QUIRK_ALI_ALADDIN_IV_V;
-        quirk.type |= QUIRK_TYPE_MEM_SIZE;
-        quirk.process = get_m1531_41_mb_cache_size;
+        add_quirk(QUIRK_ALI_ALADDIN_IV_V, QUIRK_TYPE_MEM_SIZE, get_m1531_41_mb_cache_size);
     }
 
     //  -------------------------------------------------------------------
@@ -326,9 +345,7 @@ void quirks_init(void)
     // Motherboard cache detection
     else if (quirk.root_vid == PCI_VID_VIA && (quirk.root_did == 0x0585 // VIA VT82C585
             || quirk.root_did == 0x0597 || quirk.root_did == 0x0598)) { // VIA VT82C597/8
-        quirk.id    = QUIRK_VIA_VP;
-        quirk.type |= QUIRK_TYPE_MEM_SIZE;
-        quirk.process = get_vt82c585_597_mb_cache_size;
+        add_quirk(QUIRK_VIA_VP, QUIRK_TYPE_MEM_SIZE, get_vt82c585_597_mb_cache_size);
     }
 
     //  --------------------------
@@ -336,9 +353,7 @@ void quirks_init(void)
     //  --------------------------
     // Motherboard cache detection
     else if (quirk.root_vid == PCI_VID_SIS && quirk.root_did == 0x0530) {  // SiS 530
-        quirk.id    = QUIRK_SIS_530;
-        quirk.type |= QUIRK_TYPE_MEM_SIZE;
-        quirk.process = get_sis_530_mb_cache_size;
+        add_quirk(QUIRK_SIS_530, QUIRK_TYPE_MEM_SIZE, get_sis_530_mb_cache_size);
     }
 
     //  ------------------------
@@ -350,9 +365,7 @@ void quirks_init(void)
     if (quirk.root_vid == PCI_VID_INTEL && quirk.root_did == 0x1130) {      // Intel i815
         if (pci_config_read16(0, 0, 0, PCI_SUB_VID_REG) == PCI_VID_ASUS) {  // ASUS
             if (pci_config_read16(0, 0, 0, PCI_SUB_DID_REG) == 0x8027) {    // TUSL2-C
-                quirk.id    = QUIRK_TUSL2;
-                quirk.type |= QUIRK_TYPE_SMBUS;
-                quirk.process = asus_tusl2_configure_mux;
+                add_quirk(QUIRK_TUSL2, QUIRK_TYPE_SMBUS, asus_tusl2_configure_mux);
             }
         }
     }
@@ -364,9 +377,7 @@ void quirks_init(void)
     // We were unable to find a solution so far, so disable SMP by default
     if (quirk.root_vid == PCI_VID_INTEL && quirk.root_did == 0x6F00) {             // Broadwell-E (Xeon-D)
         if (pci_config_read16(0, 0, 0, PCI_SUB_VID_REG) == PCI_VID_SUPERMICRO) {   // Super Micro
-                quirk.id    = QUIRK_X10SDV_NOSMP;
-                quirk.type |= QUIRK_TYPE_SMP;
-                quirk.process = NULL;
+                add_quirk(QUIRK_X10SDV_NOSMP, QUIRK_TYPE_SMP, NULL);
         }
     }
 
@@ -378,9 +389,7 @@ void quirks_init(void)
         && cpuid_info.version.extendedFamily == 0 && cpuid_info.version.extendedModel == 0) {   // Early K8
         if ((cpuid_info.version.model == 4 && cpuid_info.version.stepping == 0) ||              // SH-B0 ClawHammer (Athlon 64)
             (cpuid_info.version.model == 5 && cpuid_info.version.stepping <= 1)) {              // SH-B0/B3 SledgeHammer (Opteron)
-                quirk.id    = QUIRK_K8_BSTEP_NOTEMP;
-                quirk.type |= QUIRK_TYPE_TEMP;
-                quirk.process = disable_temp_reporting;
+                add_quirk(QUIRK_K8_BSTEP_NOTEMP, QUIRK_TYPE_TEMP, disable_temp_reporting);
         }
     }
 
@@ -390,9 +399,7 @@ void quirks_init(void)
     if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
         && cpuid_info.version.extendedFamily == 0 && cpuid_info.version.extendedModel >= 4) {   // Later K8
 
-        quirk.id    = QUIRK_K8_REVFG_TEMP;
-        quirk.type |= QUIRK_TYPE_TEMP;
-        quirk.process = amd_k8_revfg_temp;
+        add_quirk(QUIRK_K8_REVFG_TEMP, QUIRK_TYPE_TEMP, amd_k8_revfg_temp);
     }
 
     //  ------------------------------------------------
@@ -412,9 +419,7 @@ void quirks_init(void)
                 (cpuid_info.version.model == 4 && cpuid_info.version.stepping <= 2) ||          // RB-C2
                 cpuid_info.version.model == 8) {                                                // HY-D0
 
-                quirk.id    = QUIRK_AMD_ERRATA_319;
-                quirk.type |= QUIRK_TYPE_TEMP;
-                quirk.process = disable_temp_reporting;
+                add_quirk(QUIRK_AMD_ERRATA_319, QUIRK_TYPE_TEMP, disable_temp_reporting);
             }
         }
     }
@@ -425,9 +430,7 @@ void quirks_init(void)
     if (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family == 0xF
         && cpuid_info.version.extendedFamily >= 8) {
 
-        quirk.id    = QUIRK_AMD_ZEN_TCTL_OFFSET;
-        quirk.type |= QUIRK_TYPE_TEMP;
-        quirk.process = amd_zen_apply_tctl_offset;
+        add_quirk(QUIRK_AMD_ZEN_TCTL_OFFSET, QUIRK_TYPE_TEMP, amd_zen_apply_tctl_offset);
     }
 
     //  -----------------------------------------------
@@ -437,8 +440,7 @@ void quirks_init(void)
         && cpuid_info.version.extendedFamily >= 0xA
         && l3_cache == 192 * 1024 && is_amd_dual_ccd_x3d()) {
 
-        quirk.id = QUIRK_AMD_X3D_L3_SIZE;
-        quirk.type |= QUIRK_TYPE_CPUID;
+        add_quirk(QUIRK_AMD_X3D_L3_SIZE, QUIRK_TYPE_CPUID, NULL);
         l3_cache = 128 * 1024;      // 96MB (V-Cache CCD) + 32MB (standard CCD)
     }
 
@@ -447,9 +449,7 @@ void quirks_init(void)
     //  -----------------------------------------------------------
     if (quirk.root_vid == PCI_VID_LOONGSON) {
         if (pci_config_read16(0, 4, 1, PCI_DID_REG) == 0x7a14) {
-            quirk.id    = QUIRK_LOONGSON7A00_EHCI_WORKARD;
-            quirk.type |= QUIRK_TYPE_USB;
-            quirk.process = loongson_7a00_ehci_workaround;
+            add_quirk(QUIRK_LOONGSON7A00_EHCI_WORKARD, QUIRK_TYPE_USB, loongson_7a00_ehci_workaround);
         }
     }
 
@@ -459,9 +459,7 @@ void quirks_init(void)
     if (quirk.root_vid == PCI_VID_VIA) {
         if (pci_config_read16(0, 0x10, 3, PCI_DID_REG) == 0x3104
         ||  pci_config_read16(0, 0x10, 4, PCI_DID_REG) == 0x3104) {
-            quirk.id    = QUIRK_VIA_VT823X_EHCI;
-            quirk.type |= QUIRK_TYPE_USB;
-            quirk.process = via_vt823x_ehci_workaround;
+            add_quirk(QUIRK_VIA_VT823X_EHCI, QUIRK_TYPE_USB, via_vt823x_ehci_workaround);
         }
     }
 
@@ -486,15 +484,11 @@ void quirks_init(void)
             case PCI_DID_LPC_ICH4M:
             case PCI_DID_LPC_ICH5:
             case PCI_DID_LPC_6300ESB:
-                quirk.id      = QUIRK_UNHIDE_ICH05;
-                quirk.type   |= QUIRK_TYPE_SMBUS;
-                quirk.process = unhide_ich_0_5;
+                add_quirk(QUIRK_UNHIDE_ICH05, QUIRK_TYPE_SMBUS, unhide_ich_0_5);
                 break;
             case PCI_DID_LPC_ICH6M:
                 if (root_subvid == PCI_VID_DELL && root_subdid == 0x0182) { // Dell D620
-                    quirk.id      = QUIRK_UNHIDE_ASUS_SMBUS;
-                    quirk.type   |= QUIRK_TYPE_SMBUS;
-                    quirk.process = unhide_asus_smbus;
+                    add_quirk(QUIRK_UNHIDE_ASUS_SMBUS, QUIRK_TYPE_SMBUS, unhide_asus_smbus);
                 }
                 break;
             default:

@@ -59,9 +59,7 @@ void cpu_temp_init(void)
     }
 
     // Process temperature-related quirks
-    if (quirk.type & QUIRK_TYPE_TEMP) {
-        quirk.process();
-    }
+    quirk_process(QUIRK_TYPE_TEMP);
 
     // Get TjMax for Intel CPU
     if (cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.max_cpuid >= 6 && (cpuid_info.dts_pmp & 1)) {
