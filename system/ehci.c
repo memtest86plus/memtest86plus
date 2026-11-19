@@ -621,6 +621,12 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
 
     usleep(100*MILLISEC);  // USB maximum device attach time
 
+    // Free the forgotten drive's port: the loop may return before reaching it.
+    if (ws->msd_port != 0) {
+        ws->port_in_use[ws->msd_port - 1] = false;
+        ws->msd_port = 0;
+    }
+
     // Scan the ports that are not already in use, looking for a USB drive.
     usb_ep_t keyboards[1];
     for (int port_idx = 0; port_idx < ws->num_ports; port_idx++) {
@@ -629,11 +635,9 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
         // Check the port is powered up.
         if (~port_status & EHCI_PORT_SC_PP) continue;
 
-        // Skip ports owned by a previous scan, unless unplugged or hosting a since-forgotten drive.
+        // Skip ports owned by a previous scan, unless unplugged.
         if (ws->port_in_use[port_idx]) {
-            if (ws->msd_port == 1 + port_idx) {
-                ws->msd_port = 0;
-            } else if ((port_status & (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) == (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) {
+            if ((port_status & (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) == (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) {
                 continue;
             }
             ws->port_in_use[port_idx] = false;
