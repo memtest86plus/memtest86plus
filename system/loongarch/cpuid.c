@@ -75,6 +75,9 @@ void cpuid_init(void)
     } else {
       cpuid_info.flags.htt = true;
     }
+
+    // get_tsc() reads the stable counter (rdtime.d)
+    cpuid_info.flags.rdtsc = true;
 }
 
 core_type_t get_ap_hybrid_type(void)
