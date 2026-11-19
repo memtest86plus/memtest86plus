@@ -132,13 +132,14 @@ startup64:
 	.globl	efi_handover
 efi_handover:
 	andq	$~0xf, %rsp
-	call	efi_setup
 
 	# Disable write protection in case the boot loader has made the
-	# loaded image read-only.
+	# loaded image read-only (efi_setup writes to static data).
 	movq	%cr0, %rcx
-	andw	$0x7fff, %cx
+	andl	$~0x10000, %ecx
 	movq	%rcx, %cr0
+
+	call	efi_setup
 
 	# Save the boot params pointer.
 
