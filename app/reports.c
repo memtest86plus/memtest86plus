@@ -411,14 +411,12 @@ void save_results_to_usb(void)
 {
     bool reenumerated = false;
 
-    // The drive may have been plugged in after boot - scan for it now. This must be
+    // The drive may have been plugged in or replugged after boot - check for it now. This must be
     // done before the heap mark below is recorded, so that anything allocated for a
     // newly found drive is not freed when the save completes.
   restart:
-    if (!usb_mass_storage_found) {
-        prints(POP_R+14, POP_LI, "Scanning for USB drive...   ");
-        (void)usb_scan_for_msd();
-    }
+    prints(POP_R+14, POP_LI, usb_mass_storage_found ? "Checking USB drive...       " : "Scanning for USB drive...   ");
+    (void)usb_scan_for_msd();
 
     // Save heap state so we can free everything when done.
     uintptr_t heap_lm_mark = heap_mark(HEAP_TYPE_LM_1);
