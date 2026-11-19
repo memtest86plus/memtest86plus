@@ -27,6 +27,7 @@
 
 int test_addr_walk1(int my_cpu)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     // There isn't a meaningful address for this test.
@@ -36,7 +37,7 @@ int test_addr_walk1(int my_cpu)
 
     testword_t invert = 0;
     for (int i = 0; i < 2; i++) {
-        if (my_cpu == master_cpu) {
+        if (test_is_primary_context_master(my_cpu)) {
             display_test_pattern_value(invert);
         }
         ticks++;
@@ -44,9 +45,9 @@ int test_addr_walk1(int my_cpu)
             continue;
         }
 
-        for (int j = 0; j < vm_map_size; j++) {
-            uintptr_t pb = (uintptr_t)vm_map[j].start;
-            uintptr_t pe = (uintptr_t)vm_map[j].end;
+        for (int j = 0; j < vm_map_size[context]; j++) {
+            uintptr_t pb = (uintptr_t)vm_map[context][j].start;
+            uintptr_t pe = (uintptr_t)vm_map[context][j].end;
 
             // Walking one on our first address.
             uintptr_t mask1 = sizeof(testword_t);

@@ -29,17 +29,18 @@
 
 int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
 {
+    int context = test_context_index();
     int ticks = 0;
 
     testword_t pattern = (testword_t)1 << offset;
     pattern = inverse ? ~pattern : pattern;
 
-    if (my_cpu == master_cpu) {
+    if (test_is_primary_context_master(my_cpu)) {
         display_test_pattern_value(pattern);
     }
 
     // Initialize memory with the initial pattern.
-    for (int i = 0; i < vm_map_size; i++) {
+    for (int i = 0; i < vm_map_size[context]; i++) {
         testword_t *start, *end;
         calculate_chunk(&start, &end, my_cpu, i, sizeof(testword_t));
         if (end < start) SKIP_RANGE(1)  // we need at least one word for this test
@@ -78,7 +79,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
 
         flush_caches(my_cpu);
 
-        for (int j = 0; j < vm_map_size; j++) {
+        for (int j = 0; j < vm_map_size[context]; j++) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
             if (end < start) SKIP_RANGE(1)  // we need at least one word for this test
@@ -118,7 +119,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
 
         flush_caches(my_cpu);
 
-        for (int j = vm_map_size - 1; j >= 0; j--) {
+        for (int j = vm_map_size[context] - 1; j >= 0; j--) {
             testword_t *start, *end;
             calculate_chunk(&start, &end, my_cpu, j, sizeof(testword_t));
             if (end < start) SKIP_RANGE(1)  // we need at least one word for this test

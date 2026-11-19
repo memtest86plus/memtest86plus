@@ -105,7 +105,7 @@ bool            enable_sm          = true;
 bool            enable_spd_crc     = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
-bool            enable_numa        = false;
+bool            enable_numa        = true;
 
 bool            enable_ecc_polling = false;
 
@@ -364,7 +364,8 @@ static void parse_option(const char *option, const char *params)
     } else if (strncmp(option, "nospdcrc", 9) == 0) {
         enable_spd_crc = false;
     } else if (strncmp(option, "numa", 5) == 0) {
-        enable_numa = true;
+        // "on" and "par" are kept as aliases; an unknown mode (e.g. a typo) turns NUMA off.
+        enable_numa = params[0] == '\0' || strncmp(params, "on", 3) == 0 || strncmp(params, "par", 4) == 0;
     } else if (strncmp(option, "nonuma", 7) == 0) {
         enable_numa = false;
     } else if (strncmp(option, "powersave", 10) == 0) {

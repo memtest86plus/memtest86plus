@@ -12,6 +12,7 @@
 #define _REGISTERS_H_
 
 #ifdef __loongarch_lp64
+#define NUMA_NODE_OFFSET      44          // Node field (4 bits) of multi-node physical addresses
 #define RSIZE                 8           // 64 bit mode register size
 #define GP_REG_CONTEXT_SIZE   32 * RSIZE  // General-purpose registers size
 #define FP_REG_CONTEXT_SIZE   34 * RSIZE  // Floating-point registers size

@@ -360,9 +360,6 @@ static uint64_t next_log_time  = 0;
 static bool     log_running    = false;
 static bool     log_error_seen = false;
 
-static int      log_test_ticks = 0;
-static int      log_pass_ticks = 0;
-
 // Start a log line with the "MTLOG ts=<sec>.<decisec> ev=<event>" prefix.
 static char *slog_begin(const char *event)
 {
@@ -398,11 +395,12 @@ static void slog(const char *event, const char *fmt, ...)
     slog_end(pos);
 }
 
-static int slog_pct(int ticks, int total)
+static int slog_pct(uint64_t ticks, uint64_t total)
 {
     if (total <= 0) return 0;
-    int pct = 100 * ticks / total;
-    return pct > 100 ? 100 : pct;
+    if (ticks >= total) return 100;
+    // The pre-clamp keeps the 100 * ticks product within 64 bits.
+    return (int)((100 * ticks) / total);
 }
 
 //------------------------------------------------------------------------------
@@ -594,7 +592,6 @@ void serial_log_event(slog_event_t event)
 
     switch (event) {
       case SLOG_PASS_START:
-        log_pass_ticks = 0;
         slog("pass_start", " pass=%i", pass_num);
         break;
       case SLOG_PASS_END:
@@ -609,7 +606,6 @@ void serial_log_event(slog_event_t event)
         break;
       case SLOG_TEST_START: {
         log_error_seen = false;
-        log_test_ticks = 0;
         const char *text;
         int len = test_desc_text(test_num, &text);
         char name[40];
@@ -624,23 +620,43 @@ void serial_log_event(slog_event_t event)
     }
 }
 
+void serial_log_wave_bind(int wave, unsigned int num_contexts)
+{
+    if (!log_running) return;
+    slog("wave_bind", " wave=%i contexts=%u", wave, num_contexts);
+}
+
+void serial_log_context_end(int wave, int context, int domain, int status)
+{
+    if (!log_running) return;
+    slog("context_end", " wave=%i context=%i domain=%i status=%i",
+         wave, context, domain, status);
+}
+
 void serial_log_tick(void)
 {
     if (!log_running || clks_per_msec == 0) return;
-
-    log_test_ticks++;
-    log_pass_ticks++;
 
     uint64_t now = get_tsc();
     if (now < next_log_time) return;
     next_log_time = now + SERIAL_LOG_INTERVAL * 1000 * (uint64_t)clks_per_msec;
 
-    // Same progress calculation as do_tick(), from our own tick counters.
+    // The screen's progress, from the display's tick counters.
     pass_type_t pass_type = (pass_num == 0) ? FAST_PASS : FULL_PASS;
 
+    if (VMEM_MAX_CONTEXTS > 1 && numa_run_active) {
+        // jobs= is active/total, like the screen's Testing line.
+        slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i jobs=%u/%u errors=%u",
+             pass_num, slog_pct(pass_ticks, ticks_per_pass[pass_type]),
+             test_num, slog_pct(test_ticks, ticks_per_test[pass_type][test_num]),
+             (uintptr_t)numa_active_jobs(), (uintptr_t)num_bound_execution_contexts,
+             (uintptr_t)error_count);
+        return;
+    }
+
     slog("tick", " pass=%i pass_pct=%i test=%i test_pct=%i errors=%u",
-         pass_num, slog_pct(log_pass_ticks, ticks_per_pass[pass_type]),
-         test_num, slog_pct(log_test_ticks, ticks_per_test[pass_type][test_num]),
+         pass_num, slog_pct(pass_ticks, ticks_per_pass[pass_type]),
+         test_num, slog_pct(test_ticks, ticks_per_test[pass_type][test_num]),
          (uintptr_t)error_count);
 }
 

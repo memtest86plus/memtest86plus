@@ -32,7 +32,22 @@
 
 #define	STACKS_SIZE	(BSP_STACK_SIZE + MAX_APS * AP_STACK_SIZE)
 
-#define	LOCALS_SIZE	16		/* Stack region reserved for thread-local storage */
+/*
+ * Execution contexts testing at once (8 covers a 2-socket SNC4/NPS4 machine);
+ * more domains run in successive waves.
+ */
+#if defined(__i386__)
+#define	VMEM_MAX_CONTEXTS	1
+#else
+#define	VMEM_MAX_CONTEXTS	8
+#endif
+
+/*
+ * Stack region reserved for thread-local storage: one flag each for the start
+ * and run barriers and every context barrier, from offset 1. A multiple of 16
+ * keeps the initial stack pointer aligned.
+ */
+#define	LOCALS_SIZE	(((2 + VMEM_MAX_CONTEXTS + 1) + 15) & ~15)
 
 #define LOW_LOAD_ADDR	0x00010000	/* The low  load address for the main program */
 #define HIGH_LOAD_ADDR	0x00100000	/* The high load address for the main program */

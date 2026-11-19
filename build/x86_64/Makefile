@@ -154,10 +154,12 @@ tests/x86/%.o: ../../tests/x86/%.c
 	@mkdir -p tests/x86
 	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
+tests/%.o: CFLAGS += -Werror=stack-usage=1024
 tests/%.o: ../../tests/%.c
 	@mkdir -p tests
 	$(CC) -c $(CFLAGS) $(OPT_FAST) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)
 
+app/main.o: CFLAGS += -Werror=stack-usage=8192
 app/%.o: ../../app/%.c app/build_version.h
 	@mkdir -p app
 	$(CC) -c $(CFLAGS) $(OPT_SMALL) $(INC_DIRS) -o $@ $< -MMD -MP -MT $@ -MF $(@:.o=.d)

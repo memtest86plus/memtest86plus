@@ -341,23 +341,32 @@ uintptr_t map_region(uintptr_t base_addr, size_t size, bool only_for_startup)
     return base_addr;
 }
 
-bool map_window(uintptr_t start_page __attribute__((unused)))
+bool vmem_prepare_execution_contexts(int num_contexts)
+{
+    // All of physical memory is identity mapped and shared: only a complete map is needed.
+    if (num_contexts < 1 || num_contexts > VMEM_MAX_CONTEXTS) {
+        return false;
+    }
+    return !paging_incomplete;
+}
+
+bool map_window(int context_id __attribute__((unused)), uintptr_t start_page __attribute__((unused)))
 {
     // All of physical memory is permanently identity mapped.
     return true;
 }
 
-void *first_word_mapping(uintptr_t page)
+void *first_word_mapping(uintptr_t page, int context_id __attribute__((unused)))
 {
     return (void *)(page << PAGE_SHIFT);
 }
 
-void *last_word_mapping(uintptr_t page, size_t word_size)
+void *last_word_mapping(uintptr_t page, size_t word_size, int context_id)
 {
-    return (uint8_t *)first_word_mapping(page) + (PAGE_SIZE - word_size);
+    return (uint8_t *)first_word_mapping(page, context_id) + (PAGE_SIZE - word_size);
 }
 
-uintptr_t page_of(void *addr)
+uintptr_t page_of(void *addr, int context_id __attribute__((unused)))
 {
     return (uintptr_t)addr >> PAGE_SHIFT;
 }
