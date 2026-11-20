@@ -85,27 +85,29 @@ void get_imc_config_intel_mtl(void)
     // Get Memory Clock
     ptr32 = (uint32_t*)(mchbar_addr + MTL_MMR_PTGRAM_REG);
 
+    float ref_clk;
     switch((*ptr32 >> 20) & 0xF) {
         default:
         case 0x1:
-            imc.freq = 200;
+            ref_clk = 200.0f;
             break;
         case 0x2:
-            imc.freq = 100;
+            ref_clk = 100.0f;
             break;
         case 0xA:
-            imc.freq = 133;
+            ref_clk = 400.0f / 3.0f;
             break;
         case 0xB:
-            imc.freq = 66;
+            ref_clk = 200.0f / 3.0f;
             break;
         case 0xC:
-            imc.freq = 33;
+            ref_clk = 100.0f / 3.0f;
             break;
     }
 
-    imc.freq *= (*ptr32 >> 12) & 0xFF; // * Divider
-    imc.freq *= (((*ptr32 >> 24) & 1) + 1) * 2; // * Gear * DDR
+    ref_clk *= (*ptr32 >> 12) & 0xFF; // * Divider
+    ref_clk *= (((*ptr32 >> 24) & 1) + 1) * 2; // * Gear * DDR
+    imc.freq = (uint16_t)(ref_clk + 0.5f);
 
     // Get DRAM Timings
     ptr = (uintptr_t*)(mchbar_addr + offset + MTL_MMR_CH0_CAS_REG);
