@@ -117,6 +117,7 @@ typedef struct {
     bool    (*bulk_transfer)        (usb_hcd_r, const usb_ep_t *, void *, size_t, bool);
     bool    (*reset_bulk_ep)        (usb_hcd_r, const usb_ep_t *, int);
     bool    (*scan_for_msd)         (usb_hcd_r);
+    bool    (*release_msd)          (usb_hcd_r);
 } hcd_methods_t;
 
 /**
@@ -391,6 +392,12 @@ bool find_usb_mass_storage(usb_msd_t *msd);
  * Used by config.c to decide whether to offer saving results to USB.
  */
 bool usb_hcd_available(void);
+
+/**
+ * Returns true if results can be saved to USB now or later: a drive was found,
+ * or an active host controller can be rescanned for one.
+ */
+bool usb_save_possible(void);
 
 /**
  * Rescans the root ports of the active host controllers for a newly attached

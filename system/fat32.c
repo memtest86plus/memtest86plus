@@ -81,7 +81,7 @@ static bool read_sector(fat32_fs_t *fs, uint32_t lba)
         return true;
     }
     fs->buf_valid = false;
-    if (!msd_read_sectors(fs->msd, fs->partition_lba + lba, 1, fs->sector_buf)) {
+    if (!msd_read_sectors(fs->msd, (uint64_t)fs->partition_lba + lba, 1, fs->sector_buf)) {
         return false;
     }
     fs->buf_lba   = lba;
@@ -93,7 +93,7 @@ static bool write_sector(fat32_fs_t *fs, uint32_t lba)
 {
     // The buffer holds this sector's contents once written, so it stays a valid entry.
     fs->buf_valid = false;
-    if (!msd_write_sectors(fs->msd, fs->partition_lba + lba, 1, fs->sector_buf)) {
+    if (!msd_write_sectors(fs->msd, (uint64_t)fs->partition_lba + lba, 1, fs->sector_buf)) {
         return false;
     }
     fs->buf_lba   = lba;

@@ -132,13 +132,14 @@ startup64:
 	.globl	efi_handover
 efi_handover:
 	andq	$~0xf, %rsp
-	call	efi_setup
 
 	# Disable write protection in case the boot loader has made the
-	# loaded image read-only.
+	# loaded image read-only (efi_setup writes to static data).
 	movq	%cr0, %rcx
-	andw	$0x7fff, %cx
+	andl	$~0x10000, %ecx
 	movq	%rcx, %cr0
+
+	call	efi_setup
 
 	# Save the boot params pointer.
 
@@ -472,6 +473,18 @@ int_handler:
 	popq	%rbp
 	addq	$16, %rsp		# discard the vector number and error code
 	iretq
+
+# void call_on_stack(void (*fn)(void), void *stack_top)
+
+	.globl	call_on_stack
+call_on_stack:
+	pushq	%rbp
+	movq	%rsp, %rbp		# rbp keeps our stack pointer across the call
+	movq	%rsi, %rsp
+	call	*%rdi
+	movq	%rbp, %rsp
+	popq	%rbp
+	ret
 
 # The interrupt descriptor table.
 

@@ -356,7 +356,11 @@ void error_init(void)
     error_info.last_addr        = 0;
     error_info.last_xor         = 0;
 
-    error_count = 0;
+    for (int i = 0; i < NUM_TEST_PATTERNS; i++) {
+        test_list[i].errors = 0;
+    }
+    error_count      = 0;
+    error_count_cecc = 0;
 }
 
 void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_t bad)

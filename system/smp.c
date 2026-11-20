@@ -295,7 +295,7 @@ typedef struct __attribute__((packed)) {
 
 #endif
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t     type;
     uint8_t     length;
     uint16_t    reserved;
@@ -1163,7 +1163,8 @@ static bool start_cpu(int cpu_num)
 
     bool use_long_delays = true;
     if ((cpuid_info.vendor_id.str[0] == 'G' && cpuid_info.version.family == 6)      // Intel P6 or later
-    ||  (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family >= 15)) {  // AMD Hammer or later
+    ||  (cpuid_info.vendor_id.str[0] == 'A' && cpuid_info.version.family >= 15)     // AMD Hammer or later
+    ||  (cpuid_info.vendor_id.str[0] == 'H')) {                                     // Hygon
         use_long_delays = false;
     }
 
@@ -1355,13 +1356,16 @@ void smp_init(bool smp_enable)
 
     // Process SMP Quirks
     if (quirk.type & QUIRK_TYPE_SMP) {
-        // quirk.process();
+        // quirk_process(QUIRK_TYPE_SMP);
         smp_enable = false;
     }
 
     if (smp_enable) {
 #if defined(__i386__) || defined(__x86_64__)
-        (void)(find_cpus_in_madt() || find_cpus_in_floating_mp_struct());
+        if (!find_cpus_in_madt()) {
+            num_available_cpus = 1;     // drop a partial CPU list
+            (void)find_cpus_in_floating_mp_struct();
+        }
         if (apic != NULL || apic_x2apic) {
             verify_bsp_is_cpu0();
         }

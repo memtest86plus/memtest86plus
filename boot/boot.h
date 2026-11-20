@@ -116,6 +116,9 @@ extern uint8_t	ap_trampoline_end[];
 
 extern uint8_t	_stacks[];
 
+/* Calls fn with the stack pointer set to stack_top (16-byte aligned), then returns on the caller's stack. */
+extern void	call_on_stack(void (*fn)(void), void *stack_top);
+
 extern uint8_t	_end[];
 
 #endif /* ! __ASSEMBLY__ */

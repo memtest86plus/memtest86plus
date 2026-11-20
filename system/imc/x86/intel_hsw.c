@@ -74,7 +74,7 @@ void get_imc_config_intel_hsw(void)
     imc.width = (reg0 && reg1) ? 128 : 64;
 
     // Define offset (ie: which channel is really used)
-    offset = reg0 ? 0x0000 : 0x4000;
+    offset = reg0 ? 0x0000 : 0x0400;
 
     // CAS Latency (tCAS)
     ptr = (uintptr_t*)((uintptr_t)mmio_reg + offset + HSW_REG_TIMING_CAS);

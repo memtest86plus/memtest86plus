@@ -444,6 +444,9 @@ static void global_init(void)
 
     keyboard_init();
 
+    // Later allocations must not alter the memory map.
+    heap_reserve_runtime();
+
     display_init();
 
     error_init();
@@ -996,9 +999,9 @@ void main(void)
                 pass_num = 0;
                 start_pass = true;
                 if (!dummy_run) {
+                    error_init();
                     display_start_run();
                     badram_init();
-                    error_init();
                     serial_log_run_start();
                 }
                 // Snapshot the CPU selection for this run and build the NUMA domain list.

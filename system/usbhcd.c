@@ -2,6 +2,7 @@
 // Copyright (C) 2021-2022 Martin Whitaker.
 // Copyright (C) 2026 Sam Demeulemeester.
 
+#include "heap.h"
 #include "keyboard.h"
 #include "memrw.h"
 #include "pci.h"
@@ -81,7 +82,8 @@ static const hcd_methods_t methods = {
     .configure_bulk_ep   = NULL,
     .bulk_transfer       = NULL,
     .reset_bulk_ep       = NULL,
-    .scan_for_msd        = NULL
+    .scan_for_msd        = NULL,
+    .release_msd         = NULL
 };
 
 // All entries in this array must be initialised in order to generate the necessary relocation records.
@@ -110,6 +112,10 @@ static usb_msd_t usb_msd_info;
 // Index into hcd_list of the controller hosting the MSD. Stored as an index because
 // a cached usb_hcd_t pointer would go stale on relocation (see the note in reloc64.c).
 static int usb_msd_hcd_idx = -1;
+
+// Heap mark taken before the rescan that found the MSD.
+static bool      usb_msd_found_by_rescan = false;
+static uintptr_t usb_msd_heap_mark       = 0;
 
 //------------------------------------------------------------------------------
 // Public Variables
@@ -282,7 +288,7 @@ static void get_keyboard_info_from_descriptors(const uint8_t *desc_buffer, int d
             if (kbd && (endpoint->address & 0x80) && (endpoint->attributes & 0x3) == 0x3) {
                 kbd->endpoint_num    = endpoint->address & 0xf;
                 kbd->max_packet_size = endpoint->max_packet_size;
-                kbd->interval        = endpoint->interval;
+                kbd->interval        = endpoint->interval ? endpoint->interval : 1;
                 kbd = NULL;
 
                 *num_keyboards += 1;
@@ -1180,9 +1186,7 @@ void find_usb_keyboards(bool pause_if_none)
 
     hci_info_t hci_list[MAX_HCI];
 
-    if ((quirk.type & QUIRK_TYPE_USB) && (quirk.process != NULL)) {
-        quirk.process();
-    }
+    quirk_process(QUIRK_TYPE_USB);
 
     int num_hci = find_usb_controllers(hci_list);
 
@@ -1284,8 +1288,29 @@ bool usb_hcd_available(void)
     return num_hcd > 0;
 }
 
+bool usb_save_possible(void)
+{
+    if (usb_mass_storage_found) {
+        return true;
+    }
+    for (int i = 0; i < num_hcd; i++) {
+        if (hcd_list[i].methods->scan_for_msd != NULL) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void usb_forget_msd(void)
 {
+    if (usb_msd_found_by_rescan && usb_msd_hcd_idx >= 0) {
+        // Free the device memory once the controller has released it.
+        const usb_hcd_t *hcd = &hcd_list[usb_msd_hcd_idx];
+        if (hcd->methods->release_msd == NULL || hcd->methods->release_msd(hcd)) {
+            heap_rewind(HEAP_TYPE_LM_1, usb_msd_heap_mark);
+        }
+    }
+    usb_msd_found_by_rescan = false;
     usb_mass_storage_found = false;
     usb_msd_hcd_idx = -1;
     usb_msd_name[0] = '\0';
@@ -1306,6 +1331,7 @@ bool usb_scan_for_msd(void)
         }
         usb_forget_msd();
     }
+    uintptr_t heap_lm_mark = heap_mark(HEAP_TYPE_LM_1);
     usb_runtime_scan = true;
     for (int i = 0; i < num_hcd && !usb_mass_storage_found; i++) {
         const usb_hcd_t *hcd = &hcd_list[i];
@@ -1314,5 +1340,9 @@ bool usb_scan_for_msd(void)
         }
     }
     usb_runtime_scan = false;
+    if (usb_mass_storage_found) {
+        usb_msd_found_by_rescan = true;
+        usb_msd_heap_mark       = heap_lm_mark;
+    }
     return usb_mass_storage_found;
 }

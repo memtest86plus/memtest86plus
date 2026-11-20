@@ -40,16 +40,27 @@ typedef enum {
     QUIRK_UNHIDE_ASUS_SMBUS,
 } quirk_id_t;
 
+#define QUIRK_MAX_HANDLERS  4
+
 typedef struct {
     quirk_id_t   id;
     uint16_t     type;
     uint16_t     root_vid;
     uint16_t     root_did;
-    void (*process)(void);
+    int          num_handlers;
+    struct {
+        uint16_t type;
+        void   (*process)(void);
+    } handler[QUIRK_MAX_HANDLERS];
 } quirk_t;
 
 extern quirk_t quirk;
 
 void quirks_init(void);
+
+/**
+ * Runs the handlers of the quirks matching the given type(s), in detection order.
+ */
+void quirk_process(uint16_t type);
 
 #endif /* _QUIRK_H_ */

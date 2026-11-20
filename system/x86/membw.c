@@ -591,9 +591,7 @@ static void measure_memory_bandwidth(void)
 
 void membw_init(void)
 {
-    if (quirk.type & QUIRK_TYPE_MEM_SIZE) {
-        quirk.process();
-    }
+    quirk_process(QUIRK_TYPE_MEM_SIZE);
 
     if(enable_bench) {
         measure_memory_bandwidth();

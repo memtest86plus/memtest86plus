@@ -308,11 +308,20 @@ static uint16_t get_uhci_done(workspace_t *ws)
 
 static bool wait_for_uhci_done(workspace_t *ws)
 {
-    // Rely on the controller to timeout if the device doesn't respond.
+    // The controller only detects device errors: a device that NAKs forever needs a timeout.
+    uint16_t io_base = ws->io_base;
     uint16_t status = 0;
+    int timer = 5000 * MILLISEC / 10;
     while (true) {
         status = get_uhci_done(ws);
         if (status != 0) break;
+        if (timer-- == 0) {
+            // Unlink the transfer and clear what it raised meanwhile.
+            write32(&ws->qh[0].qe_link_ptr, UHCI_LP_TERMINATE);
+            usleep(2 * MILLISEC);
+            outw(UHCI_USBSTS_INT | UHCI_USBSTS_ERR, UHCI_USBSTS);
+            return false;
+        }
         usleep(10);
     }
 
@@ -383,8 +392,9 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 
             hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-            uint32_t error_mask = UHCI_TD_STALLED | UHCI_TD_DB_ERR | UHCI_TD_BABBLE | UHCI_TD_NAK_RX | UHCI_TD_CRC_TO | UHCI_TD_BS_ERR;
-            if (~status & error_mask) {
+            // Not NAK: it may stay set from the idle polls that preceded a good report.
+            uint32_t error_mask = UHCI_TD_STALLED | UHCI_TD_DB_ERR | UHCI_TD_BABBLE | UHCI_TD_CRC_TO | UHCI_TD_BS_ERR;
+            if (!(status & error_mask)) {
                 hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
                 if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
                     *prev_kbd_rpt = *kbd_rpt;

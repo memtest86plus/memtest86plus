@@ -301,21 +301,33 @@ static ohci_td_t *get_ohci_done_head(const workspace_t *ws)
     return (ohci_td_t *)done_head;
 }
 
-static bool wait_for_ohci_done(const workspace_t *ws, int td_expected)
+static bool wait_for_ohci_done(workspace_t *ws, int td_expected)
 {
     int td_completed = 0;
 
-    // Rely on the controller to timeout if the device doesn't respond.
+    // The controller only detects device errors: a device that NAKs forever needs a timeout.
+    int timer = 5000 * MILLISEC / 10;
     while (true) {
         ohci_td_t *td = get_ohci_done_head(ws);
-        while (td != NULL) {
+        // A done list can't be longer than the TD array: anything else is a corrupt list.
+        for (int i = 0; td != NULL; i++) {
             td_completed++;
-            if ((td->control & OHCI_TD_CC) != OHCI_TD_CC_NO_ERR) {
+            if (i == WS_TD_SIZE || (td->control & OHCI_TD_CC) != OHCI_TD_CC_NO_ERR) {
                 return false;
             }
             td = (ohci_td_t *)((uintptr_t)td->next_td);
         }
-        if (td_completed == td_expected) break;
+        if (td_completed >= td_expected) break;
+        if (timer-- == 0) {
+            // Stop the transfer and drop anything it completed meanwhile. A TD retired while a
+            // done list is waiting to be read is only reported a frame after that list is taken.
+            write32(&ws->ed[0].control, OHCI_ED_SKIP);
+            for (int i = 0; i < 3; i++) {
+                usleep(2 * MILLISEC);
+                (void)get_ohci_done_head(ws);
+            }
+            return false;
+        }
         usleep(10);
     }
 
@@ -369,7 +381,7 @@ static bool setup_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb_se
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
+    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_DLY, setup_pkt, sizeof(usb_setup_pkt_t));
     build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
     build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[2]);
     write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
@@ -381,8 +393,8 @@ static bool get_data_request(const usb_hcd_t *hcd, const usb_ep_t *ep, const usb
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
-    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_INT, setup_pkt, sizeof(usb_setup_pkt_t));
-    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_INT, buffer, length);
+    build_ohci_td(&ws->td[0], OHCI_TD_DP_SETUP | OHCI_TD_DT_USE_TD | OHCI_TD_DT_0 | OHCI_TD_DI_NO_DLY, setup_pkt, sizeof(usb_setup_pkt_t));
+    build_ohci_td(&ws->td[1], OHCI_TD_DP_IN    | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, buffer, length);
     build_ohci_td(&ws->td[2], OHCI_TD_DP_OUT   | OHCI_TD_DT_USE_TD | OHCI_TD_DT_1 | OHCI_TD_DI_NO_DLY, 0, 0);
     build_ohci_ed(&ws->ed[0], ohci_ed_control(ep), &ws->td[0], &ws->td[3]);
     write32(&ws->op_regs->command_status, OHCI_CMD_CLF);
@@ -394,8 +406,14 @@ static void poll_keyboards(const usb_hcd_t *hcd)
     workspace_t *ws = (workspace_t *)hcd->ws;
 
     ohci_td_t *td = get_ohci_done_head(ws);
-    while (td != NULL) {
+    for (int i = 0; td != NULL && i < WS_TD_SIZE; i++) {
         int kbd_idx = td - ws->td - 3;
+
+        // Ignore anything that is not a keyboard TD.
+        if (kbd_idx < 0 || kbd_idx >= MAX_KEYBOARDS) {
+            td = (ohci_td_t *)((uintptr_t)td->next_td);
+            continue;
+        }
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 

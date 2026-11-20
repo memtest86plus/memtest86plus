@@ -66,7 +66,7 @@ void get_imc_config_intel_adl(void)
     chb = ~chb ? (((chb >> 16) & 0x7F) + (chb & 0x7F)) : 0;
 
     offset = cha ? 0x0 : ADL_MMR_MC1_OFFSET;
-    imc.width = (cha && chb) ? 64 : 128;
+    imc.width = (cha && chb) ? 128 : 64;
 
     // Get Memory Type (ADL supports DDR4 & DDR5)
     cha = *(uintptr_t*)(mchbar_addr + offset + ADL_MMR_IC_DECODE) & 0x7;

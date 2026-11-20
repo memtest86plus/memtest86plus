@@ -433,7 +433,8 @@ static bool do_async_transfer(const workspace_t *ws, int num_tds)
             }
             usleep(10);
         }
-        if (qtd->status & (EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF)) {
+        // Only Halted means failure: the other error bits stay set after a retry that succeeded.
+        if (qtd->status & EHCI_QTD_HALTED) {
             ok = false;
         }
     }
@@ -504,8 +505,8 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-        uint8_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF;
-        if (~status & error_mask) {
+        // Only Halted means failure: the other error bits stay set after a retry that succeeded.
+        if (!(status & EHCI_QTD_HALTED)) {
             hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
             if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
                 *prev_kbd_rpt = *kbd_rpt;
@@ -517,6 +518,7 @@ static void poll_keyboards(const usb_hcd_t *hcd)
         uint16_t dt = kbd_qhd->data_length & EHCI_QTD_DT_MASK;
         build_ehci_qtd(kbd_qtd, kbd_qtd, EHCI_QTD_PID_IN, dt, kbd_rpt, sizeof(hid_kbd_rpt_t));
 
+        if (status & EHCI_QTD_HALTED) kbd_qhd->status = 0;  // a failed transfer halted the QH
         kbd_qhd->next_qtd_ptr = (uintptr_t)kbd_qtd;
     }
 }
@@ -619,6 +621,12 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
 
     usleep(100*MILLISEC);  // USB maximum device attach time
 
+    // Free the forgotten drive's port: the loop may return before reaching it.
+    if (ws->msd_port != 0) {
+        ws->port_in_use[ws->msd_port - 1] = false;
+        ws->msd_port = 0;
+    }
+
     // Scan the ports that are not already in use, looking for a USB drive.
     usb_ep_t keyboards[1];
     for (int port_idx = 0; port_idx < ws->num_ports; port_idx++) {
@@ -627,11 +635,9 @@ static bool scan_for_msd(const usb_hcd_t *hcd)
         // Check the port is powered up.
         if (~port_status & EHCI_PORT_SC_PP) continue;
 
-        // Skip ports owned by a previous scan, unless unplugged or hosting a since-forgotten drive.
+        // Skip ports owned by a previous scan, unless unplugged.
         if (ws->port_in_use[port_idx]) {
-            if (ws->msd_port == 1 + port_idx) {
-                ws->msd_port = 0;
-            } else if ((port_status & (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) == (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) {
+            if ((port_status & (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) == (EHCI_PORT_SC_CCS | EHCI_PORT_SC_PED)) {
                 continue;
             }
             ws->port_in_use[port_idx] = false;

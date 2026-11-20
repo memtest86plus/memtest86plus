@@ -220,6 +220,7 @@ int test_block_move(int my_cpu, int iterations)
                     "move $t0, %1\n\t"           // Source, pm (mid-point)
                     "move $t2, %2\n\t"
                     "addi.d $t2, $t2, -0x8\n\t" // Length, half_length (size of a half in QWORDS) minus 8 QWORDS (64 bytes)
+                    "beqz $t2, second_done\n\t" // Nothing to move for a 16 or 17 word chunk
                     "second_loop:\n\t"
                     "ld.d $t3, $t0, 0x0\n\t"
                     "st.d $t3, $t1, 0x0\n\t"
@@ -227,6 +228,7 @@ int test_block_move(int my_cpu, int iterations)
                     "addi.d $t1, $t1, 0x8\n\t"
                     "addi.d $t2, $t2, -0x1\n\t"
                     "bnez $t2, second_loop\n\t"
+                    "second_done:\n\t"
 
 
                     // Move last 8 QWORDS (64 bytes) of the second half to the start of the first half
@@ -261,11 +263,13 @@ int test_block_move(int my_cpu, int iterations)
                     "mov  x0, %1            \n\t"   // Source, pm (mid point)
                     "add  x1, %0, #64       \n\t"   // Destination, p (start point) plus 64 bytes
                     "sub  x2, %2, #8        \n\t"   // Length, half_length minus 8 words (64 bytes)
+                    "cbz  x2, 3f            \n\t"   // Nothing to move for a 16 or 17 word chunk
                     "1:                     \n\t"
                     "ldr  x3, [x0], #8      \n\t"
                     "str  x3, [x1], #8      \n\t"
                     "subs x2, x2, #1        \n\t"
                     "b.ne 1b                \n\t"
+                    "3:                     \n\t"
 
                     // Move the last 8 words (64 bytes) of the second half to the start of the first half
                     "mov  x1, %0            \n\t"   // Destination, p (start point)

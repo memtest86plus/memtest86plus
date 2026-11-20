@@ -161,12 +161,13 @@ ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
         // signals, so we should find the HLT opcode either at pc[0] or at pc[2]. If we find
         // it, adjust the interrupt return address to point to the following instruction.
         if (pc[0] == OPCODE_HLT || (pc[0] == OPCODE_JE && pc[2] == OPCODE_HLT)) {
-            uintptr_t *return_addr;
+            uintptr_t *return_addr = &trap_regs->ip;
+#ifdef __i386__
             if (cpuid_info.flags.lm == 1) {
+                // The long mode stub passes a copy of the frame.
                 return_addr = (uintptr_t *)(trap_regs->sp - 40);
-            } else {
-                return_addr = (uintptr_t *)(trap_regs->sp - 12);
             }
+#endif
             if (pc[2] == OPCODE_HLT) {
                 *return_addr += 3;
             } else {
@@ -188,12 +189,13 @@ ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
     if (trap_regs->vect == INT_GPF) {
         uint16_t *pc = (uint16_t *)trap_regs->ip;
         if (pc[0] == OPCODE_RDMSR) {
-            uintptr_t *return_addr;
+            uintptr_t *return_addr = &trap_regs->ip;
+#ifdef __i386__
             if (cpuid_info.flags.lm == 1) {
+                // The long mode stub passes a copy of the frame.
                 return_addr = (uintptr_t *)(trap_regs->sp - 40);
-            } else {
-                return_addr = (uintptr_t *)(trap_regs->sp - 12);
             }
+#endif
             *return_addr += 2;
             trap_regs->ax = 0;
             trap_regs->dx = 0;
