@@ -604,6 +604,21 @@ static uint8_t ich5_read_spd_byte(uint8_t smbus_adr, uint16_t spd_adr)
             if (adr_page != spd_page || last_adr != smbus_adr) {
                 uint8_t rc;
 
+                // The page switch is a write: check MR0/MR1 for a SPD5118/5108 hub, or it would corrupt the device.
+                uint8_t id[2];
+                for (int i = 0; i < 2; i++) {
+                    __outb((smbus_adr << 1) | I2C_READ, SMBHSTADD);
+                    __outb(SPD5_HUB_ID_MSB + i, SMBHSTCMD);
+                    __outb(SMBHSTCNT_BYTE_DATA, SMBHSTCNT);
+                    if (ich5_process() != 0) {
+                        return 0xFF;
+                    }
+                    id[i] = __inb(SMBHSTDAT0);
+                }
+                if (id[0] != 0x51 || (id[1] != 0x18 && id[1] != 0x08)) {
+                    return 0xFF;
+                }
+
                 // DDR5 SPD Bank switch can be achieved using 2 methods
                 if(((smbus_id >> 16) & 0xFFFF) == PCI_VID_INTEL) {
                     // On Intel, we use the process call method because the SMBUS write command

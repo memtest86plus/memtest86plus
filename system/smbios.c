@@ -189,10 +189,10 @@ static int parse_dmi(uint16_t numstructs)
         // Type 17 - Memory Device
         else if (header->type == 17 && header->length > offsetof(struct mem_dev, partnum)) {
             struct mem_dev *mdev = (struct mem_dev *) dmi;
-            // Multiple type 17 structs are allowed, with unpopulated slots sometimes
-            // reported as type 2 (unknown). If type is 0 (uninitialized) or 1/2 (previously
-            // initialized with unknown value) => set or overwrite the struct
-            if (dmi_memory_device_type <= 2) {
+            // Multiple type 17 structs are allowed. Take the memory type from the first populated
+            // slot that reports one: an empty slot may report another type (DDR4 + DDR5 boards)
+            // or type 1/2 (other/unknown).
+            if (mdev->size != 0 && dmi_memory_device_type <= 2) {
                 dmi_memory_device = mdev;
                 dmi_memory_device_type = mdev->type;
             }
