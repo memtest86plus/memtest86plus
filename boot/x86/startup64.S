@@ -474,6 +474,18 @@ int_handler:
 	addq	$16, %rsp		# discard the vector number and error code
 	iretq
 
+# void call_on_stack(void (*fn)(void), void *stack_top)
+
+	.globl	call_on_stack
+call_on_stack:
+	pushq	%rbp
+	movq	%rsp, %rbp		# rbp keeps our stack pointer across the call
+	movq	%rsi, %rsp
+	call	*%rdi
+	movq	%rbp, %rsp
+	popq	%rbp
+	ret
+
 # The interrupt descriptor table.
 
 	.align	4

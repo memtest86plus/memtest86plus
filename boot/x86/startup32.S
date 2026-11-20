@@ -613,6 +613,19 @@ int_handler:
 	popl	%esi
 	lret
 
+# void call_on_stack(void (*fn)(void), void *stack_top)
+
+	.globl	call_on_stack
+call_on_stack:
+	pushl	%ebp
+	movl	%esp, %ebp		# ebp keeps our stack pointer across the call
+	movl	8(%ebp), %eax
+	movl	12(%ebp), %esp
+	call	*%eax
+	movl	%ebp, %esp
+	popl	%ebp
+	ret
+
 # The interrupt descriptor table, used for both long mode and protected mode.
 
 	.align	4

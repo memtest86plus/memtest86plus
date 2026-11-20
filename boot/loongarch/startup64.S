@@ -404,6 +404,22 @@ SetException:
     # Run the application.
     bl  main
 
+# void call_on_stack(void (*fn)(void), void *stack_top)
+
+    .globl  call_on_stack
+call_on_stack:
+    addi.d  $sp, $sp, -16
+    st.d    $ra, $sp, 8
+    st.d    $fp, $sp, 0
+    move    $fp, $sp        # fp keeps our stack pointer across the call
+    move    $sp, $a1
+    jirl    $ra, $a0, 0
+    move    $sp, $fp
+    ld.d    $fp, $sp, 0
+    ld.d    $ra, $sp, 8
+    addi.d  $sp, $sp, 16
+    jr      $ra
+
 	.previous
 
 # Variables.

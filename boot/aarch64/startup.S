@@ -340,6 +340,18 @@ exception_common:
 	add	sp, sp, #CTX_SIZE
 	eret
 
+// void call_on_stack(void (*fn)(void), void *stack_top)
+
+	.globl	call_on_stack
+call_on_stack:
+	stp	x29, x30, [sp, #-16]!
+	mov	x29, sp			// x29 keeps our stack pointer across the call
+	mov	sp, x1
+	blr	x0
+	mov	sp, x29
+	ldp	x29, x30, [sp], #16
+	ret
+
 	.previous
 
 // Variables.
