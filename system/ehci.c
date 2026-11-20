@@ -433,7 +433,8 @@ static bool do_async_transfer(const workspace_t *ws, int num_tds)
             }
             usleep(10);
         }
-        if (qtd->status & (EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF)) {
+        // Only Halted means failure: the other error bits stay set after a retry that succeeded.
+        if (qtd->status & EHCI_QTD_HALTED) {
             ok = false;
         }
     }
@@ -504,8 +505,8 @@ static void poll_keyboards(const usb_hcd_t *hcd)
 
         hid_kbd_rpt_t *kbd_rpt = &ws->kbd_rpt[kbd_idx];
 
-        uint8_t error_mask = EHCI_QTD_HALTED | EHCI_QTD_DB_ERR | EHCI_QTD_BABBLE | EHCI_QTD_TR_ERR | EHCI_QTD_MMF;
-        if (!(status & error_mask)) {
+        // Only Halted means failure: the other error bits stay set after a retry that succeeded.
+        if (!(status & EHCI_QTD_HALTED)) {
             hid_kbd_rpt_t *prev_kbd_rpt = &ws->prev_kbd_rpt[kbd_idx];
             if (process_usb_keyboard_report(hcd, kbd_rpt, prev_kbd_rpt)) {
                 *prev_kbd_rpt = *kbd_rpt;
