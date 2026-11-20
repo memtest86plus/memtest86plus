@@ -16,6 +16,8 @@
 // An arbitrary value that is unlikely to appear in a stack frame.
 #define STACK_CANARY    UINT32_C(0x446D6153)
 
+#define UI_STACK_SIZE   8192
+
 //------------------------------------------------------------------------------
 // Variables
 //------------------------------------------------------------------------------
@@ -25,6 +27,11 @@ int local_bytes_used = 0;
 // Whether each stack canary is currently valid. The stack area is not
 // preserved across program relocations, hence the arm/disarm cycle.
 static bool canary_armed[MAX_CPUS];
+
+// Stack shared by the APs for the keyboard and menu code, too deep for an AP stack slot.
+static uint8_t  ui_stack[UI_STACK_SIZE] __attribute__((aligned(16)));
+static bool     ui_stack_busy = false;
+static int      ui_stack_overflow_cpu = -1;
 
 //------------------------------------------------------------------------------
 // Private Functions
@@ -74,5 +81,23 @@ int stack_canary_check(void)
             return i;
         }
     }
-    return -1;
+    return ui_stack_overflow_cpu;
+}
+
+void call_on_ui_stack(void (*fn)(void))
+{
+    int my_cpu = smp_my_cpu_num();
+
+    // The BSP stack is large enough. A busy UI stack means a nested call: stay on the current stack.
+    if (my_cpu == 0 || __atomic_test_and_set(&ui_stack_busy, __ATOMIC_ACQUIRE)) {
+        fn();
+        return;
+    }
+    uint32_t *canary = (uint32_t *)ui_stack;
+    *canary = STACK_CANARY;
+    call_on_stack(fn, ui_stack + UI_STACK_SIZE);
+    if (*canary != STACK_CANARY) {
+        ui_stack_overflow_cpu = my_cpu;
+    }
+    __atomic_clear(&ui_stack_busy, __ATOMIC_RELEASE);
 }

@@ -574,7 +574,7 @@ void restore_big_status(void)
     big_status_displayed = false;
 }
 
-void check_input(void)
+static void handle_input(void)
 {
     char input_key = get_key();
 
@@ -604,6 +604,12 @@ void check_input(void)
       default:
         break;
     }
+}
+
+void check_input(void)
+{
+    // The menu and USB save paths overflow an AP stack slot.
+    call_on_ui_stack(handle_input);
 }
 
 void set_scroll_lock(bool enabled)

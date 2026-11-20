@@ -24,8 +24,9 @@ typedef enum {
 
 /**
  * Low-memory heap pages kept for allocations made once testing has started.
+ * A USB save needs up to 11 (XHCI drive behind five hubs).
  */
-#define HEAP_RUNTIME_PAGES  16
+#define HEAP_RUNTIME_PAGES  12
 
 /**
  * Initialises the heaps.

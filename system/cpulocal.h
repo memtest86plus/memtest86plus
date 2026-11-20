@@ -56,8 +56,15 @@ void stack_canary_disarm_all(void);
 
 /**
  * Checks all armed stack canaries. Returns the number of the first CPU
- * whose canary has been overwritten, or -1 if all are intact.
+ * whose canary has been overwritten (or that overran the UI stack), or -1
+ * if all are intact.
  */
 int stack_canary_check(void);
+
+/**
+ * Calls fn on a stack shared by the APs, larger than their own stack slots.
+ * The BSP, and any caller finding that stack in use, runs fn on its own stack.
+ */
+void call_on_ui_stack(void (*fn)(void));
 
 #endif // CPULOCAL_H

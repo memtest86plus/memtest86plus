@@ -152,7 +152,9 @@
 
 #define XHCI_MAX_MSD_SLOTS              8       // drive + parent hubs
 
-#define DEVICE_WS_SIZE                  (XHCI_MAX_OP_CONTEXT_SIZE + 2 * sizeof(ep_tr_t))
+// A device workspace ends with the heap mark taken before it was allocated.
+#define DEVICE_WS_MARK_OFFS             (XHCI_MAX_OP_CONTEXT_SIZE + 2 * sizeof(ep_tr_t))
+#define DEVICE_WS_SIZE                  (DEVICE_WS_MARK_OFFS + sizeof(uintptr_t))
 
 //------------------------------------------------------------------------------
 // Types
@@ -351,7 +353,6 @@ typedef struct {
     uintptr_t           input_context_addr;
 
     // Transient values used during device enumeration and configuration.
-    uintptr_t           initial_heap_mark;
     uintptr_t           control_ep_tr_addr;
     uintptr_t           interrupt_ep_tr_addr;
 
@@ -383,11 +384,6 @@ typedef struct {
 //------------------------------------------------------------------------------
 // Private Functions
 //------------------------------------------------------------------------------
-
-static size_t round_up(size_t size, size_t alignment)
-{
-    return (size + alignment - 1) & ~(alignment - 1);
-}
 
 // The read64_ and write64_ functions provided here provide compatibility with both
 // 32-bit and 64-bit hosts and with both 32-bit and 64-bit XHCI controllers.
@@ -717,7 +713,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
     }
 
     // Record the heap state to allow us to free memory.
-    ws->initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
+    uintptr_t initial_heap_mark = heap_mark(HEAP_TYPE_LM_1);
 
     // Allocate and initialise a private workspace for this device.
     uintptr_t device_workspace_addr = heap_alloc(HEAP_TYPE_LM_1, DEVICE_WS_SIZE, PAGE_SIZE);
@@ -726,6 +722,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
     }
 
     memset((void *)device_workspace_addr, 0, DEVICE_WS_SIZE);
+    *(uintptr_t *)(device_workspace_addr + DEVICE_WS_MARK_OFFS) = initial_heap_mark;
 
     ws->control_ep_tr_addr   = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE;
     ws->interrupt_ep_tr_addr = device_workspace_addr + XHCI_MAX_OP_CONTEXT_SIZE + sizeof(ep_tr_t);
@@ -748,7 +745,7 @@ static int allocate_slot(const usb_hcd_t *hcd)
     return slot_id;
 
 free_memory:
-    heap_rewind(HEAP_TYPE_LM_1, ws->initial_heap_mark);
+    heap_rewind(HEAP_TYPE_LM_1, initial_heap_mark);
     return 0;
 }
 
@@ -771,6 +768,9 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
 {
     workspace_t *ws = (workspace_t *)hcd->ws;
 
+    // Disabling the slot clears its index entry.
+    uintptr_t device_workspace_addr = read64_(&ws->device_context_index[slot_id]);
+
     if (!disable_slot(ws, slot_id)) {
         return false;
     }
@@ -782,7 +782,10 @@ static bool release_slot(const usb_hcd_t *hcd, int slot_id)
         }
     }
 
-    heap_rewind(HEAP_TYPE_LM_1, ws->initial_heap_mark);
+    // Rewind to this slot's own mark: slots allocated and released since have moved the heap state.
+    if (device_workspace_addr != 0) {
+        heap_rewind(HEAP_TYPE_LM_1, *(uintptr_t *)(device_workspace_addr + DEVICE_WS_MARK_OFFS));
+    }
 
     return true;
 }
@@ -1423,26 +1426,27 @@ bool xhci_probe(uintptr_t base_addr, usb_hcd_t *hcd)
 
     memset((void *)scratchpad_vaddr, 0, scratchpad_size);
 
-    // Allocate and initialise the device context base address and scratchpad buffer arrays on the heap.
-    // Both need to be aligned on a 64 byte boundary.
+    // Allocate and initialise the device context base address array. Slots are allocated at run time,
+    // so this needs to be permanently mapped: use the low-memory heap.
     uintptr_t device_context_index_size = (1 + max_slots) * sizeof(uint64_t);
-    uintptr_t scratchpad_buffer_index_offs = round_up(device_context_index_size, 64);
-    uintptr_t scratchpad_buffer_index_size = num_scratchpad_buffers * sizeof(uint64_t);
-    uintptr_t device_context_index_paddr = heap_alloc(HEAP_TYPE_HM_1, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, 64);
+    uintptr_t device_context_index_paddr = heap_alloc(HEAP_TYPE_LM_1, device_context_index_size, 64);
     if (device_context_index_paddr == 0) {
         goto no_keyboards_found;
     }
-    uintptr_t device_context_index_vaddr = map_region(device_context_index_paddr, scratchpad_buffer_index_offs + scratchpad_buffer_index_size, true);
-    if (device_context_index_vaddr == 0) {
-        goto no_keyboards_found;
-    }
+    uint64_t *device_context_index = (uint64_t *)device_context_index_paddr;
+    memset(device_context_index, 0, device_context_index_size);
 
-    memset((void *)device_context_index_vaddr, 0, device_context_index_size);
-
-    uint64_t *device_context_index = (uint64_t *)device_context_index_vaddr;
+    // Allocate and initialise the scratchpad buffer array. This is only written here.
     if (num_scratchpad_buffers > 0) {
-        uintptr_t scratchpad_buffer_index_paddr = device_context_index_paddr + scratchpad_buffer_index_offs;
-        uintptr_t scratchpad_buffer_index_vaddr = device_context_index_vaddr + scratchpad_buffer_index_offs;
+        uintptr_t scratchpad_buffer_index_size = num_scratchpad_buffers * sizeof(uint64_t);
+        uintptr_t scratchpad_buffer_index_paddr = heap_alloc(HEAP_TYPE_HM_1, scratchpad_buffer_index_size, 64);
+        if (scratchpad_buffer_index_paddr == 0) {
+            goto no_keyboards_found;
+        }
+        uintptr_t scratchpad_buffer_index_vaddr = map_region(scratchpad_buffer_index_paddr, scratchpad_buffer_index_size, true);
+        if (scratchpad_buffer_index_vaddr == 0) {
+            goto no_keyboards_found;
+        }
         device_context_index[0] = scratchpad_buffer_index_paddr;
         uint64_t *scratchpad_buffer_index = (uint64_t *)scratchpad_buffer_index_vaddr;
         for (uintptr_t i = 0; i < num_scratchpad_buffers; i++) {
