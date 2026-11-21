@@ -279,6 +279,12 @@ void display_big_status(bool pass);
 
 void restore_big_status(void);
 
+/**
+ * Shows the result of a completed pass: the graphical result page if it is
+ * available, else the PASS/FAIL banner.
+ */
+void display_pass_result(bool pass);
+
 void check_input(void);
 
 /**

@@ -26,6 +26,7 @@
 
 #include "config.h"
 #include "error.h"
+#include "result_page.h"
 #include "build_version.h"
 
 #include "tests.h"
@@ -76,6 +77,8 @@ static int prev_sec = -1;               // previous second
 static bool timed_update_done = false;  // update cycle status
 
 bool big_status_displayed = false;
+
+static int scroll_lock_col = 48;
 static uint16_t popup_status_save_buffer[POP_STAT_W * POP_STAT_H];
 
 // The context owning the once-per-second UI (see ui_owner_is()).
@@ -187,7 +190,12 @@ void display_init(void)
     set_foreground_colour(palette.footer_foreground);
     set_background_colour(palette.footer_background);
     clear_screen_region(ROW_FOOTER, 0, ROW_FOOTER, SCREEN_WIDTH - 1);
-    prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
+    if (result_page_available()) {
+        prints(ROW_FOOTER, 0, " <ESC> Exit <F1> Config <F2> DIMMs <Space> Scroll Lock");
+        scroll_lock_col = 50;
+    } else {
+        prints(ROW_FOOTER, 0, " <ESC> Exit  <F1> Configuration  <Space> Scroll Lock");
+    }
     prints(ROW_FOOTER, 64, MT_VERSION "." GIT_HASH);
 #if defined (__x86_64__)
     prints(ROW_FOOTER, 74, ".x64");
@@ -528,7 +536,7 @@ void display_temperature(void)
 
 void display_big_status(bool pass)
 {
-    if (!enable_big_status || big_status_displayed) {
+    if (!enable_big_status || big_status_displayed || result_page_shown()) {
         return;
     }
 
@@ -570,8 +578,31 @@ void restore_big_status(void)
         return;
     }
 
-    restore_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
+    // An end-of-pass result page stands in for the banner.
+    if (result_page_shown()) {
+        result_page_hide();
+    } else {
+        restore_screen_region(POP_STATUS_REGION, popup_status_save_buffer);
+    }
     big_status_displayed = false;
+}
+
+void display_pass_result(bool pass)
+{
+    if (!enable_big_status) {
+        return;
+    }
+    // Redrawn here, while no test is running, rather than by the next timed update.
+    if (result_page_shown()) {
+        result_page_refresh();
+        return;
+    }
+    restore_big_status();
+    if (result_page_show()) {
+        big_status_displayed = true;
+    } else {
+        display_big_status(pass);
+    }
 }
 
 void check_input(void)
@@ -584,6 +615,9 @@ void check_input(void)
         restore_big_status();
         enable_big_status = false;
         return;
+    } else if (result_page_shown()) {
+        result_page_hide();
+        return;
     }
 
     switch (input_key) {
@@ -594,6 +628,9 @@ void check_input(void)
         break;
       case '1':
         config_menu(false);
+        break;
+      case '2':
+        result_page_show();
         break;
       case ' ':
         set_scroll_lock(!scroll_lock);
@@ -610,7 +647,7 @@ void set_scroll_lock(bool enabled)
 {
     scroll_lock = enabled;
     set_foreground_colour(palette.footer_foreground);
-    prints(ROW_FOOTER, 48, scroll_lock ? "unlock" : "lock  ");
+    prints(ROW_FOOTER, scroll_lock_col, scroll_lock ? "unlock" : "lock  ");
     set_foreground_colour(palette.foreground);
 }
 
@@ -698,6 +735,7 @@ static void ui_error_banner(void)
     if (err_banner_redraw && !big_status_displayed && error_count > 1) {
         display_big_status(false);
     }
+    result_page_refresh();
 }
 
 // Canary and ECC checks: they may take error_mutex (order error -> ui), so not under ui_mutex.
@@ -875,6 +913,7 @@ void do_tick(int my_cpu)
         if (err_banner_redraw && !big_status_displayed && error_count > 1) {
             display_big_status(false);
         }
+        result_page_refresh();
 
         // Check ECC Errors
         memctrl_poll_ecc();

@@ -18,6 +18,7 @@
 
 #include "error.h"
 #include "display.h"
+#include "result_page.h"
 #include "splash.h"
 
 #include "interrupt.h"
@@ -210,6 +211,7 @@ ISR_GP_REGS_ONLY void interrupt(struct trap_regs *trap_regs)
     spin_trylock(ui_mutex);
 
     splash_end();
+    result_page_hide();
 
     clear_message_area();
 

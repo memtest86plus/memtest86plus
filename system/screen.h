@@ -95,6 +95,11 @@ void screen_init(void);
 bool screen_hold(screen_fb_t *fb);
 
 /**
+ * Returns true if screen_hold() is available (native graphics mode).
+ */
+bool screen_can_hold(void);
+
+/**
  * Ends a successful screen_hold(): clears the framebuffer and repaints the text display.
  */
 void screen_release(void);

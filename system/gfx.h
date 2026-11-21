@@ -35,9 +35,9 @@ typedef struct {
 void gfx_init(const screen_fb_t *fb);
 
 /**
- * Clears the specified rectangle to black.
+ * Fills the specified rectangle with the specified colour.
  */
-void gfx_clear_rect(int x, int y, int width, int height);
+void gfx_fill_rect(int x, int y, int width, int height, uint32_t colour);
 
 /**
  * Draws the string's foreground pixels at (x,y) (top left),

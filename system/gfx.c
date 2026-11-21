@@ -100,17 +100,18 @@ void gfx_init(const screen_fb_t *info)
     fb = *info;
 }
 
-void gfx_clear_rect(int x, int y, int width, int height)
+void gfx_fill_rect(int x, int y, int width, int height, uint32_t colour)
 {
     if (x < 0) { width  += x; x = 0; }
     if (y < 0) { height += y; y = 0; }
     if (x + width  > fb.width)  width  = fb.width  - x;
     if (y + height > fb.height) height = fb.height - y;
 
+    uint32_t pixel = pack(colour);
     for (int row = y; row < y + height; row++) {
         uint32_t *line = (uint32_t *)fb.base + row * fb.stride;
         for (int col = x; col < x + width; col++) {
-            line[col] = 0;
+            line[col] = pixel;
         }
     }
 }

@@ -84,7 +84,7 @@ void splash_status(const char *message)
 {
     if (!active) return;
 
-    gfx_clear_rect(0, status_row, fb.width, FONT_HEIGHT * text_scale);
+    gfx_fill_rect(0, status_row, fb.width, FONT_HEIGHT * text_scale, 0);
     draw_centred_text(status_row, STATUS_COLOUR, message);
 }
 
@@ -92,8 +92,8 @@ void splash_notice(const char *message)
 {
     if (!active) return;
 
-    gfx_clear_rect(0, status_row, fb.width, FONT_HEIGHT * text_scale);
-    gfx_clear_rect(0, notice_row, fb.width, FONT_HEIGHT * text_scale);
+    gfx_fill_rect(0, status_row, fb.width, FONT_HEIGHT * text_scale, 0);
+    gfx_fill_rect(0, notice_row, fb.width, FONT_HEIGHT * text_scale, 0);
     draw_centred_text(notice_row, STATUS_COLOUR, message);
 }
 

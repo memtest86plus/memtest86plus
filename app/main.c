@@ -1169,10 +1169,8 @@ void main(void)
             display_pass_count(pass_num);
             if (error_count == 0) {
                 display_status("Pass   ");
-                display_big_status(true);
-            } else {
-                display_big_status(false);
             }
+            display_pass_result(error_count == 0);
         }
     }
 }

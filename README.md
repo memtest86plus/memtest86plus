@@ -192,7 +192,8 @@ recognised:
   * nobench
     * disables the integrated memory benchmark
   * nobigstatus
-    * disables the big PASS/FAIL pop-up status display
+    * disables the big PASS/FAIL pop-up status display (and the automatic
+      display of the DIMM result page)
   * nodimmdecode
     * disables the attribution of errors to DIMM slots
   * nosm
@@ -346,7 +347,9 @@ At startup, and when running tests, Memtest86+ responds to the following keys:
   * F1
     * enters the configuration menu
   * F2
-    * toggles use of multiple CPU cores (SMP), at startup only
+    * toggles use of multiple CPU cores (SMP), at startup
+    * shows the DIMM result page, when running tests (x86-64 native
+      graphics mode only)
   * Space
     * toggles scroll lock (stops/starts error message scrolling)
   * Enter
@@ -514,6 +517,26 @@ fault to be determined. The bus stress test (test 3) also does not contribute,
 as its errors are typically transient interface faults rather than bad cells.
 The rowhammer test (test 11) likewise does not contribute, as a hammer-induced
 flip does not mean the address is a defective cell under normal use.
+
+### DIMM Result Page
+
+On x86-64, when booted in UEFI mode with the native screen resolution, a
+graphical page shows the memory slots reported by the BIOS and their state.
+It replaces the PASS/FAIL pop-up at the end of each pass, until dismissed by
+a key press, and can be shown at any time with the F2 key.
+
+  * a module the errors were attributed to is drawn in red, with its error
+    count
+  * when no error could be attributed to a module, all the modules are drawn
+    in amber, as suspects
+  * the other modules are drawn in green, and empty slots as an outline
+
+Errors are attributed to a module when a single module is installed, or when
+the memory controller configuration can be decoded (currently Intel 6th to
+11th generation Core desktop processors with identical DDR3 or DDR4 modules,
+and readable SPD data). The slot names are the ones given by the BIOS, which
+normally match the markings on the motherboard. The `nodimmdecode` boot
+option disables the decoding.
 
 ## Trouble-shooting Memory Errors
 

@@ -452,6 +452,11 @@ void screen_init(void)
     }
 }
 
+bool screen_can_hold(void)
+{
+    return native_fb.base != 0;
+}
+
 bool screen_hold(screen_fb_t *fb)
 {
     if (native_fb.base == 0 || screen_held) {

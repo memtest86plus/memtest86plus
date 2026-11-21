@@ -95,6 +95,7 @@ APP_OBJS = app/badram.o \
            app/error.o \
            app/main.o \
            app/reports.o \
+           app/result_page.o \
            app/splash.o \
            app/splash_logo.o \
            app/x86/interrupt.o
