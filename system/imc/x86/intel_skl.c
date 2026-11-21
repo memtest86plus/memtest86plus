@@ -19,8 +19,15 @@
 #define SKL_MMR_TIMINGS         0x4000
 #define SKL_MMR_SCHEDULER_CONF  0x401C
 #define SKL_MMR_TIMING_CAS      0x4070
+#define SKL_MMR_MAD_INTER       0x5000
+#define SKL_MMR_MAD_INTRA_CH0   0x5004
+#define SKL_MMR_MAD_INTRA_CH1   0x5008
 #define SKL_MMR_MAD_CHAN0       0x500C
 #define SKL_MMR_MAD_CHAN1       0x5010
+#define SKL_MMR_CHANNEL_HASH    0x5024
+#define SKL_MMR_CHANNEL_EHASH   0x5028
+#define ICL_MMR_REMAPBASE       0x5090
+#define ICL_MMR_REMAPLIMIT      0x5098
 #define SKL_MMR_SA_PERF_STATUS  0x5918
 #define SKL_MMR_DRAM_CLOCK      0x5E00
 
@@ -28,6 +35,52 @@
 
 #define SKL_MMR_BASE_MASK       0x7FFFFF8000
 #define SKL_MMR_MAD_IN_USE_MASK 0x003F003F
+
+#define SKL_PCI_REMAPBASE       0x90
+#define SKL_PCI_REMAPLIMIT      0x98
+#define SKL_PCI_TOM             0xA0
+#define SKL_PCI_TOUUD           0xA8
+#define SKL_PCI_TOLUD           0xBC
+
+static uint32_t mch_read32(uintptr_t mchbar_addr, uint32_t offset)
+{
+    return *(volatile uint32_t *)(mchbar_addr + offset);
+}
+
+static uint64_t mch_read64(uintptr_t mchbar_addr, uint32_t offset)
+{
+    return mch_read32(mchbar_addr, offset) | (uint64_t)mch_read32(mchbar_addr, offset + 4) << 32;
+}
+
+static uint64_t pci_read64(int reg)
+{
+    return pci_config_read32(0, 0, 0, reg) | (uint64_t)pci_config_read32(0, 0, 0, reg + 4) << 32;
+}
+
+// DIMM decoder registers (datasheets vol. 2: 332688 / 337345 for SKL, 636761 for RKL). On SKL the
+// hash registers are not documented: read at their RKL offsets, the decoder uses them in hash mode only.
+void get_mad_intel(uintptr_t mchbar_addr, intel_mad_layout_t layout)
+{
+    intel_mad.layout       = layout;
+    intel_mad.mad_inter    = mch_read32(mchbar_addr, SKL_MMR_MAD_INTER);
+    intel_mad.mad_intra[0] = mch_read32(mchbar_addr, SKL_MMR_MAD_INTRA_CH0);
+    intel_mad.mad_intra[1] = mch_read32(mchbar_addr, SKL_MMR_MAD_INTRA_CH1);
+    intel_mad.mad_dimm[0]  = mch_read32(mchbar_addr, SKL_MMR_MAD_CHAN0);
+    intel_mad.mad_dimm[1]  = mch_read32(mchbar_addr, SKL_MMR_MAD_CHAN1);
+    intel_mad.ch_hash      = mch_read32(mchbar_addr, SKL_MMR_CHANNEL_HASH);
+    intel_mad.ch_ehash     = mch_read32(mchbar_addr, SKL_MMR_CHANNEL_EHASH);
+    if (layout == INTEL_MAD_SKL) {
+        intel_mad.remap_base  = pci_read64(SKL_PCI_REMAPBASE);
+        intel_mad.remap_limit = pci_read64(SKL_PCI_REMAPLIMIT);
+    } else {
+        intel_mad.remap_base  = mch_read64(mchbar_addr, ICL_MMR_REMAPBASE);
+        intel_mad.remap_limit = mch_read64(mchbar_addr, ICL_MMR_REMAPLIMIT);
+    }
+    intel_mad.tom          = pci_read64(SKL_PCI_TOM);
+    intel_mad.touud        = pci_read64(SKL_PCI_TOUUD);
+    intel_mad.tolud        = pci_config_read32(0, 0, 0, SKL_PCI_TOLUD);
+    intel_mad.valid        = intel_mad_view(&intel_mad, &imc_view);
+}
 
 void get_imc_config_intel_skl(void)
 {
@@ -52,6 +105,8 @@ void get_imc_config_intel_skl(void)
 #endif
 
     uintptr_t mchbar_addr = map_region(mmio_reg, SKL_MMR_WINDOW_RANGE, false);
+
+    get_mad_intel(mchbar_addr, INTEL_MAD_SKL);
 
     // Get DRAM Ratio (QCLK_RATIO, bit 7 = 100 MHz reference instead of 133 MHz)
     ptr = (uintptr_t*)(mchbar_addr + SKL_MMR_SA_PERF_STATUS);

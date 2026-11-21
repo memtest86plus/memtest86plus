@@ -105,7 +105,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
                     testword_t expect = pattern;
                     testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
-                        data_error(p, expect, actual, true);
+                        data_error(p, expect, actual, ERR_BADRAM | ERR_LOCATE);
                     }
                     write_word(p, ~expect);
                     pattern = pattern << 1 | pattern >> (TESTWORD_WIDTH - 1);  // rotate left
@@ -146,7 +146,7 @@ int test_mov_inv_walk1(int my_cpu, int iterations, int offset, bool inverse)
                     testword_t expect = pattern;
                     testword_t actual = read_word(p);
                     if (unlikely(actual != expect)) {
-                        data_error(p, expect, actual, true);
+                        data_error(p, expect, actual, ERR_BADRAM | ERR_LOCATE);
                     }
                     write_word(p, ~expect);
                 } while (p-- > ps); // test before decrement in case pointer overflows

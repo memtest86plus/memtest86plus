@@ -54,6 +54,8 @@ void get_imc_config_intel_icl(void)
 
     uintptr_t mchbar_addr = map_region(mmio_reg, ICL_MMR_WINDOW_RANGE, false);
 
+    get_mad_intel(mchbar_addr, INTEL_MAD_ICL);
+
     imc.type = "DDR4";
 
     // Get SoC Base Clock

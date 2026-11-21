@@ -107,7 +107,7 @@ static void burst_interleave(testword_t *pw, size_t nw, vec_state_t *stw,
         }
         size_t kr = (nr < burst_blocks) ? nr : burst_blocks;
         if (kr > 0) {
-            vec_check_fwd(str, pr, kr, false, false);
+            vec_check_fwd(str, pr, kr, false, ERR_LOCATE | ERR_NO_CHIP);
             pr += kr * VEC_LANES;
             nr -= kr;
         }
@@ -143,14 +143,14 @@ static int do_sweep(int my_cpu, int iteration, bool second, size_t burst_blocks,
             for (testword_t *q = start; q < bstart && q <= end; q++) {
                 testword_t actual = read_word(q);
                 if (iteration > 0 && unlikely(actual != epat_prev)) {
-                    data_error(q, epat_prev, actual, false);
+                    data_error(q, epat_prev, actual, ERR_LOCATE | ERR_NO_CHIP);
                 }
                 write_word(q, epat_cur);
             }
             for (testword_t *q = bstart + nbody; q <= end; q++) {
                 testword_t actual = read_word(q);
                 if (iteration > 0 && unlikely(actual != epat_prev)) {
-                    data_error(q, epat_prev, actual, false);
+                    data_error(q, epat_prev, actual, ERR_LOCATE | ERR_NO_CHIP);
                 }
                 write_word(q, epat_cur);
             }

@@ -317,7 +317,7 @@ int test_block_move(int my_cpu, int iterations)
                 testword_t p0 = read_word(p + 0);
                 testword_t p1 = read_word(p + 1);
                 if (unlikely(p0 != p1)) {
-                    data_error(p, p0, p1, false);
+                    data_error(p, p0, p1, 0);
                 }
             } while (p <= (pe - 2) && (p += 2)); // test before increment in case pointer overflows
             do_tick(my_cpu);

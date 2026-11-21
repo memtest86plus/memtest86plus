@@ -47,6 +47,10 @@ typedef struct spd_infos {
     uint16_t    tRP;
     uint16_t    tRAS;
     uint16_t    tRC;
+    uint8_t     ranks;      // package ranks (per sub-channel on DDR5), 0 = unknown
+    uint8_t     dev_width;  // SDRAM I/O width (4, 8, 16, 32), 0 = unknown
+    uint8_t     bus_width;  // primary bus width per (sub-)channel, ECC excluded
+    uint32_t    serial;     // module serial number, SPD byte order (MSB = first byte)
 } spd_info;
 
 typedef struct ram_infos {

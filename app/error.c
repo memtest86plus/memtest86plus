@@ -19,6 +19,7 @@
 
 #include "badram.h"
 #include "config.h"
+#include "dimm_err.h"
 #include "display.h"
 #include "test.h"
 
@@ -152,7 +153,7 @@ static bool update_error_info(testword_t page, testword_t offset, uintptr_t addr
     return update_stats;
 }
 
-static void common_err(error_type_t type, uintptr_t addr, testword_t good, testword_t bad, bool use_for_badram)
+static void common_err(error_type_t type, uintptr_t addr, testword_t good, testword_t bad, uint8_t flags)
 {
     // Lock order: error_mutex, then ui_mutex. The ISR trylocks both, so a fault in here still
     // reaches the reboot prompt.
@@ -192,7 +193,7 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
     bool new_address = (type != NEW_MODE);
 
     bool new_badram = false;
-    if (error_mode >= ERROR_MODE_BADRAM && use_for_badram) {
+    if (error_mode >= ERROR_MODE_BADRAM && (flags & ERR_BADRAM)) {
         new_badram = badram_insert(page, offset);
     }
 
@@ -204,6 +205,9 @@ static void common_err(error_type_t type, uintptr_t addr, testword_t good, testw
         } else {
             if (error_count < ERROR_LIMIT) {
                 error_count++;
+                if (flags & ERR_LOCATE) {
+                    dimm_err_insert(((uint64_t)page << PAGE_SHIFT) | offset);
+                }
             }
             if (test_list[test_num].errors < INT_MAX) {
                 test_list[test_num].errors++;
@@ -357,14 +361,16 @@ void error_init(void)
     error_info.last_xor         = 0;
 
     error_count = 0;
+
+    dimm_err_init();
 }
 
 void addr_error(testword_t *addr1, testword_t *addr2, testword_t good, testword_t bad)
 {
-    common_err(ADDR_ERROR, (uintptr_t)addr1, good, bad, false); (void)addr2;
+    common_err(ADDR_ERROR, (uintptr_t)addr1, good, bad, ERR_LOCATE | ERR_NO_CHIP); (void)addr2;
 }
 
-void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_badram)
+void data_error(testword_t *addr, testword_t good, testword_t bad, uint8_t flags)
 {
 #if USB_WORKAROUND
     /* Skip any errors that appear to be due to the BIOS using location
@@ -376,12 +382,12 @@ void data_error(testword_t *addr, testword_t good, testword_t bad, bool use_for_
         return;
     }
 #endif
-    common_err(DATA_ERROR, (uintptr_t)addr, good, bad, use_for_badram);
+    common_err(DATA_ERROR, (uintptr_t)addr, good, bad, flags);
 }
 
 void ecc_error()
 {
-    common_err(CECC_ERROR, ecc_status.addr, 0, 0, false);
+    common_err(CECC_ERROR, ecc_status.addr, 0, 0, 0);
     error_update();
 }
 
@@ -390,7 +396,7 @@ void parity_error(void)
 {
     // We don't know the real address that caused the parity error,
     // so use the last recorded test address.
-    common_err(PARITY_ERROR, test_addr[my_cpu_num()], 0, 0, false);
+    common_err(PARITY_ERROR, test_addr[my_cpu_num()], 0, 0, 0);
 }
 #endif
 
@@ -399,7 +405,7 @@ void error_update(void)
     if (error_count > 0 || error_count_cecc > 0) {
         // common_err() takes error_mutex then ui_mutex: not under ui_mutex.
         if (error_mode != last_error_mode) {
-            common_err(NEW_MODE, 0, 0, 0, false);
+            common_err(NEW_MODE, 0, 0, 0, 0);
         }
         spin_lock(ui_mutex);
         if (error_mode == ERROR_MODE_SUMMARY && test_list[test_num].errors > 0) {

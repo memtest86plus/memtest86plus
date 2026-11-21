@@ -41,6 +41,17 @@ typedef struct __attribute__((packed)) ecc_status {
 } ecc_info_t;
 
 /**
+ * Location of a physical address in the DRAM topology (DIMM decoder).
+ */
+
+typedef struct {
+    uint8_t     mc;         // memory controller
+    uint8_t     ch;         // channel within MC
+    uint8_t     dimm;       // DIMM within channel
+    uint8_t     slot;       // spd_slot_cache[] index
+} dram_loc_t;
+
+/**
  * Current DRAM configuration of the Integrated Memory Controller
  */
 
@@ -55,5 +66,23 @@ extern ecc_info_t ecc_status;
 void memctrl_init(void);
 
 void memctrl_poll_ecc(void);
+
+/**
+ * Builds the DIMM slot topology and runs the decoder cross-checks (IMC vs
+ * SPD). Call after the SPD data has been read.
+ */
+void memctrl_decode_init(void);
+
+/**
+ * Decodes a physical address to its DIMM location. Returns false if the
+ * decoder is off or the address cannot be attributed. Pure computation,
+ * callable from any CPU.
+ */
+bool memctrl_decode_addr(uint64_t pa, dram_loc_t *loc);
+
+/**
+ * Returns a short decoder status, e.g. "unsupported" or "off: IMC/SPD mismatch".
+ */
+const char *memctrl_decode_status(void);
 
 #endif // MEMCTRL_H

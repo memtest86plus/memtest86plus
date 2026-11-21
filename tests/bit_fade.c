@@ -175,7 +175,7 @@ static int pattern_check(int my_cpu, int round)
                     : invert;
                 testword_t actual = read_word(p);
                 if (unlikely(actual != expect)) {
-                    data_error(p, expect, actual, true);
+                    data_error(p, expect, actual, ERR_BADRAM | ERR_LOCATE);
                 }
             } while (p++ < pe); // test before increment in case pointer overflows
             do_tick(my_cpu);

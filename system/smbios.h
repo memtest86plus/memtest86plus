@@ -9,6 +9,9 @@
  * Copyright (C) 2004-2026 Samuel Demeulemeester.
  */
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #define DMI_SDR         0x0F
 #define DMI_RDRAM       0x11
 #define DMI_DDR         0x12
@@ -188,6 +191,35 @@ extern uint8_t dmi_memory_device_type;
 
 extern struct mem_dev *dmi_memory_devices[MAX_DMI_MEM_DEVICES];
 extern int dmi_num_memory_devices;
+
+/**
+ * Value copy of every SMBIOS Type 17 struct (empty sockets included), in
+ * table order, taken by smbios_init() before the tests overwrite the table.
+ */
+
+#define DMI_SLOT_SIZE_UNKNOWN   UINT32_MAX
+
+typedef struct {
+    uint32_t    size_mb;        // 0 = empty socket
+    char        locator[32];
+    char        bank[32];
+    char        serial[20];
+    char        part[24];
+} dmi_slot_info_t;
+
+extern dmi_slot_info_t dmi_slot_info[MAX_DMI_MEM_DEVICES];
+extern int dmi_num_slots;
+
+/**
+ * Matches each valid SPD slot (spd_slot_cache[]) to its Type 17 entry, by
+ * serial number, else by enumeration order when the populated counts agree.
+ */
+void smbios_map_spd_slots(void);
+
+/**
+ * Returns the dmi_slot_info[] index matched to an SPD slot, or -1 if none.
+ */
+int smbios_spd_slot_dmi(int slot);
 
 /**
  * Processor Information Structure (SMBIOS type 4)

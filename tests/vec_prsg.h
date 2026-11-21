@@ -14,6 +14,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "test.h"
 
@@ -105,20 +106,20 @@ void vec_fill(vec_state_t *st, testword_t *p, size_t nblocks, bool splat);
 /**
  * Checks nblocks vector blocks ascending from p against the lane sequences,
  * writing the complement behind itself (non-temporal on the SIMD tiers).
- * Mismatches are reported via data_error(..., use_for_badram) and fixed up.
+ * Mismatches are reported via data_error(..., err_flags) and fixed up.
  * The SIMD kernels process at least one block, so nblocks must be greater
  * than zero.
  */
-void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram);
+void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, uint8_t err_flags);
 
 /**
  * Checks nblocks vector blocks descending from p against the complement of
  * the lane sequences, stepping the states backwards and restoring the
  * original pattern behind itself (non-temporal on the SIMD tiers).
- * Mismatches are reported via data_error(..., use_for_badram) and fixed up.
+ * Mismatches are reported via data_error(..., err_flags) and fixed up.
  * The SIMD kernels process at least one block, so nblocks must be greater
  * than zero.
  */
-void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram);
+void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, uint8_t err_flags);
 
 #endif // VEC_PRSG_H

@@ -107,6 +107,7 @@ bool            enable_spd_crc     = true;
 bool            enable_bench       = true;
 bool            enable_mch_read    = true;
 bool            enable_numa        = true;
+bool            enable_dimm_decode = true;
 
 bool            enable_ecc_polling = false;
 
@@ -350,6 +351,8 @@ static void parse_option(const char *option, const char *params)
         enable_bench = false;
     } else if (strncmp(option, "nobigstatus", 12) == 0) {
         enable_big_status = false;
+    } else if (strncmp(option, "nodimmdecode", 13) == 0) {
+        enable_dimm_decode = false;
     } else if (strncmp(option, "noehci", 7) == 0) {
         usb_init_options |= USB_IGNORE_EHCI;
     } else if (strncmp(option, "nomch", 6) == 0) {

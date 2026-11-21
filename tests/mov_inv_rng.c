@@ -135,14 +135,14 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
             for (testword_t *q = start; q < bstart && q <= end; q++) {
                 testword_t actual = read_word(q);
                 if (unlikely(actual != epat)) {
-                    data_error(q, epat, actual, true);
+                    data_error(q, epat, actual, ERR_BADRAM | ERR_LOCATE);
                 }
                 write_word(q, ~epat);
             }
             for (testword_t *q = bstart + nbody; q <= end; q++) {
                 testword_t actual = read_word(q);
                 if (unlikely(actual != epat)) {
-                    data_error(q, epat, actual, true);
+                    data_error(q, epat, actual, ERR_BADRAM | ERR_LOCATE);
                 }
                 write_word(q, ~epat);
             }
@@ -168,7 +168,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)p;
-            vec_check_fwd(&st, p, ((size_t)(pe - p) + 1) / VEC_LANES, splat_round, true);
+            vec_check_fwd(&st, p, ((size_t)(pe - p) + 1) / VEC_LANES, splat_round, ERR_BADRAM | ERR_LOCATE);
             p = pe + 1;
             do_tick(my_cpu);
             BAILOUT;
@@ -193,7 +193,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
             for (testword_t *q = bstart + nbody; q <= end; q++) {
                 testword_t actual = read_word(q);
                 if (unlikely(actual != (testword_t)~epat)) {
-                    data_error(q, ~epat, actual, true);
+                    data_error(q, ~epat, actual, ERR_BADRAM | ERR_LOCATE);
                 }
                 write_word(q, epat);
             }
@@ -203,7 +203,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
                 for (testword_t *q = start; q < bstart && q <= end; q++) {
                     testword_t actual = read_word(q);
                     if (unlikely(actual != (testword_t)~epat)) {
-                        data_error(q, ~epat, actual, true);
+                        data_error(q, ~epat, actual, ERR_BADRAM | ERR_LOCATE);
                     }
                     write_word(q, epat);
                 }
@@ -230,7 +230,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
                 continue;
             }
             test_addr[my_cpu] = (uintptr_t)ps;
-            vec_check_rev(&st, ps, ((size_t)(p - ps) + 1) / VEC_LANES, splat_round, true);
+            vec_check_rev(&st, ps, ((size_t)(p - ps) + 1) / VEC_LANES, splat_round, ERR_BADRAM | ERR_LOCATE);
             p = ps - 1;
             do_tick(my_cpu);
             BAILOUT;
@@ -240,7 +240,7 @@ int test_mov_inv_rng(int my_cpu, bool splat_round)
             for (testword_t *q = start; q < bstart && q <= end; q++) {
                 testword_t actual = read_word(q);
                 if (unlikely(actual != (testword_t)~epat)) {
-                    data_error(q, ~epat, actual, true);
+                    data_error(q, ~epat, actual, ERR_BADRAM | ERR_LOCATE);
                 }
                 write_word(q, epat);
             }

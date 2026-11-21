@@ -193,6 +193,8 @@ recognised:
     * disables the integrated memory benchmark
   * nobigstatus
     * disables the big PASS/FAIL pop-up status display
+  * nodimmdecode
+    * disables the attribution of errors to DIMM slots
   * nosm
     * disables SMBUS/SPD parsing, DMI decoding and memory benchmark
   * nospdcrc

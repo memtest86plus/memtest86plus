@@ -36,6 +36,12 @@ uint8_t dmi_memory_device_type;
 struct mem_dev *dmi_memory_devices[MAX_DMI_MEM_DEVICES];
 int dmi_num_memory_devices = 0;
 
+dmi_slot_info_t dmi_slot_info[MAX_DMI_MEM_DEVICES];
+int dmi_num_slots = 0;
+
+// dmi_slot_info[] index + 1 of each SPD slot, 0 = none (BSS-safe default).
+static uint8_t spd_slot_dmi[MAX_SPD_SLOT];
+
 // Cached copies of board manufacturer and product name, saved at boot
 // before memory testing can overwrite the original SMBIOS table data.
 #define DMI_STRING_MAX  64
@@ -53,6 +59,7 @@ static char dmi_bios_version[DMI_STRING_MAX];
 static char dmi_bios_date[16];
 
 static bool copy_dmi_string(char *dst, size_t dst_size, struct tstruct_header *header, uint8_t string_idx);
+static uint64_t memdev_size_kb(const struct mem_dev *md);
 
 static char *get_tstruct_string(struct tstruct_header *header, uint16_t maxlen, int n)
 {
@@ -201,6 +208,16 @@ static int parse_dmi(uint16_t numstructs)
             if (mdev->size != 0 && dmi_num_memory_devices < MAX_DMI_MEM_DEVICES) {
                 dmi_memory_devices[dmi_num_memory_devices++] = mdev;
             }
+            // Value copy of every socket, for the DIMM slot labels.
+            if (dmi_num_slots < MAX_DMI_MEM_DEVICES) {
+                dmi_slot_info_t *si = &dmi_slot_info[dmi_num_slots++];
+                uint64_t size_kb = memdev_size_kb(mdev);
+                si->size_mb = (mdev->size == 0) ? 0 : (size_kb >= 1024) ? size_kb / 1024 : DMI_SLOT_SIZE_UNKNOWN;
+                copy_dmi_string(si->locator, sizeof(si->locator), &mdev->header, mdev->dev_locator);
+                copy_dmi_string(si->bank,    sizeof(si->bank),    &mdev->header, mdev->bank_locator);
+                copy_dmi_string(si->serial,  sizeof(si->serial),  &mdev->header, mdev->serialnum);
+                copy_dmi_string(si->part,    sizeof(si->part),    &mdev->header, mdev->partnum);
+            }
         }
 
         dmi += header->length;
@@ -213,6 +230,7 @@ static int parse_dmi(uint16_t numstructs)
             dmi_memory_device = NULL;
             dmi_memory_device_type = 0;
             dmi_num_memory_devices = 0;
+            dmi_num_slots = 0;
             return -1;
         }
 
@@ -230,6 +248,7 @@ static int parse_dmi(uint16_t numstructs)
             dmi_memory_device = NULL;
             dmi_memory_device_type = 0;
             dmi_num_memory_devices = 0;
+            dmi_num_slots = 0;
             return -1;
         }
     }
@@ -759,4 +778,96 @@ void print_dmi_memory_info(void)
     for (int i = 0; i < num_groups && i < MAX_SPD_SLOT; i++) {
         print_dmi_mem_group(&groups[i], ROW_SPD + i);
     }
+}
+
+// ---------------------------------------------
+// SPD slot to Type 17 matching (DIMM slot labels)
+// ---------------------------------------------
+
+// Most firmware prints the four SPD serial bytes as hex, in either byte order.
+static bool parse_dmi_serial(const char *str, uint32_t *serial)
+{
+    if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        str += 2;
+    }
+    size_t len = strlen(str);
+    if (len == 0 || len > 8) {
+        return false;
+    }
+    for (size_t i = 0; i < len; i++) {
+        if (!isxdigit(str[i])) {
+            return false;
+        }
+    }
+    *serial = hexstr2int(str);
+    return true;
+}
+
+static bool serial_match(const spd_info *spdi, const dmi_slot_info_t *si)
+{
+    uint32_t s = spdi->serial;
+    uint32_t dmi_serial;
+
+    if (s == 0 || s == UINT32_MAX || si->size_mb == 0 || !parse_dmi_serial(si->serial, &dmi_serial)) {
+        return false;
+    }
+    uint32_t swapped = (s >> 24) | ((s >> 8) & 0xFF00) | ((s << 8) & 0xFF0000) | (s << 24);
+    return dmi_serial == s || dmi_serial == swapped;
+}
+
+void smbios_map_spd_slots(void)
+{
+    int  num_spd = 0;
+    bool by_serial = true;
+
+    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
+        spd_slot_dmi[slot] = 0;
+        if (!spd_slot_cache[slot].isValid) {
+            continue;
+        }
+        num_spd++;
+        int match = -1;
+        for (int i = 0; i < dmi_num_slots; i++) {
+            if (serial_match(&spd_slot_cache[slot], &dmi_slot_info[i])) {
+                match = (match < 0) ? i : MAX_DMI_MEM_DEVICES;
+            }
+        }
+        for (int prev = 0; prev < slot; prev++) {
+            if (match >= 0 && spd_slot_dmi[prev] == match + 1) {
+                match = MAX_DMI_MEM_DEVICES;
+            }
+        }
+        if (match < 0 || match >= MAX_DMI_MEM_DEVICES) {
+            by_serial = false;
+        } else {
+            spd_slot_dmi[slot] = match + 1;
+        }
+    }
+    if (num_spd == 0 || by_serial) {
+        return;
+    }
+
+    // Fallback: firmware enumerates the sockets in SPD order (channel, then DIMM).
+    int num_dmi = 0;
+    for (int i = 0; i < dmi_num_slots; i++) {
+        if (dmi_slot_info[i].size_mb != 0) {
+            num_dmi++;
+        }
+    }
+    int i = 0;
+    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
+        spd_slot_dmi[slot] = 0;
+        if (num_dmi != num_spd || !spd_slot_cache[slot].isValid) {
+            continue;
+        }
+        while (dmi_slot_info[i].size_mb == 0) {
+            i++;
+        }
+        spd_slot_dmi[slot] = ++i;
+    }
+}
+
+int smbios_spd_slot_dmi(int slot)
+{
+    return (slot >= 0 && slot < MAX_SPD_SLOT) ? spd_slot_dmi[slot] - 1 : -1;
 }

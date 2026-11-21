@@ -276,7 +276,7 @@ static void rh_check(uintptr_t base, uintptr_t stride, const uint8_t *vic_off,
                 // Do NOT feed the BadRAM accumulator: an adversarial hammer flip
                 // does not mean this address is defective under normal use, so it
                 // must not mark the page bad. Report the error only.
-                data_error((testword_t *)p, vword, actual, false);
+                data_error((testword_t *)p, vword, actual, ERR_LOCATE);
             }
         }
     }

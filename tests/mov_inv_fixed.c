@@ -150,7 +150,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 do {
                     testword_t actual = read_word(p);
                     if (unlikely(actual != pattern1)) {
-                        data_error(p, pattern1, actual, true);
+                        data_error(p, pattern1, actual, ERR_BADRAM | ERR_LOCATE);
                     }
                     write_word(p, pattern2);
                 } while (p++ < pe); // test before increment in case pointer overflows
@@ -186,7 +186,7 @@ int test_mov_inv_fixed(int my_cpu, int iterations, testword_t pattern1, testword
                 do {
                     testword_t actual = read_word(p);
                     if (unlikely(actual != pattern2)) {
-                        data_error(p, pattern2, actual, true);
+                        data_error(p, pattern2, actual, ERR_BADRAM | ERR_LOCATE);
                     }
                     write_word(p, pattern1);
                 } while (p-- > ps); // test before decrement in case pointer overflows

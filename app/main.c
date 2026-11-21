@@ -484,6 +484,8 @@ static void global_init(void)
         post_display_init();
     }
 
+    memctrl_decode_init();
+
     // Stack slots are indexed by CPU number, and the barriers touch the slot of every available CPU.
     size_t program_size = (_stacks - _start) + BSP_STACK_SIZE + (num_available_cpus - 1) * AP_STACK_SIZE;
 

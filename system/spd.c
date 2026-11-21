@@ -164,6 +164,16 @@ static void read_sku(char *sku, uint8_t slot_idx, uint16_t offset, uint8_t max_l
     sku[sku_len] = '\0';
 }
 
+static uint32_t read_serial(uint8_t slot_idx, uint16_t offset)
+{
+    uint32_t serial = 0;
+
+    for (int i = 0; i < 4; i++) {
+        serial = serial << 8 | get_spd(slot_idx, offset + i);
+    }
+    return serial;
+}
+
 static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 {
     set_spd_type(spdi, "DDR5");
@@ -237,6 +247,11 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
             break;
         }
     }
+
+    // Module geometry (first SDRAM type)
+    spdi->dev_width = 4 << ((get_spd(slot_idx, 6) >> 5) & 3);
+    spdi->ranks     = ((get_spd(slot_idx, 234) >> 3) & 7) + 1;
+    spdi->bus_width = 8 << (get_spd(slot_idx, 235) & 3);
 
     // Compute Frequency (including XMP)
     uint16_t tCK, tCKtmp, tns;
@@ -338,6 +353,8 @@ static void parse_spd_ddr5(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 521, 30);
 
+    spdi->serial = read_serial(slot_idx, 517);
+
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 515));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 516));
 
@@ -361,6 +378,11 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
                               );
 
     spdi->hasECC = (((get_spd(slot_idx, 13) >> 3) & 1) == 1);
+
+    // Module geometry
+    spdi->dev_width = 4 << (get_spd(slot_idx, 12) & 3);
+    spdi->ranks     = ((get_spd(slot_idx, 12) >> 3) & 7) + 1;
+    spdi->bus_width = 8 << (get_spd(slot_idx, 13) & 3);
 
     // Module max clock
     float tns, tCK, ramfreq, fround;
@@ -460,6 +482,8 @@ static void parse_spd_ddr4(spd_info *spdi, uint8_t slot_idx)
 
     read_sku(spdi->sku, slot_idx, 329, 20);
 
+    spdi->serial = read_serial(slot_idx, 325);
+
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 323));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 324));
 
@@ -482,6 +506,11 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
     spdi->module_size *= ((get_spd(slot_idx, 7) >> 3) & 0x7) + 1;     // Number of Ranks: byte7[5:3]
 
     spdi->hasECC = (((get_spd(slot_idx, 8) >> 3) & 1) == 1);
+
+    // Module geometry
+    spdi->dev_width = 4 << (get_spd(slot_idx, 7) & 3);
+    spdi->ranks     = ((get_spd(slot_idx, 7) >> 3) & 7) + 1;
+    spdi->bus_width = 8 << (get_spd(slot_idx, 8) & 3);
 
     uint8_t tck = get_spd(slot_idx, 12);
     uint8_t tck2 = get_spd(slot_idx, 221);
@@ -618,6 +647,8 @@ static void parse_spd_ddr3(spd_info *spdi, uint8_t slot_idx)
     spdi->jedec_code |= get_spd(slot_idx, 118) & 0x7F;
 
     read_sku(spdi->sku, slot_idx, 128, 18);
+
+    spdi->serial = read_serial(slot_idx, 122);
 
     spdi->fab_year = bcd_to_ui8(get_spd(slot_idx, 120));
     spdi->fab_week = bcd_to_ui8(get_spd(slot_idx, 121));

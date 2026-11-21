@@ -135,7 +135,7 @@ int test_modulo_n(int my_cpu, int iterations, testword_t pattern1, testword_t pa
             do {
                 testword_t actual = read_word(p);
                 if (unlikely(actual != pattern1)) {
-                    data_error(p, pattern1, actual, true);
+                    data_error(p, pattern1, actual, ERR_BADRAM | ERR_LOCATE);
                 }
             } while ((pe - p) >= n && (p += n)); // test before increment in case pointer overflows
             do_tick(my_cpu);

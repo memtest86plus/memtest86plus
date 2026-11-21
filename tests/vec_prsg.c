@@ -111,14 +111,14 @@ static void vec_fill_scalar(vec_state_t *st, testword_t *p, size_t nblocks, bool
     }
 }
 
-static void vec_check_fwd_scalar(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram)
+static void vec_check_fwd_scalar(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, uint8_t err_flags)
 {
     for (size_t k = 0; k < nblocks; k++) {
         for (int l = 0; l < VEC_LANES; l++) {
             testword_t expect = st->lane[l];
             testword_t actual = read_word(&p[l]);
             if (unlikely(actual != expect)) {
-                data_error(&p[l], expect, actual, use_for_badram);
+                data_error(&p[l], expect, actual, err_flags);
             }
             write_word(&p[l], ~expect);
         }
@@ -131,7 +131,7 @@ static void vec_check_fwd_scalar(vec_state_t *st, testword_t *p, size_t nblocks,
     }
 }
 
-static void vec_check_rev_scalar(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram)
+static void vec_check_rev_scalar(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, uint8_t err_flags)
 {
     for (size_t k = nblocks; k-- > 0; ) {
         testword_t *q = p + k * VEC_LANES;
@@ -144,7 +144,7 @@ static void vec_check_rev_scalar(vec_state_t *st, testword_t *p, size_t nblocks,
             testword_t expect = ~st->lane[l];
             testword_t actual = read_word(&q[l]);
             if (unlikely(actual != expect)) {
-                data_error(&q[l], expect, actual, use_for_badram);
+                data_error(&q[l], expect, actual, err_flags);
             }
             write_word(&q[l], st->lane[l]);
         }
@@ -199,7 +199,7 @@ void vec_fill(vec_state_t *st, testword_t *p, size_t nblocks, bool splat)
     vec_fill_scalar(st, p, nblocks, splat);
 }
 
-void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram)
+void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, uint8_t err_flags)
 {
 #if defined(__x86_64__)
     if (simd_tier != SIMD_NONE) {
@@ -213,7 +213,7 @@ void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
             }
             // The scan stopped at a mismatching block. Report and fix it up,
             // then resume the scan on the remaining blocks.
-            vec_check_fwd_scalar(st, p, 1, splat, use_for_badram);
+            vec_check_fwd_scalar(st, p, 1, splat, err_flags);
             p += VEC_LANES;
             nblocks--;
         }
@@ -230,7 +230,7 @@ void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
             }
             // The scan stopped at a mismatching block. Report and fix it up,
             // then resume the scan on the remaining blocks.
-            vec_check_fwd_scalar(st, p, 1, splat, use_for_badram);
+            vec_check_fwd_scalar(st, p, 1, splat, err_flags);
             p += VEC_LANES;
             nblocks--;
         }
@@ -247,17 +247,17 @@ void vec_check_fwd(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
             }
             // The scan stopped at a mismatching block. Report and fix it up,
             // then resume the scan on the remaining blocks.
-            vec_check_fwd_scalar(st, p, 1, splat, use_for_badram);
+            vec_check_fwd_scalar(st, p, 1, splat, err_flags);
             p += VEC_LANES;
             nblocks--;
         }
         return;
     }
 #endif
-    vec_check_fwd_scalar(st, p, nblocks, splat, use_for_badram);
+    vec_check_fwd_scalar(st, p, nblocks, splat, err_flags);
 }
 
-void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, bool use_for_badram)
+void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, uint8_t err_flags)
 {
 #if defined(__x86_64__)
     if (simd_tier != SIMD_NONE) {
@@ -278,7 +278,7 @@ void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
                 testword_t expect = ~st->lane[l];
                 testword_t actual = read_word(&q[l]);
                 if (unlikely(actual != expect)) {
-                    data_error(&q[l], expect, actual, use_for_badram);
+                    data_error(&q[l], expect, actual, err_flags);
                 }
                 write_word(&q[l], st->lane[l]);
             }
@@ -302,7 +302,7 @@ void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
                 testword_t expect = ~st->lane[l];
                 testword_t actual = read_word(&q[l]);
                 if (unlikely(actual != expect)) {
-                    data_error(&q[l], expect, actual, use_for_badram);
+                    data_error(&q[l], expect, actual, err_flags);
                 }
                 write_word(&q[l], st->lane[l]);
             }
@@ -326,7 +326,7 @@ void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
                 testword_t expect = ~st->lane[l];
                 testword_t actual = read_word(&q[l]);
                 if (unlikely(actual != expect)) {
-                    data_error(&q[l], expect, actual, use_for_badram);
+                    data_error(&q[l], expect, actual, err_flags);
                 }
                 write_word(&q[l], st->lane[l]);
             }
@@ -336,5 +336,5 @@ void vec_check_rev(vec_state_t *st, testword_t *p, size_t nblocks, bool splat, b
         return;
     }
 #endif
-    vec_check_rev_scalar(st, p, nblocks, splat, use_for_badram);
+    vec_check_rev_scalar(st, p, nblocks, splat, err_flags);
 }

@@ -96,6 +96,7 @@ TST_OBJS = tests/addr_walk1.o \
 
 APP_OBJS = app/badram.o \
            app/config.o \
+           app/dimm_err.o \
            app/display.o \
            app/error.o \
            app/main.o \

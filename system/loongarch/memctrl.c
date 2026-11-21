@@ -11,6 +11,7 @@
 
 #include "config.h"
 #include "cpuinfo.h"
+#include "smbios.h"
 
 #include "memctrl.h"
 #include "imc/imc.h"
@@ -48,4 +49,20 @@ void memctrl_poll_ecc(void)
     if (!ecc_status.ecc_enabled) {
         return;
     }
+}
+
+void memctrl_decode_init(void)
+{
+    smbios_map_spd_slots();
+}
+
+bool memctrl_decode_addr(uint64_t pa, dram_loc_t *loc)
+{
+    (void)pa; (void)loc;
+    return false;
+}
+
+const char *memctrl_decode_status(void)
+{
+    return "unsupported platform";
 }
