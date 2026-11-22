@@ -12,6 +12,7 @@
 #include "config.h"
 #include "cpuinfo.h"
 #include "smbios.h"
+#include "spd.h"
 
 #include "memctrl.h"
 #include "imc/imc.h"
@@ -53,7 +54,9 @@ void memctrl_poll_ecc(void)
 
 void memctrl_decode_init(void)
 {
-    smbios_map_spd_slots();
+    static const uint8_t slot_order[MAX_SPD_SLOT] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+    smbios_map_spd_slots(slot_order);
 }
 
 bool memctrl_decode_addr(uint64_t pa, dram_loc_t *loc)

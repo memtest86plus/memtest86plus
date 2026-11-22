@@ -815,7 +815,7 @@ static bool serial_match(const spd_info *spdi, const dmi_slot_info_t *si)
     return dmi_serial == s || dmi_serial == swapped;
 }
 
-void smbios_map_spd_slots(void)
+void smbios_map_spd_slots(const uint8_t *slot_order)
 {
     int  num_spd = 0;
     bool by_serial = true;
@@ -847,7 +847,7 @@ void smbios_map_spd_slots(void)
         return;
     }
 
-    // Fallback: firmware enumerates the sockets in SPD order (channel, then DIMM).
+    // Fallback: firmware enumerates the sockets by channel, then DIMM, which is the order of slot_order.
     int num_dmi = 0;
     for (int i = 0; i < dmi_num_slots; i++) {
         if (dmi_slot_info[i].size_mb != 0) {
@@ -855,7 +855,8 @@ void smbios_map_spd_slots(void)
         }
     }
     int i = 0;
-    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
+    for (int n = 0; n < MAX_SPD_SLOT; n++) {
+        int slot = slot_order[n];
         spd_slot_dmi[slot] = 0;
         if (num_dmi != num_spd || !spd_slot_cache[slot].isValid) {
             continue;

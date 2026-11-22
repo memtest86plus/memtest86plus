@@ -208,7 +208,9 @@ void memctrl_poll_ecc(void)
 
 void memctrl_decode_init(void)
 {
-    smbios_map_spd_slots();
+    static const uint8_t slot_order[MAX_SPD_SLOT] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+    smbios_map_spd_slots(slot_order);
 
     decode_state = decode_check();
 }

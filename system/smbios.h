@@ -213,8 +213,10 @@ extern int dmi_num_slots;
 /**
  * Matches each valid SPD slot (spd_slot_cache[]) to its Type 17 entry, by
  * serial number, else by enumeration order when the populated counts agree.
+ * slot_order lists the MAX_SPD_SLOT SPD slots in the order firmware
+ * enumerates their sockets (channel, then DIMM).
  */
-void smbios_map_spd_slots(void);
+void smbios_map_spd_slots(const uint8_t *slot_order);
 
 /**
  * Returns the dmi_slot_info[] index matched to an SPD slot, or -1 if none.
