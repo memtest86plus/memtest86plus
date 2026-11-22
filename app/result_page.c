@@ -49,6 +49,8 @@
 #define MAX_SLOTS       MAX_DMI_MEM_DEVICES
 #define MAX_ROW_SLOTS   8                   // more slots are drawn on two rows
 
+#define MIN_LENGTH      48                  // shorter modules: optional text lines are dropped
+
 #define TEXT_LEN        96
 
 //------------------------------------------------------------------------------
@@ -82,6 +84,9 @@ static int          num_slots;
 static uint64_t     attributed;
 static uint64_t     ambiguous;
 static uint64_t     unattributed;
+static bool         board_names;
+static bool         show_bios_name;
+static bool         show_serial;
 
 static int          mod_x, mod_y;
 
@@ -305,6 +310,50 @@ static void build_model(void)
     }
 }
 
+// Firmware often names the sockets "DIMM 0" and "DIMM 1" in each bank "... CHANNEL A": gives the usual board
+// marking of such a socket ("A1", "A2"). Returns false for any other naming.
+static bool board_name(const dmi_slot_info_t *dmi, char *name)
+{
+    int len = strlen(dmi->bank);
+
+    if (strncmp(dmi->locator, "DIMM", 4) != 0) {
+        return false;
+    }
+    const char *digit = dmi->locator + ((dmi->locator[4] == ' ') ? 5 : 4);
+    if (digit[0] < '0' || digit[0] > '8' || digit[1] != '\0') {
+        return false;
+    }
+    while (len > 0 && dmi->bank[len - 1] == ' ') {
+        len--;
+    }
+    if (len < 9 || strncmp(dmi->bank + len - 9, "CHANNEL ", 8) != 0 || dmi->bank[len - 1] < 'A'
+        || dmi->bank[len - 1] > 'Z') {
+        return false;
+    }
+    name[0] = dmi->bank[len - 1];
+    name[1] = digit[0] + 1;
+    name[2] = '\0';
+    return true;
+}
+
+// The board markings are used when every socket has one and no two are the same.
+static bool check_board_names(void)
+{
+    char name[MAX_SLOTS][3];
+
+    for (int i = 0; i < num_slots; i++) {
+        if (slots[i].dmi < 0 || !board_name(&dmi_slot_info[slots[i].dmi], name[i])) {
+            return false;
+        }
+        for (int j = 0; j < i; j++) {
+            if (name[i][0] == name[j][0] && name[i][1] == name[j][1]) {
+                return false;
+            }
+        }
+    }
+    return num_slots > 0;
+}
+
 static const char *slot_bank(int i)
 {
     return (slots[i].dmi >= 0) ? dmi_slot_info[slots[i].dmi].bank : "";
@@ -335,13 +384,21 @@ static void draw_slot_text(int i, int cx, int y, int max_width, int scale, bool 
     int line = FONT_HEIGHT * scale + 6;
     char text[TEXT_LEN];
 
-    if (dmi != NULL) {
+    if (board_names) {
+        board_name(dmi, text);
+    } else if (dmi != NULL) {
         append_label(text, dmi->locator);
     } else {
         append_uint(text, append_str(text, 0, "SLOT "), slot->spd, 1);
     }
     draw_text(cx, y, max_width, scale, empty ? TEXT_DIM : TEXT_WHITE, text, true);
     y += line;
+
+    // The firmware name, under the board marking that replaces it.
+    if (show_bios_name) {
+        draw_text(cx, y, max_width, 1, TEXT_DIM, dmi->locator, true);
+        y += FONT_HEIGHT + 6;
+    }
 
     uint32_t size_mb = (slot->spd >= 0) ? spd_slot_cache[slot->spd].module_size : dmi->size_mb;
     if (!empty && size_mb != 0 && size_mb != DMI_SLOT_SIZE_UNKNOWN) {
@@ -352,12 +409,30 @@ static void draw_slot_text(int i, int cx, int y, int max_width, int scale, bool 
     y += line;
 
     // Sockets with the same locator are told apart by their bank, shown here if not in a heading.
-    if (dmi != NULL && !grouped && !unique_locator(i)) {
+    if (dmi != NULL && !grouped && !board_names && !unique_locator(i)) {
         draw_text(cx, y, max_width, 1, TEXT_DIM, dmi->bank, true);
     } else if (!empty) {
         draw_text(cx, y, max_width, 1, TEXT_DIM, (slot->spd >= 0) ? spd_slot_cache[slot->spd].sku : dmi->part, false);
     }
     y += FONT_HEIGHT + 6;
+
+    // Serial number: the SPD one, else the one given by the firmware.
+    uint32_t serial = (slot->spd >= 0) ? spd_slot_cache[slot->spd].serial : 0;
+    int len = append_str(text, 0, "S/N ");
+    if (serial != 0) {
+        for (int shift = 28; shift >= 0; shift -= 4) {
+            text[len++] = "0123456789ABCDEF"[(serial >> shift) & 0xF];
+        }
+        text[len] = '\0';
+    } else if (dmi != NULL) {
+        len = append_str(text, len, dmi->serial);
+    }
+    if (show_serial) {
+        if (!empty && len > 4) {
+            draw_text(cx, y, max_width, 1, TEXT_DIM, text, true);
+        }
+        y += FONT_HEIGHT + 6;
+    }
 
     switch (slot->state) {
       case SLOT_EMPTY:
@@ -391,6 +466,7 @@ static void draw(void)
     drawn_pass   = pass_num;
 
     build_model();
+    board_names = check_board_names();
 
     gfx_fill_rect(0, 0, fb.width, fb.height, BG);
 
@@ -485,10 +561,20 @@ static void draw(void)
     int gap = pitch / 2;
 
     int heading = grouped ? line + 14 : 0;
-    int slot_text = 3 * (line + 6) + FONT_HEIGHT + 6;
+    int slot_text = 3 * (line + 6) + (board_names ? 3 : 2) * (FONT_HEIGHT + 6);
     int row_height = (footer_y - line - y - heading) / rows;
 
     int length = row_height - slot_text - 12 - (rows - 1) * FONT_HEIGHT;
+
+    // Short screens: drop the serial number, then the firmware name, to keep room for the modules.
+    show_serial = (length >= MIN_LENGTH);
+    if (!show_serial) {
+        length += FONT_HEIGHT + 6;
+    }
+    show_bios_name = board_names && (length >= MIN_LENGTH);
+    if (board_names && !show_bios_name) {
+        length += FONT_HEIGHT + 6;
+    }
     int width  = pitch * 42 / 100;
     if (width > length * 10 / 42) {
         width = length * 10 / 42;

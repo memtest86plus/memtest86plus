@@ -543,8 +543,11 @@ of the modules. This is currently the case on:
     the Ryzen 3 8300G and Ryzen 5 8500G), with up to two modules per channel
 
 The slot names are the ones given by the BIOS, which normally match the
-markings on the motherboard. The `nodimmdecode` boot option disables the
-decoding.
+markings on the motherboard. When the BIOS only names them DIMM 0 and DIMM 1
+in each channel, the usual marking (A1, A2, B1, B2) is shown instead, with
+the BIOS name underneath. The slots are drawn in the order the BIOS lists
+them, which is not always their order on the motherboard: use the name to
+find a module. The `nodimmdecode` boot option disables the decoding.
 
 ## Trouble-shooting Memory Errors
 
