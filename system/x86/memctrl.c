@@ -26,6 +26,8 @@ imc_view_t imc_view;
 
 typedef enum {
     DECODE_UNSUPPORTED,
+    DECODE_BAD_MAP,
+    DECODE_BAD_TOPOLOGY,
     DECODE_DISABLED,
     DECODE_NO_SPD,
     DECODE_ASYMMETRIC,
@@ -34,63 +36,63 @@ typedef enum {
     DECODE_OK
 } decode_state_t;
 
+// SPD slot (SMBus address - 0x50) of a DIMM position, for two channels of two DIMMs.
+#define LAYOUT_CH_MAJOR     0x0     // 2 x channel + DIMM: Intel, AMD AM5
+#define LAYOUT_CH_SWAP      0x1     // controller channel 0 is channel B of the board (second address of each pair)
+#define LAYOUT_DIMM_MAJOR   0x2     // 2 x DIMM + channel: AMD AM4
+
+typedef uint8_t slot_layout_t;
+
 static decode_state_t decode_state;
+
+static slot_layout_t slot_layout;
+
+// SPD slot of each DIMM position, filled by the cross-check.
+static uint8_t slot_map[IMC_VIEW_MAX_MC][IMC_VIEW_MAX_CH][IMC_VIEW_MAX_DIMM];
 
 // ----------------------
 // -- Private functions --
 // ----------------------
 
-// Default topology: SMBus address 0x50 + n = channel n / 2, DIMM n % 2.
-static uint8_t topology_slot(uint8_t mc, uint8_t ch, uint8_t dimm)
+static uint8_t topology_slot(slot_layout_t layout, uint8_t mc, uint8_t ch, uint8_t dimm)
 {
-    return (mc * imc_view.n_ch + ch) * IMC_VIEW_MAX_DIMM + dimm;
+    uint8_t chan = mc * imc_view.n_ch + ch;
+
+    if (layout & LAYOUT_CH_SWAP) {
+        chan ^= 1;
+    }
+    if (layout & LAYOUT_DIMM_MAJOR) {
+        return dimm * imc_view.n_mc * imc_view.n_ch + chan;
+    }
+    return chan * IMC_VIEW_MAX_DIMM + dimm;
 }
 
-static decode_state_t decode_check(void)
+// The IMC geometry must match the SPD of the slot the layout assigns, with no SPD left over.
+// any_dimm: a DIMM alone in its channel may sit in either position (boards with one DIMM per channel).
+static decode_state_t check_view(slot_layout_t layout, bool any_dimm)
 {
-    const spd_info *ref = NULL;
     uint32_t slot_size[MAX_SPD_SLOT] = { 0 };
     uint64_t total_mb = 0;
 
-    if (!enable_dimm_decode) {
-        return DECODE_DISABLED;
-    }
-    if (imc_view.n_mc == 0 || imc_view.n_mc > IMC_VIEW_MAX_MC || imc_view.n_ch > IMC_VIEW_MAX_CH) {
-        return DECODE_UNSUPPORTED;
-    }
-
-    // Symmetric populations only.
-    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
-        const spd_info *spdi = &spd_slot_cache[slot];
-        if (!spdi->isValid) {
-            continue;
-        }
-        if (ref == NULL) {
-            ref = spdi;
-        }
-        if (spdi->module_size != ref->module_size || spdi->ranks != ref->ranks
-            || spdi->dev_width != ref->dev_width || spdi->bus_width != ref->bus_width) {
-            return DECODE_ASYMMETRIC;
-        }
-    }
-    if (ref == NULL || ref->dev_width == 0) {
-        return DECODE_NO_SPD;
-    }
-
-    // The IMC geometry must match the SPD of the slot the topology assigns.
     for (uint8_t mc = 0; mc < imc_view.n_mc; mc++) {
         for (uint8_t ch = 0; ch < imc_view.n_ch; ch++) {
+            const imc_dimm_view_t *views = imc_view.dimm[mc][ch];
             for (uint8_t dimm = 0; dimm < IMC_VIEW_MAX_DIMM; dimm++) {
-                const imc_dimm_view_t *view = &imc_view.dimm[mc][ch][dimm];
+                const imc_dimm_view_t *view = &views[dimm];
                 if (view->size_mb == 0) {
                     continue;
                 }
-                uint8_t slot = topology_slot(mc, ch, dimm);
+                uint8_t slot = topology_slot(layout, mc, ch, dimm);
+                if (any_dimm && views[dimm ^ 1].size_mb == 0
+                    && (slot >= MAX_SPD_SLOT || !spd_slot_cache[slot].isValid)) {
+                    slot = topology_slot(layout, mc, ch, dimm ^ 1);
+                }
                 if (slot >= MAX_SPD_SLOT || !spd_slot_cache[slot].isValid
                     || (view->ranks != 0 && view->ranks != spd_slot_cache[slot].ranks)
                     || (view->dev_width != 0 && view->dev_width != spd_slot_cache[slot].dev_width)) {
                     return DECODE_SPD_MISMATCH;
                 }
+                slot_map[mc][ch][dimm] = slot;
                 slot_size[slot] += view->size_mb;
                 total_mb += view->size_mb;
             }
@@ -106,6 +108,59 @@ static decode_state_t decode_check(void)
         return DECODE_SIZE_MISMATCH;
     }
     return DECODE_OK;
+}
+
+static decode_state_t decode_check(void)
+{
+    const spd_info *ref = NULL;
+    bool amd = (amd_df.status != AMD_DF_NO_SNAPSHOT);
+
+    if (!enable_dimm_decode) {
+        return DECODE_DISABLED;
+    }
+    if (amd_df.status == AMD_DF_BAD_REVISION) {
+        return DECODE_BAD_MAP;
+    }
+    if (amd_df.status == AMD_DF_BAD_TOPOLOGY) {
+        return DECODE_BAD_TOPOLOGY;
+    }
+    if (imc_view.n_mc == 0 || imc_view.n_mc > IMC_VIEW_MAX_MC || imc_view.n_ch > IMC_VIEW_MAX_CH) {
+        return DECODE_UNSUPPORTED;
+    }
+
+    // Intel: symmetric populations only. AMD describes each channel by its own maps.
+    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
+        const spd_info *spdi = &spd_slot_cache[slot];
+        if (!spdi->isValid) {
+            continue;
+        }
+        if (ref == NULL) {
+            ref = spdi;
+        }
+        if (!amd && (spdi->module_size != ref->module_size || spdi->ranks != ref->ranks
+                     || spdi->dev_width != ref->dev_width || spdi->bus_width != ref->bus_width)) {
+            return DECODE_ASYMMETRIC;
+        }
+    }
+    if (ref == NULL || ref->dev_width == 0) {
+        return DECODE_NO_SPD;
+    }
+
+    if (!amd) {
+        return check_view(slot_layout, false);
+    }
+
+    // The platform layout first, then the other channel order, then the other address rule. Boards with one DIMM
+    // per channel do not all follow them.
+    for (int try = 0; try < 8; try++) {
+        slot_layout_t layout = slot_layout ^ (try & 0x3);
+        decode_state_t state = check_view(layout, try >= 4);
+        if (state != DECODE_SPD_MISMATCH) {
+            slot_layout = layout;
+            return state;
+        }
+    }
+    return DECODE_SPD_MISMATCH;
 }
 
 // ---------------------
@@ -208,29 +263,52 @@ void memctrl_poll_ecc(void)
 
 void memctrl_decode_init(void)
 {
-    static const uint8_t slot_order[MAX_SPD_SLOT] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+    uint8_t slot_order[MAX_SPD_SLOT];
 
-    smbios_map_spd_slots(slot_order);
+    // AM4: SPD addresses go by DIMM position first (A1 0x50, B1 0x51, A2 0x52, B2 0x53).
+    slot_layout = (amd_df.client && !amd_df.ddr5) ? LAYOUT_DIMM_MAJOR : LAYOUT_CH_MAJOR;
+    if (amd_df.umc0_b) {
+        slot_layout |= LAYOUT_CH_SWAP;
+    }
 
     decode_state = decode_check();
+
+    // Firmware lists the memory sockets by channel, then DIMM: give the SPD slots in that order.
+    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
+        slot_order[slot] = slot;
+    }
+    if (slot_layout & LAYOUT_DIMM_MAJOR) {
+        slot_order[1] = 2;
+        slot_order[2] = 1;
+    }
+    smbios_map_spd_slots(slot_order);
 }
 
 bool memctrl_decode_addr(uint64_t pa, dram_loc_t *loc)
 {
-    if (decode_state != DECODE_OK || !intel_mad_decode(&intel_mad, pa, loc)) {
+    if (decode_state != DECODE_OK) {
         return false;
     }
-    loc->slot = topology_slot(loc->mc, loc->ch, loc->dimm);
-    if (loc->slot >= MAX_SPD_SLOT) {
+    if (amd_df.status == AMD_DF_OK ? !amd_df_decode(&amd_df, pa, loc) : !intel_mad_decode(&intel_mad, pa, loc)) {
         return false;
     }
-    loc->slot_mask = 1 << loc->slot;
+    if (loc->dimm == DRAM_DIMM_ANY) {
+        loc->slot      = slot_map[loc->mc][loc->ch][0];
+        loc->slot_mask = 1 << loc->slot | 1 << slot_map[loc->mc][loc->ch][1];
+    } else {
+        loc->slot      = slot_map[loc->mc][loc->ch][loc->dimm];
+        loc->slot_mask = 1 << loc->slot;
+    }
     return true;
 }
 
 const char *memctrl_decode_status(void)
 {
     switch (decode_state) {
+      case DECODE_BAD_MAP:
+        return "unsupported address map";
+      case DECODE_BAD_TOPOLOGY:
+        return "unsupported topology";
       case DECODE_DISABLED:
         return "disabled";
       case DECODE_NO_SPD:

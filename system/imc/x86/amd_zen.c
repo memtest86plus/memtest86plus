@@ -40,12 +40,156 @@
 #define ECC_RD_EN (1 << 10)
 #define ECC_WR_EN (1 << 0)
 
+// Data fabric (D18Fx), per-instance registers through the D18F4 indirect access
+#define AMD_DF_DEV                  0x18
+#define AMD_DF_FICAA_LEGACY         0x5C
+#define AMD_DF_FICAD_LEGACY         0x98
+#define AMD_DF_FICAA                0x8C
+#define AMD_DF_FICAD                0xB8
+#define AMD_DF_BROADCAST            0xFF
+#define AMD_DF_TYPE_CS              4           // coherent station: one per memory channel
+
+static bool df_legacy_access;
+
+// As Linux drivers/ras/amd/atl/access.c: register of one fabric block instance, or of all (broadcast).
+static uint32_t df_read(int instance, int func, int reg)
+{
+    uint32_t ficaa = (instance & 0xFF) << 16 | (func & 0x7) << 11 | (instance != AMD_DF_BROADCAST);
+
+    ficaa |= df_legacy_access ? (reg & 0x7FC) : (reg & 0xFFC) >> 1;
+
+    pci_config_write32(0, AMD_DF_DEV, 4, df_legacy_access ? AMD_DF_FICAA_LEGACY : AMD_DF_FICAA, ficaa);
+    return pci_config_read32(0, AMD_DF_DEV, 4, df_legacy_access ? AMD_DF_FICAD_LEGACY : AMD_DF_FICAD);
+}
+
+static bool df_client_family(void)
+{
+    switch (imc.family) {
+      case IMC_K17:
+        // Summit / Pinnacle Ridge, Raven Ridge / Picasso, Renoir, Matisse. Not Rome / Castle Peak.
+        return cpuid_info.version.extendedModel <= 1 || cpuid_info.version.extendedModel == 6
+            || cpuid_info.version.extendedModel == 7;
+      case IMC_K19_VRM:
+      case IMC_K19_CZN:
+      case IMC_K19_RPL:
+      case IMC_K19_PHX:
+      case IMC_K1A_GRG:
+        return true;
+      default:
+        return false;
+    }
+}
+
+// Register snapshot for the DIMM decoder (AM4 / AM5: one fabric node, two memory channels, four on Phoenix).
+static void get_df_snapshot(void)
+{
+    uint32_t family = cpuid_info.version.family + cpuid_info.version.extendedFamily;
+    uint32_t model  = cpuid_info.version.extendedModel << 4 | cpuid_info.version.model;
+
+    if (!df_client_family() || pci_config_read16(0, AMD_DF_DEV, 0, 0x00) != 0x1022) {
+        return;
+    }
+    if (pci_config_read16(0, AMD_DF_DEV + 1, 0, 0x00) == 0x1022) {
+        amd_df.status = AMD_DF_BAD_TOPOLOGY;
+        return;
+    }
+    amd_df.client = true;
+    amd_df.ddr5   = (imc.family >= IMC_K19_RPL);        // DDR5 register layout (Linux amd64_edac zn_regs_v2)
+    // AM4 processors without graphics have UMC0 on channel B (Summit / Pinnacle Ridge, Matisse, Vermeer). The AM4
+    // APUs have it on channel A.
+    amd_df.umc0_b = (imc.family == IMC_K19_VRM)
+                 || (imc.family == IMC_K17 && (cpuid_info.version.extendedModel == 0
+                                               || cpuid_info.version.extendedModel == 7));
+    if (!enable_dimm_decode) {
+        return;
+    }
+
+    // Linux check_for_legacy_df_access()
+    df_legacy_access = family < 0x19 || (family == 0x19 && (model < 0x10 || (model >= 0x20 && model < 0x60)));
+
+    // D18F0x40: the revision fields read as zero before DF4, where the fabric ID masks tell the revision.
+    uint32_t reg = df_read(AMD_DF_BROADCAST, 0, 0x40);
+    uint32_t major = (reg >> 24) & 0xF;
+    uint32_t minor = (reg >> 16) & 0xFF;
+    if (major == 0) {
+        if (df_read(AMD_DF_BROADCAST, 1, 0x150) & 0xFFFF) {
+            amd_df.rev = AMD_DF3P5;
+        } else if (df_read(AMD_DF_BROADCAST, 1, 0x208) & 0x3FF) {
+            amd_df.rev = AMD_DF3;
+        } else {
+            amd_df.rev = AMD_DF2;
+        }
+    } else if (major == 4 && minor <= 2) {
+        amd_df.rev = (minor == 2) ? AMD_DF4P2 : AMD_DF4;
+    } else {
+        amd_df.status = AMD_DF_BAD_REVISION;
+        return;
+    }
+
+    // The memory channels are the first fabric instances (= UMC number): two, and no more on a client part.
+    // DF 4.2 (Phoenix) has four: one for each half of a DIMM.
+    amd_df.split_ch = (amd_df.rev == AMD_DF4P2);
+    amd_df.n_ch     = amd_df.split_ch ? 4 : 2;
+    for (int i = 0; i <= amd_df.n_ch; i++) {
+        if (((df_read(i, 0, 0x44) & 0xF) == AMD_DF_TYPE_CS) != (i < amd_df.n_ch)) {
+            amd_df.status = AMD_DF_BAD_TOPOLOGY;
+            return;
+        }
+    }
+
+    bool df4 = (amd_df.rev >= AMD_DF4);
+    int map_reg = (amd_df.rev == AMD_DF4P2) ? 0x200 : 0xE00;
+    amd_df.hole_base = df_read(AMD_DF_BROADCAST, df4 ? 7 : 0, 0x104) & 0xFF000000;
+
+    for (int ch = 0; ch < amd_df.n_ch; ch++) {
+        amd_df.fabric_id[ch] = (df_read(ch, 0, 0x50) >> 8) & 0xFFF;
+
+        for (int m = 0; m < (df4 ? AMD_DF_MAX_MAP : 2); m++) {
+            amd_df_map_t *map = &amd_df.map[ch][m];
+            if (df4) {
+                map->base   = df_read(ch, 7, map_reg + 0x0 + 16 * m);
+                map->limit  = df_read(ch, 7, map_reg + 0x4 + 16 * m);
+                map->ctl    = df_read(ch, 7, map_reg + 0x8 + 16 * m);
+                map->intlv  = df_read(ch, 7, map_reg + 0xC + 16 * m);
+                map->offset = (m > 0) ? df_read(ch, 7, 0x140 + 4 * (m - 1)) : 0;
+            } else {
+                map->base   = df_read(ch, 0, 0x110 + 8 * m);
+                map->limit  = df_read(ch, 0, 0x114 + 8 * m);
+                map->ctl    = (amd_df.rev != AMD_DF2) ? df_read(ch, 0, 0x3F8) : 0;
+                map->offset = (m > 0) ? df_read(ch, 0, 0x1B4 + 4 * (m - 1)) : 0;
+            }
+        }
+
+        // UMC chip selects (offsets as Linux amd64_edac.h; chip select hash as illumos umc.h)
+        uint32_t umc_base = AMD_SMN_UMC_BAR + ch * AMD_SMN_UMC_CHB_OFFSET;
+        amd_umc_snap_t *umc = &amd_df.umc[ch];
+        for (int cs = 0; cs < AMD_UMC_MAX_CS; cs++) {
+            int mask_idx = amd_df.ddr5 ? cs : cs / 2;
+            umc->base[cs]     = amd_smn_read(umc_base + 0x00 + 4 * cs);
+            umc->base_sec[cs] = amd_smn_read(umc_base + 0x10 + 4 * cs);
+            umc->mask[cs]     = amd_smn_read(umc_base + 0x20 + 4 * mask_idx);
+            umc->mask_sec[cs] = amd_smn_read(umc_base + (amd_df.ddr5 ? 0x30 : 0x28) + 4 * mask_idx);
+            umc->addr_cfg[cs] = amd_df.ddr5 ? amd_smn_read(umc_base + 0x40 + 4 * cs) : 0;
+        }
+        for (int i = 0; i < 2; i++) {
+            umc->hash_cs[i] = amd_smn_read(umc_base + (amd_df.ddr5 ? 0xC8 : 0xE8) + 4 * i);
+        }
+    }
+
+    amd_df.status = AMD_DF_OK;
+    if (!amd_df_view(&amd_df, &imc_view)) {
+        amd_df.status = AMD_DF_BAD_TOPOLOGY;
+    }
+}
+
 void get_imc_config_amd_zen(void)
 {
     uint32_t smn_reg, offset;
     uint32_t reg_cha, reg_chb;
 
     imc.tCL_dec = 0;
+
+    get_df_snapshot();
 
     // Get Memory Mapped Register Base Address (Enable MMIO if needed)
     reg_cha = amd_smn_read(AMD_SMN_UMC_DRAM_CONFIG) & 0x7F;
