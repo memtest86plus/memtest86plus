@@ -30,7 +30,6 @@ typedef enum {
     DECODE_BAD_TOPOLOGY,
     DECODE_DISABLED,
     DECODE_NO_SPD,
-    DECODE_ASYMMETRIC,
     DECODE_SPD_MISMATCH,
     DECODE_SIZE_MISMATCH,
     DECODE_OK
@@ -128,18 +127,9 @@ static decode_state_t decode_check(void)
         return DECODE_UNSUPPORTED;
     }
 
-    // Intel: symmetric populations only. AMD describes each channel by its own maps.
-    for (int slot = 0; slot < MAX_SPD_SLOT; slot++) {
-        const spd_info *spdi = &spd_slot_cache[slot];
-        if (!spdi->isValid) {
-            continue;
-        }
-        if (ref == NULL) {
-            ref = spdi;
-        }
-        if (!amd && (spdi->module_size != ref->module_size || spdi->ranks != ref->ranks
-                     || spdi->dev_width != ref->dev_width || spdi->bus_width != ref->bus_width)) {
-            return DECODE_ASYMMETRIC;
+    for (int slot = 0; ref == NULL && slot < MAX_SPD_SLOT; slot++) {
+        if (spd_slot_cache[slot].isValid) {
+            ref = &spd_slot_cache[slot];
         }
     }
     if (ref == NULL || ref->dev_width == 0) {
@@ -313,8 +303,6 @@ const char *memctrl_decode_status(void)
         return "disabled";
       case DECODE_NO_SPD:
         return "no SPD data";
-      case DECODE_ASYMMETRIC:
-        return "asymmetric DIMMs";
       case DECODE_SPD_MISMATCH:
         return "IMC/SPD mismatch";
       case DECODE_SIZE_MISMATCH:

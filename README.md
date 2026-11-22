@@ -537,8 +537,8 @@ Errors are attributed to a module when a single module is installed, or when
 the memory controller configuration can be decoded and matches the SPD data
 of the modules. This is currently the case on:
 
-  * Intel 6th to 11th generation Core desktop processors, with identical
-    DDR3 or DDR4 modules
+  * Intel 6th to 11th generation Core desktop processors, with DDR3 or DDR4
+    modules
   * AMD Ryzen processors on AM4 and AM5 motherboards (Zen to Zen 5, except
     the Ryzen 3 8300G and Ryzen 5 8500G), with up to two modules per channel
 
