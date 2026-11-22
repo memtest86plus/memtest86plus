@@ -221,7 +221,11 @@ bool memctrl_decode_addr(uint64_t pa, dram_loc_t *loc)
         return false;
     }
     loc->slot = topology_slot(loc->mc, loc->ch, loc->dimm);
-    return loc->slot < MAX_SPD_SLOT;
+    if (loc->slot >= MAX_SPD_SLOT) {
+        return false;
+    }
+    loc->slot_mask = 1 << loc->slot;
+    return true;
 }
 
 const char *memctrl_decode_status(void)

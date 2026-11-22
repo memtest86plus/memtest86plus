@@ -527,6 +527,8 @@ a key press, and can be shown at any time with the F2 key.
 
   * a module the errors were attributed to is drawn in red, with its error
     count
+  * when the errors are known to be in one of the two modules of a memory
+    channel, both are drawn in amber, as suspects
   * when no error could be attributed to a module, all the modules are drawn
     in amber, as suspects
   * the other modules are drawn in green, and empty slots as an outline

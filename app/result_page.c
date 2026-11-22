@@ -62,6 +62,7 @@ typedef struct {
     int8_t          spd;                    // spd_slot_cache[] index, -1 = none
     slot_state_t    state;
     uint64_t        errors;
+    uint64_t        suspect;                // errors in this module or the other one of its channel
 } slot_t;
 
 //------------------------------------------------------------------------------
@@ -79,6 +80,7 @@ static slot_t       slots[MAX_SLOTS];
 static int          num_slots;
 
 static uint64_t     attributed;
+static uint64_t     ambiguous;
 static uint64_t     unattributed;
 
 static int          mod_x, mod_y;
@@ -262,10 +264,13 @@ static void build_model(void)
         num_spd++;
         int dmi = smbios_spd_slot_dmi(spd);
         if (dmi_num_slots == 0) {
-            slots[num_slots++] = (slot_t){ .dmi = -1, .spd = spd, .errors = dimm_err_slot_errors(spd) };
-        } else if (dmi >= 0) {
-            slots[dmi].spd = spd;
-            slots[dmi].errors = dimm_err_slot_errors(spd);
+            dmi = num_slots++;
+            slots[dmi] = (slot_t){ .dmi = -1 };
+        }
+        if (dmi >= 0) {
+            slots[dmi].spd     = spd;
+            slots[dmi].errors  = dimm_err_slot_errors(spd);
+            slots[dmi].suspect = dimm_err_slot_suspect(spd);
         }
     }
     for (int i = 0; i < num_slots; i++) {
@@ -283,7 +288,8 @@ static void build_model(void)
     for (int i = 0; i < num_slots; i++) {
         attributed += slots[i].errors;
     }
-    unattributed = (error_count > attributed) ? error_count - attributed : 0;
+    ambiguous    = dimm_err_ambiguous();
+    unattributed = (error_count > attributed + ambiguous) ? error_count - attributed - ambiguous : 0;
 
     for (int i = 0; i < num_slots; i++) {
         slot_t *slot = &slots[i];
@@ -291,8 +297,10 @@ static void build_model(void)
             slot->state = SLOT_EMPTY;
         } else if (slot->errors > 0) {
             slot->state = SLOT_FAIL;
+        } else if (slot->suspect > 0) {
+            slot->state = SLOT_SUSPECT;
         } else {
-            slot->state = (attributed == 0 && error_count > 0) ? SLOT_SUSPECT : SLOT_OK;
+            slot->state = (attributed + ambiguous == 0 && error_count > 0) ? SLOT_SUSPECT : SLOT_OK;
         }
     }
 }
@@ -433,13 +441,18 @@ static void draw(void)
     draw_text(cx, y, fb.width, scale, TEXT_GREY, text, false);
     y += line + line / 2;
 
-    if (unattributed > 0) {
-        if (attributed == 0) {
-            len = append_str(text, 0, "Errors not attributed to a module (DIMM decoder: ");
-            len = append_str(text, append_str(text, len, memctrl_decode_status()), ")");
-        } else {
-            len = append_str(text, append_count(text, 0, unattributed, " more error"), " not attributed to a module");
-        }
+    len = 0;
+    if (ambiguous > 0) {
+        len = append_str(text, append_count(text, 0, ambiguous, " error"), " in one of the amber modules");
+    }
+    if (unattributed > 0 && attributed + ambiguous == 0) {
+        len = append_str(text, 0, "Errors not attributed to a module (DIMM decoder: ");
+        len = append_str(text, append_str(text, len, memctrl_decode_status()), ")");
+    } else if (unattributed > 0) {
+        len = append_count(text, append_str(text, len, (len > 0) ? ", " : ""), unattributed, " more error");
+        len = append_str(text, len, " not attributed to a module");
+    }
+    if (len > 0) {
         draw_text(cx, y, fb.width, scale, TEXT_SUSPECT, text, false);
     }
     y += line + line / 2;

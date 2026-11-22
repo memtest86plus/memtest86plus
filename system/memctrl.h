@@ -44,11 +44,14 @@ typedef struct __attribute__((packed)) ecc_status {
  * Location of a physical address in the DRAM topology (DIMM decoder).
  */
 
+#define DRAM_DIMM_ANY   0xFF    // the channel is known, the DIMM within it is not
+
 typedef struct {
     uint8_t     mc;         // memory controller
     uint8_t     ch;         // channel within MC
-    uint8_t     dimm;       // DIMM within channel
-    uint8_t     slot;       // spd_slot_cache[] index
+    uint8_t     dimm;       // DIMM within channel, or DRAM_DIMM_ANY
+    uint8_t     slot;       // spd_slot_cache[] index (first candidate)
+    uint8_t     slot_mask;  // candidate spd_slot_cache[] indexes, one bit set when the DIMM is known
 } dram_loc_t;
 
 /**

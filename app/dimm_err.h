@@ -30,4 +30,16 @@ void dimm_err_insert(uint64_t pa);
  */
 uint64_t dimm_err_slot_errors(int slot);
 
+/**
+ * Returns the number of errors known to be in this SPD slot or in the other
+ * module of its channel.
+ */
+uint64_t dimm_err_slot_suspect(int slot);
+
+/**
+ * Returns the number of errors attributed to a pair of modules rather than
+ * to one.
+ */
+uint64_t dimm_err_ambiguous(void);
+
 #endif // DIMM_ERR_H
