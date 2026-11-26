@@ -68,7 +68,7 @@ To clean the directory, type `./debug_memtest.sh -c`
 
 ###	Detection of Image Base 
 
-To assign the correct address for all debugging symbols, it is neccessary to add an offset to the values in memtest.debug (the file containing the debug symbols). This offset consists of the IMAGE_BASE and the BASE_OF_CODE.  
+To assign the correct address for all debugging symbols, it is necessary to add an offset to the values in memtest.debug (the file containing the debug symbols). This offset consists of the IMAGE_BASE and the BASE_OF_CODE.  
 Both values are defined in `memtest86plus/boot/header.S` 
 
 * IMMUTABILITY OF ALL CONDITIONS
@@ -82,7 +82,7 @@ if there is a chance, that these values WILL change during the development phase
 * EXPECTED ERRATIC BEHAVIOUR OF QEMU
 
 If it is expected that mt86plus.efi is NOT always loaded at the same address, it is inevitable to determine the actual loading address first. This approach comprises a DEBUG-build of OVMF.fd (which requires the cloning of the whole edk2-repository and manually build OVMF.fd). With this DEBUG-version of OVMF.fd it is possible to write the loading addresses of all modules into a debug.log.
-This proceeding has been tested successfully but is actually not implemented in one of the srcipts.
+This proceeding has been tested successfully but is actually not implemented in one of the scripts.
 
 ###	Handle relocation of memtest
 
@@ -90,7 +90,7 @@ memtest86plus relocates itself during the test procedures. As the script loads t
 
 * IGNORE RELOCATION
 
-Just ignore the fact that at a part of the time the symbols are not recognized by gdb as gdb has no information about the symbols, when memtest86plus has been relocated. It is still possible to debug the code since memtest86plus jumps sooner or later back to the original position and all precedures which are executed at one location are also executed at the other position.
+Just ignore the fact that at a part of the time the symbols are not recognized by gdb as gdb has no information about the symbols, when memtest86plus has been relocated. It is still possible to debug the code since memtest86plus jumps sooner or later back to the original position and all procedures which are executed at one location are also executed at the other position.
 BUT: If a bug is position-dependent (i.e. it occurs only at the relocated position), you are not able to debug it.
 
 * DISABLE RELOCATION
